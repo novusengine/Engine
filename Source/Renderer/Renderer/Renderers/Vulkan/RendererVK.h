@@ -34,6 +34,7 @@ namespace Renderer
         void InitWindow(Window* window) override;
         void Deinit() override;
 
+        void SetShaderSourceDirectory(const std::string& path) override;
         void ReloadShaders(bool forceRecompileAll) override;
         void ClearUploadBuffers() override;
 

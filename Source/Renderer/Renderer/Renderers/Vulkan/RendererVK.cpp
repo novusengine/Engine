@@ -82,6 +82,11 @@ namespace Renderer
         delete(_semaphoreHandler);
     }
 
+    void RendererVK::SetShaderSourceDirectory(const std::string& path)
+    {
+        _shaderHandler->SetShaderSourceDirectory(path);
+    }
+
     void RendererVK::ReloadShaders(bool forceRecompileAll)
     {
         // Make sure the device is not rendering

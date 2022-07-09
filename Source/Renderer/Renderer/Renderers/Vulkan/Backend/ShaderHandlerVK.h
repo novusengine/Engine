@@ -60,6 +60,7 @@ namespace Renderer
 
         public:
             void Init(RenderDeviceVK* device);
+            void SetShaderSourceDirectory(const std::string& path);
             void ReloadShaders(bool forceRecompileAll);
 
             VertexShaderID LoadShader(const VertexShaderDesc& desc);

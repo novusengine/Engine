@@ -11,7 +11,6 @@
 #include <filesystem>
 #include <fstream>
 
-
 namespace Renderer
 {
     namespace Backend
@@ -42,10 +41,15 @@ namespace Renderer
                 DebugHandler::Print("Skipped loading shadercache due to debugSkipCache being true");
             }
 
-            _shaderCompiler->SetSourceDirPath(SHADER_SOURCE_DIR);
+            //_shaderCompiler->SetSourceDirPath(SHADER_SOURCE_DIR);
             _shaderCompiler->SetBinDirPath("Data/shaders");
             _shaderCompiler->SetShaderCache(_shaderCache);
             _shaderCompiler->SetShouldForceCompile(true); // ShaderHandler will only request compilation of files we want to compile, this might include force compiling something that is up to date.
+        }
+
+        void ShaderHandlerVK::SetShaderSourceDirectory(const std::string& path)
+        {
+            _shaderCompiler->SetSourceDirPath(path);
         }
 
         void ShaderHandlerVK::ReloadShaders(bool forceRecompileAll)
@@ -156,7 +160,7 @@ namespace Renderer
 
         bool ShaderHandlerVK::NeedsCompile(const std::string& shaderPath)
         {
-            std::filesystem::path sourcePath = std::filesystem::path(SHADER_SOURCE_DIR) / shaderPath;
+            std::filesystem::path sourcePath = _shaderCompiler->GetSourceDirPath() / shaderPath;
             sourcePath = std::filesystem::absolute(sourcePath.make_preferred());
 
             if (!std::filesystem::exists(sourcePath))
@@ -181,7 +185,7 @@ namespace Renderer
 
         bool ShaderHandlerVK::CompileShader(const std::string& shaderPath)
         {
-            std::filesystem::path shaderAbsolutePath = std::filesystem::path(SHADER_SOURCE_DIR) / shaderPath;
+            std::filesystem::path shaderAbsolutePath = _shaderCompiler->GetSourceDirPath() / shaderPath;
             shaderAbsolutePath = std::filesystem::absolute(shaderAbsolutePath.make_preferred());
 
             _shaderCompiler->Start();
