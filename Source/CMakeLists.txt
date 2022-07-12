@@ -6,6 +6,10 @@ if(NOT TARGET fileformat)
     add_subdirectory(FileFormat)
 endif()
 
+if(NOT TARGET input)
+    add_subdirectory(Input)
+endif()
+
 if(NOT TARGET network)
     add_subdirectory(Network)
 endif()

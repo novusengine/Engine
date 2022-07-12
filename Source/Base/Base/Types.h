@@ -37,4 +37,12 @@ using uvec4 = glm::uvec4;
 using hvec4 = glm::vec<4, f16>;
 using mat3x3 = glm::mat3x3;
 using mat4x4 = glm::mat4x4;
-using quaternion = glm::quat;
+using quat = glm::quat;
+
+template<class T> constexpr T operator~ (T a) { return (T)~(i32)a; }
+template<class T> constexpr T operator| (T a, T b) { return (T)((i32)a | (i32)b); }
+template<class T> constexpr T operator& (T a, T b) { return (T)((i32)a & (i32)b); }
+template<class T> constexpr T operator^ (T a, T b) { return (T)((i32)a ^ (i32)b); }
+template<class T> constexpr T& operator|= (T& a, T b) { return (T&)((i32&)a |= (i32)b); }
+template<class T> constexpr T& operator&= (T& a, T b) { return (T&)((i32&)a &= (i32)b); }
+template<class T> constexpr T& operator^= (T& a, T b) { return (T&)((i32&)a ^= (i32)b); }

@@ -16,8 +16,8 @@ public:
     SafeVector() { }
     SafeVector(SafeVector& other)
     {
-        std::unique_lock lock(_mutex);
-        std::unique_lock otherLock(other._mutex);
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        std::unique_lock<std::shared_mutex> otherLock(other._mutex);
 
         size_t newSize = other._vector.size();
         _vector.resize(newSize);
@@ -27,7 +27,7 @@ public:
 
     void ReadLock(const std::function<void(const std::vector<T>&)> callback) const
     {
-        std::shared_lock lock(_mutex);
+        std::shared_lock<std::shared_mutex> lock(_mutex);
         callback(_vector);
     }
 
@@ -39,7 +39,7 @@ public:
 
     const T ReadGet(size_t index) const
     {
-        std::shared_lock lock(_mutex);
+        std::shared_lock<std::shared_mutex> lock(_mutex);
         return _vector[index];
     }
 
@@ -48,43 +48,43 @@ public:
     // can occur while you're using the ref.
     const T& ReadGetUnsafe(size_t index) const
     {
-        std::shared_lock lock(_mutex);
+        std::shared_lock<std::shared_mutex> lock(_mutex);
         return _vector[index];
     }
 
     size_t Size() const
     {
-        std::shared_lock lock(_mutex);
+        std::shared_lock<std::shared_mutex> lock(_mutex);
         return _vector.size();
     }
 
     void Resize(size_t newSize)
     {
-        std::unique_lock lock(_mutex);
+        std::unique_lock<std::shared_mutex> lock(_mutex);
         _vector.resize(newSize);
     }
 
     void Reserve(size_t reserveSize)
     {
-        std::unique_lock lock(_mutex);
+        std::unique_lock<std::shared_mutex> lock(_mutex);
         _vector.reserve(reserveSize);
     }
 
     void Clear()
     {
-        std::unique_lock lock(_mutex);
+        std::unique_lock<std::shared_mutex> lock(_mutex);
         _vector.clear();
     }
 
     void PushBack(T& obj)
     {
-        std::unique_lock lock(_mutex);
+        std::unique_lock<std::shared_mutex> lock(_mutex);
         _vector.push_back(obj);
     }
 
     void PushBack(const T& obj)
     {
-        std::unique_lock lock(_mutex);
+        std::unique_lock<std::shared_mutex> lock(_mutex);
         _vector.push_back(obj);
     }
 

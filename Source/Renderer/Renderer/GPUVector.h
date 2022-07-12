@@ -4,9 +4,12 @@
 #include "CommandList.h"
 #include "Descriptors/BufferDesc.h"
 
-#include <Base/Util/SafeVector.h>
+#include <Base/Platform.h>
+#include <Base/Container/SafeVector.h>
 #include <Base/Util/DebugHandler.h>
 #include <Base/Memory/BufferRangeAllocator.h>
+
+#include <shared_mutex>
 
 namespace Renderer
 {
@@ -49,9 +52,9 @@ namespace Renderer
         // Returns true if we had to resize the buffer
         bool SyncToGPU(Renderer* renderer)
         {
-            std::unique_lock lock(_mutex);
+            std::unique_lock<std::shared_mutex> lock(SafeVector<T>::_mutex);
 
-            size_t vectorByteSize = _vector.size() * sizeof(T);
+            size_t vectorByteSize = SafeVector<T>::_vector.size() * sizeof(T);
 
             if (!_initialized)
             {
@@ -114,7 +117,7 @@ namespace Renderer
 #endif
 
             // Upload everything between allocatedBytes and allocatedBytes+bytesToAllocate
-            renderer->UploadToBuffer(_buffer, allocatedBytes, _vector.data(), allocatedBytes, bytesToAllocate);
+            renderer->UploadToBuffer(_buffer, allocatedBytes, SafeVector<T>::_vector.data(), allocatedBytes, bytesToAllocate);
 
             UpdateDirtyRegions(renderer);
 
@@ -124,9 +127,9 @@ namespace Renderer
         // Returns true if we had to resize the buffer
         bool ForceSyncToGPU(Renderer* renderer)
         {
-            std::unique_lock lock(_mutex);
+            std::unique_lock<std::shared_mutex> lock(SafeVector<T>::_mutex);
 
-            size_t vectorByteSize = _vector.size() * sizeof(T);
+            size_t vectorByteSize = SafeVector<T>::_vector.size() * sizeof(T);
 
             if (vectorByteSize == 0) // Not sure about this
                 return false;
@@ -162,7 +165,7 @@ namespace Renderer
             }
 
             // Then upload the whole buffer
-            renderer->UploadToBuffer(_buffer, 0, _vector.data(), 0, vectorByteSize);
+            renderer->UploadToBuffer(_buffer, 0, SafeVector<T>::_vector.data(), 0, vectorByteSize);
 
             return didResize;
         }
@@ -180,8 +183,8 @@ namespace Renderer
         // This shadows Clear() in SafeVector
         void Clear(bool shouldSync = true)
         {
-            std::unique_lock lock(_mutex);
-            _vector.clear();
+            std::unique_lock<std::shared_mutex> lock(SafeVector<T>::_mutex);
+            SafeVector<T>::_vector.clear();
 
             if (shouldSync && _renderer != nullptr && _buffer != BufferID::Invalid())
             {
@@ -290,7 +293,7 @@ namespace Renderer
                 // Upload for all remaining dirtyRegions
                 for (const DirtyRegion& dirtyRegion : dirtyRegions)
                 {
-                    renderer->UploadToBuffer(_buffer, dirtyRegion.offset, _vector.data(), dirtyRegion.offset, dirtyRegion.size);
+                    renderer->UploadToBuffer(_buffer, dirtyRegion.offset, SafeVector<T>::_vector.data(), dirtyRegion.offset, dirtyRegion.size);
                 }
 
                 dirtyRegions.clear();

@@ -23,6 +23,7 @@ add_library(glm::glm ALIAS glm)
 target_include_directories(glm INTERFACE
     "${CMAKE_CURRENT_LIST_DIR}/glm"
 )
+target_compile_definitions(glm INTERFACE GLM_FORCE_LEFT_HANDED GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 add_subdirectory(glfw)
 add_subdirectory(gli)
