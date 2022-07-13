@@ -33,8 +33,8 @@
 #endif
 
 #ifdef WIN32
-#define NOVUS_NO_PADDING_START __pragma(pack(push, 1))
-#define NOVUS_NO_PADDING_END __pragma(pack(pop))
+#define PRAGMA_NO_PADDING_START __pragma(pack(push, 1))
+#define PRAGMA_NO_PADDING_END __pragma(pack(pop))
 #else
-    static_assert(false, "Implement these for whatever platform you are porting to!");
+    static_assert(false, "Please add PRAGMA_NO_PADDING_START/PRAGMA_NO_PADDING_END implementation for whatever compiler you are porting to");
 #endif

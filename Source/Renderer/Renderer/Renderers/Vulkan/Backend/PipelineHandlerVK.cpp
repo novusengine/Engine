@@ -15,7 +15,7 @@ namespace Renderer
 {
     namespace Backend
     {
-NOVUS_NO_PADDING_START;
+        PRAGMA_NO_PADDING_START;
         struct GraphicsPipelineCacheDesc
         {
             GraphicsPipelineDesc::States states;
@@ -23,7 +23,7 @@ NOVUS_NO_PADDING_START;
             ImageID renderTargets[MAX_RENDER_TARGETS] = { ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid() };
             DepthImageID depthStencil = DepthImageID::Invalid();
         };
-NOVUS_NO_PADDING_END;
+        PRAGMA_NO_PADDING_END;
 
         struct GraphicsPipeline
         {

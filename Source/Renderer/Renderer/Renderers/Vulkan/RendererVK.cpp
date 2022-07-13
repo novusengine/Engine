@@ -1284,6 +1284,13 @@ namespace Renderer
             bufferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             break;
 
+        case PipelineBarrierType::ComputeWriteToIndexBuffer:
+            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            dstStageMask = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            bufferBarrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT;
+            break;
+
         case PipelineBarrierType::AllCommands:
             srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
             dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;

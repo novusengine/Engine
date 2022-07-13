@@ -31,6 +31,11 @@ namespace tracy
 
 namespace Renderer
 {
+    inline u32 GetDispatchCount(u32 num, u32 threadGroupSize)
+    {
+        return (num + (threadGroupSize - 1)) / threadGroupSize;
+    }
+
     class DescriptorSet;
     class CommandList;
 

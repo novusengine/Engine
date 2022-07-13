@@ -2,15 +2,13 @@
 #include "SharedPool.h"
 #include "Base/Types.h"
 
-//#include <entity/fwd.hpp>
-
 #include <cassert>
 #include <cstring>
 
 class Bytebuffer
 {
 public:
-    Bytebuffer(u8* inData = nullptr, size_t inSize = 128)
+    Bytebuffer(void* inData = nullptr, size_t inSize = 128)
     {
         if (inData == nullptr)
         {
@@ -19,7 +17,7 @@ public:
         }
         else
         {
-            _data = inData;
+            _data = reinterpret_cast<u8*>(inData);
         }
 
         size = inSize;
@@ -82,7 +80,7 @@ public:
         readData += readSize;
         return true;
     }
-    inline bool GetBytes(u8* dest, size_t size)
+    inline bool GetBytes(void* dest, size_t size)
     {
         assert(_data != nullptr);
 
@@ -96,7 +94,7 @@ public:
         readData += size;
         return true;
     }
-    inline bool GetBytes(u8* dest, size_t size, size_t offset)
+    inline bool GetBytes(void* dest, size_t size, size_t offset)
     {
         assert(_data != nullptr);
 
@@ -292,54 +290,6 @@ public:
 
         return true;
     }
-    //inline bool GetEnttId(entt::entity& entity)
-    //{
-    //    if constexpr (sizeof(entt::entity) == 4)
-    //    {
-    //        return GetU32(reinterpret_cast<u32&>(entity));
-    //    }
-    //    else if constexpr (sizeof(entt::entity) == 8)
-    //    {
-    //        return GetU64(reinterpret_cast<u64&>(entity));
-    //    }
-    //    else
-    //    {
-    //        assert(false);
-    //        return false;
-    //    }
-    //}
-    //inline bool GetEnttId(u32& val)
-    //{
-    //    if constexpr (sizeof(entt::entity) == 4)
-    //    {
-    //        return GetU32(reinterpret_cast<u32&>(val));
-    //    }
-    //    else if constexpr (sizeof(entt::entity) == 8)
-    //    {
-    //        return GetU64(reinterpret_cast<u64&>(val));
-    //    }
-    //    else
-    //    {
-    //        assert(false);
-    //        return false;
-    //    }
-    //}
-    //inline bool GetEnttId(u64& val)
-    //{
-    //    if constexpr (sizeof(entt::entity) == 4)
-    //    {
-    //        return GetU32(reinterpret_cast<u32&>(val));
-    //    }
-    //    else if constexpr (sizeof(entt::entity) == 8)
-    //    {
-    //        return GetU64(reinterpret_cast<u64&>(val));
-    //    }
-    //    else
-    //    {
-    //        assert(false);
-    //        return false;
-    //    }
-    //}
 
     template <typename T>
     inline bool Put(T val)
@@ -390,7 +340,7 @@ public:
         writtenData += writeSize;
         return true;
     }
-    inline bool PutBytes(const u8* val, size_t size)
+    inline bool PutBytes(const void* val, size_t size)
     {
         assert(_data != nullptr);
 
@@ -497,54 +447,6 @@ public:
         writtenData += writeSize;
         return true;
     }
-    //inline bool PutEnttId(entt::entity entity)
-    //{
-    //    if constexpr (sizeof(entt::entity) == 4)
-    //    {
-    //        return PutU32(static_cast<u32>(entity));
-    //    }
-    //    else if constexpr (sizeof(entt::entity) == 8)
-    //    {
-    //        return PutU64(static_cast<u64>(entity));
-    //    }
-    //    else
-    //    {
-    //        assert(false);
-    //        return false;
-    //    }
-    //}
-    //inline bool PutEnttId(u32 val)
-    //{
-    //    if constexpr (sizeof(entt::entity) == 4)
-    //    {
-    //        return PutU32(val);
-    //    }
-    //    else if constexpr (sizeof(entt::entity) == 8)
-    //    {
-    //        return PutU64(static_cast<u64>(val));
-    //    }
-    //    else
-    //    {
-    //        assert(false);
-    //        return false;
-    //    }
-    //}
-    //inline bool PutEnttId(u64 val)
-    //{
-    //    if constexpr (sizeof(entt::entity) == 4)
-    //    {
-    //        return PutU32(static_cast<u32>(val));
-    //    }
-    //    else if constexpr (sizeof(entt::entity) == 8)
-    //    {
-    //        return PutU64(val);
-    //    }
-    //    else
-    //    {
-    //        assert(false);
-    //        return false;
-    //    }
-    //}
     inline size_t PutString(const std::string_view val)
     {
         assert(_data != nullptr);
