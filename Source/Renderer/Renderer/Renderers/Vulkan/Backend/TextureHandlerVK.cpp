@@ -44,9 +44,11 @@ namespace Renderer
             i32 height;
             i32 layers;
             i32 mipLevels;
+            i32 numGeneratedMipLevels = 0;
 
             VkFormat format;
-            size_t fileSize;
+            size_t uploadSize;
+            size_t totalSize; // Including any possibly generated mips
 
             VmaAllocation allocation;
             VkImage image;
@@ -357,7 +359,8 @@ namespace Renderer
             texture->layers = desc.layers;
             texture->mipLevels = 1;
             texture->format = FormatConverterVK::ToVkFormat(desc.format);
-            texture->fileSize = Math::RoofToInt(static_cast<f64>(texture->width) * static_cast<f64>(texture->height) * static_cast<f64>(texture->layers) * FormatTexelSize(texture->format));
+            texture->uploadSize = Math::RoofToInt(static_cast<f64>(texture->width) * static_cast<f64>(texture->height) * static_cast<f64>(texture->layers) * FormatTexelSize(texture->format));
+            texture->totalSize = texture->uploadSize;
 
             TextureID textureID = TextureID(static_cast<TextureID::type>(nextHandle));
 
@@ -365,10 +368,10 @@ namespace Renderer
             CreateTexture(*texture);
 
             // Create upload buffer
-            auto uploadBuffer = _uploadBufferHandler->CreateUploadBuffer(textureID, 0, texture->fileSize);
+            auto uploadBuffer = _uploadBufferHandler->CreateUploadBuffer(textureID, 0, texture->uploadSize);
 
             // Copy data to upload buffer
-            memcpy(uploadBuffer->mappedMemory, desc.data, texture->fileSize);
+            memcpy(uploadBuffer->mappedMemory, desc.data, texture->uploadSize);
 
             return textureID;
         }
@@ -421,8 +424,10 @@ namespace Renderer
                     VkImageLayout beforeLayout = (texture.layoutUndefined) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                     _device->TransitionImageLayout(commandBuffer, texture.image, VK_IMAGE_ASPECT_COLOR_BIT, beforeLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.layers, texture.mipLevels);
 
+                    u32 numMipsToCopy = texture.mipLevels - texture.numGeneratedMipLevels;
+
                     // Do the copy
-                    _device->CopyBufferToImage(commandBuffer, srcBuffer, srcOffset, texture.image, texture.format, static_cast<u32>(texture.width), static_cast<u32>(texture.height), texture.layers, texture.mipLevels);
+                    _device->CopyBufferToImage(commandBuffer, srcBuffer, srcOffset, texture.image, texture.format, static_cast<u32>(texture.width), static_cast<u32>(texture.height), texture.layers, numMipsToCopy);
 
                     // Transition back to SHADER_READ_ONLY_OPTIMAL
                     _device->TransitionImageLayout(commandBuffer, texture.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture.layers, texture.mipLevels);
@@ -493,6 +498,20 @@ namespace Renderer
             return data.textures.ReadGet(id)->layers != 1;
         }
 
+        VkImage TextureHandlerVK::GetImage(const TextureID textureID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
+
+            // Lets make sure this id exists
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+            }
+
+            return data.textures.ReadGet(id)->image;
+        }
+
         VkImageView TextureHandlerVK::GetImageView(const TextureID textureID)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
@@ -532,7 +551,7 @@ namespace Renderer
             return descriptorSet;
         }
 
-        size_t TextureHandlerVK::GetTextureSize(const TextureID textureID)
+        size_t TextureHandlerVK::GetTextureUploadSize(const TextureID textureID)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
             TextureID::type id = static_cast<TextureID::type>(textureID);
@@ -543,7 +562,21 @@ namespace Renderer
                 DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
             }
 
-            return data.textures.ReadGet(id)->fileSize;
+            return data.textures.ReadGet(id)->uploadSize;
+        }
+
+        size_t TextureHandlerVK::GetTextureTotalSize(const TextureID textureID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
+
+            // Lets make sure this id exists
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+            }
+
+            return data.textures.ReadGet(id)->totalSize;
         }
 
         u32 TextureHandlerVK::GetTextureArraySize(const TextureArrayID textureArrayID)
@@ -558,6 +591,20 @@ namespace Renderer
             }
 
             return data.textureArrays.ReadGet(id).size;
+        }
+
+        ivec2 TextureHandlerVK::GetTextureDimensions(const TextureID textureID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
+
+            // Lets make sure this id exists
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+            }
+            const Texture* texture = data.textures.ReadGet(id);
+            return ivec2(texture->width, texture->height);
         }
 
         const std::string& TextureHandlerVK::GetDebugName(const TextureID textureID)
@@ -646,10 +693,26 @@ namespace Renderer
             if (pixels != nullptr)
             {
                 // This is hardcoded to 4 instead of channels since STBI is loading it as STBI_rgb_alpha, making it 4 channels
-                texture.fileSize = texture.width * texture.height * 4;
+                texture.uploadSize = texture.width * texture.height * 4;
                 texture.format = VK_FORMAT_R8G8B8A8_UNORM;
-                texture.mipLevels = 1; // If we are not loading using gli we don't support mips, so don't bother with it
                 texture.layers = 1; // If we are not loading using gli we don't support layers, so don't bother with it
+
+                texture.mipLevels = static_cast<u32>(std::floor(std::log2(std::max(texture.width, texture.height)))) + 1;
+                u32 totalSize = 0;
+
+                u32 width = texture.width;
+                u32 height = texture.height;
+
+                for (size_t i = 0; i < texture.mipLevels; i++)
+                {
+                    u32 size = width * height * 4;
+                    totalSize += size;
+
+                    if (width > 1) width /= 2;
+                    if (height > 1) height /= 2;
+                }
+                texture.totalSize = totalSize;
+                texture.numGeneratedMipLevels = texture.mipLevels - 1;
             }
             else
             {
@@ -669,7 +732,8 @@ namespace Renderer
                 texture.mipLevels = static_cast<i32>(gliTexture.levels());
 
                 texture.format = vkGetFormatFromOpenGLInternalFormat(gliFormat.Internal);
-                texture.fileSize = gliTexture.size();
+                texture.uploadSize = gliTexture.size();
+                texture.totalSize = texture.uploadSize; // TODO: Support generating mipmaps for loaded DDSes?
 
                 pixels = gliTexture.data();
             }
@@ -680,10 +744,10 @@ namespace Renderer
                 CreateTexture(texture);
 
                 // Create upload buffer
-                auto uploadBuffer = _uploadBufferHandler->CreateUploadBuffer(textureID, 0, texture.fileSize);
+                auto uploadBuffer = _uploadBufferHandler->CreateUploadBuffer(textureID, 0, texture.uploadSize, texture.numGeneratedMipLevels);
 
                 // Copy data to upload buffer
-                memcpy(uploadBuffer->mappedMemory, pixels, texture.fileSize);
+                memcpy(uploadBuffer->mappedMemory, pixels, texture.uploadSize);
             }
         }
 
@@ -701,7 +765,7 @@ namespace Renderer
             imageInfo.format = texture.format;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
             imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.flags = 0; // Optional

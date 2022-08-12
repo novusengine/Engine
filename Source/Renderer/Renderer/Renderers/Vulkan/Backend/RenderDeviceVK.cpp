@@ -412,19 +412,24 @@ namespace Renderer
             descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true;
             descriptorIndexingFeatures.pNext = &shaderSubgroupFeatures;
 
+            VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = {};
+            atomicInt64Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR;
+            atomicInt64Features.shaderBufferInt64Atomics = VK_TRUE;
+            atomicInt64Features.pNext = &descriptorIndexingFeatures;
+
             VkPhysicalDeviceFeatures2 deviceFeatures = {};
             deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             deviceFeatures.features.samplerAnisotropy = VK_TRUE;
             deviceFeatures.features.fragmentStoresAndAtomics = VK_TRUE;
             deviceFeatures.features.vertexPipelineStoresAndAtomics = VK_TRUE;
-            //deviceFeatures.features.shaderInt64 = VK_TRUE;
+            deviceFeatures.features.shaderInt64 = VK_TRUE;
             deviceFeatures.features.multiDrawIndirect = VK_TRUE;
             deviceFeatures.features.drawIndirectFirstInstance = VK_TRUE;
             deviceFeatures.features.independentBlend = VK_TRUE;
             deviceFeatures.features.geometryShader = VK_TRUE;
             deviceFeatures.features.fillModeNonSolid = VK_TRUE;
             deviceFeatures.features.depthClamp = VK_TRUE;
-            deviceFeatures.pNext = &descriptorIndexingFeatures;
+            deviceFeatures.pNext = &atomicInt64Features;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
 

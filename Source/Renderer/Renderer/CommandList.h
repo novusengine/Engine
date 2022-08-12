@@ -13,11 +13,12 @@
 #include <Base/Container/DynamicArray.h>
 
 #include <tracy/Tracy.hpp>
-#include <tracy/TracyVulkan.hpp>
+//#include <tracy/TracyVulkan.hpp>
 
 #define COMMANDLIST_DEBUG_IMMEDIATE_MODE 1 // This makes it easier to debug the renderer by providing better callstacks if it asserts or crashes inside of render-lib
 
-#if TRACY_ENABLE
+// TODO: Fix this
+#if 0//TRACY_ENABLE
 #define GPU_SCOPED_PROFILER_ZONE(commandList, name) \
     TracySourceLocation(name, #name, tracy::Color::Yellow2); \
     Renderer::ScopedGPUProfilerZone nameZone(commandList, &name);

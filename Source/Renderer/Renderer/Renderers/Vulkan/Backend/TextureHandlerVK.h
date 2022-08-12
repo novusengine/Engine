@@ -49,14 +49,18 @@ namespace Renderer
 
             bool IsOnionTexture(const TextureID textureID);
 
+            VkImage GetImage(const TextureID textureID);
             VkImageView GetImageView(const TextureID textureID);
             VkImageView GetDebugTextureImageView();
             VkImageView GetDebugOnionTextureImageView();
 
             VkDescriptorSet GetImguiImageHandle(const TextureID textureID);
 
-            size_t GetTextureSize(const TextureID textureID);
+            size_t GetTextureUploadSize(const TextureID textureID);
+            size_t GetTextureTotalSize(const TextureID textureID);
             u32 GetTextureArraySize(const TextureArrayID textureArrayID);
+
+            ivec2 GetTextureDimensions(const TextureID textureID);
 
             const std::string& GetDebugName(const TextureID textureID);
 

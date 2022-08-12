@@ -57,6 +57,7 @@ namespace Renderer
             TextureID targetTexture = TextureID::Invalid();
             size_t targetOffset;
             size_t stagingBufferOffset;
+            size_t numMipsToGenerate;
         };
 
         struct CopyBufferToBufferTask : UploadTask
@@ -307,7 +308,7 @@ namespace Renderer
             return uploadBuffer;
         }
 
-        std::shared_ptr<UploadBuffer> UploadBufferHandlerVK::CreateUploadBuffer(TextureID targetTexture, size_t targetOffset, size_t size)
+        std::shared_ptr<UploadBuffer> UploadBufferHandlerVK::CreateUploadBuffer(TextureID targetTexture, size_t targetOffset, size_t size, size_t numMipsToGenerate)
         {
             if (targetTexture == TextureID::Invalid())
             {
@@ -329,11 +330,18 @@ namespace Renderer
             task->targetTexture = targetTexture;
             task->targetOffset = targetOffset;
             task->stagingBufferOffset = offset;
+            task->numMipsToGenerate = numMipsToGenerate;
 
-            size_t targetTextureSize = _textureHandler->GetTextureSize(targetTexture);
-            if (targetOffset + size > targetTextureSize)
+            size_t targetTextureTotalSize = _textureHandler->GetTextureTotalSize(targetTexture);
+            if (targetOffset + size > targetTextureTotalSize)
             {
                 DebugHandler::PrintFatal("UploadBufferHandlerVK : Upload Overflowed Target Buffer");
+            }
+
+            size_t targetTextureUploadSize = _textureHandler->GetTextureUploadSize(targetTexture);
+            if (numMipsToGenerate > 0 && (targetTextureUploadSize == targetTextureTotalSize))
+            {
+                DebugHandler::PrintFatal("UploadBufferHandlerVK : We are trying to generate mips without creating extra room for the mips");
             }
 
             StagingBuffer& stagingBuffer = data->stagingBuffers.Get(static_cast<StagingBufferID::type>(stagingBufferID));
@@ -617,7 +625,7 @@ namespace Renderer
             VkBuffer srcBuffer = _bufferHandler->GetBuffer(stagingBuffer.buffer);
 
             size_t srcBufferSize = _bufferHandler->GetBufferSize(stagingBuffer.buffer);
-            size_t textureSize = _textureHandler->GetTextureSize(uploadToTextureTask->targetTexture);
+            size_t textureSize = _textureHandler->GetTextureUploadSize(uploadToTextureTask->targetTexture);
 
             if (uploadToTextureTask->stagingBufferOffset + textureSize > srcBufferSize)
             {
@@ -625,6 +633,82 @@ namespace Renderer
             }
 
             _textureHandler->CopyBufferToImage(commandBuffer, srcBuffer, uploadToTextureTask->stagingBufferOffset, uploadToTextureTask->targetTexture);
+
+            size_t numMipsToGenerate = uploadToTextureTask->numMipsToGenerate;
+            if (numMipsToGenerate > 0)
+            {
+                ivec2 textureDimensions = _textureHandler->GetTextureDimensions(uploadToTextureTask->targetTexture);
+                VkImage image = _textureHandler->GetImage(uploadToTextureTask->targetTexture);
+
+                VkImageMemoryBarrier barrier = {};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.image = image;
+                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                barrier.subresourceRange.baseArrayLayer = 0;
+                barrier.subresourceRange.layerCount = 1;
+                barrier.subresourceRange.levelCount = 1;
+
+                i32 width = textureDimensions.x;
+                i32 height = textureDimensions.y;
+
+                for (u32 i = 1; i < numMipsToGenerate + 1; i++)
+                {
+                    barrier.subresourceRange.baseMipLevel = i - 1;
+                    barrier.oldLayout = (i == 1) ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+                    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                        0, nullptr, 0, nullptr, 1, &barrier);
+
+                    barrier.subresourceRange.baseMipLevel = i;
+                    barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+                    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                        0, nullptr, 0, nullptr, 1, &barrier);
+
+                    VkImageBlit blit{};
+                    blit.srcOffsets[0] = { 0, 0, 0 };
+                    blit.srcOffsets[1] = { width, height, 1 };
+                    blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    blit.srcSubresource.mipLevel = i - 1;
+                    blit.srcSubresource.baseArrayLayer = 0;
+                    blit.srcSubresource.layerCount = 1;
+                    blit.dstOffsets[0] = { 0, 0, 0 };
+                    blit.dstOffsets[1] = { width > 1 ? width / 2 : 1, height > 1 ? height / 2 : 1, 1 };
+                    blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    blit.dstSubresource.mipLevel = i;
+                    blit.dstSubresource.baseArrayLayer = 0;
+                    blit.dstSubresource.layerCount = 1;
+
+                    vkCmdBlitImage(commandBuffer,
+                        image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        1, &blit,
+                        VK_FILTER_LINEAR);
+
+                    if (width > 1) width /= 2;
+                    if (height > 1) height /= 2;
+                }
+
+                for (u32 i = 0; i < numMipsToGenerate + 1; i++)
+                {
+                    barrier.subresourceRange.baseMipLevel = i;
+                    barrier.oldLayout = (i == numMipsToGenerate) ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+                    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                        0, nullptr, 0, nullptr, 1, &barrier);
+                }
+            }
         }
 
         void UploadBufferHandlerVK::HandleCopyBufferToBufferTask(VkCommandBuffer commandBuffer, CopyBufferToBufferTask* copyBufferToBufferTask)
