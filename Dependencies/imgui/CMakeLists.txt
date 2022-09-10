@@ -25,6 +25,8 @@ set(imgui_sources
 	"${imgui_folder}/imguizmo/ImCurveEdit.cpp"
 	"${imgui_folder}/imguizmo/ImGradient.cpp"
 	"${imgui_folder}/imguizmo/ImSequencer.cpp"
+
+	"${imgui_folder}/imnodes.cpp"
 	)
 
 add_library(${PROJECT_NAME} STATIC ${imgui_sources})
@@ -33,6 +35,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER ${ROOT_FOLDER}/dep)
 target_link_libraries(${PROJECT_NAME} 
 	glfw ${GLFW_LIBRARIES}
 	Vulkan::Vulkan
+	glm
 )
 
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
