@@ -38,6 +38,27 @@ if(NOT TARGET shadercooker)
     add_subdirectory(dxcompiler)
 endif()
 
+## enkiTS
+if(NOT TARGET enkiTS)
+    set(enkiTS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/enkiTS)
+    set(enkiTS_INCLUDE_DEST ${CMAKE_CURRENT_BINARY_DIR}/include/enkiTS)
+
+    set(ENKITS_BUILD_EXAMPLES OFF CACHE BOOL "Disable enkiTS examples" FORCE)
+    set(ENKITS_BUILD_C_INTERFACE OFF CACHE BOOL "Disable enkiTS C Interface" FORCE)
+    add_subdirectory(${enkiTS_ROOT})
+
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${enkiTS_INCLUDE_DEST}
+        COMMAND ${CMAKE_COMMAND} -E copy ${enkiTS_ROOT}/src/TaskScheduler.h ${enkiTS_INCLUDE_DEST}/TaskScheduler.h
+    )
+
+    add_library(enkiTS_proxy INTERFACE)
+    target_link_libraries(enkiTS_proxy INTERFACE enkiTS)
+    target_include_directories(enkiTS_proxy INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+    add_library(enkiTS::enkiTS ALIAS enkiTS_proxy)
+endif()
+
 ## engine-dependencies
 
 add_library(${PROJECT_NAME} INTERFACE)
