@@ -23,6 +23,7 @@ enum class KeybindModifier
     Alt = 1 << 3,
     Any = 1 << 4,
 };
+DECLARE_GENERIC_BITWISE_OPERATORS(KeybindModifier);
 
 typedef bool MousePositionUpdateFunc(f32 x, f32 y);
 typedef bool MouseScrollUpdateFunc(f32 x, f32 y);

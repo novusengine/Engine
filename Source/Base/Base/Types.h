@@ -39,10 +39,10 @@ using mat3x3 = glm::mat3x3;
 using mat4x4 = glm::mat4x4;
 using quat = glm::quat;
 
-template<class T> constexpr T operator~ (T a) { return (T)~(i32)a; }
-template<class T> constexpr T operator| (T a, T b) { return (T)((i32)a | (i32)b); }
-template<class T> constexpr T operator& (T a, T b) { return (T)((i32)a & (i32)b); }
-template<class T> constexpr T operator^ (T a, T b) { return (T)((i32)a ^ (i32)b); }
-template<class T> constexpr T& operator|= (T& a, T b) { return (T&)((i32&)a |= (i32)b); }
-template<class T> constexpr T& operator&= (T& a, T b) { return (T&)((i32&)a &= (i32)b); }
-template<class T> constexpr T& operator^= (T& a, T b) { return (T&)((i32&)a ^= (i32)b); }
+#define DECLARE_GENERIC_BITWISE_OPERATORS(T) inline const T operator~ (T a) { return (T)~(i32)a; } \
+inline const T operator| (T a, T b) { return (T)((i32)a | (i32)b); } \
+inline const T operator& (T a, T b) { return (T)((i32)a & (i32)b); } \
+inline const T operator^ (T a, T b) { return (T)((i32)a ^ (i32)b); } \
+inline const T& operator|= (T& a, T b) { return (T&)((i32&)a |= (i32)b); } \
+inline const T& operator&= (T& a, T b) { return (T&)((i32&)a &= (i32)b); } \
+inline const T& operator^= (T& a, T b) { return (T&)((i32&)a ^= (i32)b); }
