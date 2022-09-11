@@ -16,6 +16,14 @@ target_include_directories(robin-hood-hashing INTERFACE
     "${CMAKE_CURRENT_LIST_DIR}/robinhood"
 )
 
+## entt
+add_library(entt INTERFACE)
+add_library(entt::entt ALIAS entt)
+
+target_include_directories(entt INTERFACE
+    "${CMAKE_CURRENT_LIST_DIR}/entt"
+)
+
 ## GLM math library
 add_library(glm INTERFACE)
 add_library(glm::glm ALIAS glm)
@@ -69,6 +77,6 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     json::json
     robin-hood-hashing::robin-hood-hashing
     glm::glm
-
+    entt::entt
     type_safe
 )
