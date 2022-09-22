@@ -7,11 +7,11 @@
 #include <fstream>
 #include <bitset>
 
-using namespace ADT;
+using namespace Adt;
 
 namespace Map
 {
-    bool Chunk::Save(std::string& path)
+    bool Chunk::Save(const std::string& path)
     {
         // Create a file
         std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
@@ -115,7 +115,7 @@ namespace Map
         return true;
     }
 
-	bool Chunk::FromADT(ADT::Layout& layout, Chunk& out)
+	bool Chunk::FromADT(Adt::Layout& layout, Chunk& out)
 	{
         // TODO : Set HeightBox
 

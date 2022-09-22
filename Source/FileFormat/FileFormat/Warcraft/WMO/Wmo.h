@@ -6,7 +6,7 @@
 
 #include <robinhood/robinhood.h>
 
-namespace WMO
+namespace Wmo
 {
 PRAGMA_NO_PADDING_START;
 	struct WMOGroupFlags

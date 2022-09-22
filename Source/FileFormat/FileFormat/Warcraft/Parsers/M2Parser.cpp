@@ -6,13 +6,13 @@
 
 using namespace M2;
 
-robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, Layout&)>> M2Parser::_m2FileChunkToFunction =
+robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, Layout&)>> Parser::_m2FileChunkToFunction =
 {
-    { FileChunkToken("MD21", true), M2Parser::ReadMD21},
-    { FileChunkToken("SFID", true), M2Parser::ReadSFID},
-    { FileChunkToken("AFID", true), M2Parser::ReadAFID},
-    { FileChunkToken("BFID", true), M2Parser::ReadBFID},
-    { FileChunkToken("TXID", true), M2Parser::ReadTXID},
+    { FileChunkToken("MD21", true), Parser::ReadMD21},
+    { FileChunkToken("SFID", true), Parser::ReadSFID},
+    { FileChunkToken("AFID", true), Parser::ReadAFID},
+    { FileChunkToken("BFID", true), Parser::ReadBFID},
+    { FileChunkToken("TXID", true), Parser::ReadTXID},
 
     { FileChunkToken("PFID", true), nullptr},
     { FileChunkToken("TXAC", true), nullptr},
@@ -37,7 +37,7 @@ robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::s
     { FileChunkToken("DBOC", true), nullptr}
 };
 
-bool M2Parser::TryParse(const ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, Layout& out)
+bool Parser::TryParse(const ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, Layout& out)
 {
     if (!buffer)
         return false;
@@ -60,7 +60,7 @@ bool M2Parser::TryParse(const ParseType parseType, std::shared_ptr<Bytebuffer>& 
     return true;
 }
 
-bool M2Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     FileChunkHeader header;
 
@@ -76,7 +76,7 @@ bool M2Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, 
             if (header.token == 0 && header.size == 0 && buffer->readData == sizeof(FileChunkHeader))
                 return false;
 
-            DebugHandler::PrintError("[M2Parser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
+            DebugHandler::PrintError("[Parser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
             return false;
         }
 
@@ -95,7 +95,7 @@ bool M2Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, 
     return true;
 }
 
-bool M2Parser::ParseSkinBuffer(std::shared_ptr<Bytebuffer>& buffer, Layout& out)
+bool Parser::ParseSkinBuffer(std::shared_ptr<Bytebuffer>& buffer, Layout& out)
 {
     if (!buffer->Get(out.skin))
         return false;
@@ -103,7 +103,7 @@ bool M2Parser::ParseSkinBuffer(std::shared_ptr<Bytebuffer>& buffer, Layout& out)
     return true;
 }
 
-bool M2Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     u32 md21Offset = static_cast<u32>(buffer->readData);
     u32 md21Size = sizeof(MD21) - sizeof(layout.md21.textureCombinerCombos);
@@ -159,7 +159,7 @@ bool M2Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffe
 
     return true;
 }
-bool M2Parser::ReadSFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadSFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     u32 bytesToRead = layout.md21.numSkinProfiles * sizeof(u32);
     if (bytesToRead)
@@ -181,21 +181,21 @@ bool M2Parser::ReadSFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffe
 
     return true;
 }
-bool M2Parser::ReadAFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadAFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.afid.data))
         return false;
 
     return true;
 }
-bool M2Parser::ReadBFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadBFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.bfid.boneFileIDs))
         return false;
 
     return true;
 }
-bool M2Parser::ReadTXID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadTXID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.txid.textureFileIDs))
         return false;

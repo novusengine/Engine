@@ -10,7 +10,7 @@ PRAGMA_NO_PADDING_START;
 	struct Layout
 	{
 	public:
-		struct DB2Header
+		struct Header
 		{
 			struct Flags
 			{
@@ -170,7 +170,7 @@ PRAGMA_NO_PADDING_START;
 		};
 
 	public:
-		DB2Header db2Header = { };
+		Header header = { };
 
 		std::vector<SectionHeader> sectionHeaders = { };
 		std::vector<FieldStructure> fieldStructures = { };

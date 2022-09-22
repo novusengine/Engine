@@ -3,11 +3,12 @@
 
 #include <Base/Types.h>
 #include <Base/Platform.h>
+#include <Base/Container/StringTable.h>
 
 #include <vector>
 
 class Bytebuffer;
-namespace CLIENTDB
+namespace DB::Client
 {
 	PRAGMA_NO_PADDING_START;
 	template <class T>
@@ -26,6 +27,7 @@ namespace CLIENTDB
 
 		Flags flags = { };
 		std::vector<T> data = { };
+        StringTable stringTable = { };
 
 	public:
 		bool Save(std::string& path)
@@ -55,12 +57,24 @@ namespace CLIENTDB
             return true;
 		}
 
+        size_t GetSerializedSize()
+        {
+            size_t result = 0;
+
+            result += sizeof(FileHeader);
+            result += sizeof(Flags);
+            result += sizeof(u32) + (data.size() * sizeof(T));
+            result += sizeof(u32) + stringTable.GetNumBytes();
+
+            return result;
+        }
+
 		bool Write(std::shared_ptr<Bytebuffer>& buffer)
 		{
             if (!buffer->Put(header))
                 return false;
 
-            if (!buffer->PutU32(flags))
+            if (!buffer->Put(flags))
                 return false;
 
             // Read Elements
@@ -75,6 +89,9 @@ namespace CLIENTDB
                         return false;
                 }
             }
+
+            if (!stringTable.Serialize(buffer.get()))
+                return false;
 
             return true;
 		}

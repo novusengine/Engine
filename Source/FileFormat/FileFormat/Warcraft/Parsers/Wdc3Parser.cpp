@@ -6,7 +6,7 @@
 
 using namespace DB2::WDC3;
 
-robin_hood::unordered_set<u64> WDC3Parser::_cascEncryptionKeyLookup =
+robin_hood::unordered_set<u64> Parser::_cascEncryptionKeyLookup =
 {
 	// Battle.net app
 	0x2C547F26A2613E01ULL,
@@ -487,24 +487,24 @@ robin_hood::unordered_set<u64> WDC3Parser::_cascEncryptionKeyLookup =
 	0xFF7C9A1B789D0D42ULL
 };
 
-bool WDC3Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
+bool Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 {
-	Layout::DB2Header& db2Header = out.db2Header;
-	if (!buffer->Get(db2Header))
+	Layout::Header& header = out.header;
+	if (!buffer->Get(header))
 		return false;
 
-	u32 numSections = db2Header.sectionCount;
+	u32 numSections = header.sectionCount;
 	if (!LoadArrayOfStructs(buffer, numSections * sizeof(Layout::SectionHeader), out.sectionHeaders))
 		return false;
 
-	u32 numFields = db2Header.totalFieldCount;
+	u32 numFields = header.totalFieldCount;
 	if (!LoadArrayOfStructs(buffer, numFields * sizeof(Layout::FieldStructure), out.fieldStructures))
 		return false;
 
-	if (!LoadArrayOfStructs(buffer, db2Header.fieldStorageInfoSize, out.fieldStorageInfos))
+	if (!LoadArrayOfStructs(buffer, header.fieldStorageInfoSize, out.fieldStorageInfos))
 		return false;
 
-	if (db2Header.palletDataSize)
+	if (header.palletDataSize)
 	{
 		out.perFieldPalleteData.resize(numFields);
 
@@ -527,10 +527,10 @@ bool WDC3Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 		}
 
 		size_t palletReadData = buffer->readData - palletStartBufferIndex;
-		assert(palletReadData == db2Header.palletDataSize);
+		assert(palletReadData == header.palletDataSize);
 	}
 
-	if (db2Header.commonDataSize)
+	if (header.commonDataSize)
 	{
 		out.perFieldCommonDataIDToValue.resize(numFields);
 
@@ -561,7 +561,7 @@ bool WDC3Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 		}
 
 		size_t commonDataReadData = buffer->readData - commonDataStartBufferIndex;
-		assert(commonDataReadData == db2Header.commonDataSize);
+		assert(commonDataReadData == header.commonDataSize);
 	}
 
 	out.sections.resize(numSections);
@@ -576,7 +576,7 @@ bool WDC3Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 		bool isEncrypted = sectionHeader.tactKeyHash != 0 && _cascEncryptionKeyLookup.find(sectionHeader.tactKeyHash) == _cascEncryptionKeyLookup.end();
 		section.isEncrypted = isEncrypted;
 
-		if (db2Header.flags.HasOffsetMap)
+		if (header.flags.HasOffsetMap)
 		{
 			u32 variableRecordDataSize = sectionHeader.recordEndOffset - sectionHeader.fileOffset;
 			section.variableRecordData = buffer->GetReadPointer();
@@ -588,7 +588,7 @@ bool WDC3Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 		}
 		else
 		{
-			u32 totalRecordSize = sectionHeader.recordCount * db2Header.recordSize;
+			u32 totalRecordSize = sectionHeader.recordCount * header.recordSize;
 			section.recordData = buffer->GetReadPointer();
 			buffer->SkipRead(totalRecordSize);
 
@@ -677,16 +677,16 @@ bool WDC3Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 
 	return true;
 }
-bool WDC3Parser::TryReadRecord(const Layout& layout, u32 index, std::vector<u8>& output)
+bool Parser::TryReadRecord(const Layout& layout, u32 index, u32& outSectionID, u32& outRecordID, u8*& outRecordData)
 {
 	PRAGMA_CLANG_DIAGNOSTIC_PUSH;
 	PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wunused-value);
-	const Layout::DB2Header& db2Header = layout.db2Header;
+	const Layout::Header& header = layout.header;
 
 	u32 sectionIndex = 0;
 	u32 localIndex = index;
 
-	for (sectionIndex; sectionIndex < db2Header.sectionCount; sectionIndex++)
+	for (sectionIndex; sectionIndex < header.sectionCount; sectionIndex++)
 	{
 		const Layout::SectionHeader& sectionHeader = layout.sectionHeaders[sectionIndex];
 		if (localIndex < sectionHeader.recordCount)
@@ -706,7 +706,7 @@ bool WDC3Parser::TryReadRecord(const Layout& layout, u32 index, std::vector<u8>&
 
 	// Calculate RecordID & RecordData
 	{
-		if (db2Header.flags.HasOffsetMap)
+		if (header.flags.HasOffsetMap)
 		{
 			recordID = section.offsetMapList[localIndex];
 
@@ -719,142 +719,30 @@ bool WDC3Parser::TryReadRecord(const Layout& layout, u32 index, std::vector<u8>&
 				recordID = section.idListData[localIndex];
 
 			if (!recordID)
-				recordID = db2Header.minID + index;
+				recordID = header.minID + index;
 
-			recordData = &section.recordData[localIndex * db2Header.recordSize];
+			recordData = &section.recordData[localIndex * header.recordSize];
 		}
 	}
 
-	for (u32 i = 0; i < db2Header.totalFieldCount; i++)
-	{
-		const Layout::FieldStorageInfo& fieldStorageInfo = layout.fieldStorageInfos[i];
-		u32 bytesToRead = fieldStorageInfo.sizeInBits >> 0x3; // This converts from Bits -> Bytes
-
-		if (db2Header.flags.HasOffsetMap)
-		{
-			// Read Sparse Field Data Here
-			const u8* fieldData = &recordData[0];
-			if (!TryParseSparseField(layout, sectionIndex, fieldData, bytesToRead, output))
-				return false;
-		}
-		else
-		{
-			// Read Field Data Here based on CompressionType
-			switch (fieldStorageInfo.compressionType)
-			{
-			case Layout::FieldStorageInfo::CompressionType::None:
-			{
-				u32 byteOffset = fieldStorageInfo.offsetInBits >> 3; // This converts from Bits -> Bytes
-
-				const u8* fieldData = &recordData[byteOffset];
-				if (!TryParseCompressionField(layout, sectionIndex, fieldData, bytesToRead, output))
-					return false;
-
-				break;
-			}
-
-			case Layout::FieldStorageInfo::CompressionType::Bitpacked:
-			case Layout::FieldStorageInfo::CompressionType::BitpackedSigned:
-			{
-				u32 bitOffset = fieldStorageInfo.offsetInBits;
-				u32 bitsToRead = fieldStorageInfo.sizeInBits;
-
-				u32 unpackedBits = GetU32FromBits(recordData, bitOffset, bitsToRead);
-
-				if (fieldStorageInfo.compressionType == Layout::FieldStorageInfo::CompressionType::BitpackedSigned)
-				{
-					unpackedBits = unpackedBits << (32 - bitsToRead);
-
-					i32 unpackedBitsSigned = static_cast<i32>(unpackedBits);
-					unpackedBitsSigned = unpackedBitsSigned >> (32 - bitsToRead);
-
-					unpackedBits = *reinterpret_cast<u32*>(&unpackedBitsSigned);
-				}
-
-				const u8* fieldData = reinterpret_cast<u8*>(&unpackedBits);
-				u32 dataToRead = RoundBitToNextByte(bitsToRead);
-				if (!TryParseCompressionField(layout, sectionIndex, fieldData, dataToRead, output))
-					return false;
-
-				break;
-			}
-
-			case Layout::FieldStorageInfo::CompressionType::CommonData:
-			{
-				u32 value = fieldStorageInfo.fieldCommonData.defaultValue;
-
-				if (fieldStorageInfo.extraDataSize)
-				{
-					auto itr = layout.perFieldCommonDataIDToValue[i].find(recordID);
-					if (itr != layout.perFieldCommonDataIDToValue[i].end())
-						value = itr->second;
-				}
-
-				const u8* fieldData = reinterpret_cast<const u8*>(&value);
-				if (!TryParseCompressionField(layout, sectionIndex, fieldData, bytesToRead, output))
-					return false;
-
-				break;
-			}
-
-			case Layout::FieldStorageInfo::CompressionType::BitpackedIndexed:
-			case Layout::FieldStorageInfo::CompressionType::BitpackedIndexedArray:
-			{
-				u32 bitOffset = fieldStorageInfo.offsetInBits;
-				u32 bitsToRead = fieldStorageInfo.fieldBitpackedIndexed.bitpackingSizeInBits;
-
-				const std::vector<u32>& fieldPalleteData = layout.perFieldPalleteData[i];
-				u32 palleteMaxIndex = static_cast<u32>(fieldPalleteData.size()) - 1;
-				u32 palleteIndex = GetU32FromBits(recordData, bitOffset, bitsToRead);
-
-				if (fieldStorageInfo.compressionType == Layout::FieldStorageInfo::CompressionType::BitpackedIndexed)
-				{
-					assert(palleteIndex <= palleteMaxIndex);
-
-					const u8* fieldData = reinterpret_cast<const u8*>(&fieldPalleteData[palleteIndex]);
-					if (!TryParseCompressionField(layout, sectionIndex, fieldData, sizeof(u32), output))
-						return false;
-				}
-				else
-				{
-					u32 arrayCount = fieldStorageInfo.fieldBitpackedIndexedArray.arrayCount;
-
-					// We must multiply palleteIndex with arrayCount here, because the pallete data stores "arrayCount" of values for every "unique" set of values.
-					u32 basePalleteArrayIndex = palleteIndex * arrayCount;
-					for (u32 j = 0; j < arrayCount; j++)
-					{
-						u32 palleteArrayIndex = basePalleteArrayIndex + j;
-						assert(palleteArrayIndex <= palleteMaxIndex);
-
-						const u8* fieldData = reinterpret_cast<const u8*>(&fieldPalleteData[palleteArrayIndex]);
-						if (!TryParseCompressionField(layout, sectionIndex, fieldData, sizeof(u32), output))
-							return false;
-					}
-				}
-
-				break;
-			}
-
-			default:
-				return false;
-			}
-		}
-	}
+	outSectionID = sectionIndex;
+	outRecordID = recordID;
+	outRecordData = recordData;
 
 	return true;
 	PRAGMA_CLANG_DIAGNOSTIC_POP;
 }
 
-char* WDC3Parser::GetString(const Layout& layout, u32 recordIndex, u32 fieldIndex)
+char* Parser::GetString(const Layout& layout, u32 recordIndex, u32 fieldIndex)
 {
 	PRAGMA_CLANG_DIAGNOSTIC_PUSH;
 	PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wunused-value);
-	const Layout::DB2Header& db2Header = layout.db2Header;
+	const Layout::Header& header = layout.header;
 
 	u32 sectionIndex = 0;
 	u32 localIndex = recordIndex;
 
-	for (sectionIndex; sectionIndex < db2Header.sectionCount; sectionIndex++)
+	for (sectionIndex; sectionIndex < header.sectionCount; sectionIndex++)
 	{
 		const Layout::SectionHeader& sectionHeader = layout.sectionHeaders[sectionIndex];
 		if (localIndex < sectionHeader.recordCount)
@@ -878,12 +766,12 @@ char* WDC3Parser::GetString(const Layout& layout, u32 recordIndex, u32 fieldInde
 	// Get Field Value
 	u32 fieldOffsetInBytes = fieldStorageInfo.offsetInBits >> 3;
 
-	u8* recordData = &section.recordData[localIndex * db2Header.recordSize];
+	u8* recordData = &section.recordData[localIndex * header.recordSize];
 	u32 fieldValue = *reinterpret_cast<u32*>(recordData + fieldOffsetInBytes);
 
 	// Calculate the address to the current field within the record data
-	u32 fieldAddressInGlobalRecordSpace = (recordIndex * db2Header.recordSize) + fieldOffsetInBytes;
-	u32 offsetIntoGlobalStringtableSpace = (fieldAddressInGlobalRecordSpace + fieldValue) - (db2Header.recordSize * db2Header.recordCount);
+	u32 fieldAddressInGlobalRecordSpace = (recordIndex * header.recordSize) + fieldOffsetInBytes;
+	u32 offsetIntoGlobalStringtableSpace = (fieldAddressInGlobalRecordSpace + fieldValue) - (header.recordSize * header.recordCount);
 
 	u32 strSectionIndex = 0;
 	u32 localStringTableOffset = offsetIntoGlobalStringtableSpace;
@@ -902,11 +790,11 @@ char* WDC3Parser::GetString(const Layout& layout, u32 recordIndex, u32 fieldInde
 	return string;
 	PRAGMA_CLANG_DIAGNOSTIC_POP;
 }
-u32 WDC3Parser::GetFieldSize(const Layout& layout, u32 fieldIndex)
+u32 Parser::GetFieldSize(const Layout& layout, u32 fieldIndex)
 {
-	const Layout::DB2Header& db2Header = layout.db2Header;
+	const Layout::Header& header = layout.header;
 
-	if (fieldIndex >= db2Header.totalFieldCount)
+	if (fieldIndex >= header.totalFieldCount)
 		return 0;
 
 	const Layout::FieldStorageInfo& fieldStorageInfo = layout.fieldStorageInfos[fieldIndex];
@@ -928,16 +816,16 @@ u32 WDC3Parser::GetFieldSize(const Layout& layout, u32 fieldIndex)
 	return RoundBitToNextByte(fieldStorageInfo.sizeInBits);
 }
 
-bool WDC3Parser::IsRecordEncrypted(const Layout& layout, u32 recordIndex)
+bool Parser::IsRecordEncrypted(const Layout& layout, u32 recordIndex)
 {
 	PRAGMA_CLANG_DIAGNOSTIC_PUSH;
 	PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wunused-value);
-	const Layout::DB2Header& db2Header = layout.db2Header;
+	const Layout::Header& header = layout.header;
 
 	u32 sectionIndex = 0;
 	u32 localIndex = recordIndex;
 
-	for (sectionIndex; sectionIndex < db2Header.sectionCount; sectionIndex++)
+	for (sectionIndex; sectionIndex < header.sectionCount; sectionIndex++)
 	{
 		const Layout::SectionHeader& sectionHeader = layout.sectionHeaders[sectionIndex];
 		if (localIndex < sectionHeader.recordCount)
@@ -953,17 +841,17 @@ bool WDC3Parser::IsRecordEncrypted(const Layout& layout, u32 recordIndex)
 	return section.isEncrypted;
 	PRAGMA_CLANG_DIAGNOSTIC_POP;
 }
-u32 WDC3Parser::GetRecordIDFromIndex(const Layout& layout, u32 recordIndex)
+u32 Parser::GetRecordIDFromIndex(const Layout& layout, u32 recordIndex)
 {
 	PRAGMA_CLANG_DIAGNOSTIC_PUSH;
 	PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wunused-value);
-	const Layout::DB2Header& db2Header = layout.db2Header;
+	const Layout::Header& header = layout.header;
 
 	u32 recordID = -1;
 	u32 sectionIndex = 0;
 	u32 localIndex = recordIndex;
 
-	for (sectionIndex; sectionIndex < db2Header.sectionCount; sectionIndex++)
+	for (sectionIndex; sectionIndex < header.sectionCount; sectionIndex++)
 	{
 		const Layout::SectionHeader& sectionHeader = layout.sectionHeaders[sectionIndex];
 		if (localIndex < sectionHeader.recordCount)
@@ -978,7 +866,7 @@ u32 WDC3Parser::GetRecordIDFromIndex(const Layout& layout, u32 recordIndex)
 	if (section.isEncrypted)
 		return recordID;
 
-	if (db2Header.flags.HasOffsetMap)
+	if (header.flags.HasOffsetMap)
 	{
 		recordID = section.offsetMapList[localIndex];
 	}
@@ -988,30 +876,14 @@ u32 WDC3Parser::GetRecordIDFromIndex(const Layout& layout, u32 recordIndex)
 			recordID = section.idListData[localIndex];
 
 		if (!recordID)
-			recordID = db2Header.minID + recordID;
+			recordID = header.minID + recordID;
 	}
 
 	return recordID;
 	PRAGMA_CLANG_DIAGNOSTIC_POP;
 }
 
-bool WDC3Parser::TryParseCompressionField(const Layout& layout, u32 sectionIndex, const u8* fieldData, u32 fieldSize, std::vector<u8>& output)
-{
-	u32 beforeOutputSize = static_cast<u32>(output.size());
-	u32 afterOutputSize = beforeOutputSize + fieldSize;
-	output.resize(afterOutputSize);
-
-	memcpy(&output[beforeOutputSize], fieldData, fieldSize);
-
-	return true;
-}
-
-bool WDC3Parser::TryParseSparseField(const Layout& layout, u32 sectionIndex, const u8* fieldData, u32 fieldSize, std::vector<u8>& output)
-{
-	return true;
-}
-
-u32 WDC3Parser::RoundBitToNextByte(u32 bits)
+u32 Parser::RoundBitToNextByte(u32 bits)
 {
 	u32 value = ((bits + 7) & (-8));
 	value += 8 * (value == 24);
@@ -1019,8 +891,7 @@ u32 WDC3Parser::RoundBitToNextByte(u32 bits)
 	u32 bytes = value >> 3;
 	return bytes;
 }
-
-bool WDC3Parser::GetBitValue(const u8* fieldData, u32 bitIndex)
+bool Parser::GetBitValue(const u8* fieldData, u32 bitIndex)
 {
 	u32 byteOffset = bitIndex >> 0x3;
 
@@ -1029,7 +900,7 @@ bool WDC3Parser::GetBitValue(const u8* fieldData, u32 bitIndex)
 
 	return ((byteValue & bitmask) != 0);
 }
-u32 WDC3Parser::GetU32FromBits(const u8* fieldData, u32 bitOffset, u32 bitsToRead)
+u32 Parser::GetU32FromBits(const u8* fieldData, u32 bitOffset, u32 bitsToRead)
 {
 	u32 result = 0;
 

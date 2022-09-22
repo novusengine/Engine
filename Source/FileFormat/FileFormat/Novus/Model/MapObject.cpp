@@ -7,11 +7,11 @@
 #include <glm/gtx/euler_angles.hpp>
 #include <fstream>
 
-using namespace WMO;
+using namespace Wmo;
 
 namespace Model
 {
-    bool MapObject::Save(std::string& path)
+    bool MapObject::Save(const std::string& path)
     {
         // Create a file
         std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
@@ -305,7 +305,7 @@ namespace Model
         return true;
     }
 
-	bool MapObject::FromWMO(WMO::Layout& layout, MapObject& out)
+	bool MapObject::FromWMO(Wmo::Layout& layout, MapObject& out)
 	{
         // Convert Materials
         {

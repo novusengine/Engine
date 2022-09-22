@@ -5,10 +5,10 @@
 #include <Base/Types.h>
 #include <Base/Platform.h>
 
-namespace MAP
+namespace Map
 {
 PRAGMA_NO_PADDING_START;
-	struct Map
+	struct Layout
 	{
 	public:
 		static const u32 CURRENT_VERSION = 1;

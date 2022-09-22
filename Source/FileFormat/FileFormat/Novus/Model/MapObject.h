@@ -9,7 +9,7 @@
 
 class Bytebuffer;
 
-namespace WMO
+namespace Wmo
 {
 	struct Layout;
 }
@@ -162,10 +162,10 @@ PRAGMA_NO_PADDING_START;
 		std::vector<MapObjectGroup> groups = { };
 
 	public:
-		bool Save(std::string& path);
+		bool Save(const std::string& path);
 
 		static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapObject& out);
-		static bool FromWMO(WMO::Layout& layout, MapObject& out);
+		static bool FromWMO(Wmo::Layout& layout, MapObject& out);
 	};
 PRAGMA_NO_PADDING_END;
 }

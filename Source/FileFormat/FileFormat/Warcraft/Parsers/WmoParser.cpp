@@ -4,31 +4,31 @@
 
 #include <Base/Util/DebugHandler.h>
 
-using namespace WMO;
+using namespace Wmo;
 
-robin_hood::unordered_map<u32, std::function<bool(const WmoParser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, Layout& layout)>> WmoParser::_wmoFileChunkToFunction =
+robin_hood::unordered_map<u32, std::function<bool(const Parser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, Layout& layout)>> Parser::_wmoFileChunkToFunction =
 {
     // WMO Root Chunks
-    { FileChunkToken("MVER"), WmoParser::ReadMVER },
-    { FileChunkToken("MOHD"), WmoParser::ReadMOHD },
-    { FileChunkToken("MOMT"), WmoParser::ReadMOMT },
+    { FileChunkToken("MVER"), Parser::ReadMVER },
+    { FileChunkToken("MOHD"), Parser::ReadMOHD },
+    { FileChunkToken("MOMT"), Parser::ReadMOMT },
     { FileChunkToken("MOUV"), nullptr },
-    { FileChunkToken("MOGN"), WmoParser::ReadMOGN },
-    { FileChunkToken("MOGI"), WmoParser::ReadMOGI },
-    { FileChunkToken("MOSI"), WmoParser::ReadMOSI },
-    { FileChunkToken("MOPV"), WmoParser::ReadMOPV },
-    { FileChunkToken("MOPT"), WmoParser::ReadMOPT },
-    { FileChunkToken("MOPR"), WmoParser::ReadMOPR },
+    { FileChunkToken("MOGN"), Parser::ReadMOGN },
+    { FileChunkToken("MOGI"), Parser::ReadMOGI },
+    { FileChunkToken("MOSI"), Parser::ReadMOSI },
+    { FileChunkToken("MOPV"), Parser::ReadMOPV },
+    { FileChunkToken("MOPT"), Parser::ReadMOPT },
+    { FileChunkToken("MOPR"), Parser::ReadMOPR },
     { FileChunkToken("MOVV"), nullptr },
     { FileChunkToken("MOVB"), nullptr },
-    { FileChunkToken("MOLT"), WmoParser::ReadMOLT },
+    { FileChunkToken("MOLT"), Parser::ReadMOLT },
     { FileChunkToken("MOLV"), nullptr },
-    { FileChunkToken("MODS"), WmoParser::ReadMODS },
-    { FileChunkToken("MODI"), WmoParser::ReadMODI },
-    { FileChunkToken("MODD"), WmoParser::ReadMODD },
+    { FileChunkToken("MODS"), Parser::ReadMODS },
+    { FileChunkToken("MODI"), Parser::ReadMODI },
+    { FileChunkToken("MODD"), Parser::ReadMODD },
     { FileChunkToken("MFOG"), nullptr }, // Read these when we have FOG support.
     { FileChunkToken("MCVP"), nullptr },
-    { FileChunkToken("GFID"), WmoParser::ReadGFID },
+    { FileChunkToken("GFID"), Parser::ReadGFID },
     { FileChunkToken("MDDI"), nullptr },
     { FileChunkToken("MPVD"), nullptr },
     { FileChunkToken("MAVG"), nullptr },
@@ -40,19 +40,19 @@ robin_hood::unordered_map<u32, std::function<bool(const WmoParser::ParseType par
     { FileChunkToken("MDDL"), nullptr },
 
     // WMO Group Chunks
-    { FileChunkToken("MOGP"), WmoParser::ReadMOGP },
-    { FileChunkToken("MOPY"), WmoParser::ReadMOPY },
-    { FileChunkToken("MOVI"), WmoParser::ReadMOVI },
+    { FileChunkToken("MOGP"), Parser::ReadMOGP },
+    { FileChunkToken("MOPY"), Parser::ReadMOPY },
+    { FileChunkToken("MOVI"), Parser::ReadMOVI },
     { FileChunkToken("MOVX"), nullptr },
-    { FileChunkToken("MOVT"), WmoParser::ReadMOVT },
-    { FileChunkToken("MONR"), WmoParser::ReadMONR },
-    { FileChunkToken("MOTV"), WmoParser::ReadMOTV },
-    { FileChunkToken("MOBA"), WmoParser::ReadMOBA },
+    { FileChunkToken("MOVT"), Parser::ReadMOVT },
+    { FileChunkToken("MONR"), Parser::ReadMONR },
+    { FileChunkToken("MOTV"), Parser::ReadMOTV },
+    { FileChunkToken("MOBA"), Parser::ReadMOBA },
     { FileChunkToken("MOLR"), nullptr },
     { FileChunkToken("MODR"), nullptr },
     { FileChunkToken("MOBN"), nullptr },
     { FileChunkToken("MOBR"), nullptr },
-    { FileChunkToken("MOCV"), WmoParser::ReadMOCV },
+    { FileChunkToken("MOCV"), Parser::ReadMOCV },
     { FileChunkToken("MLIQ"), nullptr },
     { FileChunkToken("MORI"), nullptr },
     { FileChunkToken("MORB"), nullptr },
@@ -85,7 +85,7 @@ robin_hood::unordered_map<u32, std::function<bool(const WmoParser::ParseType par
     { FileChunkToken("MPBG"), nullptr },
 };
 
-bool WmoParser::TryParse(const ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, Layout& out)
+bool Parser::TryParse(const ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, Layout& out)
 {
     if (!buffer)
         return false;
@@ -99,7 +99,7 @@ bool WmoParser::TryParse(const ParseType parseType, std::shared_ptr<Bytebuffer>&
     return true;
 }
 
-bool WmoParser::ParseBufferOrderIndependent(ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ParseBufferOrderIndependent(ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     FileChunkHeader header;
 
@@ -111,7 +111,7 @@ bool WmoParser::ParseBufferOrderIndependent(ParseType parseType, std::shared_ptr
         auto itr = _wmoFileChunkToFunction.find(header.token);
         if (itr == _wmoFileChunkToFunction.end())
         {
-            DebugHandler::PrintError("[WmoParser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
+            DebugHandler::PrintError("[Parser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
             return false;
         }
 
@@ -130,7 +130,7 @@ bool WmoParser::ParseBufferOrderIndependent(ParseType parseType, std::shared_ptr
     return true;
 }
 
-bool WmoParser::ReadMVER(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMVER(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     switch (parseType)
     {
@@ -157,21 +157,21 @@ bool WmoParser::ReadMVER(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOHD(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOHD(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!buffer->Get(layout.mohd))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMOMT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOMT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.momt.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMOGN(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOGN(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     layout.mogn.numBytes = header.size;
     layout.mogn.groupNames = buffer->GetReadPointer();
@@ -179,70 +179,70 @@ bool WmoParser::ReadMOGN(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOGI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOGI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mogi.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMOSI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOSI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!buffer->Get(layout.mosi))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMOPV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOPV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mopv.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMOPT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOPT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mopt.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMOPR(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOPR(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mopr.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMOLT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOLT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.molt.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMODS(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMODS(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mods.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMODI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMODI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.modi.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadMODD(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMODD(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.modd.data))
         return false;
 
     return true;
 }
-bool WmoParser::ReadGFID(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadGFID(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.gfid.data))
         return false;
@@ -250,7 +250,7 @@ bool WmoParser::ReadGFID(const ParseType parseType, const FileChunkHeader& heade
     return true;
 }
 
-bool WmoParser::ReadMOGP(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOGP(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 
@@ -259,7 +259,7 @@ bool WmoParser::ReadMOGP(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOPY(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOPY(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 
@@ -268,7 +268,7 @@ bool WmoParser::ReadMOPY(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOVI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOVI(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 
@@ -277,7 +277,7 @@ bool WmoParser::ReadMOVI(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOVT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOVT(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 
@@ -286,7 +286,7 @@ bool WmoParser::ReadMOVT(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMONR(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMONR(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 
@@ -295,7 +295,7 @@ bool WmoParser::ReadMONR(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOTV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOTV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 
@@ -305,7 +305,7 @@ bool WmoParser::ReadMOTV(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOBA(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOBA(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 
@@ -314,7 +314,7 @@ bool WmoParser::ReadMOBA(const ParseType parseType, const FileChunkHeader& heade
 
     return true;
 }
-bool WmoParser::ReadMOCV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+bool Parser::ReadMOCV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     WMOGroup& group = layout.groups.back();
 

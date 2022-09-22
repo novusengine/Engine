@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace ADT
+namespace Adt
 {
 PRAGMA_NO_PADDING_START;
 	struct MCCV // MCCV provides us with vertex shading information for the vertices
@@ -399,7 +399,7 @@ PRAGMA_NO_PADDING_START;
 		FileIDs fileIDs[Terrain::CHUNK_NUM_PER_MAP_STRIDE][Terrain::CHUNK_NUM_PER_MAP_STRIDE] = {};
 	};
 
-	struct WDT
+	struct Wdt
 	{
 	public:
 		MVER mver = { };

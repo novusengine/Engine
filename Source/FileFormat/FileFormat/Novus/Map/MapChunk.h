@@ -7,7 +7,7 @@
 
 #include <vector>
 
-namespace ADT
+namespace Adt
 {
     struct Layout;
 }
@@ -77,10 +77,10 @@ PRAGMA_NO_PADDING_START;
         std::vector<Terrain::Placement> complexModelPlacements = { };
 
     public:
-        bool Save(std::string& path);
+        bool Save(const std::string& path);
 
         static bool Read(std::shared_ptr<Bytebuffer>& buffer, Chunk& out);
-        static bool FromADT(ADT::Layout& layout, Chunk& out);
+        static bool FromADT(Adt::Layout& layout, Chunk& out);
     };
 PRAGMA_NO_PADDING_END;
 }

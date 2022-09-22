@@ -4,20 +4,20 @@
 
 #include <Base/Util/DebugHandler.h>
 
-using namespace ADT;
+using namespace Adt;
 
-robin_hood::unordered_map<u32, std::function<bool(AdtParser::ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, const WDT&, Layout&)>> AdtParser::_adtFileChunkToFunction =
+robin_hood::unordered_map<u32, std::function<bool(Parser::ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, const Wdt&, Layout&)>> Parser::_adtFileChunkToFunction =
 {
-    { FileChunkToken("MVER"), AdtParser::ReadMVER },
-    { FileChunkToken("MHDR"), AdtParser::ReadMHDR },
-    { FileChunkToken("MDID"), AdtParser::ReadMDID },
-    { FileChunkToken("MHID"), AdtParser::ReadMHID },
-    { FileChunkToken("MDDF"), AdtParser::ReadMDDF },
-    { FileChunkToken("MODF"), AdtParser::ReadMODF },
-    { FileChunkToken("MFBO"), AdtParser::ReadMFBO },
-    { FileChunkToken("MTXF"), AdtParser::ReadMTXF },
+    { FileChunkToken("MVER"), Parser::ReadMVER },
+    { FileChunkToken("MHDR"), Parser::ReadMHDR },
+    { FileChunkToken("MDID"), Parser::ReadMDID },
+    { FileChunkToken("MHID"), Parser::ReadMHID },
+    { FileChunkToken("MDDF"), Parser::ReadMDDF },
+    { FileChunkToken("MODF"), Parser::ReadMODF },
+    { FileChunkToken("MFBO"), Parser::ReadMFBO },
+    { FileChunkToken("MTXF"), Parser::ReadMTXF },
     { FileChunkToken("MAMP"), nullptr             },
-    { FileChunkToken("MH2O"), AdtParser::ReadMH2O },
+    { FileChunkToken("MH2O"), Parser::ReadMH2O },
     { FileChunkToken("MTXP"), nullptr             },
     { FileChunkToken("MCBB"), nullptr             },
     { FileChunkToken("MBMH"), nullptr             },
@@ -31,14 +31,14 @@ robin_hood::unordered_map<u32, std::function<bool(AdtParser::ParseContext& conte
     { FileChunkToken("MTCG"), nullptr             },
 
     // MCNK and it's sub chunks
-    { FileChunkToken("MCNK"), AdtParser::ReadMCNK },
-    { FileChunkToken("MCVT"), AdtParser::ReadMCVT },
+    { FileChunkToken("MCNK"), Parser::ReadMCNK },
+    { FileChunkToken("MCVT"), Parser::ReadMCVT },
     { FileChunkToken("MCLV"), nullptr },
-    { FileChunkToken("MCCV"), AdtParser::ReadMCCV },
-    { FileChunkToken("MCLY"), AdtParser::ReadMCLY },
-    { FileChunkToken("MCAL"), AdtParser::ReadMCAL },
+    { FileChunkToken("MCCV"), Parser::ReadMCCV },
+    { FileChunkToken("MCLY"), Parser::ReadMCLY },
+    { FileChunkToken("MCAL"), Parser::ReadMCAL },
     { FileChunkToken("MCSH"), nullptr },
-    { FileChunkToken("MCNR"), AdtParser::ReadMCNR },
+    { FileChunkToken("MCNR"), Parser::ReadMCNR },
     { FileChunkToken("MCRD"), nullptr },
     { FileChunkToken("MCRW"), nullptr },
     { FileChunkToken("MCLQ"), nullptr },
@@ -53,7 +53,7 @@ robin_hood::unordered_map<u32, std::function<bool(AdtParser::ParseContext& conte
     { FileChunkToken("MWID"), nullptr }
 };
 
-bool AdtParser::TryParse(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& textureBuffer, std::shared_ptr<Bytebuffer>& objectBuffer, const WDT& wdt, Layout& out)
+bool Parser::TryParse(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& textureBuffer, std::shared_ptr<Bytebuffer>& objectBuffer, const Wdt& wdt, Layout& out)
 {
     if (!rootBuffer)
         return false;
@@ -85,7 +85,7 @@ bool AdtParser::TryParse(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_pt
     return true;
 }
 
-bool AdtParser::ParseBufferOrderIndependent(ParseContext& context, ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ParseBufferOrderIndependent(ParseContext& context, ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     FileChunkHeader header;
 
@@ -97,7 +97,7 @@ bool AdtParser::ParseBufferOrderIndependent(ParseContext& context, ParseType par
         auto itr = _adtFileChunkToFunction.find(header.token);
         if (itr == _adtFileChunkToFunction.end())
         {
-            DebugHandler::PrintError("[AdtParser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
+            DebugHandler::PrintError("[Parser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
             return false;
         }
 
@@ -116,14 +116,14 @@ bool AdtParser::ParseBufferOrderIndependent(ParseContext& context, ParseType par
     return true;
 }
 
-bool AdtParser::ReadMVER(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMVER(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!buffer->Get(layout.mver))
         return false;
 
     return true;
 }
-bool AdtParser::ReadMHDR(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMHDR(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     u32 mhdrOffset = static_cast<u32>(buffer->readData);
 
@@ -138,49 +138,49 @@ bool AdtParser::ReadMHDR(ParseContext& context, const AdtParser::ParseType parse
 
     return true;
 }
-bool AdtParser::ReadMDID(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMDID(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mdid.data))
         return false;
 
     return true;
 }
-bool AdtParser::ReadMHID(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMHID(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mhid.data))
         return false;
 
     return true;
 }
-bool AdtParser::ReadMDDF(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMDDF(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mddf.data))
         return false;
 
     return true;
 }
-bool AdtParser::ReadMODF(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMODF(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.modf.data))
         return false;
 
     return true;
 }
-bool AdtParser::ReadMFBO(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMFBO(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!buffer->Get(layout.mfbo))
         return false;
 
     return true;
 }
-bool AdtParser::ReadMTXF(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMTXF(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mtxf.data))
         return false;
 
     return true;
 }
-bool AdtParser::ReadMH2O(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMH2O(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     size_t bufferStartRead = buffer->readData;
 
@@ -291,12 +291,12 @@ bool AdtParser::ReadMH2O(ParseContext& context, const AdtParser::ParseType parse
 
     return true;
 }
-bool AdtParser::ReadMCNK(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMCNK(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     context.currentMCNKIndex++;
 
-    if (parseType == AdtParser::ParseType::Texture ||
-        parseType == AdtParser::ParseType::Object)
+    if (parseType == Parser::ParseType::Texture ||
+        parseType == Parser::ParseType::Object)
         return true;
 
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
@@ -306,7 +306,7 @@ bool AdtParser::ReadMCNK(ParseContext& context, const AdtParser::ParseType parse
 
     return true;
 }
-bool AdtParser::ReadMCVT(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMCVT(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -315,7 +315,7 @@ bool AdtParser::ReadMCVT(ParseContext& context, const AdtParser::ParseType parse
 
     return true;
 }
-bool AdtParser::ReadMCLY(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMCLY(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -324,7 +324,7 @@ bool AdtParser::ReadMCLY(ParseContext& context, const AdtParser::ParseType parse
 
     return true;
 }
-bool AdtParser::ReadMCAL(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMCAL(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -424,7 +424,7 @@ bool AdtParser::ReadMCAL(ParseContext& context, const AdtParser::ParseType parse
     buffer->SkipRead(header.size);
     return true;
 }
-bool AdtParser::ReadMCNR(ParseContext& context, const AdtParser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMCNR(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -438,7 +438,7 @@ bool AdtParser::ReadMCNR(ParseContext& context, const AdtParser::ParseType parse
 
     return true;
 }
-bool AdtParser::ReadMCCV(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const WDT& wdt, Layout& layout)
+bool Parser::ReadMCCV(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
