@@ -381,7 +381,7 @@ namespace ShaderCooker
 
                         char* blob;
                         size_t size;
-                        if (!dxcBridge.Compile(shader.path, shader.source, blob, size))
+                        if (!dxcBridge.Compile(shader.path, shader.source, blob, size, _sourceDirPath))
                         {
                             DebugHandler::PrintError("Failed to compile");
                             didFail = true;

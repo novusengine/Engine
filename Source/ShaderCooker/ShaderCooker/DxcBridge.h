@@ -22,7 +22,7 @@ namespace ShaderCooker
         void ClearDefines();
 
         void AddIncludeDir(std::filesystem::path path);
-        bool Compile(std::filesystem::path path, std::string& source, char*& blob, size_t& blobSize);
+        bool Compile(std::filesystem::path path, std::string& source, char*& blob, size_t& blobSize, std::filesystem::path sourceDir);
 
     private:
         bool GetProfileFromFilename(std::filesystem::path filename, std::wstring& profile, std::wstring& profileType);

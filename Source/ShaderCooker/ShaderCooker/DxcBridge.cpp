@@ -205,7 +205,17 @@ namespace ShaderCooker
         return defines;
     }
 
-    bool DxcBridge::Compile(std::filesystem::path path, std::string& source, char*& blob, size_t& blobSize)
+    void replaceAll(std::string& str, const std::string& from, const std::string& to) {
+        if (from.empty())
+            return;
+        size_t start_pos = 0;
+        while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+            str.replace(start_pos, from.length(), to);
+            start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+        }
+    }
+
+    bool DxcBridge::Compile(std::filesystem::path path, std::string& source, char*& blob, size_t& blobSize, std::filesystem::path sourceDir)
     {
         DxcBridgeData* data = static_cast<DxcBridgeData*>(_data);
 
@@ -284,17 +294,28 @@ namespace ShaderCooker
             }
 
             std::string error((const char*)printBlob->GetBufferPointer());
+            std::string fixedError = error;
+            
+            // Fix clickable links for included files
+            size_t firstSemiColon = error.find_first_of(':');
+            std::string errorRelativePath = error.substr(0, firstSemiColon);
 
-            if (StringUtils::BeginsWith(error, path.filename().string()))
+            bool hasIncludeError = errorRelativePath[0] == '.';
+            if (hasIncludeError)
             {
-                // This can't be an ErrorPrint or it won't be clickable in the Error List, just a regular Print will work fine
-                DebugHandler::Print("{}{}\n", path.parent_path().string().c_str(), error.c_str());
+                std::string errorFixedPath = sourceDir.string() + "/" + errorRelativePath.substr(2);
+
+                
+                replaceAll(fixedError, errorRelativePath, errorFixedPath);
             }
-            else
-            {
-                DebugHandler::Print("{}\n", error.c_str());
-            }
-                        
+
+            // Fix clickable links for original file
+            std::string filenameString = path.filename().string();
+            std::string pathString = path.string();
+            replaceAll(fixedError, filenameString, pathString);
+
+            DebugHandler::Print("%s\n", fixedError.c_str());
+        
             return false;
         }
 

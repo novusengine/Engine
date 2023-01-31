@@ -101,6 +101,11 @@ namespace Renderer
             createInfo.codeSize = binary.size();
             createInfo.pCode = reinterpret_cast<const uint32_t*>(binary.data());
 
+            if (createInfo.codeSize == 0)
+            {
+                DebugHandler::PrintFatal("ShaderHandlerVK::CreateShaderModule Tried to load shader with size 0, did you forget Permutation Fields?");
+            }
+
             VkShaderModule shaderModule;
             if (vkCreateShaderModule(_device->_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
             {

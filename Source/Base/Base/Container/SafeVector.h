@@ -64,6 +64,13 @@ public:
         _vector.resize(newSize);
     }
 
+    void Grow(size_t growthSize)
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        size_t size = _vector.size();
+        _vector.resize(size + growthSize);
+    }
+
     void Reserve(size_t reserveSize)
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);

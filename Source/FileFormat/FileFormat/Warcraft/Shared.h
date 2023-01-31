@@ -31,6 +31,7 @@ namespace Terrain
     constexpr u16 CELL_TOTAL_GRID_SIZE          = CELL_INNER_GRID_SIZE + CELL_OUTER_GRID_SIZE;
     constexpr u32 CELL_NUM_PATCHES_PER_STRIDE   = 8;
     constexpr u32 CELL_NUM_PATCHES              = CELL_NUM_PATCHES_PER_STRIDE * CELL_NUM_PATCHES_PER_STRIDE;
+    constexpr u32 CELL_NUM_INDICES              = 768;
 
     constexpr f32 PATCH_SIZE                    = CELL_SIZE / CELL_NUM_PATCHES_PER_STRIDE;
     constexpr f32 PATCH_HALF_SIZE               = PATCH_SIZE / 2.0f;

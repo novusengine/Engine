@@ -728,7 +728,7 @@ namespace Renderer
 
                 texture.width = gliTexture.extent().x;
                 texture.height = gliTexture.extent().y;
-                texture.layers = static_cast<i32>(gliTexture.layers());
+                texture.layers = gliTexture.extent().z;//static_cast<i32>(gliTexture.layers());
                 texture.mipLevels = static_cast<i32>(gliTexture.levels());
 
                 texture.format = vkGetFormatFromOpenGLInternalFormat(gliFormat.Internal);

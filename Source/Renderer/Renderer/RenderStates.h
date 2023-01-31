@@ -6,6 +6,23 @@ namespace Renderer
 {
     static const int MAX_RENDER_TARGETS = 8;
 
+    struct IndirectDraw
+    {
+        u32 vertexCount;
+        u32 instanceCount;
+        u32 firstVertex;
+        u32 firstInstance;
+    };
+
+    struct IndexedIndirectDraw
+    {
+        u32 indexCount;
+        u32 instanceCount;
+        u32 firstIndex;
+        i32 vertexOffset;
+        u32 firstInstance;
+    };
+
     PRAGMA_NO_PADDING_START;
     enum class FillMode
     {
