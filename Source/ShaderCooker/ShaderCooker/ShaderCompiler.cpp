@@ -198,7 +198,7 @@ namespace ShaderCooker
                                 if (shader.source.length() == 0)
                                 {
                                     _shaders.pop_back();
-                                    DebugHandler::PrintError("Compiler failed to read script (%s)", itr->string().c_str());
+                                    DebugHandler::PrintError("Compiler failed to read script ({0})", itr->string().c_str());
                                     itr = _stageInfo.paths.erase(itr);
                                     _numFailedShaders++;
                                     continue;
@@ -222,7 +222,7 @@ namespace ShaderCooker
                         continue;
                     }
 
-                    DebugHandler::PrintError("Compiler failed to find path (%s)", path.c_str());
+                    DebugHandler::PrintError("Compiler failed to find path ({0})", path.c_str());
                     _numFailedShaders++;
                 }
 
@@ -364,7 +364,7 @@ namespace ShaderCooker
 
                     if (numPermutations > 1)
                     {
-                        DebugHandler::Print(">> Generated %u permutations from %s", numPermutations, shader.name.c_str());
+                        DebugHandler::Print(">> Generated {0} permutations from {1}", numPermutations, shader.name.c_str());
                     }
 
                     bool didFail = false;
@@ -462,7 +462,7 @@ namespace ShaderCooker
 
         filename += extension;
 
-        DebugHandler::Print("Compiling: %s", filename.c_str());
+        DebugHandler::Print("Compiling: {0}", filename.c_str());
     }
 
 }

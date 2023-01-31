@@ -288,11 +288,11 @@ namespace ShaderCooker
             if (StringUtils::BeginsWith(error, path.filename().string()))
             {
                 // This can't be an ErrorPrint or it won't be clickable in the Error List, just a regular Print will work fine
-                DebugHandler::Print("%s%s\n", path.parent_path().c_str(), error.c_str());
+                DebugHandler::Print("{}{}\n", path.parent_path().string().c_str(), error.c_str());
             }
             else
             {
-                DebugHandler::Print("%s\n", error.c_str());
+                DebugHandler::Print("{}\n", error.c_str());
             }
                         
             return false;

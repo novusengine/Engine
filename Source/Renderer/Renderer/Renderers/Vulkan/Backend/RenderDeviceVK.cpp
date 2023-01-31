@@ -111,11 +111,11 @@ namespace Renderer
         {
             if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
             {
-                DebugHandler::PrintError("Validation layer: %s", pCallbackData->pMessage);
+                DebugHandler::PrintError("Validation layer: {0}", pCallbackData->pMessage);
             }
             else if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
             {
-                DebugHandler::PrintWarning("Validation layer: %s", pCallbackData->pMessage);
+                DebugHandler::PrintWarning("Validation layer: {0}", pCallbackData->pMessage);
             }
 
             return VK_FALSE;
@@ -549,7 +549,7 @@ namespace Renderer
 
             if (SwapChainVK::FRAME_BUFFER_COUNT < swapChainSupport.capabilities.minImageCount || SwapChainVK::FRAME_BUFFER_COUNT > swapChainSupport.capabilities.maxImageCount)
             {
-                DebugHandler::PrintFatal("Physical device does not support the requested number of swapchain images, you requested %u, and it supports between %u and %u", SwapChainVK::FRAME_BUFFER_COUNT, swapChainSupport.capabilities.minImageCount, swapChainSupport.capabilities.maxImageCount);
+                DebugHandler::PrintFatal("Physical device does not support the requested number of swapchain images, you requested {0}, and it supports between {1} and {2}", SwapChainVK::FRAME_BUFFER_COUNT, swapChainSupport.capabilities.minImageCount, swapChainSupport.capabilities.maxImageCount);
             }
 
             VkSurfaceFormatKHR surfaceFormat = swapChain->ChooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -692,14 +692,14 @@ namespace Renderer
 
             if (!deviceFeatures.samplerAnisotropy)
             {
-                DebugHandler::Print("[Renderer]: GPU Detected %s with score %i because it doesn't support sampler anisotropy", deviceProperties.deviceName, 0);
+                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support sampler anisotropy", deviceProperties.deviceName, 0);
                 return 0;
             }
 
             // Application can't function without geometry shaders
             if (!deviceFeatures.geometryShader)
             {
-                DebugHandler::Print("[Renderer]: GPU Detected %s with score %i because it doesn't support geometry shaders", deviceProperties.deviceName, 0);
+                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support geometry shaders", deviceProperties.deviceName, 0);
                 return 0;
             }
 
@@ -707,7 +707,7 @@ namespace Renderer
             QueueFamilyIndices indices = FindQueueFamilies(device);
             if (!indices.IsComplete())
             {
-                DebugHandler::Print("[Renderer]: GPU Detected %s with score %i because it doesn't support VK_QUEUE_GRAPHICS_BIT", deviceProperties.deviceName, 0);
+                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support VK_QUEUE_GRAPHICS_BIT", deviceProperties.deviceName, 0);
                 return 0;
             }
 
@@ -715,11 +715,11 @@ namespace Renderer
             bool extensionsSupported = CheckDeviceExtensionSupport(device);
             if (!extensionsSupported)
             {
-                DebugHandler::Print("[Renderer]: GPU Detected %s with score %i because it doesn't support the required extensions", deviceProperties.deviceName, 0);
+                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support the required extensions", deviceProperties.deviceName, 0);
                 return 0;
             }
 
-            DebugHandler::Print("[Renderer]: GPU Detected %s with score %i", deviceProperties.deviceName, score);
+            DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1}", deviceProperties.deviceName, score);
             return score;
         }
 
@@ -1141,11 +1141,11 @@ namespace Renderer
                 errorMessages.push_back("We requested device feature shaderStorageTexelBufferArrayNonUniformIndexing which was not supported!");
                 didError = true;
             }
-            if (requestedDescriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind && !supportedDescriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind)
-            {
-                errorMessages.push_back("We requested device feature descriptorBindingUniformBufferUpdateAfterBind which was not supported!");
-                didError = true;
-            }
+            //if (requestedDescriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind && !supportedDescriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind)
+            //{
+            //    errorMessages.push_back("We requested device feature descriptorBindingUniformBufferUpdateAfterBind which was not supported!");
+            //    didError = true;
+            //}
             if (requestedDescriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind && !supportedDescriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind)
             {
                 errorMessages.push_back("We requested device feature descriptorBindingSampledImageUpdateAfterBind which was not supported!");
@@ -1236,7 +1236,7 @@ namespace Renderer
 
                 if (!layerFound)
                 {
-                    DebugHandler::PrintFatal("We do not support a validation layer that we need to support: %s", layerName);
+                    DebugHandler::PrintFatal("We do not support a validation layer that we need to support: {0}", layerName);
                 }
             }
         }
@@ -1361,7 +1361,7 @@ namespace Renderer
                 }
                 else
                 {
-                    DebugHandler::PrintFatal("Tried to use a format that wasn't uncompressed or used BC compression, what is this? id: %u", format);
+                    DebugHandler::PrintFatal("Tried to use a format that wasn't uncompressed or used BC compression, what is this? id: {}", format);
                 }
 
                 curWidth = Math::Max(1, curWidth / 2);

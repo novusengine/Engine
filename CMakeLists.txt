@@ -18,4 +18,6 @@ include(CMake/Configuration.cmake)
 include(CMake/VSFilterUtils.cmake)
 
 add_subdirectory(Dependencies)
+
+include(CMake/TreatWarningsAsError.cmake)
 add_subdirectory(Source)

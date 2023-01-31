@@ -740,7 +740,7 @@ namespace Renderer
                 {
                     if (set != bindInfo.set)
                     {
-                        DebugHandler::PrintError("While creating DescriptorSet, we found BindInfo with matching name (%s) and type (%u), but it didn't match the location (%i != %i)", bindInfo.name, bindInfo.descriptorType, bindInfo.set, set);
+                        DebugHandler::PrintError("While creating DescriptorSet, we found BindInfo with matching name ({}) and type ({}), but it didn't match the location ({} != {})", bindInfo.name, bindInfo.descriptorType, bindInfo.set, set);
                     }
                 }
                 else

@@ -29,11 +29,11 @@ namespace Renderer
             {
                 if (_shaderCache->Load(SHADER_CACHE_PATH))
                 {
-                    DebugHandler::PrintSuccess("Loaded shadercache from: %s", SHADER_CACHE_PATH.string().c_str());
+                    DebugHandler::Print("Loaded shadercache from: {}", SHADER_CACHE_PATH.string().c_str());
                 }
                 else
                 {
-                    DebugHandler::Print("Creating shadercache at: %s", SHADER_CACHE_PATH.string().c_str());
+                    DebugHandler::Print("Creating shadercache at: {}", SHADER_CACHE_PATH.string().c_str());
                 }
             }
             else

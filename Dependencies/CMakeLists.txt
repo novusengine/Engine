@@ -37,6 +37,7 @@ add_subdirectory(glfw)
 add_subdirectory(gli)
 add_subdirectory(imgui)
 add_subdirectory(typesafe)
+add_subdirectory(spdlog)
 
 if(NOT TARGET tracy)
     add_subdirectory(TracyProfiler)
@@ -79,4 +80,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     glm::glm
     entt::entt
     type_safe
+    spdlog
 )
