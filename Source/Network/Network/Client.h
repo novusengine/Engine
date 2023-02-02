@@ -27,7 +27,7 @@ namespace Network
 
     public:
         bool IsConnected() { return _isConnected; }
-        std::shared_ptr<Bytebuffer> GetReadBuffer() { return _socket->GetReadBuffer(); }
+        std::shared_ptr<Bytebuffer>& GetReadBuffer() { return _socket->GetReadBuffer(); }
         std::shared_ptr<Socket> GetSocket() { return _socket; }
 
     private:

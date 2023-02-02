@@ -95,7 +95,7 @@ namespace Network
         Result SetReceiveBufferSize(size_t size);
         Result SetSendBufferSize(size_t size);
 
-        std::shared_ptr<Bytebuffer> GetReadBuffer() { return _readBuffer; }
+        std::shared_ptr<Bytebuffer>& GetReadBuffer() { return _readBuffer; }
 
     private:
         Result CreateSocket();

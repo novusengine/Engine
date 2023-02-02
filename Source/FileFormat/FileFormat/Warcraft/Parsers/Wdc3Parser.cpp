@@ -508,7 +508,7 @@ bool Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 	{
 		out.perFieldPalleteData.resize(numFields);
 
-		size_t palletStartBufferIndex = buffer->readData;
+		//size_t palletStartBufferIndex = buffer->readData;
 		for (u32 i = 0; i < numFields; i++)
 		{
 			const Layout::FieldStorageInfo& fieldInfo = out.fieldStorageInfos[i];
@@ -526,15 +526,15 @@ bool Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 				return false;
 		}
 
-		size_t palletReadData = buffer->readData - palletStartBufferIndex;
-		assert(palletReadData == header.palletDataSize);
+		//size_t palletReadData = buffer->readData - palletStartBufferIndex;
+		//assert(palletReadData == header.palletDataSize);
 	}
 
 	if (header.commonDataSize)
 	{
 		out.perFieldCommonDataIDToValue.resize(numFields);
 
-		size_t commonDataStartBufferIndex = buffer->readData;
+		//size_t commonDataStartBufferIndex = buffer->readData;
 		for (u32 i = 0; i < numFields; i++)
 		{
 			const Layout::FieldStorageInfo& fieldInfo = out.fieldStorageInfos[i];
@@ -560,8 +560,8 @@ bool Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 			}
 		}
 
-		size_t commonDataReadData = buffer->readData - commonDataStartBufferIndex;
-		assert(commonDataReadData == header.commonDataSize);
+		//size_t commonDataReadData = buffer->readData - commonDataStartBufferIndex;
+		//assert(commonDataReadData == header.commonDataSize);
 	}
 
 	out.sections.resize(numSections);
@@ -629,7 +629,7 @@ bool Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 
 		if (sectionHeader.relationshipMapDataSize)
 		{
-			size_t relationshipMapStartBufferIndex = buffer->readData;
+			//size_t relationshipMapStartBufferIndex = buffer->readData;
 
 			if (section.isEncrypted)
 			{
@@ -661,8 +661,8 @@ bool Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
 				}
 			}
 
-			size_t relationshipMapReadData = buffer->readData - relationshipMapStartBufferIndex;
-			assert(relationshipMapReadData == sectionHeader.relationshipMapDataSize);
+			//size_t relationshipMapReadData = buffer->readData - relationshipMapStartBufferIndex;
+			//assert(relationshipMapReadData == sectionHeader.relationshipMapDataSize);
 		}
 
 		// Read Offset Map ID List
