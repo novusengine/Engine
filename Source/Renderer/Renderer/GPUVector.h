@@ -5,17 +5,16 @@
 #include "Descriptors/BufferDesc.h"
 
 #include <Base/Platform.h>
-#include <Base/Container/SafeVector.h>
-#include <Base/Util/DebugHandler.h>
 #include <Base/Memory/BufferRangeAllocator.h>
+#include <Base/Util/DebugHandler.h>
 
 #include <shared_mutex>
 
 namespace Renderer
 {
-    // This is a combined SafeVector<T> with a backing GPU Buffer and BufferRangeAllocator keeping track of the offsets of the GPU Buffer
+    // This is a combined Vector<T> with a backing GPU Buffer and BufferRangeAllocator keeping track of the offsets of the GPU Buffer
     template <typename T>
-    class GPUVector : public SafeVector<T>
+    class GPUVector
     {
         struct DirtyRegion
         {
@@ -30,13 +29,10 @@ namespace Renderer
             if (offset >= allocatedBytes)
                 return;
 
-            _dirtyRegions.WriteLock([&](std::vector<DirtyRegion>& dirtyRegions)
-            {
-                DirtyRegion& dirtyRegion = dirtyRegions.emplace_back();
+            DirtyRegion& dirtyRegion = _dirtyRegions.emplace_back();
 
-                dirtyRegion.offset = offset;
-                dirtyRegion.size = size;
-            });
+            dirtyRegion.offset = offset;
+            dirtyRegion.size = size;
         }
 
         void SetDirtyElement(size_t elementIndex)
@@ -52,9 +48,7 @@ namespace Renderer
         // Returns true if we had to resize the buffer
         bool SyncToGPU(Renderer* renderer)
         {
-            std::unique_lock<std::shared_mutex> lock(SafeVector<T>::_mutex);
-
-            size_t vectorByteSize = SafeVector<T>::_vector.size() * sizeof(T);
+            size_t vectorByteSize = _vector.size() * sizeof(T);
 
             if (!_initialized)
             {
@@ -104,20 +98,17 @@ namespace Renderer
             }
 
 #ifdef NC_Debug
-            _dirtyRegions.ReadLock([&](const std::vector<DirtyRegion>& dirtyRegions)
+            for (u32 i = 0; i < _dirtyRegions.size(); i++)
             {
-                for (u32 i = 0; i < dirtyRegions.size(); i++)
+                if (_dirtyRegions[i].offset >= allocatedBytes)
                 {
-                    if (dirtyRegions[i].offset >= allocatedBytes)
-                    {
-                        DebugHandler::PrintFatal("[GPUVector] : UploadToBuffer will attempt to update a region in the buffer that ALSO exists in UpdateDirtyRegions, this will cause data corruption.");
-                    }
+                    DebugHandler::PrintFatal("[GPUVector] : UploadToBuffer will attempt to update a region in the buffer that ALSO exists in UpdateDirtyRegions, this will cause data corruption.");
                 }
-            });
+            }
 #endif
 
             // Upload everything between allocatedBytes and allocatedBytes+bytesToAllocate
-            renderer->UploadToBuffer(_buffer, allocatedBytes, SafeVector<T>::_vector.data(), allocatedBytes, bytesToAllocate);
+            renderer->UploadToBuffer(_buffer, allocatedBytes, _vector.data(), allocatedBytes, bytesToAllocate);
 
             UpdateDirtyRegions(renderer);
 
@@ -127,9 +118,7 @@ namespace Renderer
         // Returns true if we had to resize the buffer
         bool ForceSyncToGPU(Renderer* renderer)
         {
-            std::unique_lock<std::shared_mutex> lock(SafeVector<T>::_mutex);
-
-            size_t vectorByteSize = SafeVector<T>::_vector.size() * sizeof(T);
+            size_t vectorByteSize = _vector.size() * sizeof(T);
 
             if (vectorByteSize == 0) // Not sure about this
                 return false;
@@ -165,7 +154,7 @@ namespace Renderer
             }
 
             // Then upload the whole buffer
-            renderer->UploadToBuffer(_buffer, 0, SafeVector<T>::_vector.data(), 0, vectorByteSize);
+            renderer->UploadToBuffer(_buffer, 0, _vector.data(), 0, vectorByteSize);
 
             return didResize;
         }
@@ -180,11 +169,30 @@ namespace Renderer
             _usage = usage;
         }
 
-        // This shadows Clear() in SafeVector
+        size_t Size() const
+        {
+            return _vector.size();
+        }
+
+        void Resize(size_t newSize)
+        {
+            _vector.resize(newSize);
+        }
+
+        void Grow(size_t growthSize)
+        {
+            size_t size = _vector.size();
+            _vector.resize(size + growthSize);
+        }
+
+        void Reserve(size_t reserveSize)
+        {
+            _vector.reserve(reserveSize);
+        }
+
         void Clear(bool shouldSync = true)
         {
-            std::unique_lock<std::shared_mutex> lock(SafeVector<T>::_mutex);
-            SafeVector<T>::_vector.clear();
+            _vector.clear();
 
             if (shouldSync && _renderer != nullptr && _buffer != BufferID::Invalid())
             {
@@ -199,8 +207,10 @@ namespace Renderer
                 _allocator.Init(0, size);
             }
 
-            _dirtyRegions.Clear();
+            _dirtyRegions.clear();
         }
+
+        std::vector<T>& Get() { return _vector; }
 
         bool HasDirtyRegions() { return _dirtyRegions.Size() > 0; }
         bool IsValid() { return _buffer != BufferID::Invalid(); }
@@ -236,68 +246,65 @@ namespace Renderer
 
         void UpdateDirtyRegions(Renderer* renderer)
         {
-            _dirtyRegions.WriteLock([&](std::vector<DirtyRegion>& dirtyRegions)
+            if (_dirtyRegions.size() == 0)
+                return;
+
+            // Sort dirtyRegions by offset
+            std::sort(_dirtyRegions.begin(), _dirtyRegions.end(), [](const DirtyRegion& a, const DirtyRegion& b)
             {
-                if (dirtyRegions.size() == 0)
-                    return;
-
-                // Sort dirtyRegions by offset
-                std::sort(dirtyRegions.begin(), dirtyRegions.end(), [](const DirtyRegion& a, const DirtyRegion& b)
-                {
-                    return a.offset < b.offset;
-                });
-
-                u32 numDirtyRegions = static_cast<u32>(dirtyRegions.size());
-
-                std::vector<u32> regionIndexToRemove;
-                regionIndexToRemove.reserve(numDirtyRegions);
-
-                i64 lastRegionEnd = -1;
-                u32 lastRegionIndex = 0;
-
-                for (u32 i = 0; i < numDirtyRegions; i++)
-                {
-                    DirtyRegion& curRegion = dirtyRegions[i];
-                    i64 curRegionEnd = static_cast<i64>(curRegion.offset + curRegion.size);
-
-                    // curRegionEnd exists completely inside of lastRegionEnd
-                    if (lastRegionEnd >= curRegionEnd)
-                    {
-                        regionIndexToRemove.push_back(i);
-                    }
-                    // Partial Overlap / Merge detected
-                    else if (lastRegionEnd >= static_cast<i64>(curRegion.offset))
-                    {
-                        DirtyRegion& prevRegion = dirtyRegions[lastRegionIndex];
-
-                        i64 sizeDiff = curRegionEnd - lastRegionEnd;
-                        prevRegion.size += sizeDiff;
-
-                        regionIndexToRemove.push_back(i);
-                    }
-                    else
-                    {
-                        lastRegionIndex = i;
-                    }
-
-                    lastRegionEnd = glm::max(lastRegionEnd, curRegionEnd);
-                }
-                
-                i32 numDirtyRegionsToRemove = static_cast<i32>(regionIndexToRemove.size());
-                for (i32 i = numDirtyRegionsToRemove - 1; i >= 0; i--)
-                {
-                    u32 index = regionIndexToRemove[i];
-                    dirtyRegions.erase(dirtyRegions.begin() + index);
-                }
-                
-                // Upload for all remaining dirtyRegions
-                for (const DirtyRegion& dirtyRegion : dirtyRegions)
-                {
-                    renderer->UploadToBuffer(_buffer, dirtyRegion.offset, SafeVector<T>::_vector.data(), dirtyRegion.offset, dirtyRegion.size);
-                }
-
-                dirtyRegions.clear();
+                return a.offset < b.offset;
             });
+
+            u32 numDirtyRegions = static_cast<u32>(_dirtyRegions.size());
+
+            std::vector<u32> regionIndexToRemove;
+            regionIndexToRemove.reserve(numDirtyRegions);
+
+            i64 lastRegionEnd = -1;
+            u32 lastRegionIndex = 0;
+
+            for (u32 i = 0; i < numDirtyRegions; i++)
+            {
+                DirtyRegion& curRegion = _dirtyRegions[i];
+                i64 curRegionEnd = static_cast<i64>(curRegion.offset + curRegion.size);
+
+                // curRegionEnd exists completely inside of lastRegionEnd
+                if (lastRegionEnd >= curRegionEnd)
+                {
+                    regionIndexToRemove.push_back(i);
+                }
+                // Partial Overlap / Merge detected
+                else if (lastRegionEnd >= static_cast<i64>(curRegion.offset))
+                {
+                    DirtyRegion& prevRegion = _dirtyRegions[lastRegionIndex];
+
+                    i64 sizeDiff = curRegionEnd - lastRegionEnd;
+                    prevRegion.size += sizeDiff;
+
+                    regionIndexToRemove.push_back(i);
+                }
+                else
+                {
+                    lastRegionIndex = i;
+                }
+
+                lastRegionEnd = glm::max(lastRegionEnd, curRegionEnd);
+            }
+            
+            i32 numDirtyRegionsToRemove = static_cast<i32>(regionIndexToRemove.size());
+            for (i32 i = numDirtyRegionsToRemove - 1; i >= 0; i--)
+            {
+                u32 index = regionIndexToRemove[i];
+                _dirtyRegions.erase(_dirtyRegions.begin() + index);
+            }
+            
+            // Upload for all remaining dirtyRegions
+            for (const DirtyRegion& dirtyRegion : _dirtyRegions)
+            {
+                renderer->UploadToBuffer(_buffer, dirtyRegion.offset, _vector.data(), dirtyRegion.offset, dirtyRegion.size);
+            }
+
+            _dirtyRegions.clear();
         }
 
         bool _initialized = false;
@@ -308,6 +315,7 @@ namespace Renderer
         std::string _debugName = "";
         u8 _usage = 0;
 
-        SafeVector<DirtyRegion> _dirtyRegions;
+        std::vector<DirtyRegion> _dirtyRegions;
+        std::vector<T> _vector;
     };
 }

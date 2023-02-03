@@ -40,8 +40,6 @@ namespace StringUtils
         throw std::invalid_argument("Invalid input string");
     }
 
-    
-
     std::string GetLineFromCin()
     {
         std::string line;
@@ -49,7 +47,7 @@ namespace StringUtils
         return line;
     }
 
-    std::vector<std::string> SplitString(std::string string, char delim)
+    std::vector<std::string> SplitString(std::string const& string, char delim)
     {
         std::vector<std::string> results;
         std::stringstream ss(string);
