@@ -43,16 +43,14 @@ namespace Renderer
 
             std::filesystem::path path = std::filesystem::absolute(fontPath);
             std::string fontPathStr = path.string();
-            std::string fontNameStr = path.filename().string();
 
-            FileReader file(fontPathStr, fontNameStr);
+            FileReader file(fontPathStr);
             if (!file.Open())
             {
                 DebugHandler::PrintWarning("Could not open Font file %s. Using fallback font", fontPath.c_str());
 
                 path = std::filesystem::absolute(FALLBACK_FONT_PATH);
                 file.SetPath(path.string());
-                file.SetFileName(path.filename().string());
                 if (!file.Open())
                 {
                     DebugHandler::PrintFatal("Could not open Fallback Font file %s.", FALLBACK_FONT_PATH);

@@ -34,8 +34,7 @@ namespace ShaderCooker
 
         // Open the file
         std::string pathAsStr = path.string();
-        std::string filenameAsStr = path.filename().string();
-        FileReader fileReader(pathAsStr, filenameAsStr);
+        FileReader fileReader(pathAsStr);
         if (!fileReader.Open())
         {
             return false;

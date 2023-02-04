@@ -96,28 +96,36 @@ namespace DB::Client
             return true;
 		}
 
-		static bool Read(std::shared_ptr<Bytebuffer>& buffer, ClientDB& out)
+		bool Read(std::shared_ptr<Bytebuffer>& buffer)
 		{
-			out = { };
-
-			if (!buffer->Get(out.header))
+			if (!buffer->Get(header))
 				return false;
 
-			if (!buffer->Get(out.flags))
+			if (!buffer->Get(flags))
 				return false;
 
             // Read Elements
             {
+                data.clear();
+
                 u32 numElements = 0;
                 if (!buffer->GetU32(numElements))
                     return false;
 
                 if (numElements)
                 {
-                    out.mapObjectPlacements.resize(numElements);
-                    if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.data[0]), numElements * sizeof(T)))
+                    data.resize(numElements);
+                    if (!buffer->GetBytes(reinterpret_cast<u8*>(&data[0]), numElements * sizeof(T)))
                         return false;
                 }
+            }
+
+            // Read Stringtable
+            {
+                stringTable.Clear();
+
+                if (!stringTable.Deserialize(buffer.get()))
+                    return false;
             }
 
             return true;

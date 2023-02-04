@@ -7,7 +7,7 @@
 class FileReader
 {
 public:
-    FileReader(const std::string& path, const std::string& fileName) : _path(path), _fileName(fileName), _length(0) {}
+    FileReader(const std::string& path) : _path(path), _length(0) { }
     ~FileReader() { Close(); }
 
     bool Open()
@@ -42,8 +42,7 @@ public:
         buffer->writtenData += length;
     }
 
-    std::string Path() { return _path; }
-    std::string FileName() { return _fileName; }
+    const std::string& Path() { return _path; }
     size_t Length() { return _length; }
     
     void SetPath(const std::string& path)
@@ -51,15 +50,9 @@ public:
         assert(!_fileStream);
         _path = path;
     }
-    void SetFileName(const std::string& fileName)
-    {
-        assert(!_fileStream);
-        _fileName = fileName;
-    }
 
 private:
     std::ifstream _fileStream;
     std::string _path;
-    std::string _fileName;
     size_t _length;
 };
