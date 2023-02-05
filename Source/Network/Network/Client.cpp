@@ -40,7 +40,7 @@ namespace Network
         return Init(_socket->GetMode());
     }
 
-    Socket::Result Client::Init(std::shared_ptr<Socket> socket)
+    Socket::Result Client::Init(std::shared_ptr<Socket>& socket)
     {
         if (_isInitialized == true)
         {
@@ -136,7 +136,7 @@ namespace Network
         return result;
     }
 
-    Socket::Result Client::Send(std::shared_ptr<Bytebuffer> buffer)
+    Socket::Result Client::Send(std::shared_ptr<Bytebuffer>& buffer)
     {
         return Send(buffer->GetDataPointer(), buffer->writtenData);
     }

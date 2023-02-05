@@ -20,7 +20,7 @@ namespace Network
         Socket::Result Connect(std::string& hostname, u16 port);
         Socket::Result Close();
         Socket::Result Send(void* data, size_t size);
-        Socket::Result Send(std::shared_ptr<Bytebuffer> buffer);
+        Socket::Result Send(std::shared_ptr<Bytebuffer>& buffer);
 
         Socket::Result Read();
         Socket::Result Read(void* data, size_t size);
@@ -28,10 +28,10 @@ namespace Network
     public:
         bool IsConnected() { return _isConnected; }
         std::shared_ptr<Bytebuffer>& GetReadBuffer() { return _socket->GetReadBuffer(); }
-        std::shared_ptr<Socket> GetSocket() { return _socket; }
+        std::shared_ptr<Socket>& GetSocket() { return _socket; }
 
     private:
-        Socket::Result Init(std::shared_ptr<Socket> socket);
+        Socket::Result Init(std::shared_ptr<Socket>& socket);
 
     private:
         friend class Server;
