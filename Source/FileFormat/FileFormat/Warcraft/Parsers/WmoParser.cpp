@@ -41,7 +41,9 @@ robin_hood::unordered_map<u32, std::function<bool(const Parser::ParseType parseT
 
     // WMO Group Chunks
     { FileChunkToken("MOGP"), Parser::ReadMOGP },
+    { FileChunkToken("MOGX"), nullptr },
     { FileChunkToken("MOPY"), Parser::ReadMOPY },
+    { FileChunkToken("MPY2"), nullptr },
     { FileChunkToken("MOVI"), Parser::ReadMOVI },
     { FileChunkToken("MOVX"), nullptr },
     { FileChunkToken("MOVT"), Parser::ReadMOVT },
