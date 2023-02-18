@@ -6,9 +6,10 @@ add_library(${PROJECT_NAME} ${BASE_FILES})
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_precompile_headers(${PROJECT_NAME} PUBLIC "Base/base_pch.h")
 target_link_libraries(${PROJECT_NAME} PUBLIC
 	engine::dependencies
 )
 
-set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER ${ROOT_FOLDER} LINKER_LANGUAGE CXX)
+set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER ${ROOT_FOLDER} LINKER_LANGUAGE CXX UNITY_BUILD ON)
 create_vs_filters(${BASE_FILES})

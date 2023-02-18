@@ -83,11 +83,11 @@ namespace Renderer
             // Create imgui sampler
             SamplerDesc samplerDesc;
             samplerDesc.enabled = true;
-            samplerDesc.filter = Renderer::SamplerFilter::MIN_MAG_MIP_LINEAR;
-            samplerDesc.addressU = Renderer::TextureAddressMode::WRAP;
-            samplerDesc.addressV = Renderer::TextureAddressMode::WRAP;
-            samplerDesc.addressW = Renderer::TextureAddressMode::CLAMP;
-            samplerDesc.shaderVisibility = Renderer::ShaderVisibility::PIXEL;
+            samplerDesc.filter = SamplerFilter::MIN_MAG_MIP_LINEAR;
+            samplerDesc.addressU = TextureAddressMode::WRAP;
+            samplerDesc.addressV = TextureAddressMode::WRAP;
+            samplerDesc.addressW = TextureAddressMode::CLAMP;
+            samplerDesc.shaderVisibility = ShaderVisibility::PIXEL;
             _imguiSampler = _samplerHandler->CreateSampler(samplerDesc);
         }
 

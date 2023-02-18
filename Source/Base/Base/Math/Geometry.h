@@ -28,8 +28,8 @@ namespace Geometry
     struct OrientedBoundingBox
     {
         vec3 center;
-        vec3 rotation;
         vec3 extents;
+        quat rotation;
     };
 
 #pragma pack(push, 1)

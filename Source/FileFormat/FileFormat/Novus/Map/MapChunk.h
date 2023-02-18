@@ -40,10 +40,7 @@ namespace Map
 		f16 cellMinHeight = f16(10000);
 		f16 cellMaxHeight = f16(-10000);
 
-		VertexData vertexData[Terrain::CELL_TOTAL_GRID_SIZE] = { };
-		//f32 heightData[Terrain::CELL_TOTAL_GRID_SIZE] = { 0 };
-		//u8 normalData[Terrain::CELL_TOTAL_GRID_SIZE][3] = { {127}, {255}, {127} }; // This is ugly but lets us pack this data into 25% of the original size
-		//u8 colorData[Terrain::CELL_TOTAL_GRID_SIZE][3] = { {127}, {127}, {127} }; // This is ugly but lets us pack this data into 25% of the original size
+		VertexData vertexData[Terrain::CELL_TOTAL_GRID_SIZE];
 
 		u64 hole = 0;
 
@@ -82,7 +79,7 @@ namespace Map
 		HeightHeader heightHeader = { };
 		HeightBox heightBox = { };
 
-		Cell cells[Terrain::CHUNK_NUM_CELLS] = { };
+		Cell cells[Terrain::CHUNK_NUM_CELLS];
 
 		u32 chunkAlphaMapTextureHash = Terrain::TEXTURE_ID_INVALID;
 		std::vector<Terrain::Placement> mapObjectPlacements = { };

@@ -27,7 +27,7 @@ DECLARE_GENERIC_BITWISE_OPERATORS(KeybindModifier);
 
 typedef bool MousePositionUpdateFunc(f32 x, f32 y);
 typedef bool MouseScrollUpdateFunc(f32 x, f32 y);
-typedef bool KeyboardInputCallbackFunc(i32 key, KeybindAction, KeybindModifier);
+typedef bool KeyboardInputCallbackFunc(i32 key, KeybindAction action, KeybindModifier modifier);
 typedef bool CharInputCallbackFunc(u32 unicode);
 
 class KeybindGroup
