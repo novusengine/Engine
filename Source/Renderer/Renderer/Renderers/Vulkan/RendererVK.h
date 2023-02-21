@@ -28,7 +28,7 @@ namespace Renderer
     class RendererVK : public Renderer
     {
     public:
-        RendererVK();
+        RendererVK(Window* window);
 
         void InitDebug() override;
         void InitWindow(Window* window) override;

@@ -65,6 +65,7 @@
 
 #include "imgui_impl_vulkan.h"
 #include <stdio.h>
+#include <vector>
 
 // Visual Studio warnings
 #ifdef _MSC_VER
@@ -1407,6 +1408,30 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
 
     // Create the Render Pass
     {
+        std::vector<VkSubpassDependency> dependencies;
+
+        VkSubpassDependency& dependency = dependencies.emplace_back();
+        dependency.srcSubpass = 0;
+        dependency.dstSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependency.dependencyFlags = 0;
+
+        VkSubpassDependency& dependency2 = dependencies.emplace_back();
+        dependency2.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency2.dstSubpass = 0;
+        dependency2.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency2.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency2.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependency2.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependency2.dependencyFlags = 0;
+
         VkAttachmentDescription attachment = {};
         attachment.format = wd->SurfaceFormat.format;
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1423,21 +1448,15 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &color_attachment;
-        VkSubpassDependency dependency = {};
-        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependency.dstSubpass = 0;
-        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.srcAccessMask = 0;
-        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
         VkRenderPassCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         info.attachmentCount = 1;
         info.pAttachments = &attachment;
         info.subpassCount = 1;
         info.pSubpasses = &subpass;
-        info.dependencyCount = 1;
-        info.pDependencies = &dependency;
+        info.dependencyCount = static_cast<unsigned int>(dependencies.size());
+        info.pDependencies = dependencies.data();
         err = vkCreateRenderPass(device, &info, allocator, &wd->RenderPass);
         check_vk_result(err);
 

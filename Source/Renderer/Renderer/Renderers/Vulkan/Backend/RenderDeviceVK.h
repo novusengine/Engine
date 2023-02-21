@@ -50,6 +50,7 @@ namespace Renderer
         class RenderDeviceVK
         {
         public:
+            RenderDeviceVK(Window* window);
             ~RenderDeviceVK();
 
             void Init();
@@ -109,6 +110,7 @@ namespace Renderer
 
             static PFN_vkCmdDrawIndexedIndirectCountKHR fnVkCmdDrawIndexedIndirectCountKHR;
         private:
+            Window* _window;
             uvec2 _mainWindowSize;
             vec2 _renderSize = vec2(1, 1);
 

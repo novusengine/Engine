@@ -11,8 +11,10 @@
 
 #pragma warning (push)
 #pragma warning(disable : 4005)
+#define GLFW_EXPOSE_NATIVE_WIN32
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #pragma warning(pop)
 
 #include <Base/Util/DebugHandler.h>
@@ -52,6 +54,12 @@ namespace Renderer
             "VK_EXT_descriptor_indexing",
             "VK_EXT_sampler_filter_minmax"
         };
+
+        RenderDeviceVK::RenderDeviceVK(Window* window)
+            : _window(window)
+        {
+
+        }
 
         RenderDeviceVK::~RenderDeviceVK()
         {
@@ -160,6 +168,30 @@ namespace Renderer
 
             // Create the Render Pass
             {
+                std::vector<VkSubpassDependency> dependencies;
+
+                VkSubpassDependency& dependency = dependencies.emplace_back();
+                dependency.srcSubpass = 0;
+                dependency.dstSubpass = VK_SUBPASS_EXTERNAL;
+                dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                dependency.dependencyFlags = 0;
+
+                VkSubpassDependency& dependency2 = dependencies.emplace_back();
+                dependency2.srcSubpass = VK_SUBPASS_EXTERNAL;
+                dependency2.dstSubpass = 0;
+                dependency2.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                dependency2.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                dependency2.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                dependency2.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                dependency2.dependencyFlags = 0;
+
                 VkAttachmentDescription attachment = {};
                 attachment.format = VK_FORMAT_R16G16B16A16_SFLOAT;
                 attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -176,21 +208,15 @@ namespace Renderer
                 subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                 subpass.colorAttachmentCount = 1;
                 subpass.pColorAttachments = &color_attachment;
-                VkSubpassDependency dependency = {};
-                dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-                dependency.dstSubpass = 0;
-                dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                dependency.srcAccessMask = 0;
-                dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                
                 VkRenderPassCreateInfo info = {};
                 info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
                 info.attachmentCount = 1;
                 info.pAttachments = &attachment;
                 info.subpassCount = 1;
                 info.pSubpasses = &subpass;
-                info.dependencyCount = 1;
-                info.pDependencies = &dependency;
+                info.dependencyCount = static_cast<u32>(dependencies.size());
+                info.pDependencies = dependencies.data();
                 vkCreateRenderPass(_device, &info, nullptr, &_imguiContext->imguiPass);
             }
 
@@ -752,6 +778,7 @@ namespace Renderer
                 }
                 
                 VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
+                surfaceCreateInfo.hwnd = glfwGetWin32Window(_window->GetWindow());
                 VkSurfaceKHR surface;
                 vkCreateWin32SurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &surface);
 

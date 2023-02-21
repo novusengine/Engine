@@ -27,8 +27,8 @@
 
 namespace Renderer
 {
-    RendererVK::RendererVK()
-        : _device(new Backend::RenderDeviceVK())
+    RendererVK::RendererVK(Window* window)
+        : _device(new Backend::RenderDeviceVK(window))
     {
         // Create handlers
         _bufferHandler = new Backend::BufferHandlerVK();
