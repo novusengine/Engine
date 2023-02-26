@@ -24,13 +24,34 @@ namespace Model
 		// Write Header
 		{
 			output.write(reinterpret_cast<const char*>(&header), sizeof(FileHeader));
+
+		}
+
+		// Set Model Header
+		{
+			modelHeader.numVertices = static_cast<u32>(vertices.size());
+
+			modelHeader.numVertexLookupIDs = static_cast<u32>(modelData.vertexLookupIDs.size());
+			modelHeader.numIndices = static_cast<u32>(modelData.indices.size());
+			modelHeader.numRenderBatches = static_cast<u32>(modelData.renderBatches.size());
+
+			modelHeader.numTextures = static_cast<u32>(textures.size());
+			modelHeader.numMaterials = static_cast<u32>(materials.size());
+			modelHeader.numTextureTransforms = static_cast<u32>(textureTransforms.size());
+
+			modelHeader.numSequences = static_cast<u32>(sequences.size());
+			modelHeader.numBones = static_cast<u32>(bones.size());
+		}
+
+		// Write Model Header
+		{
+			output.write(reinterpret_cast<const char*>(&modelHeader), sizeof(ModelHeader));
 			output.write(reinterpret_cast<const char*>(&flags), sizeof(ComplexModel::Flags));
 		}
 
 		// Write Sequences
 		{
-			u32 numElements = static_cast<u32>(sequences.size());
-			output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+			u32 numElements = modelHeader.numSequences;
 
 			if (numElements > 0)
 			{
@@ -40,8 +61,7 @@ namespace Model
 
 		// Write Bones
 		{
-			u32 numElements = static_cast<u32>(bones.size());
-			output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+			u32 numElements = modelHeader.numBones;
 
 			if (numElements > 0)
 			{
@@ -64,8 +84,7 @@ namespace Model
 
 		// Write Vertices
 		{
-			u32 numVertices = static_cast<u32>(vertices.size());
-			output.write(reinterpret_cast<const char*>(&numVertices), sizeof(u32));
+			u32 numVertices = modelHeader.numVertices;
 
 			if (numVertices > 0)
 			{
@@ -75,8 +94,7 @@ namespace Model
 
 		// Write Textures
 		{
-			u32 numTextures = static_cast<u32>(textures.size());
-			output.write(reinterpret_cast<const char*>(&numTextures), sizeof(u32));
+			u32 numTextures = modelHeader.numTextures;
 
 			if (numTextures > 0)
 			{
@@ -93,8 +111,7 @@ namespace Model
 
 		// Write Materials
 		{
-			u32 numMaterials = static_cast<u32>(materials.size());
-			output.write(reinterpret_cast<const char*>(&numMaterials), sizeof(u32));
+			u32 numMaterials = modelHeader.numMaterials;
 
 			if (numMaterials > 0)
 			{
@@ -104,8 +121,7 @@ namespace Model
 
 		// Write Texture Transforms
 		{
-			u32 numTextureTransforms = static_cast<u32>(textureTransforms.size());
-			output.write(reinterpret_cast<const char*>(&numTextureTransforms), sizeof(u32));
+			u32 numTextureTransforms = modelHeader.numTextureTransforms;
 
 			if (numTextureTransforms > 0)
 			{
@@ -226,8 +242,7 @@ namespace Model
 		{
 			// Write Vertex Lookup IDs
 			{
-				u32 numVertexLookupIds = static_cast<u32>(modelData.vertexLookupIDs.size());
-				output.write(reinterpret_cast<const char*>(&numVertexLookupIds), sizeof(u32));
+				u32 numVertexLookupIds = modelHeader.numVertexLookupIDs;
 
 				if (numVertexLookupIds > 0)
 				{
@@ -237,8 +252,7 @@ namespace Model
 
 			// Write Indices
 			{
-				u32 numIndices = static_cast<u32>(modelData.indices.size());
-				output.write(reinterpret_cast<const char*>(&numIndices), sizeof(u32));
+				u32 numIndices = modelHeader.numIndices;
 
 				if (numIndices > 0)
 				{
@@ -248,8 +262,7 @@ namespace Model
 
 			// Write Render Batches
 			{
-				u32 numRenderBatches = static_cast<u32>(modelData.renderBatches.size());
-				output.write(reinterpret_cast<const char*>(&numRenderBatches), sizeof(u32));
+				u32 numRenderBatches = modelHeader.numRenderBatches;
 
 				for (u32 i = 0; i < numRenderBatches; i++)
 				{
@@ -292,21 +305,26 @@ namespace Model
 			if (!buffer->Get(out.header))
 				return false;
 
+		}
+
+		// Read Model Header
+		{
+			if (!buffer->Get(out.modelHeader))
+				return false;
+
 			if (!buffer->Get(out.flags))
 				return false;
 		}
 
 		// Read Sequences
 		{
-			if (!ReadVectorFromBuffer(buffer, out.sequences))
+			if (!buffer->GetVector(out.sequences, out.modelHeader.numSequences))
 				return false;
 		}
 
 		// Read Bones
 		{
-			u32 numElements = 0;
-			if (!buffer->GetU32(numElements))
-				return false;
+			u32 numElements = out.modelHeader.numBones;
 
 			if (numElements)
 			{
@@ -344,27 +362,25 @@ namespace Model
 
 		// Read Vertices
 		{
-			if (!ReadVectorFromBuffer(buffer, out.vertices))
+			if (!buffer->GetVector(out.vertices, out.modelHeader.numVertices))
 				return false;
 		}
 
 		// Read Textures
 		{
-			if (!ReadVectorFromBuffer(buffer, out.textures))
+			if (!buffer->GetVector(out.textures, out.modelHeader.numTextures))
 				return false;
 		}
 
 		// Read Material
 		{
-			if (!ReadVectorFromBuffer(buffer, out.materials))
+			if (!buffer->GetVector(out.materials, out.modelHeader.numMaterials))
 				return false;
 		}
 
 		// Read Texture Transforms
 		{
-			u32 numElements = 0;
-			if (!buffer->GetU32(numElements))
-				return false;
+			u32 numElements = out.modelHeader.numTextureTransforms;
 
 			if (numElements)
 			{
@@ -455,21 +471,19 @@ namespace Model
 		{
 			// Read Vertex Lookup IDs
 			{
-				if (!ReadVectorFromBuffer(buffer, out.modelData.vertexLookupIDs))
+				if (!buffer->GetVector(out.modelData.vertexLookupIDs, out.modelHeader.numVertexLookupIDs))
 					return false;
 			}
 
 			// Read Indices
 			{
-				if (!ReadVectorFromBuffer(buffer, out.modelData.indices))
+				if (!buffer->GetVector(out.modelData.indices, out.modelHeader.numIndices))
 					return false;
 			}
 
 			// Read Render Batches
 			{
-				u32 numRenderBatches = 0;
-				if (!buffer->GetU32(numRenderBatches))
-					return false;
+				u32 numRenderBatches = out.modelHeader.numRenderBatches;
 
 				if (numRenderBatches)
 				{
@@ -532,6 +546,27 @@ namespace Model
 					}
 				}
 			}
+		}
+
+		return true;
+	}
+
+	bool ComplexModel::ReadHeader(std::shared_ptr<Bytebuffer>& buffer, ModelHeader& out)
+	{
+		out = { };
+
+		FileHeader fileHeader;
+
+		// Read Header
+		{
+			if (!buffer->Get(fileHeader))
+				return false;
+		}
+
+		// Read Model Header
+		{
+			if (!buffer->Get(out))
+				return false;
 		}
 
 		return true;

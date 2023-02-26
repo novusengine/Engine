@@ -21,7 +21,7 @@ PRAGMA_NO_PADDING_START
 	struct ComplexModel
 	{
 	public:
-		static const u32 CURRENT_VERSION = 1;
+		static const u32 CURRENT_VERSION = 2;
 
 		struct Flags
 		{
@@ -351,9 +351,25 @@ PRAGMA_NO_PADDING_START
 			std::vector<u16> indices = { }; // These are relative to the index of vertexLookupIds and needs to be translated
 			std::vector<RenderBatch> renderBatches = { };
 		};
+		struct ModelHeader
+		{
+			u32 numVertices;
+
+			u32 numVertexLookupIDs;
+			u32 numIndices;
+			u32 numRenderBatches;
+
+			u32 numTextures;
+			u32 numMaterials;
+			u32 numTextureTransforms;
+
+			u32 numSequences;
+			u32 numBones;
+		};
 
 	public:
 		FileHeader header = FileHeader(FileHeader::Type::ComplexModel, CURRENT_VERSION);
+		ModelHeader modelHeader = { };
 
 		Flags flags = { };
 
@@ -385,6 +401,7 @@ PRAGMA_NO_PADDING_START
 		bool Save(const std::string& path);
 
 		static bool Read(std::shared_ptr<Bytebuffer>& buffer, ComplexModel& out);
+		static bool ReadHeader(std::shared_ptr<Bytebuffer>& buffer, ModelHeader& out);
 		static bool FromM2(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& skinBuffer, M2::Layout& layout, ComplexModel& out);
 
 	private:

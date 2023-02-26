@@ -290,6 +290,31 @@ public:
 
         return true;
     }
+    template <typename T>
+    inline bool GetVector(std::vector<T>& container, u32 numElements)
+    {
+        if (numElements)
+        {
+            container.resize(numElements);
+            if (!GetBytes(reinterpret_cast<u8*>(&container[0]), numElements * sizeof(T)))
+                return false;
+        }
+
+        return true;
+    }
+    template <typename T>
+    inline bool GetVector(std::vector<T>& container, u32 numElements, u32 offset)
+    {
+        if (numElements)
+        {
+            container.resize(numElements);
+            if (!GetBytes(reinterpret_cast<u8*>(&container[0]), numElements * sizeof(T), offset))
+                return false;
+        }
+
+        return true;
+    }
+
 
     template <typename T>
     inline bool Put(T val)
