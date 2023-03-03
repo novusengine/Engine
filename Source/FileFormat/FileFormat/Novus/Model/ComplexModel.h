@@ -341,6 +341,7 @@ PRAGMA_NO_PADDING_START
 			u32 indexStart = 0;
 			u32 indexCount = 0;
 			u8 renderPriority = 0;
+			bool isTransparent = false;
 
 			std::vector<TextureUnit> textureUnits = { };
 		};
@@ -357,7 +358,10 @@ PRAGMA_NO_PADDING_START
 
 			u32 numVertexLookupIDs;
 			u32 numIndices;
+
 			u32 numRenderBatches;
+			u32 numOpaqueRenderBatches;
+			u32 numTransparentRenderBatches;
 
 			u32 numTextures;
 			u32 numMaterials;

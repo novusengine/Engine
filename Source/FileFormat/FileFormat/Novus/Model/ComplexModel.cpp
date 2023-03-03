@@ -35,6 +35,18 @@ namespace Model
 			modelHeader.numIndices = static_cast<u32>(modelData.indices.size());
 			modelHeader.numRenderBatches = static_cast<u32>(modelData.renderBatches.size());
 
+			for (auto& renderBatch : modelData.renderBatches)
+			{
+				if (renderBatch.isTransparent)
+				{
+					modelHeader.numTransparentRenderBatches++;
+				}
+				else
+				{
+					modelHeader.numOpaqueRenderBatches++;
+				}
+			}
+
 			modelHeader.numTextures = static_cast<u32>(textures.size());
 			modelHeader.numMaterials = static_cast<u32>(materials.size());
 			modelHeader.numTextureTransforms = static_cast<u32>(textureTransforms.size());
@@ -897,6 +909,20 @@ namespace Model
 						textureUnit.vertexShaderID = GetVertexShaderID(shaderID, textureUnit.textureCount);
 						textureUnit.pixelShaderID = GetPixelShaderID(shaderID, textureUnit.textureCount);
 					}
+				}
+			}
+			
+			// Figure out if the renderbatches are opaque or transparent
+			for (auto& renderBatch : out.modelData.renderBatches)
+			{
+				if (renderBatch.textureUnits.size() > 0)
+				{
+					const Material& material = out.materials[renderBatch.textureUnits[0].materialIndex];
+					renderBatch.isTransparent = material.blendingMode != Material::BlendingMode::Opaque && material.blendingMode != Material::BlendingMode::AlphaKey;
+				}
+				else
+				{
+					renderBatch.isTransparent = false;
 				}
 			}
 		}
