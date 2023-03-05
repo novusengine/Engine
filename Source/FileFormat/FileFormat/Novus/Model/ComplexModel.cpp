@@ -24,7 +24,6 @@ namespace Model
 		// Write Header
 		{
 			output.write(reinterpret_cast<const char*>(&header), sizeof(FileHeader));
-
 		}
 
 		// Set Model Header
@@ -45,6 +44,8 @@ namespace Model
 				{
 					modelHeader.numOpaqueRenderBatches++;
 				}
+
+				modelHeader.numTextureUnits += static_cast<u32>(renderBatch.textureUnits.size());
 			}
 
 			modelHeader.numTextures = static_cast<u32>(textures.size());

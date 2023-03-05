@@ -364,6 +364,7 @@ PRAGMA_NO_PADDING_START
 			u32 numTransparentRenderBatches;
 
 			u32 numTextures;
+			u32 numTextureUnits;
 			u32 numMaterials;
 			u32 numTextureTransforms;
 
