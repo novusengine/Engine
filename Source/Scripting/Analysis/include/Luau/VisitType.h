@@ -9,7 +9,6 @@
 #include "Luau/Type.h"
 
 LUAU_FASTINT(LuauVisitRecursionLimit)
-LUAU_FASTFLAG(LuauCompleteVisitor);
 
 namespace Luau
 {
@@ -318,9 +317,10 @@ struct GenericTypeVisitor
             }
         }
         else if (auto ntv = get<NegationType>(ty))
-            visit(ty, *ntv);
-        else if (!FFlag::LuauCompleteVisitor)
-            return visit_detail::unsee(seen, ty);
+        {
+            if (visit(ty, *ntv))
+                traverse(ntv->ty);
+        }
         else
             LUAU_ASSERT(!"GenericTypeVisitor::traverse(TypeId) is not exhaustive!");
 

@@ -263,6 +263,7 @@ void TypeCloner::operator()(const TableType& t)
         arg = clone(arg, dest, cloneState);
 
     ttv->definitionModuleName = t.definitionModuleName;
+    ttv->definitionLocation = t.definitionLocation;
     ttv->tags = t.tags;
 }
 
@@ -437,6 +438,7 @@ TypeId shallowClone(TypeId ty, TypeArena& dest, const TxnLog* log, bool alwaysCl
         clone.genericPacks = ftv->genericPacks;
         clone.magicFunction = ftv->magicFunction;
         clone.dcrMagicFunction = ftv->dcrMagicFunction;
+        clone.dcrMagicRefinement = ftv->dcrMagicRefinement;
         clone.tags = ftv->tags;
         clone.argNames = ftv->argNames;
         result = dest.addType(std::move(clone));
@@ -446,6 +448,7 @@ TypeId shallowClone(TypeId ty, TypeArena& dest, const TxnLog* log, bool alwaysCl
         LUAU_ASSERT(!ttv->boundTo);
         TableType clone = TableType{ttv->props, ttv->indexer, ttv->level, ttv->scope, ttv->state};
         clone.definitionModuleName = ttv->definitionModuleName;
+        clone.definitionLocation = ttv->definitionLocation;
         clone.name = ttv->name;
         clone.syntheticName = ttv->syntheticName;
         clone.instantiatedTypeParams = ttv->instantiatedTypeParams;

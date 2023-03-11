@@ -78,6 +78,8 @@ struct NativeContext
 
     void (*luaF_close)(lua_State* L, StkId level) = nullptr;
 
+    const TValue* (*luaT_gettm)(Table* events, TMS event, TString* ename) = nullptr;
+
     double (*libm_exp)(double) = nullptr;
     double (*libm_pow)(double, double) = nullptr;
     double (*libm_fmod)(double, double) = nullptr;
@@ -94,6 +96,10 @@ struct NativeContext
     double (*libm_log)(double) = nullptr;
     double (*libm_log2)(double) = nullptr;
     double (*libm_log10)(double) = nullptr;
+    double (*libm_ldexp)(double, int) = nullptr;
+    double (*libm_round)(double) = nullptr;
+    double (*libm_frexp)(double, int*) = nullptr;
+    double (*libm_modf)(double, double*) = nullptr;
 
     // Helper functions
     bool (*forgLoopNodeIter)(lua_State* L, Table* h, int index, TValue* ra) = nullptr;

@@ -140,8 +140,6 @@ TEST_CASE("lookahead")
 
 TEST_CASE("string_interpolation_basic")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     const std::string testInput = R"(`foo {"bar"}`)";
     Luau::Allocator alloc;
     AstNameTable table(alloc);
@@ -157,10 +155,38 @@ TEST_CASE("string_interpolation_basic")
     CHECK_EQ(interpEnd.type, Lexeme::InterpStringEnd);
 }
 
+TEST_CASE("string_interpolation_full")
+{
+    ScopedFastFlag sff("LuauFixInterpStringMid", true);
+
+    const std::string testInput = R"(`foo {"bar"} {"baz"} end`)";
+    Luau::Allocator alloc;
+    AstNameTable table(alloc);
+    Lexer lexer(testInput.c_str(), testInput.size(), table);
+
+    Lexeme interpBegin = lexer.next();
+    CHECK_EQ(interpBegin.type, Lexeme::InterpStringBegin);
+    CHECK_EQ(interpBegin.toString(), "`foo {");
+
+    Lexeme quote1 = lexer.next();
+    CHECK_EQ(quote1.type, Lexeme::QuotedString);
+    CHECK_EQ(quote1.toString(), "\"bar\"");
+
+    Lexeme interpMid = lexer.next();
+    CHECK_EQ(interpMid.type, Lexeme::InterpStringMid);
+    CHECK_EQ(interpMid.toString(), "} {");
+
+    Lexeme quote2 = lexer.next();
+    CHECK_EQ(quote2.type, Lexeme::QuotedString);
+    CHECK_EQ(quote2.toString(), "\"baz\"");
+
+    Lexeme interpEnd = lexer.next();
+    CHECK_EQ(interpEnd.type, Lexeme::InterpStringEnd);
+    CHECK_EQ(interpEnd.toString(), "} end`");
+}
+
 TEST_CASE("string_interpolation_double_brace")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     const std::string testInput = R"(`foo{{bad}}bar`)";
     Luau::Allocator alloc;
     AstNameTable table(alloc);
@@ -179,8 +205,6 @@ TEST_CASE("string_interpolation_double_brace")
 
 TEST_CASE("string_interpolation_double_but_unmatched_brace")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     const std::string testInput = R"(`{{oops}`, 1)";
     Luau::Allocator alloc;
     AstNameTable table(alloc);
@@ -195,8 +219,6 @@ TEST_CASE("string_interpolation_double_but_unmatched_brace")
 
 TEST_CASE("string_interpolation_unmatched_brace")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     const std::string testInput = R"({
         `hello {"world"}
     } -- this might be incorrectly parsed as a string)";
@@ -213,8 +235,6 @@ TEST_CASE("string_interpolation_unmatched_brace")
 
 TEST_CASE("string_interpolation_with_unicode_escape")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     const std::string testInput = R"(`\u{1F41B}`)";
     Luau::Allocator alloc;
     AstNameTable table(alloc);

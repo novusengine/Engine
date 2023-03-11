@@ -3,6 +3,8 @@
 
 #include "Luau/AssemblyBuilderX64.h"
 
+#include "EmitCommon.h"
+
 #include "lobject.h"
 #include "ltm.h"
 
@@ -23,7 +25,11 @@ namespace Luau
 namespace CodeGen
 {
 
+enum class IrCondition : uint8_t;
 struct NativeState;
+
+namespace X64
+{
 
 // Data that is very common to access is placed in non-volatile registers
 constexpr RegisterX64 rState = r15;         // lua_State* L
@@ -38,6 +44,7 @@ constexpr unsigned kLocalsSize = 24;     // 3 extra slots for our custom locals 
 
 constexpr OperandX64 sClosure = qword[rsp + kStackSize + 0]; // Closure* cl
 constexpr OperandX64 sCode = qword[rsp + kStackSize + 8];    // Instruction* code
+constexpr OperandX64 sTemporarySlot = addr[rsp + kStackSize + 16];
 
 // TODO: These should be replaced with a portable call function that checks the ABI at runtime and reorders moves accordingly to avoid conflicts
 #if defined(_WIN32)
@@ -63,21 +70,6 @@ constexpr OperandX64 sArg5 = noreg;
 constexpr OperandX64 sArg6 = noreg;
 
 #endif
-
-constexpr unsigned kTValueSizeLog2 = 4;
-constexpr unsigned kLuaNodeSizeLog2 = 5;
-constexpr unsigned kLuaNodeTagMask = 0xf;
-
-constexpr unsigned kOffsetOfLuaNodeTag = 12; // offsetof cannot be used on a bit field
-constexpr unsigned kOffsetOfInstructionC = 3;
-
-// Leaf functions that are placed in every module to perform common instruction sequences
-struct ModuleHelpers
-{
-    Label exitContinueVm;
-    Label exitNoContinueVm;
-    Label continueCallInVm;
-};
 
 inline OperandX64 luauReg(int ri)
 {
@@ -148,14 +140,6 @@ inline void setLuauReg(AssemblyBuilderX64& build, RegisterX64 tmp, int ri, Opera
     build.vmovups(luauReg(ri), tmp);
 }
 
-inline void setNodeValue(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 op, int ri)
-{
-    LUAU_ASSERT(op.cat == CategoryX64::mem);
-
-    build.vmovups(tmp, luauReg(ri));
-    build.vmovups(op, tmp);
-}
-
 inline void jumpIfTagIs(AssemblyBuilderX64& build, int ri, lua_Type tag, Label& label)
 {
     build.cmp(luauRegTag(ri), tag);
@@ -165,6 +149,12 @@ inline void jumpIfTagIs(AssemblyBuilderX64& build, int ri, lua_Type tag, Label& 
 inline void jumpIfTagIsNot(AssemblyBuilderX64& build, int ri, lua_Type tag, Label& label)
 {
     build.cmp(luauRegTag(ri), tag);
+    build.jcc(ConditionX64::NotEqual, label);
+}
+
+inline void jumpIfTagIsNot(AssemblyBuilderX64& build, RegisterX64 reg, lua_Type tag, Label& label)
+{
+    build.cmp(dword[reg + offsetof(TValue, tt)], tag);
     build.jcc(ConditionX64::NotEqual, label);
 }
 
@@ -224,6 +214,13 @@ inline void jumpIfNodeValueTagIs(AssemblyBuilderX64& build, RegisterX64 node, lu
     build.jcc(ConditionX64::Equal, label);
 }
 
+inline void jumpIfNodeHasNext(AssemblyBuilderX64& build, RegisterX64 node, Label& label)
+{
+    build.mov(ecx, dword[node + offsetof(LuaNode, key) + kOffsetOfLuaNodeNext]);
+    build.shr(ecx, kNextBitOffset);
+    build.jcc(ConditionX64::NotZero, label);
+}
+
 inline void jumpIfNodeKeyNotInExpectedSlot(AssemblyBuilderX64& build, RegisterX64 tmp, RegisterX64 node, OperandX64 expectedKey, Label& label)
 {
     jumpIfNodeKeyTagIsNot(build, tmp, node, LUA_TSTRING, label);
@@ -235,8 +232,8 @@ inline void jumpIfNodeKeyNotInExpectedSlot(AssemblyBuilderX64& build, RegisterX6
     jumpIfNodeValueTagIs(build, node, LUA_TNIL, label);
 }
 
-void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs, OperandX64 rhs, ConditionX64 cond, Label& label);
-void jumpOnAnyCmpFallback(AssemblyBuilderX64& build, int ra, int rb, ConditionX64 cond, Label& label);
+void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs, OperandX64 rhs, IrCondition cond, Label& label);
+void jumpOnAnyCmpFallback(AssemblyBuilderX64& build, int ra, int rb, IrCondition cond, Label& label);
 
 void getTableNodeAtCachedSlot(AssemblyBuilderX64& build, RegisterX64 tmp, RegisterX64 node, RegisterX64 table, int pcpos);
 void convertNumberToIndexOrJump(AssemblyBuilderX64& build, RegisterX64 tmp, RegisterX64 numd, RegisterX64 numi, Label& label);
@@ -250,6 +247,7 @@ void callBarrierTable(AssemblyBuilderX64& build, RegisterX64 tmp, RegisterX64 ta
 void callBarrierObject(AssemblyBuilderX64& build, RegisterX64 tmp, RegisterX64 object, int ra, Label& skip);
 void callBarrierTableFast(AssemblyBuilderX64& build, RegisterX64 table, Label& skip);
 void callCheckGc(AssemblyBuilderX64& build, int pcpos, bool savepc, Label& skip);
+void callGetFastTmOrFallback(AssemblyBuilderX64& build, RegisterX64 table, TMS tm, Label& fallback);
 
 void emitExit(AssemblyBuilderX64& build, bool continueInVm);
 void emitUpdateBase(AssemblyBuilderX64& build);
@@ -258,7 +256,7 @@ void emitInterrupt(AssemblyBuilderX64& build, int pcpos);
 void emitFallback(AssemblyBuilderX64& build, NativeState& data, int op, int pcpos);
 
 void emitContinueCallInVm(AssemblyBuilderX64& build);
-void emitExitFromLastReturn(AssemblyBuilderX64& build);
 
+} // namespace X64
 } // namespace CodeGen
 } // namespace Luau

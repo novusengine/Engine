@@ -46,7 +46,7 @@ struct ParallelSumTaskSet : ITaskSet
     Count*    m_pPartialSums;
     uint32_t  m_NumPartialSums;
 
-    ParallelSumTaskSet( uint32_t size_ ) : m_pPartialSums(NULL), m_NumPartialSums(0) { m_SetSize = size_; }
+    ParallelSumTaskSet( uint32_t size_ ) : m_pPartialSums(NULL), m_NumPartialSums(0) { m_SetSize = size_; m_MinRange = 10 * 1024; }
     virtual ~ParallelSumTaskSet()
     {
         delete[] m_pPartialSums;
@@ -99,12 +99,12 @@ static const int REPEATS    = RUNS + WARMUPS;
 int main(int argc, const char * argv[])
 {
     uint32_t maxThreads = enki::GetNumHardwareThreads();
-    double* avSpeedUps = new double[ maxThreads ];
+    double* avTimes = new double[ maxThreads ];
 
 
     // start by measuring serial
     double avSerial = 0.0f;
-    uint32_t setSize = 20 * 1024 * 1024;
+    uint32_t setSize = 100 * 1024 * 1024;
     uint64_t sumSerial;
     for( int run = 0; run< REPEATS; ++run )
     {
@@ -131,7 +131,7 @@ int main(int argc, const char * argv[])
     for( uint32_t numThreads = 1; numThreads <= maxThreads; ++numThreads )
     {
         g_TS.Initialize(numThreads);
-        double avSpeedUp = 0.0;
+        double avTime = 0.0;
 
         for( int run = 0; run< REPEATS; ++run )
         {
@@ -154,7 +154,7 @@ int main(int argc, const char * argv[])
 
             if( run >= WARMUPS )
             {
-                avSpeedUp += avSerial  / tParallel.GetTimeMS() / RUNS;
+                avTime += tParallel.GetTimeMS() / RUNS;
             }
 
             if( sumSerial != parallelReductionSumTaskSet.m_FinalSum )
@@ -166,14 +166,15 @@ int main(int argc, const char * argv[])
             printf("Speed Up Serial / Parallel: %f\n\n", avSerial  / tParallel.GetTimeMS() );
 
         }
-        avSpeedUps[numThreads-1] = avSpeedUp;
-        printf("\nAverage Speed Up for %d Hardware Threads Serial / Parallel: %f\n", numThreads, avSpeedUp );
+        avTimes[numThreads-1] = avTime;
+        printf("\nAverage Time for %d Hardware Threads Serial / Parallel: %f, Speed Up over serial: %f\n", numThreads, avTime, avSerial / avTime );
     }
 
-    printf("\nHardware Threads, Av Speed Up/s\n" );
+    printf("\nTime Serial (no task system): %f\n", avSerial );
+    printf("\nHardware Threads, Av Time, Av Speed Up over serial, Av Speed up over 1 thread\n" );
     for( uint32_t numThreads = 1; numThreads <= maxThreads; ++numThreads )
     {
-        printf("%d, %f\n", numThreads, avSpeedUps[numThreads-1] );
+        printf("%d, %f, %f, %f\n", numThreads, avTimes[numThreads-1], avSerial / avTimes[numThreads-1], avTimes[0] / avTimes[numThreads-1] );
     }
 
     return 0;

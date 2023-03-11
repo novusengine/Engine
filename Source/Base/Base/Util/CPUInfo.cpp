@@ -17,10 +17,10 @@ class CPUID
     u32 regs[4];
 
 public:
-    CPUID(unsigned funcId, unsigned subFuncId)
+    CPUID(u32 funcId, u32 subFuncId)
     {
 #ifdef _WIN32
-        __cpuidex((int*)regs, (int)funcId, (int)subFuncId);
+        __cpuidex((i32*)regs, (i32)funcId, (i32)subFuncId);
 #else
         asm volatile
             ("cpuid" : "=a" (regs[0]), "=b" (regs[1]), "=c" (regs[2]), "=d" (regs[3])
@@ -49,18 +49,24 @@ CPUInfo& CPUInfo::Get()
     return *_cpuInfo;
 }
 
-void CPUInfo::Print()
+void CPUInfo::Print(i32 detailLevel)
 {
-    DebugHandler::Print("[CPUInfo]: {0}", _prettyName);
+    if (detailLevel > 0)
+    {
+        DebugHandler::Print("[CPUInfo]: {0}", _prettyName);
+    }
 
-    DebugHandler::Print("[CPUInfo]: Supports Hyperthreading: {0}", _isHTT ? "yes" : "no");
-    DebugHandler::Print("[CPUInfo]: Supports SSE: {0}", _isSSE ? "yes" : "no");
-    DebugHandler::Print("[CPUInfo]: Supports SSE2: {0}", _isSSE2 ? "yes" : "no");
-    DebugHandler::Print("[CPUInfo]: Supports SSE3: {0}", _isSSE3 ? "yes" : "no");
-    DebugHandler::Print("[CPUInfo]: Supports SSE4.1: {0}", _isSSE41 ? "yes" : "no");
-    DebugHandler::Print("[CPUInfo]: Supports SSE4.2: {0}", _isSSE42 ? "yes" : "no");
-    DebugHandler::Print("[CPUInfo]: Supports AVX: {0}", _isAVX ? "yes" : "no");
-    DebugHandler::Print("[CPUInfo]: Supports AVX2: {0}", _isAVX2 ? "yes" : "no");
+    if (detailLevel > 1)
+    {
+        DebugHandler::Print("[CPUInfo]: Supports Hyperthreading: {0}", features.isHTT ? "yes" : "no");
+        DebugHandler::Print("[CPUInfo]: Supports SSE: {0}", features.isSSE ? "yes" : "no");
+        DebugHandler::Print("[CPUInfo]: Supports SSE2: {0}", features.isSSE2 ? "yes" : "no");
+        DebugHandler::Print("[CPUInfo]: Supports SSE3: {0}", features.isSSE3 ? "yes" : "no");
+        DebugHandler::Print("[CPUInfo]: Supports SSE4.1: {0}", features.isSSE41 ? "yes" : "no");
+        DebugHandler::Print("[CPUInfo]: Supports SSE4.2: {0}", features.isSSE42 ? "yes" : "no");
+        DebugHandler::Print("[CPUInfo]: Supports AVX: {0}", features.isAVX ? "yes" : "no");
+        DebugHandler::Print("[CPUInfo]: Supports AVX2: {0}", features.isAVX2 ? "yes" : "no");
+    }
 }
 
 static inline void rtrim(std::string& s)
@@ -81,16 +87,16 @@ CPUInfo::CPUInfo()
     _vendorId += string((const char*)&cpuID0.ECX(), 4);
     // Get SSE instructions availability
     CPUID cpuID1(1, 0);
-    _isHTT = cpuID1.EDX() & AVX_POS;
-    _isSSE = cpuID1.EDX() & SSE_POS;
-    _isSSE2 = cpuID1.EDX() & SSE2_POS;
-    _isSSE3 = cpuID1.ECX() & SSE3_POS;
-    _isSSE41 = cpuID1.ECX() & SSE41_POS;
-    _isSSE42 = cpuID1.ECX() & SSE41_POS;
-    _isAVX = cpuID1.ECX() & AVX_POS;
+    features.isHTT = cpuID1.EDX() & AVX_POS;
+    features.isSSE = cpuID1.EDX() & SSE_POS;
+    features.isSSE2 = cpuID1.EDX() & SSE2_POS;
+    features.isSSE3 = cpuID1.ECX() & SSE3_POS;
+    features.isSSE41 = cpuID1.ECX() & SSE41_POS;
+    features.isSSE42 = cpuID1.ECX() & SSE41_POS;
+    features.isAVX = cpuID1.ECX() & AVX_POS;
     // Get AVX2 instructions availability
     CPUID cpuID7(7, 0);
-    _isAVX2 = cpuID7.EBX() & AVX2_POS;
+    features.isAVX2 = cpuID7.EBX() & AVX2_POS;
 
     string upVId = _vendorId;
     for_each(upVId.begin(), upVId.end(), [](char& in)
@@ -127,7 +133,7 @@ CPUInfo::CPUInfo()
                     _numCores = 1 + (CPUID(4, 0).EAX() >> 26) & 0x3F;
                 }
             }
-            if (_isHTT)
+            if (features.isHTT)
             {
                 if (!(_numCores > 1))
                 {
@@ -151,7 +157,7 @@ CPUInfo::CPUInfo()
                 _numCores = 1 + (CPUID(0x80000008, 0).ECX() & 0xFF);
             }
         }
-        if (_isHTT)
+        if (features.isHTT)
         {
             if (!(_numCores > 1))
             {
@@ -171,12 +177,12 @@ CPUInfo::CPUInfo()
     }
     else
     {
-        DebugHandler::PrintFatal("Unexpected vendor id (%s)", upVId.c_str());
+        DebugHandler::PrintFatal("Unexpected vendor id ({0})", upVId.c_str());
     }
 
     // Get processor brand string
     // This seems to be working for both Intel & AMD vendors
-    for (int i = 0x80000002; i < 0x80000005; ++i)
+    for (i32 i = 0x80000002; i < 0x80000005; ++i)
     {
         CPUID cpuID(i, 0);
         _modelName += string((const char*)&cpuID.EAX(), 4);

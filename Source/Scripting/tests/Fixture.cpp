@@ -21,8 +21,6 @@
 static const char* mainModuleName = "MainModule";
 
 LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
-LUAU_FASTFLAG(LuauUnknownAndNeverType)
-LUAU_FASTFLAG(LuauReportShadowedTypeAlias)
 
 extern std::optional<unsigned> randomSeed; // tests/main.cpp
 
@@ -178,7 +176,13 @@ AstStatBlock* Fixture::parse(const std::string& source, const ParseOptions& pars
         {
             frontend.lint(*sourceModule);
 
-            typeChecker.check(*sourceModule, sourceModule->mode.value_or(Luau::Mode::Nonstrict));
+            if (FFlag::DebugLuauDeferredConstraintResolution)
+            {
+                Luau::check(*sourceModule, {}, frontend.builtinTypes, NotNull{&ice}, NotNull{&moduleResolver}, NotNull{&fileResolver},
+                    typeChecker.globalScope, frontend.options);
+            }
+            else
+                typeChecker.check(*sourceModule, sourceModule->mode.value_or(Luau::Mode::Nonstrict));
         }
 
         throw ParseErrors(result.errors);
@@ -585,6 +589,7 @@ void registerHiddenTypes(Frontend* frontend)
     globalScope->exportedTypeBindings["fun"] = TypeFun{{}, frontend->builtinTypes->functionType};
     globalScope->exportedTypeBindings["cls"] = TypeFun{{}, frontend->builtinTypes->classType};
     globalScope->exportedTypeBindings["err"] = TypeFun{{}, frontend->builtinTypes->errorType};
+    globalScope->exportedTypeBindings["tbl"] = TypeFun{{}, frontend->builtinTypes->tableType};
 }
 
 void createSomeClasses(Frontend* frontend)
@@ -606,11 +611,13 @@ void createSomeClasses(Frontend* frontend)
 
     TypeId childType = arena.addType(ClassType{"Child", {}, parentType, std::nullopt, {}, nullptr, "Test"});
 
-    ClassType* childClass = getMutable<ClassType>(childType);
-    childClass->props["virtual_method"] = {makeFunction(arena, childType, {}, {})};
-
     addGlobalBinding(*frontend, "Child", {childType});
     moduleScope->exportedTypeBindings["Child"] = TypeFun{{}, childType};
+
+    TypeId anotherChildType = arena.addType(ClassType{"AnotherChild", {}, parentType, std::nullopt, {}, nullptr, "Test"});
+
+    addGlobalBinding(*frontend, "AnotherChild", {anotherChildType});
+    moduleScope->exportedTypeBindings["AnotherChild"] = TypeFun{{}, anotherChildType};
 
     TypeId unrelatedType = arena.addType(ClassType{"Unrelated", {}, frontend->builtinTypes->classType, std::nullopt, {}, nullptr, "Test"});
 

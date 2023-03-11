@@ -17,13 +17,10 @@ LUAU_FASTFLAGVARIABLE(DebugLuauCheckNormalizeInvariant, false)
 // This could theoretically be 2000 on amd64, but x86 requires this.
 LUAU_FASTINTVARIABLE(LuauNormalizeIterationLimit, 1200);
 LUAU_FASTINTVARIABLE(LuauNormalizeCacheLimit, 100000);
-LUAU_FASTFLAGVARIABLE(LuauNormalizeCombineTableFix, false);
-LUAU_FASTFLAGVARIABLE(LuauTypeNormalization2, false);
 LUAU_FASTFLAGVARIABLE(LuauNegatedClassTypes, false);
 LUAU_FASTFLAGVARIABLE(LuauNegatedFunctionTypes, false);
-LUAU_FASTFLAG(LuauUnknownAndNeverType)
+LUAU_FASTFLAGVARIABLE(LuauNegatedTableTypes, false);
 LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution)
-LUAU_FASTFLAG(LuauOverloadedFunctionSubtypingPerf);
 LUAU_FASTFLAG(LuauUninhabitedSubAnything2)
 
 namespace Luau
@@ -451,8 +448,20 @@ static bool areNormalizedFunctions(const NormalizedFunctionType& tys)
 static bool areNormalizedTables(const TypeIds& tys)
 {
     for (TypeId ty : tys)
-        if (!get<TableType>(ty) && !get<MetatableType>(ty))
+    {
+        if (get<TableType>(ty) || get<MetatableType>(ty))
+            continue;
+
+        const PrimitiveType* pt = get<PrimitiveType>(ty);
+        if (!pt)
             return false;
+
+        if (pt->type == PrimitiveType::Table && FFlag::LuauNegatedTableTypes)
+            continue;
+
+        return false;
+    }
+
     return true;
 }
 
@@ -1219,7 +1228,25 @@ void Normalizer::unionTablesWithTable(TypeIds& heres, TypeId there)
 void Normalizer::unionTables(TypeIds& heres, const TypeIds& theres)
 {
     for (TypeId there : theres)
-        unionTablesWithTable(heres, there);
+    {
+        if (FFlag::LuauNegatedTableTypes)
+        {
+            if (there == builtinTypes->tableType)
+            {
+                heres.clear();
+                heres.insert(there);
+                return;
+            }
+            else
+            {
+                unionTablesWithTable(heres, there);
+            }
+        }
+        else
+        {
+            unionTablesWithTable(heres, there);
+        }
+    }
 }
 
 // So why `ignoreSmallerTyvars`?
@@ -1378,6 +1405,11 @@ bool Normalizer::unionNormalWithTy(NormalizedType& here, TypeId there, int ignor
             LUAU_ASSERT(FFlag::LuauNegatedFunctionTypes);
             here.functions.resetToTop();
         }
+        else if (ptv->type == PrimitiveType::Table && FFlag::LuauNegatedTableTypes)
+        {
+            here.tables.clear();
+            here.tables.insert(there);
+        }
         else
             LUAU_ASSERT(!"Unreachable");
     }
@@ -1409,6 +1441,8 @@ bool Normalizer::unionNormalWithTy(NormalizedType& here, TypeId there, int ignor
         if (!unionNormals(here, *tn))
             return false;
     }
+    else if (get<BlockedType>(there))
+        LUAU_ASSERT(!"Internal error: Trying to normalize a BlockedType");
     else
         LUAU_ASSERT(!"Unreachable");
 
@@ -1507,6 +1541,21 @@ std::optional<NormalizedType> Normalizer::negateNormal(const NormalizedType& her
             return std::nullopt;
     }
 
+    /*
+     * It is not possible to negate an arbitrary table type, because function
+     * types are not runtime-testable. Thus, we prohibit negation of anything
+     * other than `table` and `never`.
+     */
+    if (FFlag::LuauNegatedTableTypes)
+    {
+        if (here.tables.empty())
+            result.tables.insert(builtinTypes->tableType);
+        else if (here.tables.size() == 1 && here.tables.front() == builtinTypes->tableType)
+            result.tables.clear();
+        else
+            return std::nullopt;
+    }
+
     // TODO: negating tables
     // TODO: negating tyvars?
 
@@ -1573,6 +1622,10 @@ void Normalizer::subtractPrimitive(NormalizedType& here, TypeId ty)
         break;
     case PrimitiveType::Function:
         here.functions.resetToNever();
+        break;
+    case PrimitiveType::Table:
+        LUAU_ASSERT(FFlag::LuauNegatedTableTypes);
+        here.tables.clear();
         break;
     }
 }
@@ -1998,6 +2051,11 @@ std::optional<TypeId> Normalizer::intersectionOfTables(TypeId here, TypeId there
     if (sharedState->counters.recursionLimit > 0 && sharedState->counters.recursionLimit < sharedState->counters.recursionCount)
         return std::nullopt;
 
+    if (isPrim(here, PrimitiveType::Table))
+        return there;
+    else if (isPrim(there, PrimitiveType::Table))
+        return here;
+
     TypeId htable = here;
     TypeId hmtable = nullptr;
     if (const MetatableType* hmtv = get<MetatableType>(here))
@@ -2165,7 +2223,7 @@ std::optional<TypeId> Normalizer::intersectionOfFunctions(TypeId here, TypeId th
         argTypes = *argTypesOpt;
         retTypes = hftv->retTypes;
     }
-    else if (FFlag::LuauOverloadedFunctionSubtypingPerf && hftv->argTypes == tftv->argTypes)
+    else if (hftv->argTypes == tftv->argTypes)
     {
         std::optional<TypePackId> retTypesOpt = intersectionOfTypePacks(hftv->argTypes, tftv->argTypes);
         if (!retTypesOpt)
@@ -2525,6 +2583,7 @@ bool Normalizer::intersectNormalWithTy(NormalizedType& here, TypeId there)
         NormalizedStringType strings = std::move(here.strings);
         NormalizedFunctionType functions = std::move(here.functions);
         TypeId threads = here.threads;
+        TypeIds tables = std::move(here.tables);
 
         clearNormal(here);
 
@@ -2542,6 +2601,11 @@ bool Normalizer::intersectNormalWithTy(NormalizedType& here, TypeId there)
         {
             LUAU_ASSERT(FFlag::LuauNegatedFunctionTypes);
             here.functions = std::move(functions);
+        }
+        else if (ptv->type == PrimitiveType::Table)
+        {
+            LUAU_ASSERT(FFlag::LuauNegatedTableTypes);
+            here.tables = std::move(tables);
         }
         else
             LUAU_ASSERT(!"Unreachable");
@@ -2589,6 +2653,14 @@ bool Normalizer::intersectNormalWithTy(NormalizedType& here, TypeId there)
                 intersectNormals(here, *negated);
             }
         }
+        else if (get<AnyType>(t))
+        {
+            // HACK: Refinements sometimes intersect with ~any under the
+            // assumption that it is the same as any.
+            return true;
+        }
+        else if (auto nt = get<NegationType>(t))
+            return intersectNormalWithTy(here, nt->ty);
         else
         {
             // TODO negated unions, intersections, table, and function.

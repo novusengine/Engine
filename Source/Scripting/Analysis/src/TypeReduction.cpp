@@ -4,38 +4,178 @@
 #include "Luau/Common.h"
 #include "Luau/Error.h"
 #include "Luau/RecursionCounter.h"
+#include "Luau/VisitType.h"
 
 #include <numeric>
 #include <deque>
 
 LUAU_FASTINTVARIABLE(LuauTypeReductionCartesianProductLimit, 100'000)
-LUAU_FASTINTVARIABLE(LuauTypeReductionRecursionLimit, 700)
+LUAU_FASTINTVARIABLE(LuauTypeReductionRecursionLimit, 400)
 LUAU_FASTFLAGVARIABLE(DebugLuauDontReduceTypes, false)
 
 namespace Luau
 {
 
+namespace detail
+{
+bool TypeReductionMemoization::isIrreducible(TypeId ty)
+{
+    ty = follow(ty);
+
+    // Only does shallow check, the TypeReducer itself already does deep traversal.
+    if (auto edge = types.find(ty); edge && edge->irreducible)
+        return true;
+    else if (get<FreeType>(ty) || get<BlockedType>(ty) || get<PendingExpansionType>(ty))
+        return false;
+    else if (auto tt = get<TableType>(ty); tt && (tt->state == TableState::Free || tt->state == TableState::Unsealed))
+        return false;
+    else
+        return true;
+}
+
+bool TypeReductionMemoization::isIrreducible(TypePackId tp)
+{
+    tp = follow(tp);
+
+    // Only does shallow check, the TypeReducer itself already does deep traversal.
+    if (auto edge = typePacks.find(tp); edge && edge->irreducible)
+        return true;
+    else if (get<FreeTypePack>(tp) || get<BlockedTypePack>(tp))
+        return false;
+    else if (auto vtp = get<VariadicTypePack>(tp))
+        return isIrreducible(vtp->ty);
+    else
+        return true;
+}
+
+TypeId TypeReductionMemoization::memoize(TypeId ty, TypeId reducedTy)
+{
+    ty = follow(ty);
+    reducedTy = follow(reducedTy);
+
+    // The irreducibility of this [`reducedTy`] depends on whether its contents are themselves irreducible.
+    // We don't need to recurse much further than that, because we already record the irreducibility from
+    // the bottom up.
+    bool irreducible = isIrreducible(reducedTy);
+    if (auto it = get<IntersectionType>(reducedTy))
+    {
+        for (TypeId part : it)
+            irreducible &= isIrreducible(part);
+    }
+    else if (auto ut = get<UnionType>(reducedTy))
+    {
+        for (TypeId option : ut)
+            irreducible &= isIrreducible(option);
+    }
+    else if (auto tt = get<TableType>(reducedTy))
+    {
+        for (auto& [k, p] : tt->props)
+            irreducible &= isIrreducible(p.type);
+
+        if (tt->indexer)
+        {
+            irreducible &= isIrreducible(tt->indexer->indexType);
+            irreducible &= isIrreducible(tt->indexer->indexResultType);
+        }
+
+        for (auto ta : tt->instantiatedTypeParams)
+            irreducible &= isIrreducible(ta);
+
+        for (auto tpa : tt->instantiatedTypePackParams)
+            irreducible &= isIrreducible(tpa);
+    }
+    else if (auto mt = get<MetatableType>(reducedTy))
+    {
+        irreducible &= isIrreducible(mt->table);
+        irreducible &= isIrreducible(mt->metatable);
+    }
+    else if (auto ft = get<FunctionType>(reducedTy))
+    {
+        irreducible &= isIrreducible(ft->argTypes);
+        irreducible &= isIrreducible(ft->retTypes);
+    }
+    else if (auto nt = get<NegationType>(reducedTy))
+        irreducible &= isIrreducible(nt->ty);
+
+    types[ty] = {reducedTy, irreducible};
+    types[reducedTy] = {reducedTy, irreducible};
+    return reducedTy;
+}
+
+TypePackId TypeReductionMemoization::memoize(TypePackId tp, TypePackId reducedTp)
+{
+    tp = follow(tp);
+    reducedTp = follow(reducedTp);
+
+    bool irreducible = isIrreducible(reducedTp);
+    TypePackIterator it = begin(tp);
+    while (it != end(tp))
+    {
+        irreducible &= isIrreducible(*it);
+        ++it;
+    }
+
+    if (it.tail())
+        irreducible &= isIrreducible(*it.tail());
+
+    typePacks[tp] = {reducedTp, irreducible};
+    typePacks[reducedTp] = {reducedTp, irreducible};
+    return reducedTp;
+}
+
+std::optional<ReductionEdge<TypeId>> TypeReductionMemoization::memoizedof(TypeId ty) const
+{
+    auto fetchContext = [this](TypeId ty) -> std::optional<ReductionEdge<TypeId>> {
+        if (auto edge = types.find(ty))
+            return *edge;
+        else
+            return std::nullopt;
+    };
+
+    TypeId currentTy = ty;
+    std::optional<ReductionEdge<TypeId>> lastEdge;
+    while (auto edge = fetchContext(currentTy))
+    {
+        lastEdge = edge;
+        if (edge->irreducible)
+            return edge;
+        else if (edge->type == currentTy)
+            return edge;
+        else
+            currentTy = edge->type;
+    }
+
+    return lastEdge;
+}
+
+std::optional<ReductionEdge<TypePackId>> TypeReductionMemoization::memoizedof(TypePackId tp) const
+{
+    auto fetchContext = [this](TypePackId tp) -> std::optional<ReductionEdge<TypePackId>> {
+        if (auto edge = typePacks.find(tp))
+            return *edge;
+        else
+            return std::nullopt;
+    };
+
+    TypePackId currentTp = tp;
+    std::optional<ReductionEdge<TypePackId>> lastEdge;
+    while (auto edge = fetchContext(currentTp))
+    {
+        lastEdge = edge;
+        if (edge->irreducible)
+            return edge;
+        else if (edge->type == currentTp)
+            return edge;
+        else
+            currentTp = edge->type;
+    }
+
+    return lastEdge;
+}
+} // namespace detail
+
 namespace
 {
-
-struct RecursionGuard : RecursionLimiter
-{
-    std::deque<const void*>* seen;
-
-    RecursionGuard(int* count, int limit, std::deque<const void*>* seen)
-        : RecursionLimiter(count, limit)
-        , seen(seen)
-    {
-        // count has been incremented, which should imply that seen has already had an element pushed in.
-        LUAU_ASSERT(size_t(*count) == seen->size());
-    }
-
-    ~RecursionGuard()
-    {
-        LUAU_ASSERT(!seen->empty()); // It is UB to pop_back() on an empty deque.
-        seen->pop_back();
-    }
-};
 
 template<typename A, typename B, typename Thing>
 std::pair<const A*, const B*> get2(const Thing& one, const Thing& two)
@@ -50,6 +190,10 @@ struct TypeReducer
     NotNull<TypeArena> arena;
     NotNull<BuiltinTypes> builtinTypes;
     NotNull<InternalErrorReporter> handle;
+    NotNull<detail::TypeReductionMemoization> memoization;
+    DenseHashSet<const void*>* cyclics;
+
+    int depth = 0;
 
     TypeId reduce(TypeId ty);
     TypePackId reduce(TypePackId tp);
@@ -60,64 +204,64 @@ struct TypeReducer
     TypeId functionType(TypeId ty);
     TypeId negationType(TypeId ty);
 
-    std::deque<const void*> seen;
-    int depth = 0;
-
-    RecursionGuard guard(TypeId ty);
-    RecursionGuard guard(TypePackId tp);
-
-    std::unordered_map<TypeId, TypeId> copies;
+    using BinaryFold = std::optional<TypeId> (TypeReducer::*)(TypeId, TypeId);
+    using UnaryFold = TypeId (TypeReducer::*)(TypeId);
 
     template<typename T>
     LUAU_NOINLINE std::pair<TypeId, T*> copy(TypeId ty, const T* t)
     {
-        if (auto it = copies.find(ty); it != copies.end())
-            return {it->second, getMutable<T>(it->second)};
+        ty = follow(ty);
 
+        if (auto edge = memoization->memoizedof(ty))
+            return {edge->type, getMutable<T>(edge->type)};
+
+        // We specifically do not want to use [`detail::TypeReductionMemoization::memoize`] because that will
+        // potentially consider these copiedTy to be reducible, but we need this to resolve cyclic references
+        // without attempting to recursively reduce it, causing copies of copies of copies of...
         TypeId copiedTy = arena->addType(*t);
-        copies[ty] = copiedTy;
+        memoization->types[ty] = {copiedTy, true};
+        memoization->types[copiedTy] = {copiedTy, true};
         return {copiedTy, getMutable<T>(copiedTy)};
     }
 
-    using Folder = std::optional<TypeId> (TypeReducer::*)(TypeId, TypeId);
-
     template<typename T, typename Iter>
-    void foldl_impl(Iter it, Iter endIt, Folder f, NotNull<std::vector<TypeId>> result)
+    void foldl_impl(Iter it, Iter endIt, BinaryFold f, std::vector<TypeId>* result, bool* didReduce)
     {
+        RecursionLimiter rl{&depth, FInt::LuauTypeReductionRecursionLimit};
+
         while (it != endIt)
         {
-            bool replaced = false;
-            TypeId currentTy = reduce(*it);
-            RecursionGuard rg = guard(*it);
+            TypeId right = reduce(*it);
+            *didReduce |= right != follow(*it);
 
             // We're hitting a case where the `currentTy` returned a type that's the same as `T`.
             // e.g. `(string?) & ~(false | nil)` became `(string?) & (~false & ~nil)` but the current iterator we're consuming doesn't know this.
             // We will need to recurse and traverse that first.
-            if (auto t = get<T>(currentTy))
+            if (auto t = get<T>(right))
             {
-                foldl_impl<T>(begin(t), end(t), f, result);
+                foldl_impl<T>(begin(t), end(t), f, result, didReduce);
                 ++it;
                 continue;
             }
 
+            bool replaced = false;
             auto resultIt = result->begin();
             while (resultIt != result->end())
             {
-                TypeId& ty = *resultIt;
-
-                std::optional<TypeId> reduced = (this->*f)(ty, currentTy);
-                if (reduced && replaced)
+                TypeId left = *resultIt;
+                if (left == right)
                 {
-                    // We want to erase any other elements that occurs after the first replacement too.
-                    // e.g. `"a" | "b" | string` where `"a"` and `"b"` is in the `result` vector, then `string` replaces both `"a"` and `"b"`.
-                    // If we don't erase redundant elements, `"b"` may be kept or be replaced by `string`, leaving us with `string | string`.
-                    resultIt = result->erase(resultIt);
+                    replaced = true;
+                    ++resultIt;
+                    continue;
                 }
-                else if (reduced && !replaced)
+
+                std::optional<TypeId> reduced = (this->*f)(left, right);
+                if (reduced)
                 {
+                    *resultIt = *reduced;
                     ++resultIt;
                     replaced = true;
-                    ty = *reduced;
                 }
                 else
                 {
@@ -127,21 +271,54 @@ struct TypeReducer
             }
 
             if (!replaced)
-                result->push_back(currentTy);
+                result->push_back(right);
 
+            *didReduce |= replaced;
             ++it;
         }
     }
 
+    template<typename T>
+    TypeId flatten(std::vector<TypeId>&& types)
+    {
+        if (types.size() == 1)
+            return types[0];
+        else
+            return arena->addType(T{std::move(types)});
+    }
+
     template<typename T, typename Iter>
-    TypeId foldl(Iter it, Iter endIt, Folder f)
+    TypeId foldl(Iter it, Iter endIt, std::optional<TypeId> ty, BinaryFold f)
     {
         std::vector<TypeId> result;
-        foldl_impl<T>(it, endIt, f, NotNull{&result});
-        if (result.size() == 1)
-            return result[0];
+        bool didReduce = false;
+        foldl_impl<T>(it, endIt, f, &result, &didReduce);
+
+        // If we've done any reduction, then we'll need to reduce it again, e.g.
+        // `"a" | "b" | string` is reduced into `string | string`, which is then reduced into `string`.
+        if (!didReduce)
+            return ty ? *ty : flatten<T>(std::move(result));
         else
-            return arena->addType(T{std::move(result)});
+            return reduce(flatten<T>(std::move(result)));
+    }
+
+    template<typename T>
+    TypeId apply(BinaryFold f, TypeId left, TypeId right)
+    {
+        std::vector<TypeId> types{left, right};
+        return foldl<T>(begin(types), end(types), std::nullopt, f);
+    }
+
+    template<typename Into, typename Over>
+    TypeId distribute(TypeIterator<Over> it, TypeIterator<Over> endIt, BinaryFold f, TypeId ty)
+    {
+        std::vector<TypeId> result;
+        while (it != endIt)
+        {
+            result.push_back(apply<Into>(f, *it, ty));
+            ++it;
+        }
+        return flatten<Over>(std::move(result));
     }
 };
 
@@ -149,40 +326,60 @@ TypeId TypeReducer::reduce(TypeId ty)
 {
     ty = follow(ty);
 
-    if (std::find(seen.begin(), seen.end(), ty) != seen.end())
+    if (auto edge = memoization->memoizedof(ty))
+    {
+        if (edge->irreducible)
+            return edge->type;
+        else
+            ty = edge->type;
+    }
+    else if (cyclics->contains(ty))
         return ty;
 
-    RecursionGuard rg = guard(ty);
+    RecursionLimiter rl{&depth, FInt::LuauTypeReductionRecursionLimit};
 
+    TypeId result = nullptr;
     if (auto i = get<IntersectionType>(ty))
-        return foldl<IntersectionType>(begin(i), end(i), &TypeReducer::intersectionType);
+        result = foldl<IntersectionType>(begin(i), end(i), ty, &TypeReducer::intersectionType);
     else if (auto u = get<UnionType>(ty))
-        return foldl<UnionType>(begin(u), end(u), &TypeReducer::unionType);
+        result = foldl<UnionType>(begin(u), end(u), ty, &TypeReducer::unionType);
     else if (get<TableType>(ty) || get<MetatableType>(ty))
-        return tableType(ty);
+        result = tableType(ty);
     else if (get<FunctionType>(ty))
-        return functionType(ty);
-    else if (auto n = get<NegationType>(ty))
-        return negationType(follow(n->ty));
+        result = functionType(ty);
+    else if (get<NegationType>(ty))
+        result = negationType(ty);
     else
-        return ty;
+        result = ty;
+
+    return memoization->memoize(ty, result);
 }
 
 TypePackId TypeReducer::reduce(TypePackId tp)
 {
     tp = follow(tp);
 
-    if (std::find(seen.begin(), seen.end(), tp) != seen.end())
+    if (auto edge = memoization->memoizedof(tp))
+    {
+        if (edge->irreducible)
+            return edge->type;
+        else
+            tp = edge->type;
+    }
+    else if (cyclics->contains(tp))
         return tp;
 
-    RecursionGuard rg = guard(tp);
+    RecursionLimiter rl{&depth, FInt::LuauTypeReductionRecursionLimit};
 
+    bool didReduce = false;
     TypePackIterator it = begin(tp);
 
     std::vector<TypeId> head;
     while (it != end(tp))
     {
-        head.push_back(reduce(*it));
+        TypeId reducedTy = reduce(*it);
+        head.push_back(reducedTy);
+        didReduce |= follow(*it) != follow(reducedTy);
         ++it;
     }
 
@@ -190,10 +387,22 @@ TypePackId TypeReducer::reduce(TypePackId tp)
     if (tail)
     {
         if (auto vtp = get<VariadicTypePack>(follow(*it.tail())))
-            tail = arena->addTypePack(VariadicTypePack{reduce(vtp->ty), vtp->hidden});
+        {
+            TypeId reducedTy = reduce(vtp->ty);
+            if (follow(vtp->ty) != follow(reducedTy))
+            {
+                tail = arena->addTypePack(VariadicTypePack{reducedTy, vtp->hidden});
+                didReduce = true;
+            }
+        }
     }
 
-    return arena->addTypePack(TypePack{std::move(head), tail});
+    if (!didReduce)
+        return memoization->memoize(tp, tp);
+    else if (head.empty() && tail)
+        return memoization->memoize(tp, *tail);
+    else
+        return memoization->memoize(tp, arena->addTypePack(TypePack{std::move(head), tail}));
 }
 
 std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
@@ -213,23 +422,28 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
         return right; // any & T ~ T
     else if (get<AnyType>(right))
         return left; // T & any ~ T
+    else if (get<FreeType>(left))
+        return std::nullopt; // 'a & T ~ 'a & T
+    else if (get<FreeType>(right))
+        return std::nullopt; // T & 'a ~ T & 'a
+    else if (get<GenericType>(left))
+        return std::nullopt; // G & T ~ G & T
+    else if (get<GenericType>(right))
+        return std::nullopt; // T & G ~ T & G
     else if (get<ErrorType>(left))
         return std::nullopt; // error & T ~ error & T
     else if (get<ErrorType>(right))
         return std::nullopt; // T & error ~ T & error
+    else if (get<BlockedType>(left))
+        return std::nullopt; // *blocked* & T ~ *blocked* & T
+    else if (get<BlockedType>(right))
+        return std::nullopt; // T & *blocked* ~ T & *blocked*
+    else if (get<PendingExpansionType>(left))
+        return std::nullopt; // *pending* & T ~ *pending* & T
+    else if (get<PendingExpansionType>(right))
+        return std::nullopt; // T & *pending* ~ T & *pending*
     else if (auto ut = get<UnionType>(left))
-    {
-        std::vector<TypeId> options;
-        for (TypeId option : ut)
-        {
-            if (auto result = intersectionType(option, right))
-                options.push_back(*result);
-            else
-                options.push_back(arena->addType(IntersectionType{{option, right}}));
-        }
-
-        return foldl<UnionType>(begin(options), end(options), &TypeReducer::unionType); // (A | B) & T ~ (A & T) | (B & T)
-    }
+        return reduce(distribute<IntersectionType>(begin(ut), end(ut), &TypeReducer::intersectionType, right)); // (A | B) & T ~ (A & T) | (B & T)
     else if (get<UnionType>(right))
         return intersectionType(right, left); // T & (A | B) ~ (A | B) & T
     else if (auto [p1, p2] = get2<PrimitiveType, PrimitiveType>(left, right); p1 && p2)
@@ -259,6 +473,24 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
     }
     else if (auto [f, p] = get2<FunctionType, PrimitiveType>(left, right); f && p)
         return intersectionType(right, left); // () -> () & P ~ P & () -> ()
+    else if (auto [p, t] = get2<PrimitiveType, TableType>(left, right); p && t)
+    {
+        if (p->type == PrimitiveType::Table)
+            return right; // table & {} ~ {}
+        else
+            return builtinTypes->neverType; // string & {} ~ never
+    }
+    else if (auto [p, t] = get2<PrimitiveType, MetatableType>(left, right); p && t)
+    {
+        if (p->type == PrimitiveType::Table)
+            return right; // table & {} ~ {}
+        else
+            return builtinTypes->neverType; // string & {} ~ never
+    }
+    else if (auto [t, p] = get2<TableType, PrimitiveType>(left, right); t && p)
+        return intersectionType(right, left); // {} & P ~ P & {}
+    else if (auto [t, p] = get2<MetatableType, PrimitiveType>(left, right); t && p)
+        return intersectionType(right, left); // M & P ~ P & M
     else if (auto [s1, s2] = get2<SingletonType, SingletonType>(left, right); s1 && s2)
     {
         if (*s1 == *s2)
@@ -276,14 +508,7 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
             return builtinTypes->neverType; // Base & Unrelated ~ never
     }
     else if (auto [f1, f2] = get2<FunctionType, FunctionType>(left, right); f1 && f2)
-    {
-        if (std::find(seen.begin(), seen.end(), left) != seen.end())
-            return std::nullopt;
-        else if (std::find(seen.begin(), seen.end(), right) != seen.end())
-            return std::nullopt;
-
         return std::nullopt; // TODO
-    }
     else if (auto [t1, t2] = get2<TableType, TableType>(left, right); t1 && t2)
     {
         if (t1->state == TableState::Free || t2->state == TableState::Free)
@@ -291,10 +516,10 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
         else if (t1->state == TableState::Generic || t2->state == TableState::Generic)
             return std::nullopt; // '{ x: T } & { x: U } ~ '{ x: T } & { x: U }
 
-        if (std::find(seen.begin(), seen.end(), left) != seen.end())
-            return std::nullopt;
-        else if (std::find(seen.begin(), seen.end(), right) != seen.end())
-            return std::nullopt;
+        if (cyclics->contains(left))
+            return std::nullopt; // (t1 where t1 = { p: t1 }) & {} ~ t1 & {}
+        else if (cyclics->contains(right))
+            return std::nullopt; // {} & (t1 where t1 = { p: t1 }) ~ {} & t1
 
         TypeId resultTy = arena->addType(TableType{});
         TableType* table = getMutable<TableType>(resultTy);
@@ -306,8 +531,7 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
             // even if we have the corresponding property in the other one.
             if (auto other = t2->props.find(name); other != t2->props.end())
             {
-                std::vector<TypeId> parts{prop.type, other->second.type};
-                TypeId propTy = foldl<IntersectionType>(begin(parts), end(parts), &TypeReducer::intersectionType);
+                TypeId propTy = apply<IntersectionType>(&TypeReducer::intersectionType, prop.type, other->second.type);
                 if (get<NeverType>(propTy))
                     return builtinTypes->neverType; // { p : string } & { p : number } ~ { p : string & number } ~ { p : never } ~ never
                 else
@@ -322,27 +546,30 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
             // TODO: And vice versa, t2 properties against t1 indexer if it exists,
             // even if we have the corresponding property in the other one.
             if (!t1->props.count(name))
-                table->props[name] = prop; // {} & { p : string } ~ { p : string }
+                table->props[name] = {reduce(prop.type)}; // {} & { p : string & string } ~ { p : string }
         }
 
         if (t1->indexer && t2->indexer)
         {
-            std::vector<TypeId> keyParts{t1->indexer->indexType, t2->indexer->indexType};
-            TypeId keyTy = foldl<IntersectionType>(begin(keyParts), end(keyParts), &TypeReducer::intersectionType);
+            TypeId keyTy = apply<IntersectionType>(&TypeReducer::intersectionType, t1->indexer->indexType, t2->indexer->indexType);
             if (get<NeverType>(keyTy))
-                return builtinTypes->neverType; // { [string]: _ } & { [number]: _ } ~ { [string & number]: _ } ~ { [never]: _ } ~ never
+                return std::nullopt; // { [string]: _ } & { [number]: _ } ~ { [string]: _ } & { [number]: _ }
 
-            std::vector<TypeId> valueParts{t1->indexer->indexResultType, t2->indexer->indexResultType};
-            TypeId valueTy = foldl<IntersectionType>(begin(valueParts), end(valueParts), &TypeReducer::intersectionType);
-            if (get<NeverType>(valueTy))
-                return builtinTypes->neverType; // { [_]: string } & { [_]: number } ~ { [_]: string & number } ~ { [_]: never } ~ never
-
-            table->indexer = TableIndexer{keyTy, valueTy};
+            TypeId valueTy = apply<IntersectionType>(&TypeReducer::intersectionType, t1->indexer->indexResultType, t2->indexer->indexResultType);
+            table->indexer = TableIndexer{keyTy, valueTy}; // { [string]: number } & { [string]: string } ~ { [string]: never }
         }
         else if (t1->indexer)
-            table->indexer = t1->indexer; // { [number]: boolean } & { p : string } ~ { p : string, [number]: boolean }
+        {
+            TypeId keyTy = reduce(t1->indexer->indexType);
+            TypeId valueTy = reduce(t1->indexer->indexResultType);
+            table->indexer = TableIndexer{keyTy, valueTy}; // { [number]: boolean } & { p : string } ~ { p : string, [number]: boolean }
+        }
         else if (t2->indexer)
-            table->indexer = t2->indexer; // { p : string } & { [number]: boolean } ~ { p : string, [number]: boolean }
+        {
+            TypeId keyTy = reduce(t2->indexer->indexType);
+            TypeId valueTy = reduce(t2->indexer->indexResultType);
+            table->indexer = TableIndexer{keyTy, valueTy}; // { p : string } & { [number]: boolean } ~ { p : string, [number]: boolean }
+        }
 
         return resultTy;
     }
@@ -352,6 +579,45 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
         return intersectionType(right, left); // T & M ~ M & T
     else if (auto [m1, m2] = get2<MetatableType, MetatableType>(left, right); m1 && m2)
         return std::nullopt; // TODO
+    else if (auto [nl, nr] = get2<NegationType, NegationType>(left, right); nl && nr)
+    {
+        // These should've been reduced already.
+        TypeId nlTy = follow(nl->ty);
+        TypeId nrTy = follow(nr->ty);
+        LUAU_ASSERT(!get<UnknownType>(nlTy) && !get<UnknownType>(nrTy));
+        LUAU_ASSERT(!get<NeverType>(nlTy) && !get<NeverType>(nrTy));
+        LUAU_ASSERT(!get<AnyType>(nlTy) && !get<AnyType>(nrTy));
+        LUAU_ASSERT(!get<IntersectionType>(nlTy) && !get<IntersectionType>(nrTy));
+        LUAU_ASSERT(!get<UnionType>(nlTy) && !get<UnionType>(nrTy));
+
+        if (auto [npl, npr] = get2<PrimitiveType, PrimitiveType>(nlTy, nrTy); npl && npr)
+        {
+            if (npl->type == npr->type)
+                return left; // ~P1 & ~P2 ~ ~P1 iff P1 == P2
+            else
+                return std::nullopt; // ~P1 & ~P2 ~ ~P1 & ~P2 iff P1 != P2
+        }
+        else if (auto [nsl, nsr] = get2<SingletonType, SingletonType>(nlTy, nrTy); nsl && nsr)
+        {
+            if (*nsl == *nsr)
+                return left; // ~"A" & ~"A" ~ ~"A"
+            else
+                return std::nullopt; // ~"A" & ~"B" ~ ~"A" & ~"B"
+        }
+        else if (auto [ns, np] = get2<SingletonType, PrimitiveType>(nlTy, nrTy); ns && np)
+        {
+            if (get<StringSingleton>(ns) && np->type == PrimitiveType::String)
+                return right; // ~"A" & ~string ~ ~string
+            else if (get<BooleanSingleton>(ns) && np->type == PrimitiveType::Boolean)
+                return right; // ~false & ~boolean ~ ~boolean
+            else
+                return std::nullopt; // ~"A" | ~P ~ ~"A" & ~P
+        }
+        else if (auto [np, ns] = get2<PrimitiveType, SingletonType>(nlTy, nrTy); np && ns)
+            return intersectionType(right, left); // ~P & ~S ~ ~S & ~P
+        else
+            return std::nullopt; // ~T & ~U ~ ~T & ~U
+    }
     else if (auto nl = get<NegationType>(left))
     {
         // These should've been reduced already.
@@ -407,15 +673,29 @@ std::optional<TypeId> TypeReducer::intersectionType(TypeId left, TypeId right)
         }
         else if (auto [nc, c] = get2<ClassType, ClassType>(nlTy, right); nc && c)
         {
-            if (isSubclass(nc, c))
-                return std::nullopt; // ~Derived & Base ~ ~Derived & Base
-            else if (isSubclass(c, nc))
+            if (isSubclass(c, nc))
                 return builtinTypes->neverType; // ~Base & Derived ~ never
+            else if (isSubclass(nc, c))
+                return std::nullopt; // ~Derived & Base ~ ~Derived & Base
             else
                 return right; // ~Base & Unrelated ~ Unrelated
         }
+        else if (auto [np, t] = get2<PrimitiveType, TableType>(nlTy, right); np && t)
+        {
+            if (np->type == PrimitiveType::Table)
+                return builtinTypes->neverType; // ~table & {} ~ never
+            else
+                return right; // ~string & {} ~ {}
+        }
+        else if (auto [np, t] = get2<PrimitiveType, MetatableType>(nlTy, right); np && t)
+        {
+            if (np->type == PrimitiveType::Table)
+                return builtinTypes->neverType; // ~table & {} ~ never
+            else
+                return right; // ~string & {} ~ {}
+        }
         else
-            return std::nullopt; // TODO
+            return right; // ~T & U ~ U
     }
     else if (get<NegationType>(right))
         return intersectionType(right, left); // T & ~U ~ ~U & T
@@ -471,6 +751,24 @@ std::optional<TypeId> TypeReducer::unionType(TypeId left, TypeId right)
     }
     else if (auto [f, p] = get2<FunctionType, PrimitiveType>(left, right); f && p)
         return unionType(right, left); // () -> () | P ~ P | () -> ()
+    else if (auto [p, t] = get2<PrimitiveType, TableType>(left, right); p && t)
+    {
+        if (p->type == PrimitiveType::Table)
+            return left; // table | {} ~ table
+        else
+            return std::nullopt; // P | {} ~ P | {}
+    }
+    else if (auto [p, t] = get2<PrimitiveType, MetatableType>(left, right); p && t)
+    {
+        if (p->type == PrimitiveType::Table)
+            return left; // table | {} ~ table
+        else
+            return std::nullopt; // P | {} ~ P | {}
+    }
+    else if (auto [t, p] = get2<TableType, PrimitiveType>(left, right); t && p)
+        return unionType(right, left); // {} | P ~ P | {}
+    else if (auto [t, p] = get2<MetatableType, PrimitiveType>(left, right); t && p)
+        return unionType(right, left); // M | P ~ P | M
     else if (auto [s1, s2] = get2<SingletonType, SingletonType>(left, right); s1 && s2)
     {
         if (*s1 == *s2)
@@ -488,22 +786,7 @@ std::optional<TypeId> TypeReducer::unionType(TypeId left, TypeId right)
             return std::nullopt; // Base | Unrelated ~ Base | Unrelated
     }
     else if (auto [nt, it] = get2<NegationType, IntersectionType>(left, right); nt && it)
-    {
-        std::vector<TypeId> parts;
-        for (TypeId option : it)
-        {
-            if (auto result = unionType(left, option))
-                parts.push_back(*result);
-            else
-            {
-                // TODO: does there exist a reduced form such that `~T | A` hasn't already reduced it, if `A & B` is irreducible?
-                // I want to say yes, but I can't generate a case that hits this code path.
-                parts.push_back(arena->addType(UnionType{{left, option}}));
-            }
-        }
-
-        return foldl<IntersectionType>(begin(parts), end(parts), &TypeReducer::intersectionType); // ~T | (A & B) ~ (~T | A) & (~T | B)
-    }
+        return reduce(distribute<UnionType>(begin(it), end(it), &TypeReducer::unionType, left)); // ~T | (A & B) ~ (~T | A) & (~T | B)
     else if (auto [it, nt] = get2<IntersectionType, NegationType>(left, right); it && nt)
         return unionType(right, left); // (A & B) | ~T ~ ~T | (A & B)
     else if (auto [nl, nr] = get2<NegationType, NegationType>(left, right); nl && nr)
@@ -592,12 +875,26 @@ std::optional<TypeId> TypeReducer::unionType(TypeId left, TypeId right)
         }
         else if (auto [nc, c] = get2<ClassType, ClassType>(nlTy, right); nc && c)
         {
-            if (isSubclass(nc, c))
-                return builtinTypes->unknownType; // ~Derived | Base ~ unknown
-            else if (isSubclass(c, nc))
+            if (isSubclass(c, nc))
                 return std::nullopt; // ~Base | Derived ~ ~Base | Derived
+            else if (isSubclass(nc, c))
+                return builtinTypes->unknownType; // ~Derived | Base ~ unknown
             else
                 return left; // ~Base | Unrelated ~ ~Base
+        }
+        else if (auto [np, t] = get2<PrimitiveType, TableType>(nlTy, right); np && t)
+        {
+            if (np->type == PrimitiveType::Table)
+                return std::nullopt; // ~table | {} ~ ~table | {}
+            else
+                return right; // ~P | {} ~ ~P | {}
+        }
+        else if (auto [np, t] = get2<PrimitiveType, MetatableType>(nlTy, right); np && t)
+        {
+            if (np->type == PrimitiveType::Table)
+                return std::nullopt; // ~table | {} ~ ~table | {}
+            else
+                return right; // ~P | M ~ ~P | M
         }
         else
             return std::nullopt; // TODO
@@ -610,8 +907,6 @@ std::optional<TypeId> TypeReducer::unionType(TypeId left, TypeId right)
 
 TypeId TypeReducer::tableType(TypeId ty)
 {
-    RecursionGuard rg = guard(ty);
-
     if (auto mt = get<MetatableType>(ty))
     {
         auto [copiedTy, copied] = copy(ty, mt);
@@ -621,15 +916,30 @@ TypeId TypeReducer::tableType(TypeId ty)
     }
     else if (auto tt = get<TableType>(ty))
     {
+        // Because of `typeof()`, we need to preserve pointer identity of free/unsealed tables so that
+        // all mutations that occurs on this will be applied without leaking the implementation details.
+        // As a result, we'll just use the type instead of cloning it if it's free/unsealed.
+        //
+        // We could choose to do in-place reductions here, but to be on the safer side, I propose that we do not.
+        if (tt->state == TableState::Free || tt->state == TableState::Unsealed)
+            return ty;
+
         auto [copiedTy, copied] = copy(ty, tt);
 
         for (auto& [name, prop] : copied->props)
-            prop.type = reduce(prop.type);
-
-        if (auto& indexer = copied->indexer)
         {
-            indexer->indexType = reduce(indexer->indexType);
-            indexer->indexResultType = reduce(indexer->indexResultType);
+            TypeId propTy = reduce(prop.type);
+            if (get<NeverType>(propTy))
+                return builtinTypes->neverType;
+            else
+                prop.type = propTy;
+        }
+
+        if (copied->indexer)
+        {
+            TypeId keyTy = reduce(copied->indexer->indexType);
+            TypeId valueTy = reduce(copied->indexer->indexResultType);
+            copied->indexer = TableIndexer{keyTy, valueTy};
         }
 
         for (TypeId& ty : copied->instantiatedTypeParams)
@@ -641,16 +951,14 @@ TypeId TypeReducer::tableType(TypeId ty)
         return copiedTy;
     }
     else
-        handle->ice("Unexpected type in TypeReducer::tableType");
+        handle->ice("TypeReducer::tableType expects a TableType or MetatableType");
 }
 
 TypeId TypeReducer::functionType(TypeId ty)
 {
-    RecursionGuard rg = guard(ty);
-
     const FunctionType* f = get<FunctionType>(ty);
     if (!f)
-        handle->ice("TypeReducer::reduce expects a FunctionType");
+        handle->ice("TypeReducer::functionType expects a FunctionType");
 
     // TODO: once we have bounded quantification, we need to be able to reduce the generic bounds.
     auto [copiedTy, copied] = copy(ty, f);
@@ -661,94 +969,97 @@ TypeId TypeReducer::functionType(TypeId ty)
 
 TypeId TypeReducer::negationType(TypeId ty)
 {
-    RecursionGuard rg = guard(ty);
+    const NegationType* n = get<NegationType>(ty);
+    if (!n)
+        return arena->addType(NegationType{ty});
 
-    if (auto nn = get<NegationType>(ty))
+    TypeId negatedTy = follow(n->ty);
+
+    if (auto nn = get<NegationType>(negatedTy))
         return nn->ty; // ~~T ~ T
-    else if (get<NeverType>(ty))
+    else if (get<NeverType>(negatedTy))
         return builtinTypes->unknownType; // ~never ~ unknown
-    else if (get<UnknownType>(ty))
+    else if (get<UnknownType>(negatedTy))
         return builtinTypes->neverType; // ~unknown ~ never
-    else if (get<AnyType>(ty))
+    else if (get<AnyType>(negatedTy))
         return builtinTypes->anyType; // ~any ~ any
-    else if (auto ni = get<IntersectionType>(ty))
+    else if (auto ni = get<IntersectionType>(negatedTy))
     {
         std::vector<TypeId> options;
         for (TypeId part : ni)
-            options.push_back(negationType(part));
-        return foldl<UnionType>(begin(options), end(options), &TypeReducer::unionType); // ~(T & U) ~ (~T | ~U)
+            options.push_back(negationType(arena->addType(NegationType{part})));
+        return reduce(flatten<UnionType>(std::move(options))); // ~(T & U) ~ (~T | ~U)
     }
-    else if (auto nu = get<UnionType>(ty))
+    else if (auto nu = get<UnionType>(negatedTy))
     {
         std::vector<TypeId> parts;
         for (TypeId option : nu)
-            parts.push_back(negationType(option));
-        return foldl<IntersectionType>(begin(parts), end(parts), &TypeReducer::intersectionType); // ~(T | U) ~ (~T & ~U)
+            parts.push_back(negationType(arena->addType(NegationType{option})));
+        return reduce(flatten<IntersectionType>(std::move(parts))); // ~(T | U) ~ (~T & ~U)
     }
     else
-        return arena->addType(NegationType{ty}); // for all T except the ones handled above, ~T ~ ~T
+        return ty; // for all T except the ones handled above, ~T ~ ~T
 }
 
-RecursionGuard TypeReducer::guard(TypeId ty)
+struct MarkCycles : TypeVisitor
 {
-    seen.push_back(ty);
-    return RecursionGuard{&depth, FInt::LuauTypeReductionRecursionLimit, &seen};
-}
+    DenseHashSet<const void*> cyclics{nullptr};
 
-RecursionGuard TypeReducer::guard(TypePackId tp)
-{
-    seen.push_back(tp);
-    return RecursionGuard{&depth, FInt::LuauTypeReductionRecursionLimit, &seen};
-}
+    void cycle(TypeId ty) override
+    {
+        cyclics.insert(follow(ty));
+    }
 
+    void cycle(TypePackId tp) override
+    {
+        cyclics.insert(follow(tp));
+    }
+
+    bool visit(TypeId ty) override
+    {
+        return !cyclics.find(follow(ty));
+    }
+
+    bool visit(TypePackId tp) override
+    {
+        return !cyclics.find(follow(tp));
+    }
+};
 } // namespace
 
-TypeReduction::TypeReduction(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes, NotNull<InternalErrorReporter> handle)
+TypeReduction::TypeReduction(
+    NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes, NotNull<InternalErrorReporter> handle, const TypeReductionOptions& opts)
     : arena(arena)
     , builtinTypes(builtinTypes)
     , handle(handle)
+    , options(opts)
 {
 }
 
 std::optional<TypeId> TypeReduction::reduce(TypeId ty)
 {
-    if (auto found = cachedTypes.find(ty))
-        return *found;
+    ty = follow(ty);
 
-    if (auto reduced = reduceImpl(ty))
-    {
-        cachedTypes[ty] = *reduced;
-        return *reduced;
-    }
-
-    return std::nullopt;
-}
-
-std::optional<TypePackId> TypeReduction::reduce(TypePackId tp)
-{
-    if (auto found = cachedTypePacks.find(tp))
-        return *found;
-
-    if (auto reduced = reduceImpl(tp))
-    {
-        cachedTypePacks[tp] = *reduced;
-        return *reduced;
-    }
-
-    return std::nullopt;
-}
-
-std::optional<TypeId> TypeReduction::reduceImpl(TypeId ty)
-{
     if (FFlag::DebugLuauDontReduceTypes)
         return ty;
-
-    if (hasExceededCartesianProductLimit(ty))
+    else if (!options.allowTypeReductionsFromOtherArenas && ty->owningArena != arena)
+        return ty;
+    else if (auto edge = memoization.memoizedof(ty))
+    {
+        if (edge->irreducible)
+            return edge->type;
+        else
+            ty = edge->type;
+    }
+    else if (hasExceededCartesianProductLimit(ty))
         return std::nullopt;
 
     try
     {
-        TypeReducer reducer{arena, builtinTypes, handle};
+        MarkCycles finder;
+        finder.traverse(ty);
+
+        TypeReducer reducer{arena, builtinTypes, handle, NotNull{&memoization}, &finder.cyclics};
         return reducer.reduce(ty);
     }
     catch (const RecursionLimitException&)
@@ -757,17 +1068,30 @@ std::optional<TypeId> TypeReduction::reduceImpl(TypeId ty)
     }
 }
 
-std::optional<TypePackId> TypeReduction::reduceImpl(TypePackId tp)
+std::optional<TypePackId> TypeReduction::reduce(TypePackId tp)
 {
+    tp = follow(tp);
+
     if (FFlag::DebugLuauDontReduceTypes)
         return tp;
-
-    if (hasExceededCartesianProductLimit(tp))
+    else if (!options.allowTypeReductionsFromOtherArenas && tp->owningArena != arena)
+        return tp;
+    else if (auto edge = memoization.memoizedof(tp))
+    {
+        if (edge->irreducible)
+            return edge->type;
+        else
+            tp = edge->type;
+    }
+    else if (hasExceededCartesianProductLimit(tp))
         return std::nullopt;
 
     try
     {
-        TypeReducer reducer{arena, builtinTypes, handle};
+        MarkCycles finder;
+        finder.traverse(tp);
+
+        TypeReducer reducer{arena, builtinTypes, handle, NotNull{&memoization}, &finder.cyclics};
         return reducer.reduce(tp);
     }
     catch (const RecursionLimitException&)

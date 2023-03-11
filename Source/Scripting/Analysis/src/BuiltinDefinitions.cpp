@@ -15,10 +15,7 @@
 
 #include <algorithm>
 
-LUAU_FASTFLAGVARIABLE(LuauSetMetaTableArgsCheck, false)
-LUAU_FASTFLAG(LuauUnknownAndNeverType)
-LUAU_FASTFLAGVARIABLE(LuauBuiltInMetatableNoBadSynthetic, false)
-LUAU_FASTFLAG(LuauReportShadowedTypeAlias)
+LUAU_FASTFLAGVARIABLE(LuauDeprecateTableGetnForeach, false)
 
 /** FIXME: Many of these type definitions are not quite completely accurate.
  *
@@ -44,8 +41,6 @@ static std::optional<WithPredicate<TypePackId>> magicFunctionRequire(
 static bool dcrMagicFunctionSelect(MagicFunctionCallContext context);
 static bool dcrMagicFunctionRequire(MagicFunctionCallContext context);
 static bool dcrMagicFunctionPack(MagicFunctionCallContext context);
-
-static std::vector<ConnectiveId> dcrMagicRefinementAssert(const MagicRefinementContext& context);
 
 TypeId makeUnion(TypeArena& arena, std::vector<TypeId>&& types)
 {
@@ -253,11 +248,8 @@ void registerBuiltinTypes(Frontend& frontend)
     frontend.getGlobalScope()->addBuiltinTypeBinding("string", TypeFun{{}, frontend.builtinTypes->stringType});
     frontend.getGlobalScope()->addBuiltinTypeBinding("boolean", TypeFun{{}, frontend.builtinTypes->booleanType});
     frontend.getGlobalScope()->addBuiltinTypeBinding("thread", TypeFun{{}, frontend.builtinTypes->threadType});
-    if (FFlag::LuauUnknownAndNeverType)
-    {
-        frontend.getGlobalScope()->addBuiltinTypeBinding("unknown", TypeFun{{}, frontend.builtinTypes->unknownType});
-        frontend.getGlobalScope()->addBuiltinTypeBinding("never", TypeFun{{}, frontend.builtinTypes->neverType});
-    }
+    frontend.getGlobalScope()->addBuiltinTypeBinding("unknown", TypeFun{{}, frontend.builtinTypes->unknownType});
+    frontend.getGlobalScope()->addBuiltinTypeBinding("never", TypeFun{{}, frontend.builtinTypes->neverType});
 }
 
 void registerBuiltinGlobals(TypeChecker& typeChecker)
@@ -316,7 +308,7 @@ void registerBuiltinGlobals(TypeChecker& typeChecker)
             FunctionType{
                 {genericMT},
                 {},
-                arena.addTypePack(TypePack{{FFlag::LuauUnknownAndNeverType ? tabTy : tableMetaMT, genericMT}}),
+                arena.addTypePack(TypePack{{tabTy, genericMT}}),
                 arena.addTypePack(TypePack{{tableMetaMT}})
             }
         ), "@luau"
@@ -345,6 +337,14 @@ void registerBuiltinGlobals(TypeChecker& typeChecker)
         ttv->props["freeze"] = makeProperty(makeFunction(arena, std::nullopt, {tabTy}, {tabTy}), "@luau/global/table.freeze");
         ttv->props["clone"] = makeProperty(makeFunction(arena, std::nullopt, {tabTy}, {tabTy}), "@luau/global/table.clone");
 
+        if (FFlag::LuauDeprecateTableGetnForeach)
+        {
+            ttv->props["getn"].deprecated = true;
+            ttv->props["getn"].deprecatedSuggestion = "#";
+            ttv->props["foreach"].deprecated = true;
+            ttv->props["foreachi"].deprecated = true;
+        }
+
         attachMagicFunction(ttv->props["pack"].type, magicFunctionPack);
         attachDcrMagicFunction(ttv->props["pack"].type, dcrMagicFunctionPack);
     }
@@ -358,8 +358,7 @@ void registerBuiltinGlobals(Frontend& frontend)
     LUAU_ASSERT(!frontend.globalTypes.types.isFrozen());
     LUAU_ASSERT(!frontend.globalTypes.typePacks.isFrozen());
 
-    if (FFlag::LuauReportShadowedTypeAlias)
-        registerBuiltinTypes(frontend);
+    registerBuiltinTypes(frontend);
 
     TypeArena& arena = frontend.globalTypes;
     NotNull<BuiltinTypes> builtinTypes = frontend.builtinTypes;
@@ -410,7 +409,7 @@ void registerBuiltinGlobals(Frontend& frontend)
             FunctionType{
                 {genericMT},
                 {},
-                arena.addTypePack(TypePack{{FFlag::LuauUnknownAndNeverType ? tabTy : tableMetaMT, genericMT}}),
+                arena.addTypePack(TypePack{{tabTy, genericMT}}),
                 arena.addTypePack(TypePack{{tableMetaMT}})
             }
         ), "@luau"
@@ -429,7 +428,6 @@ void registerBuiltinGlobals(Frontend& frontend)
     }
 
     attachMagicFunction(getGlobalBinding(frontend, "assert"), magicFunctionAssert);
-    attachDcrMagicRefinement(getGlobalBinding(frontend, "assert"), dcrMagicRefinementAssert);
     attachMagicFunction(getGlobalBinding(frontend, "setmetatable"), magicFunctionSetMetaTable);
     attachMagicFunction(getGlobalBinding(frontend, "select"), magicFunctionSelect);
     attachDcrMagicFunction(getGlobalBinding(frontend, "select"), dcrMagicFunctionSelect);
@@ -439,6 +437,14 @@ void registerBuiltinGlobals(Frontend& frontend)
         // tabTy is a generic table type which we can't express via declaration syntax yet
         ttv->props["freeze"] = makeProperty(makeFunction(arena, std::nullopt, {tabTy}, {tabTy}), "@luau/global/table.freeze");
         ttv->props["clone"] = makeProperty(makeFunction(arena, std::nullopt, {tabTy}, {tabTy}), "@luau/global/table.clone");
+
+        if (FFlag::LuauDeprecateTableGetnForeach)
+        {
+            ttv->props["getn"].deprecated = true;
+            ttv->props["getn"].deprecatedSuggestion = "#";
+            ttv->props["foreach"].deprecated = true;
+            ttv->props["foreachi"].deprecated = true;
+        }
 
         attachMagicFunction(ttv->props["pack"].type, magicFunctionPack);
     }
@@ -538,11 +544,8 @@ static std::optional<WithPredicate<TypePackId>> magicFunctionSetMetaTable(
 {
     auto [paramPack, _predicates] = withPredicate;
 
-    if (FFlag::LuauUnknownAndNeverType)
-    {
-        if (size(paramPack) < 2 && finite(paramPack))
-            return std::nullopt;
-    }
+    if (size(paramPack) < 2 && finite(paramPack))
+        return std::nullopt;
 
     TypeArena& arena = typechecker.currentModule->internalTypes;
 
@@ -551,11 +554,8 @@ static std::optional<WithPredicate<TypePackId>> magicFunctionSetMetaTable(
     TypeId target = follow(expectedArgs[0]);
     TypeId mt = follow(expectedArgs[1]);
 
-    if (FFlag::LuauUnknownAndNeverType)
-    {
-        typechecker.tablify(target);
-        typechecker.tablify(mt);
-    }
+    typechecker.tablify(target);
+    typechecker.tablify(mt);
 
     if (const auto& tab = get<TableType>(target))
     {
@@ -565,9 +565,6 @@ static std::optional<WithPredicate<TypePackId>> magicFunctionSetMetaTable(
         }
         else
         {
-            if (!FFlag::LuauUnknownAndNeverType)
-                typechecker.tablify(mt);
-
             const TableType* mtTtv = get<TableType>(mt);
             MetatableType mtv{target, mt};
             if ((tab->name || tab->syntheticName) && (mtTtv && (mtTtv->name || mtTtv->syntheticName)))
@@ -577,21 +574,14 @@ static std::optional<WithPredicate<TypePackId>> magicFunctionSetMetaTable(
 
                 if (tableName == metatableName)
                     mtv.syntheticName = tableName;
-                else if (!FFlag::LuauBuiltInMetatableNoBadSynthetic)
-                    mtv.syntheticName = "{ @metatable: " + metatableName + ", " + tableName + " }";
             }
 
             TypeId mtTy = arena.addType(mtv);
 
-            if (FFlag::LuauSetMetaTableArgsCheck && expr.args.size < 1)
-            {
-                if (FFlag::LuauUnknownAndNeverType)
-                    return std::nullopt;
-                else
-                    return WithPredicate<TypePackId>{};
-            }
+            if (expr.args.size < 1)
+                return std::nullopt;
 
-            if (!FFlag::LuauSetMetaTableArgsCheck || !expr.self)
+            if (!expr.self)
             {
                 AstExpr* targetExpr = expr.args.data[0];
                 if (AstExprLocal* targetLocal = targetExpr->as<AstExprLocal>())
@@ -636,32 +626,13 @@ static std::optional<WithPredicate<TypePackId>> magicFunctionAssert(
     if (head.size() > 0)
     {
         auto [ty, ok] = typechecker.pickTypesFromSense(head[0], true, typechecker.builtinTypes->nilType);
-        if (FFlag::LuauUnknownAndNeverType)
-        {
-            if (get<NeverType>(*ty))
-                head = {*ty};
-            else
-                head[0] = *ty;
-        }
+        if (get<NeverType>(*ty))
+            head = {*ty};
         else
-        {
-            if (!ty)
-                head = {typechecker.nilType};
-            else
-                head[0] = *ty;
-        }
+            head[0] = *ty;
     }
 
     return WithPredicate<TypePackId>{arena.addTypePack(TypePack{std::move(head), tail})};
-}
-
-static std::vector<ConnectiveId> dcrMagicRefinementAssert(const MagicRefinementContext& ctx)
-{
-    if (ctx.argumentConnectives.empty())
-        return {};
-
-    ctx.cgb->applyRefinements(ctx.scope, ctx.callSite->location, ctx.argumentConnectives[0]);
-    return {};
 }
 
 static std::optional<WithPredicate<TypePackId>> magicFunctionPack(

@@ -1,5 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
+#include "Luau/Common.h"
 #include "Luau/Scope.h"
+#include "Luau/Symbol.h"
 #include "Luau/TypeInfer.h"
 #include "Luau/Type.h"
 
@@ -8,6 +10,8 @@
 #include "doctest.h"
 
 using namespace Luau;
+
+LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution)
 
 struct TryUnifyFixture : Fixture
 {
@@ -112,11 +116,6 @@ TEST_CASE_FIXTURE(TryUnifyFixture, "incompatible_tables_are_preserved")
 
 TEST_CASE_FIXTURE(TryUnifyFixture, "uninhabited_intersection_sub_never")
 {
-    ScopedFastFlag sffs[]{
-        {"LuauSubtypeNormalizer", true},
-        {"LuauTypeNormalization2", true},
-    };
-
     CheckResult result = check(R"(
         function f(arg : string & number) : never
           return arg
@@ -127,11 +126,6 @@ TEST_CASE_FIXTURE(TryUnifyFixture, "uninhabited_intersection_sub_never")
 
 TEST_CASE_FIXTURE(TryUnifyFixture, "uninhabited_intersection_sub_anything")
 {
-    ScopedFastFlag sffs[]{
-        {"LuauSubtypeNormalizer", true},
-        {"LuauTypeNormalization2", true},
-    };
-
     CheckResult result = check(R"(
         function f(arg : string & number) : boolean
           return arg
@@ -143,8 +137,6 @@ TEST_CASE_FIXTURE(TryUnifyFixture, "uninhabited_intersection_sub_anything")
 TEST_CASE_FIXTURE(TryUnifyFixture, "uninhabited_table_sub_never")
 {
     ScopedFastFlag sffs[]{
-        {"LuauSubtypeNormalizer", true},
-        {"LuauTypeNormalization2", true},
         {"LuauUninhabitedSubAnything2", true},
     };
 
@@ -159,8 +151,6 @@ TEST_CASE_FIXTURE(TryUnifyFixture, "uninhabited_table_sub_never")
 TEST_CASE_FIXTURE(TryUnifyFixture, "uninhabited_table_sub_anything")
 {
     ScopedFastFlag sffs[]{
-        {"LuauSubtypeNormalizer", true},
-        {"LuauTypeNormalization2", true},
         {"LuauUninhabitedSubAnything2", true},
     };
 
@@ -268,7 +258,10 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "cli_41095_concat_log_in_sealed_table_unifica
 
     LUAU_REQUIRE_ERROR_COUNT(2, result);
     CHECK_EQ(toString(result.errors[0]), "No overload for function accepts 0 arguments.");
-    CHECK_EQ(toString(result.errors[1]), "Available overloads: ({a}, a) -> (); and ({a}, number, a) -> ()");
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        CHECK_EQ(toString(result.errors[1]), "Available overloads: <V>({V}, V) -> (); and <V>({V}, number, V) -> ()");
+    else
+        CHECK_EQ(toString(result.errors[1]), "Available overloads: ({a}, a) -> (); and ({a}, number, a) -> ()");
 }
 
 TEST_CASE_FIXTURE(TryUnifyFixture, "free_tail_is_grown_properly")
@@ -363,8 +356,6 @@ TEST_CASE_FIXTURE(TryUnifyFixture, "metatables_unify_against_shape_of_free_table
 
 TEST_CASE_FIXTURE(TryUnifyFixture, "fuzz_tail_unification_issue")
 {
-    ScopedFastFlag luauTxnLogTypePackIterator{"LuauTxnLogTypePackIterator", true};
-
     TypePackVar variadicAny{VariadicTypePack{typeChecker.anyType}};
     TypePackVar packTmp{TypePack{{typeChecker.anyType}, &variadicAny}};
     TypePackVar packSub{TypePack{{typeChecker.anyType, typeChecker.anyType}, &packTmp}};
@@ -374,6 +365,18 @@ TEST_CASE_FIXTURE(TryUnifyFixture, "fuzz_tail_unification_issue")
     TypePackVar packSuper{TypePack{{&freeTy}, &freeTp}};
 
     state.tryUnify(&packSub, &packSuper);
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "fuzz_unify_any_should_check_log")
+{
+    CheckResult result = check(R"(
+repeat
+_._,_ = nil
+until _
+local l0:(any)&(typeof(_)),l0:(any)|(any) = _,_
+    )");
+
+    LUAU_REQUIRE_ERRORS(result);
 }
 
 TEST_SUITE_END();

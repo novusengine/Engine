@@ -4,6 +4,7 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS "3.19")
     target_sources(Luau.Common PRIVATE
         Common/include/Luau/Common.h
         Common/include/Luau/Bytecode.h
+        Common/include/Luau/DenseHash.h
         Common/include/Luau/ExperimentalFlags.h
     )
 endif()
@@ -12,7 +13,6 @@ endif()
 target_sources(Luau.Ast PRIVATE
     Ast/include/Luau/Ast.h
     Ast/include/Luau/Confusables.h
-    Ast/include/Luau/DenseHash.h
     Ast/include/Luau/Lexer.h
     Ast/include/Luau/Location.h
     Ast/include/Luau/ParseOptions.h
@@ -63,8 +63,15 @@ target_sources(Luau.CodeGen PRIVATE
     CodeGen/include/Luau/CodeGen.h
     CodeGen/include/Luau/ConditionA64.h
     CodeGen/include/Luau/ConditionX64.h
+    CodeGen/include/Luau/IrAnalysis.h
+    CodeGen/include/Luau/IrBuilder.h
+    CodeGen/include/Luau/IrDump.h
+    CodeGen/include/Luau/IrData.h
+    CodeGen/include/Luau/IrUtils.h
     CodeGen/include/Luau/Label.h
     CodeGen/include/Luau/OperandX64.h
+    CodeGen/include/Luau/OptimizeConstProp.h
+    CodeGen/include/Luau/OptimizeFinalX64.h
     CodeGen/include/Luau/RegisterA64.h
     CodeGen/include/Luau/RegisterX64.h
     CodeGen/include/Luau/UnwindBuilder.h
@@ -82,7 +89,17 @@ target_sources(Luau.CodeGen PRIVATE
     CodeGen/src/EmitCommonX64.cpp
     CodeGen/src/EmitInstructionX64.cpp
     CodeGen/src/Fallbacks.cpp
+    CodeGen/src/IrAnalysis.cpp
+    CodeGen/src/IrBuilder.cpp
+    CodeGen/src/IrDump.cpp
+    CodeGen/src/IrLoweringX64.cpp
+    CodeGen/src/IrRegAllocX64.cpp
+    CodeGen/src/IrTranslateBuiltins.cpp
+    CodeGen/src/IrTranslation.cpp
+    CodeGen/src/IrUtils.cpp
     CodeGen/src/NativeState.cpp
+    CodeGen/src/OptimizeConstProp.cpp
+    CodeGen/src/OptimizeFinalX64.cpp
     CodeGen/src/UnwindBuilderDwarf2.cpp
     CodeGen/src/UnwindBuilderWin.cpp
 
@@ -91,10 +108,15 @@ target_sources(Luau.CodeGen PRIVATE
     CodeGen/src/CodeGenUtils.h
     CodeGen/src/CodeGenX64.h
     CodeGen/src/EmitBuiltinsX64.h
+    CodeGen/src/EmitCommon.h
     CodeGen/src/EmitCommonX64.h
     CodeGen/src/EmitInstructionX64.h
     CodeGen/src/Fallbacks.h
     CodeGen/src/FallbacksProlog.h
+    CodeGen/src/IrLoweringX64.h
+    CodeGen/src/IrRegAllocX64.h
+    CodeGen/src/IrTranslateBuiltins.h
+    CodeGen/src/IrTranslation.h
     CodeGen/src/NativeState.h
 )
 
@@ -105,10 +127,11 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/include/Luau/AstJsonEncoder.h
     Analysis/include/Luau/AstQuery.h
     Analysis/include/Luau/Autocomplete.h
+    Analysis/include/Luau/Breadcrumb.h
     Analysis/include/Luau/BuiltinDefinitions.h
     Analysis/include/Luau/Clone.h
     Analysis/include/Luau/Config.h
-    Analysis/include/Luau/Connective.h
+    Analysis/include/Luau/Refinement.h
     Analysis/include/Luau/Constraint.h
     Analysis/include/Luau/ConstraintGraphBuilder.h
     Analysis/include/Luau/ConstraintSolver.h
@@ -163,7 +186,7 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/src/BuiltinDefinitions.cpp
     Analysis/src/Clone.cpp
     Analysis/src/Config.cpp
-    Analysis/src/Connective.cpp
+    Analysis/src/Refinement.cpp
     Analysis/src/Constraint.cpp
     Analysis/src/ConstraintGraphBuilder.cpp
     Analysis/src/ConstraintSolver.cpp
@@ -322,8 +345,10 @@ if(TARGET Luau.UnitTest)
         tests/ConstraintSolver.test.cpp
         tests/CostModel.test.cpp
         tests/DataFlowGraph.test.cpp
+        tests/DenseHash.test.cpp
         tests/Error.test.cpp
         tests/Frontend.test.cpp
+        tests/IrBuilder.test.cpp
         tests/JsonEmitter.test.cpp
         tests/Lexer.test.cpp
         tests/Linter.test.cpp

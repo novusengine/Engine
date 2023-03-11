@@ -13,7 +13,8 @@
 #include <limits.h>
 
 LUAU_FASTINTVARIABLE(LuauSuggestionDistance, 4)
-LUAU_FASTFLAGVARIABLE(LuauLintGlobalNeverReadBeforeWritten, false)
+
+LUAU_FASTFLAGVARIABLE(LuauImproveDeprecatedApiLint, false)
 
 namespace Luau
 {
@@ -331,8 +332,7 @@ private:
                         "Global '%s' is only used in the enclosing function defined at line %d; consider changing it to local",
                         g.firstRef->name.value, top->location.begin.line + 1);
             }
-            else if (FFlag::LuauLintGlobalNeverReadBeforeWritten && g.assigned && !g.readBeforeWritten && !g.definedInModuleScope &&
-                     g.firstRef->name != context->placeholder)
+            else if (g.assigned && !g.readBeforeWritten && !g.definedInModuleScope && g.firstRef->name != context->placeholder)
             {
                 emitWarning(*context, LintWarning::Code_GlobalUsedAsLocal, g.firstRef->location,
                     "Global '%s' is never read before being written. Consider changing it to local", g.firstRef->name.value);
@@ -353,7 +353,7 @@ private:
 
     bool visit(AstExprGlobal* node) override
     {
-        if (FFlag::LuauLintGlobalNeverReadBeforeWritten && !functionStack.empty() && !functionStack.back().dominatedGlobals.contains(node->name))
+        if (!functionStack.empty() && !functionStack.back().dominatedGlobals.contains(node->name))
         {
             Global& g = globals[node->name];
             g.readBeforeWritten = true;
@@ -386,18 +386,15 @@ private:
             {
                 Global& g = globals[gv->name];
 
-                if (FFlag::LuauLintGlobalNeverReadBeforeWritten)
+                if (functionStack.empty())
                 {
-                    if (functionStack.empty())
+                    g.definedInModuleScope = true;
+                }
+                else
+                {
+                    if (!functionStack.back().conditionalExecution)
                     {
-                        g.definedInModuleScope = true;
-                    }
-                    else
-                    {
-                        if (!functionStack.back().conditionalExecution)
-                        {
-                            functionStack.back().dominatedGlobals.insert(gv->name);
-                        }
+                        functionStack.back().dominatedGlobals.insert(gv->name);
                     }
                 }
 
@@ -437,11 +434,8 @@ private:
             else
             {
                 g.assigned = true;
-                if (FFlag::LuauLintGlobalNeverReadBeforeWritten)
-                {
-                    g.definedAsFunction = true;
-                    g.definedInModuleScope = functionStack.empty();
-                }
+                g.definedAsFunction = true;
+                g.definedInModuleScope = functionStack.empty();
             }
 
             trackGlobalRef(gv);
@@ -475,9 +469,6 @@ private:
 
     bool visit(AstStatIf* node) override
     {
-        if (!FFlag::LuauLintGlobalNeverReadBeforeWritten)
-            return true;
-
         HoldConditionalExecution ce(*this);
         node->condition->visit(this);
         node->thenbody->visit(this);
@@ -489,9 +480,6 @@ private:
 
     bool visit(AstStatWhile* node) override
     {
-        if (!FFlag::LuauLintGlobalNeverReadBeforeWritten)
-            return true;
-
         HoldConditionalExecution ce(*this);
         node->condition->visit(this);
         node->body->visit(this);
@@ -501,9 +489,6 @@ private:
 
     bool visit(AstStatRepeat* node) override
     {
-        if (!FFlag::LuauLintGlobalNeverReadBeforeWritten)
-            return true;
-
         HoldConditionalExecution ce(*this);
         node->condition->visit(this);
         node->body->visit(this);
@@ -513,9 +498,6 @@ private:
 
     bool visit(AstStatFor* node) override
     {
-        if (!FFlag::LuauLintGlobalNeverReadBeforeWritten)
-            return true;
-
         HoldConditionalExecution ce(*this);
         node->from->visit(this);
         node->to->visit(this);
@@ -530,9 +512,6 @@ private:
 
     bool visit(AstStatForIn* node) override
     {
-        if (!FFlag::LuauLintGlobalNeverReadBeforeWritten)
-            return true;
-
         HoldConditionalExecution ce(*this);
         for (AstExpr* expr : node->values)
             expr->visit(this);
@@ -2123,7 +2102,7 @@ class LintDeprecatedApi : AstVisitor
 public:
     LUAU_NOINLINE static void process(LintContext& context)
     {
-        if (!context.module)
+        if (!FFlag::LuauImproveDeprecatedApiLint && !context.module)
             return;
 
         LintDeprecatedApi pass{&context};
@@ -2140,26 +2119,51 @@ private:
 
     bool visit(AstExprIndexName* node) override
     {
-        std::optional<TypeId> ty = context->getType(node->expr);
-        if (!ty)
-            return true;
+        if (std::optional<TypeId> ty = context->getType(node->expr))
+            check(node, follow(*ty));
+        else if (AstExprGlobal* global = node->expr->as<AstExprGlobal>())
+            if (FFlag::LuauImproveDeprecatedApiLint)
+                check(node->location, global->name, node->index);
 
-        if (const ClassType* cty = get<ClassType>(follow(*ty)))
+        return true;
+    }
+
+    void check(AstExprIndexName* node, TypeId ty)
+    {
+        if (const ClassType* cty = get<ClassType>(ty))
         {
             const Property* prop = lookupClassProp(cty, node->index.value);
 
             if (prop && prop->deprecated)
                 report(node->location, *prop, cty->name.c_str(), node->index.value);
         }
-        else if (const TableType* tty = get<TableType>(follow(*ty)))
+        else if (const TableType* tty = get<TableType>(ty))
         {
             auto prop = tty->props.find(node->index.value);
 
             if (prop != tty->props.end() && prop->second.deprecated)
-                report(node->location, prop->second, tty->name ? tty->name->c_str() : nullptr, node->index.value);
+            {
+                // strip synthetic typeof() for builtin tables
+                if (FFlag::LuauImproveDeprecatedApiLint && tty->name && tty->name->compare(0, 7, "typeof(") == 0 && tty->name->back() == ')')
+                    report(node->location, prop->second, tty->name->substr(7, tty->name->length() - 8).c_str(), node->index.value);
+                else
+                    report(node->location, prop->second, tty->name ? tty->name->c_str() : nullptr, node->index.value);
+            }
         }
+    }
 
-        return true;
+    void check(const Location& location, AstName global, AstName index)
+    {
+        if (const LintContext::Global* gv = context->builtinGlobals.find(global))
+        {
+            if (const TableType* tty = get<TableType>(gv->type))
+            {
+                auto prop = tty->props.find(index.value);
+
+                if (prop != tty->props.end() && prop->second.deprecated)
+                    report(location, prop->second, global.value, index.value);
+            }
+        }
     }
 
     void report(const Location& location, const Property& prop, const char* container, const char* field)
@@ -2638,10 +2642,6 @@ private:
         case ConstantNumberParseResult::HexOverflow:
             emitWarning(*context, LintWarning::Code_IntegerParsing, node->location,
                 "Hexadecimal number literal exceeded available precision and has been truncated to 2^64");
-            break;
-        case ConstantNumberParseResult::DoublePrefix:
-            emitWarning(*context, LintWarning::Code_IntegerParsing, node->location,
-                "Hexadecimal number literal has a double prefix, which will fail to parse in the future; remove the extra 0x to fix");
             break;
         }
 

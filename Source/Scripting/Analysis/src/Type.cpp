@@ -24,9 +24,8 @@ LUAU_FASTFLAG(DebugLuauFreezeArena)
 LUAU_FASTINTVARIABLE(LuauTypeMaximumStringifierLength, 500)
 LUAU_FASTINTVARIABLE(LuauTableTypeMaximumStringifierLength, 0)
 LUAU_FASTINT(LuauTypeInferRecursionLimit)
-LUAU_FASTFLAG(LuauUnknownAndNeverType)
-LUAU_FASTFLAGVARIABLE(LuauMaybeGenericIntersectionTypes, false)
 LUAU_FASTFLAG(LuauInstantiateInSubtyping)
+LUAU_FASTFLAGVARIABLE(LuauMatchReturnsOptionalString, false);
 
 namespace Luau
 {
@@ -212,7 +211,7 @@ bool isOptional(TypeId ty)
 
     ty = follow(ty);
 
-    if (get<AnyType>(ty) || (FFlag::LuauUnknownAndNeverType && get<UnknownType>(ty)))
+    if (get<AnyType>(ty) || get<UnknownType>(ty))
         return true;
 
     auto utv = get<UnionType>(ty);
@@ -358,39 +357,24 @@ bool maybeGeneric(TypeId ty)
 {
     LUAU_ASSERT(!FFlag::LuauInstantiateInSubtyping);
 
-    if (FFlag::LuauMaybeGenericIntersectionTypes)
-    {
-        ty = follow(ty);
-
-        if (get<FreeType>(ty))
-            return true;
-
-        if (auto ttv = get<TableType>(ty))
-        {
-            // TODO: recurse on table types CLI-39914
-            (void)ttv;
-            return true;
-        }
-
-        if (auto itv = get<IntersectionType>(ty))
-        {
-            return std::any_of(begin(itv), end(itv), maybeGeneric);
-        }
-
-        return isGeneric(ty);
-    }
-
     ty = follow(ty);
+
     if (get<FreeType>(ty))
         return true;
-    else if (auto ttv = get<TableType>(ty))
+
+    if (auto ttv = get<TableType>(ty))
     {
         // TODO: recurse on table types CLI-39914
         (void)ttv;
         return true;
     }
-    else
-        return isGeneric(ty);
+
+    if (auto itv = get<IntersectionType>(ty))
+    {
+        return std::any_of(begin(itv), end(itv), maybeGeneric);
+    }
+
+    return isGeneric(ty);
 }
 
 bool maybeSingleton(TypeId ty)
@@ -414,7 +398,7 @@ bool hasLength(TypeId ty, DenseHashSet<TypeId>& seen, int* recursionCount)
     if (seen.contains(ty))
         return true;
 
-    if (isString(ty) || get<AnyType>(ty) || get<TableType>(ty) || get<MetatableType>(ty))
+    if (isString(ty) || isPrim(ty, PrimitiveType::Table) || get<AnyType>(ty) || get<TableType>(ty) || get<MetatableType>(ty))
         return true;
 
     if (auto uty = get<UnionType>(ty))
@@ -760,6 +744,8 @@ BuiltinTypes::BuiltinTypes()
     , threadType(arena->addType(Type{PrimitiveType{PrimitiveType::Thread}, /*persistent*/ true}))
     , functionType(arena->addType(Type{PrimitiveType{PrimitiveType::Function}, /*persistent*/ true}))
     , classType(arena->addType(Type{ClassType{"class", {}, std::nullopt, std::nullopt, {}, {}, {}}, /*persistent*/ true}))
+    , tableType(arena->addType(Type{PrimitiveType{PrimitiveType::Table}, /*persistent*/ true}))
+    , emptyTableType(arena->addType(Type{TableType{TableState::Sealed, TypeLevel{}, nullptr}, /*persistent*/ true}))
     , trueType(arena->addType(Type{SingletonType{BooleanSingleton{true}}, /*persistent*/ true}))
     , falseType(arena->addType(Type{SingletonType{BooleanSingleton{false}}, /*persistent*/ true}))
     , anyType(arena->addType(Type{AnyType{}, /*persistent*/ true}))
@@ -768,15 +754,16 @@ BuiltinTypes::BuiltinTypes()
     , errorType(arena->addType(Type{ErrorType{}, /*persistent*/ true}))
     , falsyType(arena->addType(Type{UnionType{{falseType, nilType}}, /*persistent*/ true}))
     , truthyType(arena->addType(Type{NegationType{falsyType}, /*persistent*/ true}))
+    , optionalNumberType(arena->addType(Type{UnionType{{numberType, nilType}}, /*persistent*/ true}))
+    , optionalStringType(arena->addType(Type{UnionType{{stringType, nilType}}, /*persistent*/ true}))
     , anyTypePack(arena->addTypePack(TypePackVar{VariadicTypePack{anyType}, /*persistent*/ true}))
     , neverTypePack(arena->addTypePack(TypePackVar{VariadicTypePack{neverType}, /*persistent*/ true}))
-    , uninhabitableTypePack(arena->addTypePack({neverType}, neverTypePack))
+    , uninhabitableTypePack(arena->addTypePack(TypePackVar{TypePack{{neverType}, neverTypePack}, /*persistent*/ true}))
     , errorTypePack(arena->addTypePack(TypePackVar{Unifiable::Error{}, /*persistent*/ true}))
 {
     TypeId stringMetatable = makeStringMetatable();
     asMutable(stringType)->ty = PrimitiveType{PrimitiveType::String, stringMetatable};
     persist(stringMetatable);
-    persist(uninhabitableTypePack);
 
     freeze(*arena);
 }
@@ -1231,12 +1218,12 @@ static std::vector<TypeId> parsePatternString(NotNull<BuiltinTypes> builtinTypes
             if (i + 1 < size && data[i + 1] == ')')
             {
                 i++;
-                result.push_back(builtinTypes->numberType);
+                result.push_back(FFlag::LuauMatchReturnsOptionalString ? builtinTypes->optionalNumberType : builtinTypes->numberType);
                 continue;
             }
 
             ++depth;
-            result.push_back(builtinTypes->stringType);
+            result.push_back(FFlag::LuauMatchReturnsOptionalString ? builtinTypes->optionalStringType : builtinTypes->stringType);
         }
         else if (data[i] == ')')
         {
@@ -1254,7 +1241,7 @@ static std::vector<TypeId> parsePatternString(NotNull<BuiltinTypes> builtinTypes
         return std::vector<TypeId>();
 
     if (result.empty())
-        result.push_back(builtinTypes->stringType);
+        result.push_back(FFlag::LuauMatchReturnsOptionalString ? builtinTypes->optionalStringType : builtinTypes->stringType);
 
     return result;
 }

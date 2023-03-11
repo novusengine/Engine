@@ -47,6 +47,7 @@ TypeId Instantiation::clean(TypeId ty)
     FunctionType clone = FunctionType{level, scope, ftv->argTypes, ftv->retTypes, ftv->definition, ftv->hasSelf};
     clone.magicFunction = ftv->magicFunction;
     clone.dcrMagicFunction = ftv->dcrMagicFunction;
+    clone.dcrMagicRefinement = ftv->dcrMagicRefinement;
     clone.tags = ftv->tags;
     clone.argNames = ftv->argNames;
     TypeId result = addType(std::move(clone));
@@ -116,6 +117,7 @@ TypeId ReplaceGenerics::clean(TypeId ty)
     {
         TableType clone = TableType{ttv->props, ttv->indexer, level, scope, TableState::Free};
         clone.definitionModuleName = ttv->definitionModuleName;
+        clone.definitionLocation = ttv->definitionLocation;
         return addType(std::move(clone));
     }
     else

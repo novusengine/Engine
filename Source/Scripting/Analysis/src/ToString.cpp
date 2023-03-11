@@ -14,11 +14,7 @@
 #include <stdexcept>
 
 LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution)
-LUAU_FASTFLAG(LuauUnknownAndNeverType)
-LUAU_FASTFLAGVARIABLE(LuauLineBreaksDetermineIndents, false)
 LUAU_FASTFLAGVARIABLE(LuauFunctionReturnStringificationFixup, false)
-LUAU_FASTFLAGVARIABLE(LuauUnseeArrayTtv, false)
-LUAU_FASTFLAGVARIABLE(LuauSerializeNilUnionAsNil, false)
 
 /*
  * Prefix generic typenames with gen-
@@ -277,20 +273,10 @@ struct StringifierState
 private:
     void emitIndentation()
     {
-        if (!FFlag::LuauLineBreaksDetermineIndents)
-        {
-            if (!opts.DEPRECATED_indent)
-                return;
+        if (!opts.useLineBreaks)
+            return;
 
-            emit(std::string(indentation, ' '));
-        }
-        else
-        {
-            if (!opts.useLineBreaks)
-                return;
-
-            emit(std::string(indentation, ' '));
-        }
+        emit(std::string(indentation, ' '));
     }
 };
 
@@ -323,8 +309,7 @@ struct TypeStringifier
         }
 
         Luau::visit(
-            [this, tv](auto&& t)
-            {
+            [this, tv](auto&& t) {
                 return (*this)(tv, t);
             },
             tv->ty);
@@ -457,6 +442,9 @@ struct TypeStringifier
             return;
         case PrimitiveType::Function:
             state.emit("function");
+            return;
+        case PrimitiveType::Table:
+            state.emit("table");
             return;
         default:
             LUAU_ASSERT(!"Unknown primitive type");
@@ -619,9 +607,7 @@ struct TypeStringifier
             stringify(ttv.indexer->indexResultType);
             state.emit("}");
 
-            if (FFlag::LuauUnseeArrayTtv)
-                state.unsee(&ttv);
-
+            state.unsee(&ttv);
             return;
         }
 
@@ -781,11 +767,8 @@ struct TypeStringifier
             if (results.size() > 1)
                 s = ")?";
 
-            if (FFlag::LuauSerializeNilUnionAsNil)
-            {
-                if (!hasNonNilDisjunct)
-                    s = "nil";
-            }
+            if (!hasNonNilDisjunct)
+                s = "nil";
 
             state.emit(s);
         }
@@ -842,7 +825,7 @@ struct TypeStringifier
     void operator()(TypeId, const ErrorType& tv)
     {
         state.result.error = true;
-        state.emit(FFlag::LuauUnknownAndNeverType ? "*error-type*" : "*unknown*");
+        state.emit("*error-type*");
     }
 
     void operator()(TypeId, const LazyType& ltv)
@@ -925,8 +908,7 @@ struct TypePackStringifier
         }
 
         Luau::visit(
-            [this, tp](auto&& t)
-            {
+            [this, tp](auto&& t) {
                 return (*this)(tp, t);
             },
             tp->ty);
@@ -982,7 +964,7 @@ struct TypePackStringifier
     void operator()(TypePackId, const Unifiable::Error& error)
     {
         state.result.error = true;
-        state.emit(FFlag::LuauUnknownAndNeverType ? "*error-type*" : "*unknown*");
+        state.emit("*error-type*");
     }
 
     void operator()(TypePackId, const VariadicTypePack& pack)
@@ -1076,11 +1058,9 @@ static void assignCycleNames(const std::set<TypeId>& cycles, const std::set<Type
         if (auto ttv = get<TableType>(follow(cycleTy)); !exhaustive && ttv && (ttv->syntheticName || ttv->name))
         {
             // If we have a cycle type in type parameters, assign a cycle name for this named table
-            if (std::find_if(ttv->instantiatedTypeParams.begin(), ttv->instantiatedTypeParams.end(),
-                    [&](auto&& el)
-                    {
-                        return cycles.count(follow(el));
-                    }) != ttv->instantiatedTypeParams.end())
+            if (std::find_if(ttv->instantiatedTypeParams.begin(), ttv->instantiatedTypeParams.end(), [&](auto&& el) {
+                    return cycles.count(follow(el));
+                }) != ttv->instantiatedTypeParams.end())
                 cycleNames[cycleTy] = ttv->name ? *ttv->name : *ttv->syntheticName;
 
             continue;
@@ -1175,11 +1155,9 @@ ToStringResult toStringDetailed(TypeId ty, ToStringOptions& opts)
     state.exhaustive = true;
 
     std::vector<std::pair<TypeId, std::string>> sortedCycleNames{state.cycleNames.begin(), state.cycleNames.end()};
-    std::sort(sortedCycleNames.begin(), sortedCycleNames.end(),
-        [](const auto& a, const auto& b)
-        {
-            return a.second < b.second;
-        });
+    std::sort(sortedCycleNames.begin(), sortedCycleNames.end(), [](const auto& a, const auto& b) {
+        return a.second < b.second;
+    });
 
     bool semi = false;
     for (const auto& [cycleTy, name] : sortedCycleNames)
@@ -1190,8 +1168,7 @@ ToStringResult toStringDetailed(TypeId ty, ToStringOptions& opts)
         state.emit(name);
         state.emit(" = ");
         Luau::visit(
-            [&tvs, cycleTy = cycleTy](auto&& t)
-            {
+            [&tvs, cycleTy = cycleTy](auto&& t) {
                 return tvs(cycleTy, t);
             },
             cycleTy->ty);
@@ -1272,11 +1249,9 @@ ToStringResult toStringDetailed(TypePackId tp, ToStringOptions& opts)
     state.exhaustive = true;
 
     std::vector<std::pair<TypeId, std::string>> sortedCycleNames{state.cycleNames.begin(), state.cycleNames.end()};
-    std::sort(sortedCycleNames.begin(), sortedCycleNames.end(),
-        [](const auto& a, const auto& b)
-        {
-            return a.second < b.second;
-        });
+    std::sort(sortedCycleNames.begin(), sortedCycleNames.end(), [](const auto& a, const auto& b) {
+        return a.second < b.second;
+    });
 
     bool semi = false;
     for (const auto& [cycleTy, name] : sortedCycleNames)
@@ -1287,8 +1262,7 @@ ToStringResult toStringDetailed(TypePackId tp, ToStringOptions& opts)
         state.emit(name);
         state.emit(" = ");
         Luau::visit(
-            [&tvs, cycleTy = cycleTy](auto t)
-            {
+            [&tvs, cycleTy = cycleTy](auto t) {
                 return tvs(cycleTy, t);
             },
             cycleTy->ty);
@@ -1428,11 +1402,29 @@ std::string dump(TypeId ty)
     return s;
 }
 
+std::string dump(const std::optional<TypeId>& ty)
+{
+    if (ty)
+        return dump(*ty);
+
+    printf("nullopt\n");
+    return "nullopt";
+}
+
 std::string dump(TypePackId ty)
 {
     std::string s = toString(ty, dumpOptions());
     printf("%s\n", s.c_str());
     return s;
+}
+
+std::string dump(const std::optional<TypePackId>& ty)
+{
+    if (ty)
+        return dump(*ty);
+
+    printf("nullopt\n");
+    return "nullopt";
 }
 
 std::string dump(const ScopePtr& scope, const char* name)
@@ -1541,6 +1533,10 @@ std::string toString(const Constraint& constraint, ToStringOptions& opts)
             const std::string pathStr = c.path.size() == 1 ? "\"" + c.path[0] + "\"" : "[\"" + join(c.path, "\", \"") + "\"]";
             return tos(c.resultType) + " ~ setProp " + tos(c.subjectType) + ", " + pathStr + " " + tos(c.propType);
         }
+        else if constexpr (std::is_same_v<T, SetIndexerConstraint>)
+        {
+            return tos(c.resultType) + " ~ setIndexer " + tos(c.subjectType) + " [ " + tos(c.indexType) + " ] " + tos(c.propType);
+        }
         else if constexpr (std::is_same_v<T, SingletonOrTopTypeConstraint>)
         {
             std::string result = tos(c.resultType);
@@ -1551,6 +1547,8 @@ std::string toString(const Constraint& constraint, ToStringOptions& opts)
             else
                 return result + " ~ if isSingleton D then D else unknown where D = " + discriminant;
         }
+        else if constexpr (std::is_same_v<T, UnpackConstraint>)
+            return tos(c.resultPack) + " ~ unpack " + tos(c.sourcePack);
         else
             static_assert(always_false_v<T>, "Non-exhaustive constraint switch");
     };

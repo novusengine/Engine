@@ -3,10 +3,8 @@
 
 #include "Luau/Ast.h"
 #include "Luau/Common.h"
-#include "Luau/Connective.h"
-#include "Luau/DataFlowGraph.h"
+#include "Luau/Refinement.h"
 #include "Luau/DenseHash.h"
-#include "Luau/Def.h"
 #include "Luau/NotNull.h"
 #include "Luau/Predicate.h"
 #include "Luau/Unifiable.h"
@@ -117,6 +115,7 @@ struct PrimitiveType
         String,
         Thread,
         Function,
+        Table,
     };
 
     Type type;
@@ -245,6 +244,18 @@ struct WithPredicate
 {
     T type;
     PredicateVec predicates;
+
+    WithPredicate() = default;
+    explicit WithPredicate(T type)
+        : type(type)
+    {
+    }
+
+    WithPredicate(T type, PredicateVec predicates)
+        : type(type)
+        , predicates(std::move(predicates))
+    {
+    }
 };
 
 using MagicFunction = std::function<std::optional<WithPredicate<TypePackId>>(
@@ -262,15 +273,12 @@ using DcrMagicFunction = bool (*)(MagicFunctionCallContext);
 
 struct MagicRefinementContext
 {
-    ScopePtr scope;
-    NotNull<struct ConstraintGraphBuilder> cgb;
-    NotNull<const DataFlowGraph> dfg;
-    NotNull<ConnectiveArena> connectiveArena;
-    std::vector<ConnectiveId> argumentConnectives;
+    NotNull<Scope> scope;
     const class AstExprCall* callSite;
+    std::vector<std::optional<TypeId>> discriminantTypes;
 };
 
-using DcrMagicRefinement = std::vector<ConnectiveId> (*)(const MagicRefinementContext&);
+using DcrMagicRefinement = void (*)(const MagicRefinementContext&);
 
 struct FunctionType
 {
@@ -303,8 +311,8 @@ struct FunctionType
     TypePackId argTypes;
     TypePackId retTypes;
     MagicFunction magicFunction = nullptr;
-    DcrMagicFunction dcrMagicFunction = nullptr;     // Fired only while solving constraints
-    DcrMagicRefinement dcrMagicRefinement = nullptr; // Fired only while generating constraints
+    DcrMagicFunction dcrMagicFunction = nullptr;
+    DcrMagicRefinement dcrMagicRefinement = nullptr;
     bool hasSelf;
     bool hasNoGenerics = false;
 };
@@ -375,6 +383,7 @@ struct TableType
     std::vector<TypeId> instantiatedTypeParams;
     std::vector<TypePackId> instantiatedTypePackParams;
     ModuleName definitionModuleName;
+    Location definitionLocation;
 
     std::optional<TypeId> boundTo;
     Tags tags;
@@ -650,14 +659,19 @@ public:
     const TypeId threadType;
     const TypeId functionType;
     const TypeId classType;
+    const TypeId tableType;
+    const TypeId emptyTableType;
     const TypeId trueType;
     const TypeId falseType;
     const TypeId anyType;
     const TypeId unknownType;
     const TypeId neverType;
     const TypeId errorType;
-    const TypeId falsyType;  // No type binding!
-    const TypeId truthyType; // No type binding!
+    const TypeId falsyType;
+    const TypeId truthyType;
+
+    const TypeId optionalNumberType;
+    const TypeId optionalStringType;
 
     const TypePackId anyTypePack;
     const TypePackId neverTypePack;
@@ -849,5 +863,16 @@ void attachTag(Property& prop, const std::string& tagName);
 bool hasTag(TypeId ty, const std::string& tagName);
 bool hasTag(const Property& prop, const std::string& tagName);
 bool hasTag(const Tags& tags, const std::string& tagName); // Do not use in new work.
+
+/*
+ * Use this to change the kind of a particular type.
+ *
+ * LUAU_NOINLINE so that the calling frame doesn't have to pay the stack storage for the new variant.
+ */
+template<typename T, typename... Args>
+LUAU_NOINLINE T* emplaceType(Type* ty, Args&&... args)
+{
+    return &ty->ty.emplace<T>(std::forward<Args>(args)...);
+}
 
 } // namespace Luau

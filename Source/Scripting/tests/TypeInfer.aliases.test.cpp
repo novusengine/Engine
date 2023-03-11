@@ -201,11 +201,11 @@ TEST_CASE_FIXTURE(Fixture, "generic_aliases")
 
     const char* expectedError;
     if (FFlag::LuauTypeMismatchInvarianceInError)
-        expectedError = "Type '{ v: string }' could not be converted into 'T<number>'\n"
+        expectedError = "Type 'bad' could not be converted into 'T<number>'\n"
                         "caused by:\n"
                         "  Property 'v' is not compatible. Type 'string' could not be converted into 'number' in an invariant context";
     else
-        expectedError = "Type '{ v: string }' could not be converted into 'T<number>'\n"
+        expectedError = "Type 'bad' could not be converted into 'T<number>'\n"
                         "caused by:\n"
                         "  Property 'v' is not compatible. Type 'string' could not be converted into 'number'";
 
@@ -226,15 +226,15 @@ TEST_CASE_FIXTURE(Fixture, "dependent_generic_aliases")
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
 
-    const char* expectedError;
+    std::string expectedError;
     if (FFlag::LuauTypeMismatchInvarianceInError)
-        expectedError = "Type '{ t: { v: string } }' could not be converted into 'U<number>'\n"
+        expectedError = "Type 'bad' could not be converted into 'U<number>'\n"
                         "caused by:\n"
                         "  Property 't' is not compatible. Type '{ v: string }' could not be converted into 'T<number>'\n"
                         "caused by:\n"
                         "  Property 'v' is not compatible. Type 'string' could not be converted into 'number' in an invariant context";
     else
-        expectedError = "Type '{ t: { v: string } }' could not be converted into 'U<number>'\n"
+        expectedError = "Type 'bad' could not be converted into 'U<number>'\n"
                         "caused by:\n"
                         "  Property 't' is not compatible. Type '{ v: string }' could not be converted into 'T<number>'\n"
                         "caused by:\n"
@@ -357,8 +357,6 @@ TEST_CASE_FIXTURE(Fixture, "cli_38393_recursive_intersection_oom")
         type t0<t0> = ((typeof(_))&((t0)&(((typeof(_))&(t0))->typeof(_))),{n163:any,})->(any,typeof(_))
         _(_)
     )");
-
-    LUAU_REQUIRE_ERRORS(result);
 }
 
 TEST_CASE_FIXTURE(Fixture, "type_alias_fwd_declaration_is_precise")
@@ -857,16 +855,8 @@ TEST_CASE_FIXTURE(Fixture, "forward_declared_alias_is_not_clobbered_by_prior_uni
         type FutureIntersection = A & B
     )");
 
-    if (FFlag::DebugLuauDeferredConstraintResolution)
-    {
-        // To be quite honest, I don't know exactly why DCR fixes this.
-        LUAU_REQUIRE_NO_ERRORS(result);
-    }
-    else
-    {
-        // TODO: shared self causes this test to break in bizarre ways.
-        LUAU_REQUIRE_ERRORS(result);
-    }
+    // TODO: shared self causes this test to break in bizarre ways.
+    LUAU_REQUIRE_ERRORS(result);
 }
 
 TEST_CASE_FIXTURE(Fixture, "recursive_types_restriction_ok")
@@ -890,8 +880,6 @@ TEST_CASE_FIXTURE(Fixture, "recursive_types_restriction_not_ok")
 
 TEST_CASE_FIXTURE(Fixture, "report_shadowed_aliases")
 {
-    ScopedFastFlag sff{"LuauReportShadowedTypeAlias", true};
-
     // We allow a previous type alias to depend on a future type alias. That exact feature enables a confusing example, like the following snippet,
     // which has the type alias FakeString point to the type alias `string` that which points to `number`.
     CheckResult result = check(R"(
