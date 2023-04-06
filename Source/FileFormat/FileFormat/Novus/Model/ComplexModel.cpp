@@ -287,6 +287,9 @@ namespace Model
 					output.write(reinterpret_cast<const char*>(&renderBatch.indexStart), sizeof(u32));
 					output.write(reinterpret_cast<const char*>(&renderBatch.indexCount), sizeof(u32));
 
+					u8 isTransparent = static_cast<u8>(renderBatch.isTransparent);
+					output.write(reinterpret_cast<const char*>(&isTransparent), sizeof(u8));
+
 					u32 numTextureUnits = static_cast<u32>(renderBatch.textureUnits.size());
 					output.write(reinterpret_cast<const char*>(&numTextureUnits), sizeof(u32));
 
@@ -520,6 +523,12 @@ namespace Model
 						if (!buffer->GetU32(renderBatch.indexCount))
 							return false;
 
+						u8 isTransparent = 0;
+						if (!buffer->GetU8(isTransparent))
+							return false;
+
+						renderBatch.isTransparent = isTransparent == 1;
+
 						u32 numTextureUnits = 0;
 						if (!buffer->GetU32(numTextureUnits))
 							return false;
@@ -638,7 +647,7 @@ namespace Model
 				ComplexModel::Vertex& vertex = out.vertices[i];
 				M2Vertex* m2Vertex = layout.md21.vertices.GetElement(rootBuffer, i);
 
-				vertex.position = m2Vertex->position;
+				vertex.position = CoordinateSpaces::ModelPosToNovus(m2Vertex->position);
 				vertex.uvCoords[0] = m2Vertex->uvCords[0];
 				vertex.uvCoords[1] = m2Vertex->uvCords[1];
 
@@ -892,7 +901,47 @@ namespace Model
 				localVertexIndex = out.modelData.vertexLookupIDs[localVertexIndex];
 			}
 
-			// TODO : Clone and invert two sided renderbatches so we don't need to have double pipelines
+			// Clone and invert two sided renderbatches so we don't need to have double pipelines
+			{
+				u32 numRenderBatches = static_cast<u32>(out.modelData.renderBatches.size());
+				for (u32 i = 0; i < numRenderBatches; i++)
+				{
+					u32 numTextureUnits = static_cast<u32>(out.modelData.renderBatches[i].textureUnits.size());
+					for (u32 j = 0; j < numTextureUnits; j++)
+					{
+						ComplexModel::TextureUnit& textureUnit = out.modelData.renderBatches[i].textureUnits[j];
+						const Material& material = out.materials[textureUnit.materialIndex];
+
+						if (material.flags.disableBackfaceCulling)
+						{
+							ComplexModel::RenderBatch& clonedRenderBatch = out.modelData.renderBatches.emplace_back();
+							ComplexModel::RenderBatch& renderBatch = out.modelData.renderBatches[i]; // We can't get this one earlier since the emplace might reallocate
+
+							clonedRenderBatch.groupID = renderBatch.groupID;
+							clonedRenderBatch.indexCount = renderBatch.indexCount;
+							clonedRenderBatch.indexStart = renderBatch.indexStart;
+							clonedRenderBatch.textureUnits = renderBatch.textureUnits;
+							clonedRenderBatch.vertexCount = renderBatch.vertexCount;
+							clonedRenderBatch.vertexStart = renderBatch.vertexStart;
+
+							u32 numIndicesBeforeAdd = static_cast<u32>(out.modelData.indices.size());
+							u32 indexStart = clonedRenderBatch.indexStart;
+							u32 indexCount = clonedRenderBatch.indexCount;
+
+							out.modelData.indices.resize(numIndicesBeforeAdd + indexCount);
+							for (u32 k = 0; k < indexCount; k++)
+							{
+								u32 dst = numIndicesBeforeAdd + k;
+								u32 src = indexStart + (indexCount - k) - 1; // Read the original indices backwards
+
+								out.modelData.indices[dst] = out.modelData.indices[src];
+							}
+
+							clonedRenderBatch.indexStart = numIndicesBeforeAdd;
+						}
+					}
+				}
+			}
 
 			// Fix Shader ID
 			{

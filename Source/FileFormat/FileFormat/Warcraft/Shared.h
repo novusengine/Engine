@@ -176,3 +176,47 @@ inline vec3 OctNormalDecode(vec2 encN)
 
     return normalize(n);
 }
+
+namespace CoordinateSpaces
+{
+    // Novus Coordinate space matches what Unity has
+    // LEFT HANDED
+    // X = East
+    // Y = Up
+    // Z = North
+
+    // Placement Coordinate space
+    // RIGHT HANDED
+    // X = West
+    // Y = Up
+    // Z = North
+    inline vec3 PlacementPosToNovus(const vec3& pos)
+    {
+        return vec3(-pos.x, pos.y, pos.z);
+    }
+
+    inline vec3 PlacementRotToNovus(const vec3& rot)
+    {
+        // When going from Right Handed to Left Handed we need to negate the rotations
+        return vec3(-rot.x, -rot.y , rot.z);
+    }
+
+    inline quat PlacementRotToNovus(const quat& rot)
+    {
+        vec3 euler = glm::eulerAngles(rot);
+        euler = PlacementRotToNovus(euler);
+
+        return quat(euler);
+    }
+
+    // Model Coordinate space (M2 and WMO)
+    // RIGHT HANDED
+    // X = South
+    // Y = East
+    // Z = UP
+    inline vec3 ModelPosToNovus(const vec3& pos)
+    {
+        return vec3(pos.y, pos.z, -pos.x);
+    }
+}
+

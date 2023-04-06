@@ -226,10 +226,12 @@ namespace Map
 				Terrain::Placement& placement = out.mapObjectPlacements.emplace_back();
 				placement.uniqueID = placementInfo.uniqueID;
 				placement.nameHash = placementInfo.fileID;
-				placement.position = vec3(Terrain::MAP_HALF_SIZE - placementInfo.position.z, Terrain::MAP_HALF_SIZE - placementInfo.position.x, placementInfo.position.y);
 
-				vec3 placementRotation = glm::radians(vec3(placementInfo.rotation.z, placementInfo.rotation.x, placementInfo.rotation.y + 180.f));
-				glm::mat4 matrix = glm::eulerAngleZYX(placementRotation.z, placementRotation.y, placementRotation.x);
+				vec3 centeredPosition = vec3(Terrain::MAP_HALF_SIZE - placementInfo.position.x, placementInfo.position.y, Terrain::MAP_HALF_SIZE - placementInfo.position.z);
+				placement.position = CoordinateSpaces::PlacementPosToNovus(centeredPosition);
+
+				vec3 placementRotation = glm::radians(CoordinateSpaces::PlacementRotToNovus(placementInfo.rotation));
+				glm::mat4 matrix = glm::eulerAngleYXZ(placementRotation.y, placementRotation.x, placementRotation.z);
 				placement.rotation = glm::quat_cast(matrix);
 
 				bool hasScale = placementInfo.flags.HasScale;
@@ -252,10 +254,12 @@ namespace Map
 				Terrain::Placement& placement = out.complexModelPlacements.emplace_back();
 				placement.uniqueID = placementInfo.uniqueID;
 				placement.nameHash = placementInfo.fileID;
-				placement.position = vec3(Terrain::MAP_HALF_SIZE - placementInfo.position.z, Terrain::MAP_HALF_SIZE - placementInfo.position.x, placementInfo.position.y);
 
-				vec3 placementRotation = glm::radians(vec3(placementInfo.rotation.z, placementInfo.rotation.x, placementInfo.rotation.y + 180.f));
-				glm::mat4 matrix = glm::eulerAngleZYX(placementRotation.z, placementRotation.y, placementRotation.x);
+				vec3 centeredPosition = vec3(Terrain::MAP_HALF_SIZE - placementInfo.position.x, placementInfo.position.y, Terrain::MAP_HALF_SIZE - placementInfo.position.z);
+				placement.position = CoordinateSpaces::PlacementPosToNovus(centeredPosition);
+
+				vec3 placementRotation = glm::radians(CoordinateSpaces::PlacementRotToNovus(placementInfo.rotation));
+				glm::mat4 matrix = glm::eulerAngleYXZ(placementRotation.y, placementRotation.x, placementRotation.z);
 				placement.rotation = glm::quat_cast(matrix);
 				placement.scale = placementInfo.scale;
 			}
