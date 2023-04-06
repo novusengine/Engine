@@ -50,8 +50,7 @@ namespace Renderer
         PER_PASS,
         PER_DRAW,
         TERRAIN,
-        MAPOBJECT,
-        CMODEL
+        MODEL
     };
 
     inline const char* DescriptorSetToName(DescriptorSetSlot slot)
@@ -64,8 +63,7 @@ namespace Renderer
             case PER_PASS: return "PER_PASS";
             case PER_DRAW: return "PER_DRAW";
             case TERRAIN: return "TERRAIN";
-            case MAPOBJECT: return "MAPOBJECT";
-            case CMODEL: return "CMODEL";
+            case MODEL: return "MODEL";
             default:
                 DebugHandler::PrintFatal("Unknown DescriptorSet, did we forget to extend the DescriptorSetToName function after adding new DescriptorSetSlots?");
         }

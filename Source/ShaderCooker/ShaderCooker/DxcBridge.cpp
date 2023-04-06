@@ -189,8 +189,7 @@ namespace ShaderCooker
         defines.push_back(MakeDefine(L"PER_PASS", L"3"));
         defines.push_back(MakeDefine(L"PER_DRAW", L"4"));
         defines.push_back(MakeDefine(L"TERRAIN", L"5"));
-        defines.push_back(MakeDefine(L"MAPOBJECT", L"6"));
-        defines.push_back(MakeDefine(L"CMODEL", L"7"));
+        defines.push_back(MakeDefine(L"MODEL", L"6"));
 
         // Define all SHADER_*PROFILE* to 0
         for (const char* profile : validProfilesArray)
@@ -314,8 +313,9 @@ namespace ShaderCooker
             std::string pathString = path.string();
             replaceAll(fixedError, filenameString, pathString);
 
-            DebugHandler::Print("%s\n", fixedError.c_str());
-        
+            //DebugHandler::Print("{0}\n", fixedError.c_str());
+            printf("%s", fixedError.c_str()); // Skip the timestamp that DebugHandler attaches so we can goto the errors through the visual studio output
+
             return false;
         }
 
@@ -353,7 +353,7 @@ namespace ShaderCooker
 
         if (!withoutHlsl.has_extension())
         {
-            DebugHandler::PrintError("Filename \"%s\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: %s", filename.string(), validProfiles);
+            DebugHandler::PrintError("Filename \"{0}\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
 
             return false;
         }
@@ -362,7 +362,7 @@ namespace ShaderCooker
 
         if (extension.length() != 2 && extension.length() != 3)
         {
-            DebugHandler::PrintError("Filename \"%s\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: %s", filename.string(), validProfiles);
+            DebugHandler::PrintError("Filename \"{0}\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
 
             return false;
         }
@@ -380,7 +380,7 @@ namespace ShaderCooker
 
         if (!isValidProfile)
         {
-            DebugHandler::PrintError("Filename \"%s\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: %s", filename.string(), validProfiles);
+            DebugHandler::PrintError("Filename \"{0}\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
             return false;
         }
 

@@ -65,7 +65,7 @@ namespace ShaderCooker
 
         if (errorCount > 0)
         {
-            DebugHandler::PrintError("Shader (%s) failed to pass syntax check", shader.name.c_str());
+            DebugHandler::PrintError("Shader ({0}) failed to pass syntax check", shader.name.c_str());
         }
 
         return errorCount == 0;
@@ -103,7 +103,7 @@ namespace ShaderCooker
                 }
                 else
                 {
-                    DebugHandler::PrintError("Shader (%s) includes (%s) the include could not be resolved", shader.name.c_str(), include.name.c_str());
+                    DebugHandler::PrintError("Shader ({0}) includes ({1}) the include could not be resolved", shader.name.c_str(), include.name.c_str());
                 }
             }
         }
@@ -237,7 +237,7 @@ namespace ShaderCooker
                     break;
 
                 default:
-                    ReportError(1, "Expected to find identifier for permutation (%s). (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(1, "Expected to find identifier for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
                 }
 
@@ -257,7 +257,7 @@ namespace ShaderCooker
                     break;
 
                 default:
-                    ReportError(2, "Expected to find ',' or ']' for permutation (%s). (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(2, "Expected to find ',' or ']' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
                 }
 
@@ -272,7 +272,7 @@ namespace ShaderCooker
                     break;
 
                 default:
-                    ReportError(3, "Expected to find '=' for permutation (%s). (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(3, "Expected to find '=' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
                 }
                 break;
@@ -286,7 +286,7 @@ namespace ShaderCooker
                     break;
 
                 default:
-                    ReportError(4, "Expected to find identifier for permutation name but found (%s). (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(4, "Expected to find identifier for permutation name but found ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
                 }
                 break;
@@ -300,7 +300,7 @@ namespace ShaderCooker
                     break;
 
                 default:
-                    ReportError(5, "Expected to find '[' for permutation (%s). (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(5, "Expected to find '[' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
                 }
                 break;
@@ -314,7 +314,7 @@ namespace ShaderCooker
                     break;
 
                 default:
-                    ReportError(6, "Expected to find ']' for permutation (%s). (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(6, "Expected to find ']' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
                 }
                 break;
@@ -328,14 +328,14 @@ namespace ShaderCooker
                     break;
 
                 default:
-                    ReportError(7, "Expected to find ';' for permutation (%s). (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(7, "Expected to find ';' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
                 }
                 break;
             }
 
             default:
-                ReportError(8, "Internal compiler error for permutation (%s), please contact Pursche. (Line: %d, Col: %d)", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                ReportError(8, "Internal compiler error for permutation ({0}), please contact Pursche. (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                 return false;
             }
         }

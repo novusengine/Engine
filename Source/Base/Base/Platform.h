@@ -1,7 +1,8 @@
 #pragma once
 
+#define DO_PRAGMA(X) _Pragma(#X)
+
 #if defined(__clang__)
-    #define DO_PRAGMA(X) _Pragma(#X)
     #define PRAGMA_CLANG_DIAGNOSTIC_PUSH        DO_PRAGMA(GCC diagnostic push)
     #define PRAGMA_CLANG_DIAGNOSTIC_POP         DO_PRAGMA(GCC diagnostic pop)
     #define PRAGMA_CLANG_DIAGNOSTIC_IGNORE(x)   DO_PRAGMA(GCC diagnostic ignored #x)
@@ -9,6 +10,12 @@
     #define PRAGMA_CLANG_DIAGNOSTIC_PUSH
     #define PRAGMA_CLANG_DIAGNOSTIC_POP
     #define PRAGMA_CLANG_DIAGNOSTIC_IGNORE(x)
+#endif
+
+#if defined(_MSC_VER)
+    #define PRAGMA_MSVC_IGNORE_WARNING(X)   DO_PRAGMA(warning(disable : X))
+#else
+    #define PRAGMA_MSVC_IGNORE_WARNING(X)   (void)
 #endif
 
 #if defined(__clang__)
