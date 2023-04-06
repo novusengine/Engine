@@ -282,8 +282,14 @@ TEST_CASE_FIXTURE(Fixture, "infer_generic_methods")
         function x:f(): string return self:id("hello") end
         function x:g(): number return self:id(37) end
     )");
-    // TODO: Quantification should be doing the conversion, not normalization.
-    LUAU_REQUIRE_ERRORS(result);
+
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        LUAU_REQUIRE_NO_ERRORS(result);
+    else
+    {
+        // TODO: Quantification should be doing the conversion, not normalization.
+        LUAU_REQUIRE_ERRORS(result);
+    }
 }
 
 TEST_CASE_FIXTURE(Fixture, "calling_self_generic_methods")
@@ -296,7 +302,8 @@ TEST_CASE_FIXTURE(Fixture, "calling_self_generic_methods")
             local y: number = self:id(37)
         end
     )");
-    // TODO: Should typecheck but currently errors CLI-39916
+
+    // TODO: Should typecheck but currently errors CLI-54277
     LUAU_REQUIRE_ERRORS(result);
 }
 
@@ -1041,8 +1048,11 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "infer_generic_function_function_argument")
     )");
 
     LUAU_REQUIRE_NO_ERRORS(result);
+}
 
-    result = check(R"(
+TEST_CASE_FIXTURE(BuiltinsFixture, "infer_generic_function_function_argument_2")
+{
+    CheckResult result = check(R"(
         local function map<a, b>(arr: {a}, f: (a) -> b)
             local r = {}
             for i,v in ipairs(arr) do
@@ -1056,8 +1066,11 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "infer_generic_function_function_argument")
 
     LUAU_REQUIRE_NO_ERRORS(result);
     REQUIRE_EQ("{boolean}", toString(requireType("r")));
+}
 
-    check(R"(
+TEST_CASE_FIXTURE(BuiltinsFixture, "infer_generic_function_function_argument_3")
+{
+    CheckResult result = check(R"(
         local function foldl<a, b>(arr: {a}, init: b, f: (b, a) -> b)
             local r = init
             for i,v in ipairs(arr) do
@@ -1202,10 +1215,6 @@ TEST_CASE_FIXTURE(Fixture, "quantify_functions_even_if_they_have_an_explicit_gen
 
 TEST_CASE_FIXTURE(Fixture, "do_not_always_instantiate_generic_intersection_types")
 {
-    ScopedFastFlag sff[] = {
-        {"LuauMaybeGenericIntersectionTypes", true},
-    };
-
     CheckResult result = check(R"(
         --!strict
         type Array<T> = { [number]: T }

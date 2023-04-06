@@ -458,6 +458,24 @@ TEST_CASE_FIXTURE(Fixture, "type_alias_should_work_when_name_is_also_local")
     REQUIRE(block->body.data[1]->is<AstStatTypeAlias>());
 }
 
+TEST_CASE_FIXTURE(Fixture, "type_alias_span_is_correct")
+{
+    AstStatBlock* block = parse(R"(
+        type Packed1<T...> = (T...) -> (T...)
+        type Packed2<T...> = (Packed1<T...>, T...) -> (Packed1<T...>, T...)
+    )");
+
+    REQUIRE(block != nullptr);
+    REQUIRE(2 == block->body.size);
+    AstStatTypeAlias* t1 = block->body.data[0]->as<AstStatTypeAlias>();
+    REQUIRE(t1);
+    REQUIRE(Location{Position{1, 8}, Position{1, 45}} == t1->location);
+
+    AstStatTypeAlias* t2 = block->body.data[1]->as<AstStatTypeAlias>();
+    REQUIRE(t2);
+    REQUIRE(Location{Position{2, 8}, Position{2, 75}} == t2->location);
+}
+
 TEST_CASE_FIXTURE(Fixture, "parse_error_messages")
 {
     CHECK_EQ(getParseError(R"(
@@ -683,21 +701,12 @@ TEST_CASE_FIXTURE(Fixture, "parse_numbers_binary")
 
 TEST_CASE_FIXTURE(Fixture, "parse_numbers_error")
 {
-    ScopedFastFlag luauErrorDoubleHexPrefix{"LuauErrorDoubleHexPrefix", true};
-
     CHECK_EQ(getParseError("return 0b123"), "Malformed number");
     CHECK_EQ(getParseError("return 123x"), "Malformed number");
     CHECK_EQ(getParseError("return 0xg"), "Malformed number");
     CHECK_EQ(getParseError("return 0x0x123"), "Malformed number");
     CHECK_EQ(getParseError("return 0xffffffffffffffffffffllllllg"), "Malformed number");
     CHECK_EQ(getParseError("return 0x0xffffffffffffffffffffffffffff"), "Malformed number");
-}
-
-TEST_CASE_FIXTURE(Fixture, "parse_numbers_error_soft")
-{
-    ScopedFastFlag luauErrorDoubleHexPrefix{"LuauErrorDoubleHexPrefix", false};
-
-    CHECK_EQ(getParseError("return 0x0x0x0x0x0x0x0"), "Malformed number");
 }
 
 TEST_CASE_FIXTURE(Fixture, "break_return_not_last_error")
@@ -906,8 +915,6 @@ TEST_CASE_FIXTURE(Fixture, "parse_compound_assignment_error_multiple")
 
 TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_double_brace_begin")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     try
     {
         parse(R"(
@@ -923,8 +930,6 @@ TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_double_brace_begin")
 
 TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_double_brace_mid")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     try
     {
         parse(R"(
@@ -940,8 +945,6 @@ TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_double_brace_mid")
 
 TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_without_end_brace")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     auto columnOfEndBraceError = [this](const char* code) {
         try
         {
@@ -966,8 +969,6 @@ TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_without_end_brace")
 
 TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_without_end_brace_in_table")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     try
     {
         parse(R"(
@@ -986,8 +987,6 @@ TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_without_end_brace_in_table
 
 TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_mid_without_end_brace_in_table")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     try
     {
         parse(R"(
@@ -1006,8 +1005,6 @@ TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_mid_without_end_brace_in_t
 
 TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_as_type_fail")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     try
     {
         parse(R"(
@@ -1028,8 +1025,6 @@ TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_as_type_fail")
 
 TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_call_without_parens")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     try
     {
         parse(R"(
@@ -1040,6 +1035,35 @@ TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_call_without_parens")
     catch (const ParseErrors& e)
     {
         CHECK_EQ("Expected identifier when parsing expression, got `{", e.getErrors().front().getMessage());
+    }
+}
+
+TEST_CASE_FIXTURE(Fixture, "parse_interpolated_string_without_expression")
+{
+    ScopedFastFlag sff("LuauFixInterpStringMid", true);
+
+    try
+    {
+        parse(R"(
+            print(`{}`)
+        )");
+        FAIL("Expected ParseErrors to be thrown");
+    }
+    catch (const ParseErrors& e)
+    {
+        CHECK_EQ("Malformed interpolated string, expected expression inside '{}'", e.getErrors().front().getMessage());
+    }
+
+    try
+    {
+        parse(R"(
+            print(`{}{1}`)
+        )");
+        FAIL("Expected ParseErrors to be thrown");
+    }
+    catch (const ParseErrors& e)
+    {
+        CHECK_EQ("Malformed interpolated string, expected expression inside '{}'", e.getErrors().front().getMessage());
     }
 }
 
@@ -2177,8 +2201,6 @@ type C<X...> = Packed<(number, X...)>
 
 TEST_CASE_FIXTURE(Fixture, "invalid_type_forms")
 {
-    ScopedFastFlag luauFixNamedFunctionParse{"LuauFixNamedFunctionParse", true};
-
     matchParseError("type A = (b: number)", "Expected '->' when parsing function type, got <eof>");
     matchParseError("type P<T...> = () -> T... type B = P<(x: number, y: string)>", "Expected '->' when parsing function type, got '>'");
     matchParseError("type F<T... = (a: string)> = (T...) -> ()", "Expected '->' when parsing function type, got '>'");

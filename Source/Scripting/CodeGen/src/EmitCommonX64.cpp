@@ -2,6 +2,7 @@
 #include "EmitCommonX64.h"
 
 #include "Luau/AssemblyBuilderX64.h"
+#include "Luau/IrData.h"
 
 #include "CustomExecUtils.h"
 #include "NativeState.h"
@@ -13,8 +14,10 @@ namespace Luau
 {
 namespace CodeGen
 {
+namespace X64
+{
 
-void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs, OperandX64 rhs, ConditionX64 cond, Label& label)
+void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs, OperandX64 rhs, IrCondition cond, Label& label)
 {
     // Refresher on comi/ucomi EFLAGS:
     // CF only: less
@@ -35,23 +38,23 @@ void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs,
     // And because of NaN, integer check interchangeability like 'not less or equal' <-> 'greater' does not hold
     switch (cond)
     {
-    case ConditionX64::NotLessEqual:
+    case IrCondition::NotLessEqual:
         // (b < a) is the same as !(a <= b). jnae checks CF=1 which means < or NaN
         build.jcc(ConditionX64::NotAboveEqual, label);
         break;
-    case ConditionX64::LessEqual:
+    case IrCondition::LessEqual:
         // (b >= a) is the same as (a <= b). jae checks CF=0 which means >= and not NaN
         build.jcc(ConditionX64::AboveEqual, label);
         break;
-    case ConditionX64::NotLess:
+    case IrCondition::NotLess:
         // (b <= a) is the same as !(a < b). jna checks CF=1 or ZF=1 which means <= or NaN
         build.jcc(ConditionX64::NotAbove, label);
         break;
-    case ConditionX64::Less:
+    case IrCondition::Less:
         // (b > a) is the same as (a < b). ja checks CF=0 and ZF=0 which means > and not NaN
         build.jcc(ConditionX64::Above, label);
         break;
-    case ConditionX64::NotEqual:
+    case IrCondition::NotEqual:
         // ZF=0 or PF=1 means != or NaN
         build.jcc(ConditionX64::NotZero, label);
         build.jcc(ConditionX64::Parity, label);
@@ -61,25 +64,25 @@ void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs,
     }
 }
 
-void jumpOnAnyCmpFallback(AssemblyBuilderX64& build, int ra, int rb, ConditionX64 cond, Label& label)
+void jumpOnAnyCmpFallback(AssemblyBuilderX64& build, int ra, int rb, IrCondition cond, Label& label)
 {
     build.mov(rArg1, rState);
     build.lea(rArg2, luauRegAddress(ra));
     build.lea(rArg3, luauRegAddress(rb));
 
-    if (cond == ConditionX64::NotLessEqual || cond == ConditionX64::LessEqual)
+    if (cond == IrCondition::NotLessEqual || cond == IrCondition::LessEqual)
         build.call(qword[rNativeContext + offsetof(NativeContext, luaV_lessequal)]);
-    else if (cond == ConditionX64::NotLess || cond == ConditionX64::Less)
+    else if (cond == IrCondition::NotLess || cond == IrCondition::Less)
         build.call(qword[rNativeContext + offsetof(NativeContext, luaV_lessthan)]);
-    else if (cond == ConditionX64::NotEqual || cond == ConditionX64::Equal)
+    else if (cond == IrCondition::NotEqual || cond == IrCondition::Equal)
         build.call(qword[rNativeContext + offsetof(NativeContext, luaV_equalval)]);
     else
         LUAU_ASSERT(!"Unsupported condition");
 
     emitUpdateBase(build);
     build.test(eax, eax);
-    build.jcc(cond == ConditionX64::NotLessEqual || cond == ConditionX64::NotLess || cond == ConditionX64::NotEqual ? ConditionX64::Zero
-                                                                                                                    : ConditionX64::NotZero,
+    build.jcc(cond == IrCondition::NotLessEqual || cond == IrCondition::NotLess || cond == IrCondition::NotEqual ? ConditionX64::Zero
+                                                                                                                 : ConditionX64::NotZero,
         label);
 }
 
@@ -191,9 +194,26 @@ static void callBarrierImpl(AssemblyBuilderX64& build, RegisterX64 tmp, Register
     build.test(byte[tmp + offsetof(GCheader, marked)], bit2mask(WHITE0BIT, WHITE1BIT));
     build.jcc(ConditionX64::Zero, skip);
 
-    LUAU_ASSERT(object != rArg3);
-    build.mov(rArg3, tmp);
-    build.mov(rArg2, object);
+    // TODO: even with re-ordering we have a chance of failure, we have a task to fix this in the future
+    if (object == rArg3)
+    {
+        LUAU_ASSERT(tmp != rArg2);
+
+        if (rArg2 != object)
+            build.mov(rArg2, object);
+
+        if (rArg3 != tmp)
+            build.mov(rArg3, tmp);
+    }
+    else
+    {
+        if (rArg3 != tmp)
+            build.mov(rArg3, tmp);
+
+        if (rArg2 != object)
+            build.mov(rArg2, object);
+    }
+
     build.mov(rArg1, rState);
     build.call(qword[rNativeContext + contextOffset]);
 }
@@ -237,6 +257,22 @@ void callCheckGc(AssemblyBuilderX64& build, int pcpos, bool savepc, Label& skip)
     build.call(qword[rNativeContext + offsetof(NativeContext, luaC_step)]);
 
     emitUpdateBase(build);
+}
+
+void callGetFastTmOrFallback(AssemblyBuilderX64& build, RegisterX64 table, TMS tm, Label& fallback)
+{
+    build.mov(rArg1, qword[table + offsetof(Table, metatable)]);
+    build.test(rArg1, rArg1);
+    build.jcc(ConditionX64::Zero, fallback); // no metatable
+
+    build.test(byte[rArg1 + offsetof(Table, tmcache)], 1 << tm);
+    build.jcc(ConditionX64::NotZero, fallback); // no tag method
+
+    // rArg1 is already prepared
+    build.mov(rArg2, tm);
+    build.mov(rax, qword[rState + offsetof(lua_State, global)]);
+    build.mov(rArg3, qword[rax + offsetof(global_State, tmname) + tm * sizeof(TString*)]);
+    build.call(qword[rNativeContext + offsetof(NativeContext, luaT_gettm)]);
 }
 
 void emitExit(AssemblyBuilderX64& build, bool continueInVm)
@@ -344,5 +380,6 @@ void emitContinueCallInVm(AssemblyBuilderX64& build)
     emitExit(build, /* continueInVm */ true);
 }
 
+} // namespace X64
 } // namespace CodeGen
 } // namespace Luau

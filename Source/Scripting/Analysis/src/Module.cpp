@@ -18,7 +18,6 @@
 LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
 LUAU_FASTFLAGVARIABLE(LuauClonePublicInterfaceLess, false);
 LUAU_FASTFLAG(LuauSubstitutionReentrant);
-LUAU_FASTFLAG(LuauScopelessModule);
 LUAU_FASTFLAG(LuauClassTypeVarsInSubstitution);
 LUAU_FASTFLAG(LuauSubstitutionFixMissingFields);
 
@@ -227,14 +226,11 @@ void Module::clonePublicInterface(NotNull<BuiltinTypes> builtinTypes, InternalEr
     }
 
     // Copy external stuff over to Module itself
-    if (FFlag::LuauScopelessModule)
-    {
-        this->returnType = moduleScope->returnType;
+    this->returnType = moduleScope->returnType;
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        this->exportedTypeBindings = moduleScope->exportedTypeBindings;
+    else
         this->exportedTypeBindings = std::move(moduleScope->exportedTypeBindings);
-    }
-
-    freeze(internalTypes);
-    freeze(interfaceTypes);
 }
 
 bool Module::hasModuleScope() const

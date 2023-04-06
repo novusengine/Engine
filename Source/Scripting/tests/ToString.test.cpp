@@ -83,7 +83,6 @@ TEST_CASE_FIXTURE(Fixture, "table_respects_use_line_break")
 
     ToStringOptions opts;
     opts.useLineBreaks = true;
-    opts.DEPRECATED_indent = true;
 
     //clang-format off
     CHECK_EQ("{|\n"
@@ -97,7 +96,6 @@ TEST_CASE_FIXTURE(Fixture, "table_respects_use_line_break")
 
 TEST_CASE_FIXTURE(Fixture, "nil_or_nil_is_nil_not_question_mark")
 {
-    ScopedFastFlag sff("LuauSerializeNilUnionAsNil", true);
     CheckResult result = check(R"(
       type nil_ty = nil | nil
       local a : nil_ty = nil
@@ -109,7 +107,6 @@ TEST_CASE_FIXTURE(Fixture, "nil_or_nil_is_nil_not_question_mark")
 
 TEST_CASE_FIXTURE(Fixture, "long_disjunct_of_nil_is_nil_not_question_mark")
 {
-    ScopedFastFlag sff("LuauSerializeNilUnionAsNil", true);
     CheckResult result = check(R"(
       type nil_ty = nil | nil | nil | nil | nil
       local a : nil_ty = nil
@@ -294,9 +291,9 @@ TEST_CASE_FIXTURE(Fixture, "quit_stringifying_type_when_length_is_exceeded")
     {
         o.maxTypeLength = 30;
         CHECK_EQ(toString(requireType("f0"), o), "() -> ()");
-        CHECK_EQ(toString(requireType("f1"), o), "<a>(a) -> (() -> ()) | (a & ~(false?))... *TRUNCATED*");
-        CHECK_EQ(toString(requireType("f2"), o), "<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~(false?))... *TRUNCATED*");
-        CHECK_EQ(toString(requireType("f3"), o), "<c>(c) -> (<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~(false?))... *TRUNCATED*");
+        CHECK_EQ(toString(requireType("f1"), o), "<a>(a) -> (() -> ()) | (a & ~false & ~nil)... *TRUNCATED*");
+        CHECK_EQ(toString(requireType("f2"), o), "<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~false & ~nil)... *TRUNCATED*");
+        CHECK_EQ(toString(requireType("f3"), o), "<c>(c) -> (<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~false & ~nil)... *TRUNCATED*");
     }
     else
     {
@@ -324,9 +321,9 @@ TEST_CASE_FIXTURE(Fixture, "stringifying_type_is_still_capped_when_exhaustive")
     {
         o.maxTypeLength = 30;
         CHECK_EQ(toString(requireType("f0"), o), "() -> ()");
-        CHECK_EQ(toString(requireType("f1"), o), "<a>(a) -> (() -> ()) | (a & ~(false?))... *TRUNCATED*");
-        CHECK_EQ(toString(requireType("f2"), o), "<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~(false?))... *TRUNCATED*");
-        CHECK_EQ(toString(requireType("f3"), o), "<c>(c) -> (<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~(false?))... *TRUNCATED*");
+        CHECK_EQ(toString(requireType("f1"), o), "<a>(a) -> (() -> ()) | (a & ~false & ~nil)... *TRUNCATED*");
+        CHECK_EQ(toString(requireType("f2"), o), "<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~false & ~nil)... *TRUNCATED*");
+        CHECK_EQ(toString(requireType("f3"), o), "<c>(c) -> (<b>(b) -> (<a>(a) -> (() -> ()) | (a & ~false & ~nil)... *TRUNCATED*");
     }
     else
     {
@@ -789,7 +786,7 @@ TEST_CASE_FIXTURE(Fixture, "toStringNamedFunction_include_self_param")
 
     TypeId parentTy = requireType("foo");
     auto ttv = get<TableType>(follow(parentTy));
-    auto ftv = get<FunctionType>(ttv->props.at("method").type);
+    auto ftv = get<FunctionType>(follow(ttv->props.at("method").type));
 
     CHECK_EQ("foo:method<a>(self: a, arg: string): ()", toStringNamedFunction("foo:method", *ftv));
 }
@@ -806,19 +803,21 @@ TEST_CASE_FIXTURE(Fixture, "toStringNamedFunction_hide_self_param")
         end
     )");
 
-    TypeId parentTy = requireType("foo");
-    auto ttv = get<TableType>(follow(parentTy));
-    auto ftv = get<FunctionType>(ttv->props.at("method").type);
-
     ToStringOptions opts;
     opts.hideFunctionSelfArgument = true;
+
+    TypeId parentTy = requireType("foo");
+    auto ttv = get<TableType>(follow(parentTy));
+    REQUIRE_MESSAGE(ttv, "Expected a table but got " << toString(parentTy, opts));
+    TypeId methodTy = follow(ttv->props.at("method").type);
+    auto ftv = get<FunctionType>(methodTy);
+    REQUIRE_MESSAGE(ftv, "Expected a function but got " << toString(methodTy, opts));
+
     CHECK_EQ("foo:method<a>(arg: string): ()", toStringNamedFunction("foo:method", *ftv, opts));
 }
 
 TEST_CASE_FIXTURE(Fixture, "tostring_unsee_ttv_if_array")
 {
-    ScopedFastFlag sff("LuauUnseeArrayTtv", true);
-
     CheckResult result = check(R"(
         local x: {string}
         -- This code is constructed very specifically to use the same (by pointer

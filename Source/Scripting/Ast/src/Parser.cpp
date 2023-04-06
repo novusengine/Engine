@@ -14,21 +14,7 @@
 LUAU_FASTINTVARIABLE(LuauRecursionLimit, 1000)
 LUAU_FASTINTVARIABLE(LuauParseErrorLimit, 100)
 
-LUAU_FASTFLAGVARIABLE(LuauFixNamedFunctionParse, false)
-LUAU_DYNAMIC_FASTFLAGVARIABLE(LuaReportParseWrongNamedType, false)
-
-bool lua_telemetry_parsed_named_non_function_type = false;
-
-LUAU_FASTFLAGVARIABLE(LuauErrorDoubleHexPrefix, false)
-LUAU_DYNAMIC_FASTFLAGVARIABLE(LuaReportParseIntegerIssues, false)
-
-LUAU_FASTFLAGVARIABLE(LuauInterpolatedStringBaseSupport, false)
-
 LUAU_FASTFLAGVARIABLE(LuauParserErrorsOnMissingDefaultTypePackArgument, false)
-
-bool lua_telemetry_parsed_out_of_range_bin_integer = false;
-bool lua_telemetry_parsed_out_of_range_hex_integer = false;
-bool lua_telemetry_parsed_double_prefix_hex_integer = false;
 
 #define ERROR_INVALID_INTERP_DOUBLE_BRACE "Double braces are not permitted within interpolated strings. Did you mean '\\{'?"
 
@@ -773,7 +759,7 @@ AstStat* Parser::parseTypeAlias(const Location& start, bool exported)
 
     AstType* type = parseTypeAnnotation();
 
-    return allocator.alloc<AstStatTypeAlias>(Location(start, type->location), name->name, generics, genericPacks, type, exported);
+    return allocator.alloc<AstStatTypeAlias>(Location(start, type->location), name->name, name->location, generics, genericPacks, type, exported);
 }
 
 AstDeclaredClassProp Parser::parseDeclaredClassMethod()
@@ -1262,7 +1248,11 @@ std::pair<Location, AstTypeList> Parser::parseReturnTypeAnnotation()
         {
             AstType* returnType = parseTypeAnnotation(result, innerBegin);
 
-            return {Location{location, returnType->location}, AstTypeList{copy(&returnType, 1), varargAnnotation}};
+            // If parseTypeAnnotation parses nothing, then returnType->location.end only points at the last non-type-pack
+            // type to successfully parse.  We need the span of the whole annotation.
+            Position endPos = result.size() == 1 ? location.end : returnType->location.end;
+
+            return {Location{location.begin, endPos}, AstTypeList{copy(&returnType, 1), varargAnnotation}};
         }
 
         return {location, AstTypeList{copy(result), varargAnnotation}};
@@ -1423,7 +1413,7 @@ AstTypeOrPack Parser::parseFunctionTypeAnnotation(bool allowPack)
 
     AstArray<AstType*> paramTypes = copy(params);
 
-    if (FFlag::LuauFixNamedFunctionParse && !names.empty())
+    if (!names.empty())
         forceFunctionType = true;
 
     bool returnTypeIntroducer = lexer.current().type == Lexeme::SkinnyArrow || lexer.current().type == ':';
@@ -1431,9 +1421,6 @@ AstTypeOrPack Parser::parseFunctionTypeAnnotation(bool allowPack)
     // Not a function at all. Just a parenthesized type. Or maybe a type pack with a single element
     if (params.size() == 1 && !varargAnnotation && !forceFunctionType && !returnTypeIntroducer)
     {
-        if (DFFlag::LuaReportParseWrongNamedType && !names.empty())
-            lua_telemetry_parsed_named_non_function_type = true;
-
         if (allowPack)
             return {{}, allocator.alloc<AstTypePackExplicit>(begin.location, AstTypeList{paramTypes, nullptr})};
         else
@@ -1441,12 +1428,7 @@ AstTypeOrPack Parser::parseFunctionTypeAnnotation(bool allowPack)
     }
 
     if (!forceFunctionType && !returnTypeIntroducer && allowPack)
-    {
-        if (DFFlag::LuaReportParseWrongNamedType && !names.empty())
-            lua_telemetry_parsed_named_non_function_type = true;
-
         return {{}, allocator.alloc<AstTypePackExplicit>(begin.location, AstTypeList{paramTypes, varargAnnotation})};
-    }
 
     AstArray<std::optional<AstArgumentName>> paramNames = copy(names);
 
@@ -2108,17 +2090,7 @@ static ConstantNumberParseResult parseInteger(double& result, const char* data, 
         value = strtoull(data, &end, base);
 
         if (errno == ERANGE)
-        {
-            if (DFFlag::LuaReportParseIntegerIssues)
-            {
-                if (base == 2)
-                    lua_telemetry_parsed_out_of_range_bin_integer = true;
-                else
-                    lua_telemetry_parsed_out_of_range_hex_integer = true;
-            }
-
             return base == 2 ? ConstantNumberParseResult::BinOverflow : ConstantNumberParseResult::HexOverflow;
-        }
     }
 
     return ConstantNumberParseResult::Ok;
@@ -2132,18 +2104,7 @@ static ConstantNumberParseResult parseDouble(double& result, const char* data)
 
     // hexadecimal literal
     if (data[0] == '0' && (data[1] == 'x' || data[1] == 'X') && data[2])
-    {
-        if (!FFlag::LuauErrorDoubleHexPrefix && data[2] == '0' && (data[3] == 'x' || data[3] == 'X'))
-        {
-            if (DFFlag::LuaReportParseIntegerIssues)
-                lua_telemetry_parsed_double_prefix_hex_integer = true;
-
-            ConstantNumberParseResult parseResult = parseInteger(result, data + 2, 16);
-            return parseResult == ConstantNumberParseResult::Malformed ? parseResult : ConstantNumberParseResult::DoublePrefix;
-        }
-
         return parseInteger(result, data, 16); // pass in '0x' prefix, it's handled by 'strtoull'
-    }
 
     char* end = nullptr;
     double value = strtod(data, &end);
@@ -2187,11 +2148,11 @@ AstExpr* Parser::parseSimpleExpr()
         return parseNumber();
     }
     else if (lexer.current().type == Lexeme::RawString || lexer.current().type == Lexeme::QuotedString ||
-             (FFlag::LuauInterpolatedStringBaseSupport && lexer.current().type == Lexeme::InterpStringSimple))
+             lexer.current().type == Lexeme::InterpStringSimple)
     {
         return parseString();
     }
-    else if (FFlag::LuauInterpolatedStringBaseSupport && lexer.current().type == Lexeme::InterpStringBegin)
+    else if (lexer.current().type == Lexeme::InterpStringBegin)
     {
         return parseInterpString();
     }
@@ -2665,8 +2626,6 @@ AstExpr* Parser::parseInterpString()
                     currentLexeme.type == Lexeme::InterpStringEnd || currentLexeme.type == Lexeme::InterpStringSimple);
 
         endLocation = currentLexeme.location;
-
-        Location startOfBrace = Location(endLocation.end, 1);
 
         scratchData.assign(currentLexeme.data, currentLexeme.length);
 

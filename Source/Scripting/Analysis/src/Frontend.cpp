@@ -25,13 +25,13 @@
 #include <string>
 
 LUAU_FASTINT(LuauTypeInferIterationLimit)
+LUAU_FASTINT(LuauTypeInferRecursionLimit)
 LUAU_FASTINT(LuauTarjanChildLimit)
 LUAU_FASTFLAG(LuauInferInNoCheckMode)
 LUAU_FASTFLAGVARIABLE(LuauKnowsTheDataModel3, false)
 LUAU_FASTINTVARIABLE(LuauAutocompleteCheckTimeoutMs, 100)
 LUAU_FASTFLAGVARIABLE(DebugLuauDeferredConstraintResolution, false)
-LUAU_FASTFLAG(DebugLuauLogSolverToJson);
-LUAU_FASTFLAG(LuauScopelessModule);
+LUAU_FASTFLAGVARIABLE(DebugLuauLogSolverToJson, false);
 
 namespace Luau
 {
@@ -105,7 +105,7 @@ LoadDefinitionFileResult Frontend::loadDefinitionFile(std::string_view source, c
     module.root = parseResult.root;
     module.mode = Mode::Definition;
 
-    ModulePtr checkedModule = check(module, Mode::Definition, globalScope, {});
+    ModulePtr checkedModule = check(module, Mode::Definition, {});
 
     if (checkedModule->errors.size() > 0)
         return LoadDefinitionFileResult{false, parseResult, checkedModule};
@@ -113,9 +113,7 @@ LoadDefinitionFileResult Frontend::loadDefinitionFile(std::string_view source, c
     CloneState cloneState;
 
     std::vector<TypeId> typesToPersist;
-    typesToPersist.reserve(
-        checkedModule->declaredGlobals.size() +
-        (FFlag::LuauScopelessModule ? checkedModule->exportedTypeBindings.size() : checkedModule->getModuleScope()->exportedTypeBindings.size()));
+    typesToPersist.reserve(checkedModule->declaredGlobals.size() + checkedModule->exportedTypeBindings.size());
 
     for (const auto& [name, ty] : checkedModule->declaredGlobals)
     {
@@ -127,8 +125,7 @@ LoadDefinitionFileResult Frontend::loadDefinitionFile(std::string_view source, c
         typesToPersist.push_back(globalTy);
     }
 
-    for (const auto& [name, ty] :
-        FFlag::LuauScopelessModule ? checkedModule->exportedTypeBindings : checkedModule->getModuleScope()->exportedTypeBindings)
+    for (const auto& [name, ty] : checkedModule->exportedTypeBindings)
     {
         TypeFun globalTy = clone(ty, globalTypes, cloneState);
         std::string documentationSymbol = packageName + "/globaltype/" + name;
@@ -173,9 +170,7 @@ LoadDefinitionFileResult loadDefinitionFile(TypeChecker& typeChecker, ScopePtr t
     CloneState cloneState;
 
     std::vector<TypeId> typesToPersist;
-    typesToPersist.reserve(
-        checkedModule->declaredGlobals.size() +
-        (FFlag::LuauScopelessModule ? checkedModule->exportedTypeBindings.size() : checkedModule->getModuleScope()->exportedTypeBindings.size()));
+    typesToPersist.reserve(checkedModule->declaredGlobals.size() + checkedModule->exportedTypeBindings.size());
 
     for (const auto& [name, ty] : checkedModule->declaredGlobals)
     {
@@ -187,8 +182,7 @@ LoadDefinitionFileResult loadDefinitionFile(TypeChecker& typeChecker, ScopePtr t
         typesToPersist.push_back(globalTy);
     }
 
-    for (const auto& [name, ty] :
-        FFlag::LuauScopelessModule ? checkedModule->exportedTypeBindings : checkedModule->getModuleScope()->exportedTypeBindings)
+    for (const auto& [name, ty] : checkedModule->exportedTypeBindings)
     {
         TypeFun globalTy = clone(ty, typeChecker.globalTypes, cloneState);
         std::string documentationSymbol = packageName + "/globaltype/" + name;
@@ -524,7 +518,7 @@ CheckResult Frontend::check(const ModuleName& name, std::optional<FrontendOption
                 typeCheckerForAutocomplete.unifierIterationLimit = std::nullopt;
 
             ModulePtr moduleForAutocomplete = FFlag::DebugLuauDeferredConstraintResolution
-                                                  ? check(sourceModule, mode, environmentScope, requireCycles, /*forAutocomplete*/ true)
+                                                  ? check(sourceModule, mode, requireCycles, /*forAutocomplete*/ true, /*recordJsonLog*/ false)
                                                   : typeCheckerForAutocomplete.check(sourceModule, Mode::Strict, environmentScope);
 
             moduleResolverForAutocomplete.modules[moduleName] = moduleForAutocomplete;
@@ -551,7 +545,9 @@ CheckResult Frontend::check(const ModuleName& name, std::optional<FrontendOption
 
         typeChecker.requireCycles = requireCycles;
 
-        ModulePtr module = FFlag::DebugLuauDeferredConstraintResolution ? check(sourceModule, mode, environmentScope, requireCycles)
+        const bool recordJsonLog = FFlag::DebugLuauLogSolverToJson && moduleName == name;
+
+        ModulePtr module = FFlag::DebugLuauDeferredConstraintResolution ? check(sourceModule, mode, requireCycles, /*forAutocomplete*/ false, recordJsonLog)
                                                                         : typeChecker.check(sourceModule, mode, environmentScope);
 
         stats.timeCheck += getTimestamp() - timestamp;
@@ -571,28 +567,17 @@ CheckResult Frontend::check(const ModuleName& name, std::optional<FrontendOption
 
             module->internalTypes.clear();
 
-            if (FFlag::LuauScopelessModule)
-            {
-                module->astTypes.clear();
-                module->astTypePacks.clear();
-                module->astExpectedTypes.clear();
-                module->astOriginalCallTypes.clear();
-                module->astOverloadResolvedTypes.clear();
-                module->astResolvedTypes.clear();
-                module->astResolvedTypePacks.clear();
-                module->astScopes.clear();
+            module->astTypes.clear();
+            module->astTypePacks.clear();
+            module->astExpectedTypes.clear();
+            module->astOriginalCallTypes.clear();
+            module->astOverloadResolvedTypes.clear();
+            module->astResolvedTypes.clear();
+            module->astOriginalResolvedTypes.clear();
+            module->astResolvedTypePacks.clear();
+            module->astScopes.clear();
 
-                module->scopes.clear();
-            }
-            else
-            {
-                module->astTypes.clear();
-                module->astExpectedTypes.clear();
-                module->astOriginalCallTypes.clear();
-                module->astResolvedTypes.clear();
-                module->astResolvedTypePacks.clear();
-                module->scopes.resize(1);
-            }
+            module->scopes.clear();
         }
 
         if (mode != Mode::NoCheck)
@@ -873,14 +858,23 @@ ScopePtr Frontend::getGlobalScope()
     return globalScope;
 }
 
-ModulePtr Frontend::check(
-    const SourceModule& sourceModule, Mode mode, const ScopePtr& environmentScope, std::vector<RequireCycle> requireCycles, bool forAutocomplete)
+ModulePtr check(const SourceModule& sourceModule, const std::vector<RequireCycle>& requireCycles, NotNull<BuiltinTypes> builtinTypes,
+    NotNull<InternalErrorReporter> iceHandler, NotNull<ModuleResolver> moduleResolver, NotNull<FileResolver> fileResolver,
+    const ScopePtr& globalScope, FrontendOptions options)
+{
+    const bool recordJsonLog = FFlag::DebugLuauLogSolverToJson;
+    return check(sourceModule, requireCycles, builtinTypes, iceHandler, moduleResolver, fileResolver, globalScope, options, recordJsonLog);
+}
+
+ModulePtr check(const SourceModule& sourceModule, const std::vector<RequireCycle>& requireCycles, NotNull<BuiltinTypes> builtinTypes,
+    NotNull<InternalErrorReporter> iceHandler, NotNull<ModuleResolver> moduleResolver, NotNull<FileResolver> fileResolver,
+    const ScopePtr& globalScope, FrontendOptions options, bool recordJsonLog)
 {
     ModulePtr result = std::make_shared<Module>();
-    result->reduction = std::make_unique<TypeReduction>(NotNull{&result->internalTypes}, builtinTypes, NotNull{&iceHandler});
+    result->reduction = std::make_unique<TypeReduction>(NotNull{&result->internalTypes}, builtinTypes, iceHandler);
 
     std::unique_ptr<DcrLogger> logger;
-    if (FFlag::DebugLuauLogSolverToJson)
+    if (recordJsonLog)
     {
         logger = std::make_unique<DcrLogger>();
         std::optional<SourceCode> source = fileResolver->readSource(sourceModule.name);
@@ -890,20 +884,21 @@ ModulePtr Frontend::check(
         }
     }
 
-    DataFlowGraph dfg = DataFlowGraphBuilder::build(sourceModule.root, NotNull{&iceHandler});
+    DataFlowGraph dfg = DataFlowGraphBuilder::build(sourceModule.root, iceHandler);
 
-    const NotNull<ModuleResolver> mr{forAutocomplete ? &moduleResolverForAutocomplete : &moduleResolver};
-    const ScopePtr& globalScope{forAutocomplete ? typeCheckerForAutocomplete.globalScope : typeChecker.globalScope};
+    UnifierSharedState unifierState{iceHandler};
+    unifierState.counters.recursionLimit = FInt::LuauTypeInferRecursionLimit;
+    unifierState.counters.iterationLimit = FInt::LuauTypeInferIterationLimit;
 
-    Normalizer normalizer{&result->internalTypes, builtinTypes, NotNull{&typeChecker.unifierState}};
+    Normalizer normalizer{&result->internalTypes, builtinTypes, NotNull{&unifierState}};
 
     ConstraintGraphBuilder cgb{
         sourceModule.name,
         result,
         &result->internalTypes,
-        mr,
+        moduleResolver,
         builtinTypes,
-        NotNull(&iceHandler),
+        iceHandler,
         globalScope,
         logger.get(),
         NotNull{&dfg},
@@ -912,8 +907,8 @@ ModulePtr Frontend::check(
     cgb.visit(sourceModule.root);
     result->errors = std::move(cgb.errors);
 
-    ConstraintSolver cs{NotNull{&normalizer}, NotNull(cgb.rootScope), borrowConstraints(cgb.constraints), sourceModule.name, NotNull(&moduleResolver),
-        requireCycles, logger.get()};
+    ConstraintSolver cs{NotNull{&normalizer}, NotNull(cgb.rootScope), borrowConstraints(cgb.constraints), sourceModule.name,
+        NotNull{result->reduction.get()}, moduleResolver, requireCycles, logger.get()};
 
     if (options.randomizeConstraintResolutionSeed)
         cs.randomize(*options.randomizeConstraintResolutionSeed);
@@ -924,28 +919,34 @@ ModulePtr Frontend::check(
         result->errors.emplace_back(std::move(e));
 
     result->scopes = std::move(cgb.scopes);
-    result->astTypes = std::move(cgb.astTypes);
-    result->astTypePacks = std::move(cgb.astTypePacks);
-    result->astOriginalCallTypes = std::move(cgb.astOriginalCallTypes);
-    result->astOverloadResolvedTypes = std::move(cgb.astOverloadResolvedTypes);
-    result->astResolvedTypes = std::move(cgb.astResolvedTypes);
-    result->astResolvedTypePacks = std::move(cgb.astResolvedTypePacks);
     result->type = sourceModule.type;
 
-    result->clonePublicInterface(builtinTypes, iceHandler);
-
-    freeze(result->internalTypes);
-    freeze(result->interfaceTypes);
+    result->clonePublicInterface(builtinTypes, *iceHandler);
 
     Luau::check(builtinTypes, logger.get(), sourceModule, result.get());
 
-    if (FFlag::DebugLuauLogSolverToJson)
+    // Ideally we freeze the arenas before the call into Luau::check, but TypeReduction
+    // needs to allocate new types while Luau::check is in progress, so here we are.
+    //
+    // It does mean that mutations to the type graph can happen after the constraints
+    // have been solved, which will cause hard-to-debug problems. We should revisit this.
+    freeze(result->internalTypes);
+    freeze(result->interfaceTypes);
+
+    if (recordJsonLog)
     {
         std::string output = logger->compileOutput();
         printf("%s\n", output.c_str());
     }
 
     return result;
+}
+
+ModulePtr Frontend::check(const SourceModule& sourceModule, Mode mode, std::vector<RequireCycle> requireCycles, bool forAutocomplete, bool recordJsonLog)
+{
+    return Luau::check(sourceModule, requireCycles, builtinTypes, NotNull{&iceHandler},
+        NotNull{forAutocomplete ? &moduleResolverForAutocomplete : &moduleResolver}, NotNull{fileResolver},
+        forAutocomplete ? typeCheckerForAutocomplete.globalScope : typeChecker.globalScope, options, recordJsonLog);
 }
 
 // Read AST into sourceModules if necessary.  Trace require()s.  Report parse errors.

@@ -37,7 +37,7 @@ TEST_CASE_FIXTURE(Fixture, "DeprecatedGlobal")
     // Normally this would be defined externally, so hack it in for testing
     addGlobalBinding(frontend, "Wait", Binding{typeChecker.anyType, {}, true, "wait", "@test/global/Wait"});
 
-    LintResult result = lintTyped("Wait(5)");
+    LintResult result = lint("Wait(5)");
 
     REQUIRE(1 == result.warnings.size());
     CHECK_EQ(result.warnings[0].text, "Global 'Wait' is deprecated, use 'wait' instead");
@@ -49,7 +49,7 @@ TEST_CASE_FIXTURE(Fixture, "DeprecatedGlobalNoReplacement")
     const char* deprecationReplacementString = "";
     addGlobalBinding(frontend, "Version", Binding{typeChecker.anyType, {}, true, deprecationReplacementString});
 
-    LintResult result = lintTyped("Version()");
+    LintResult result = lint("Version()");
 
     REQUIRE(1 == result.warnings.size());
     CHECK_EQ(result.warnings[0].text, "Global 'Version' is deprecated");
@@ -171,7 +171,6 @@ return bar()
 
 TEST_CASE_FIXTURE(Fixture, "GlobalAsLocalMultiFx")
 {
-    ScopedFastFlag sff{"LuauLintGlobalNeverReadBeforeWritten", true};
     LintResult result = lint(R"(
 function bar()
     foo = 6
@@ -192,7 +191,6 @@ return bar() + baz()
 
 TEST_CASE_FIXTURE(Fixture, "GlobalAsLocalMultiFxWithRead")
 {
-    ScopedFastFlag sff{"LuauLintGlobalNeverReadBeforeWritten", true};
     LintResult result = lint(R"(
 function bar()
     foo = 6
@@ -216,7 +214,6 @@ return bar() + baz() + read()
 
 TEST_CASE_FIXTURE(Fixture, "GlobalAsLocalWithConditional")
 {
-    ScopedFastFlag sff{"LuauLintGlobalNeverReadBeforeWritten", true};
     LintResult result = lint(R"(
 function bar()
     if true then foo = 6 end
@@ -236,7 +233,6 @@ return bar() + baz()
 
 TEST_CASE_FIXTURE(Fixture, "GlobalAsLocal3WithConditionalRead")
 {
-    ScopedFastFlag sff{"LuauLintGlobalNeverReadBeforeWritten", true};
     LintResult result = lint(R"(
 function bar()
     foo = 6
@@ -260,7 +256,6 @@ return bar() + baz() + read()
 
 TEST_CASE_FIXTURE(Fixture, "GlobalAsLocalInnerRead")
 {
-    ScopedFastFlag sff{"LuauLintGlobalNeverReadBeforeWritten", true};
     LintResult result = lint(R"(
 function foo()
    local f = function() return bar end
@@ -1445,8 +1440,10 @@ TEST_CASE_FIXTURE(Fixture, "LintHygieneUAF")
     REQUIRE(12 == result.warnings.size());
 }
 
-TEST_CASE_FIXTURE(Fixture, "DeprecatedApi")
+TEST_CASE_FIXTURE(BuiltinsFixture, "DeprecatedApiTyped")
 {
+    ScopedFastFlag sff("LuauImproveDeprecatedApiLint", true);
+
     unfreeze(typeChecker.globalTypes);
     TypeId instanceType = typeChecker.globalTypes.addType(ClassType{"Instance", {}, std::nullopt, std::nullopt, {}, {}, "Test"});
     persist(instanceType);
@@ -1464,6 +1461,13 @@ TEST_CASE_FIXTURE(Fixture, "DeprecatedApi")
 
     addGlobalBinding(frontend, "Color3", Binding{colorType, {}});
 
+    if (TableType* ttv = getMutable<TableType>(getGlobalBinding(typeChecker, "table")))
+    {
+        ttv->props["foreach"].deprecated = true;
+        ttv->props["getn"].deprecated = true;
+        ttv->props["getn"].deprecatedSuggestion = "#";
+    }
+
     freeze(typeChecker.globalTypes);
 
     LintResult result = lintTyped(R"(
@@ -1472,14 +1476,43 @@ return function (i: Instance)
     print(i.Name)
     print(Color3.toHSV())
     print(Color3.doesntexist, i.doesntexist) -- type error, but this verifies we correctly handle non-existent members
+    print(table.getn({}))
+    table.foreach({}, function() end)
+    print(table.nogetn()) -- verify that we correctly handle non-existent members
     return i.DataCost
 end
 )");
 
-    REQUIRE(3 == result.warnings.size());
+    REQUIRE(5 == result.warnings.size());
     CHECK_EQ(result.warnings[0].text, "Member 'Instance.Wait' is deprecated");
     CHECK_EQ(result.warnings[1].text, "Member 'toHSV' is deprecated, use 'Color3:ToHSV' instead");
-    CHECK_EQ(result.warnings[2].text, "Member 'Instance.DataCost' is deprecated");
+    CHECK_EQ(result.warnings[2].text, "Member 'table.getn' is deprecated, use '#' instead");
+    CHECK_EQ(result.warnings[3].text, "Member 'table.foreach' is deprecated");
+    CHECK_EQ(result.warnings[4].text, "Member 'Instance.DataCost' is deprecated");
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "DeprecatedApiUntyped")
+{
+    ScopedFastFlag sff("LuauImproveDeprecatedApiLint", true);
+
+    if (TableType* ttv = getMutable<TableType>(getGlobalBinding(typeChecker, "table")))
+    {
+        ttv->props["foreach"].deprecated = true;
+        ttv->props["getn"].deprecated = true;
+        ttv->props["getn"].deprecatedSuggestion = "#";
+    }
+
+    LintResult result = lint(R"(
+return function ()
+    print(table.getn({}))
+    table.foreach({}, function() end)
+    print(table.nogetn()) -- verify that we correctly handle non-existent members
+end
+)");
+
+    REQUIRE(2 == result.warnings.size());
+    CHECK_EQ(result.warnings[0].text, "Member 'table.getn' is deprecated, use '#' instead");
+    CHECK_EQ(result.warnings[1].text, "Member 'table.foreach' is deprecated");
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "TableOperations")
@@ -1691,8 +1724,6 @@ TEST_CASE_FIXTURE(Fixture, "WrongCommentOptimize")
 
 TEST_CASE_FIXTURE(Fixture, "TestStringInterpolation")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     LintResult result = lint(R"(
         --!nocheck
         local _ = `unknown {foo}`
@@ -1711,23 +1742,6 @@ local _ = 0x10000000000000000
     REQUIRE(2 == result.warnings.size());
     CHECK_EQ(result.warnings[0].text, "Binary number literal exceeded available precision and has been truncated to 2^64");
     CHECK_EQ(result.warnings[1].text, "Hexadecimal number literal exceeded available precision and has been truncated to 2^64");
-}
-
-// TODO: remove with FFlagLuauErrorDoubleHexPrefix
-TEST_CASE_FIXTURE(Fixture, "IntegerParsingDoublePrefix")
-{
-    ScopedFastFlag luauErrorDoubleHexPrefix{"LuauErrorDoubleHexPrefix", false}; // Lint will be available until we start rejecting code
-
-    LintResult result = lint(R"(
-local _ = 0x0x123
-local _ = 0x0xffffffffffffffffffffffffffffffffff
-)");
-
-    REQUIRE(2 == result.warnings.size());
-    CHECK_EQ(result.warnings[0].text,
-        "Hexadecimal number literal has a double prefix, which will fail to parse in the future; remove the extra 0x to fix");
-    CHECK_EQ(result.warnings[1].text,
-        "Hexadecimal number literal has a double prefix, which will fail to parse in the future; remove the extra 0x to fix");
 }
 
 TEST_CASE_FIXTURE(Fixture, "ComparisonPrecedence")

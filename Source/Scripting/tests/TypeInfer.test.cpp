@@ -439,7 +439,10 @@ end
 _ += not _
 do end
 )");
+}
 
+TEST_CASE_FIXTURE(Fixture, "cyclic_follow_2")
+{
     check(R"(
 --!nonstrict
 n13,_,table,_,l0,_,_ = ...
@@ -816,8 +819,6 @@ end
 
 TEST_CASE_FIXTURE(Fixture, "tc_interpolated_string_basic")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     CheckResult result = check(R"(
         local foo: string = `hello {"world"}`
     )");
@@ -827,8 +828,6 @@ TEST_CASE_FIXTURE(Fixture, "tc_interpolated_string_basic")
 
 TEST_CASE_FIXTURE(Fixture, "tc_interpolated_string_with_invalid_expression")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     CheckResult result = check(R"(
         local function f(x: number) end
 
@@ -840,8 +839,6 @@ TEST_CASE_FIXTURE(Fixture, "tc_interpolated_string_with_invalid_expression")
 
 TEST_CASE_FIXTURE(Fixture, "tc_interpolated_string_constant_type")
 {
-    ScopedFastFlag sff{"LuauInterpolatedStringBaseSupport", true};
-
     CheckResult result = check(R"(
         local foo: "hello" = `hello`
     )");
@@ -1029,10 +1026,6 @@ TEST_CASE_FIXTURE(Fixture, "type_infer_recursion_limit_no_ice")
 TEST_CASE_FIXTURE(Fixture, "type_infer_recursion_limit_normalizer")
 {
     ScopedFastInt sfi("LuauTypeInferRecursionLimit", 10);
-    ScopedFastFlag sffs[]{
-        {"LuauSubtypeNormalizer", true},
-        {"LuauTypeNormalization2", true},
-    };
 
     CheckResult result = check(R"(
         function f<a,b,c,d,e,f,g,h,i,j>()
@@ -1048,10 +1041,6 @@ TEST_CASE_FIXTURE(Fixture, "type_infer_recursion_limit_normalizer")
 TEST_CASE_FIXTURE(Fixture, "type_infer_cache_limit_normalizer")
 {
     ScopedFastInt sfi("LuauNormalizeCacheLimit", 10);
-    ScopedFastFlag sffs[]{
-        {"LuauSubtypeNormalizer", true},
-        {"LuauTypeNormalization2", true},
-    };
 
     CheckResult result = check(R"(
         local x : ((number) -> number) & ((string) -> string) & ((nil) -> nil) & (({}) -> {})
@@ -1161,7 +1150,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "it_is_ok_to_have_inconsistent_number_of_retu
 
 TEST_CASE_FIXTURE(Fixture, "fuzz_free_table_type_change_during_index_check")
 {
-    ScopedFastFlag luauFollowInLvalueIndexCheck{"LuauFollowInLvalueIndexCheck", true};
+    ScopedFastFlag sff{"LuauScalarShapeUnifyToMtOwner2", true};
 
     CheckResult result = check(R"(
 local _ = nil
@@ -1170,6 +1159,20 @@ end
     )");
 
     LUAU_REQUIRE_ERRORS(result);
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "typechecking_in_type_guards")
+{
+    ScopedFastFlag sff{"LuauTypecheckTypeguards", true};
+
+    CheckResult result = check(R"(
+local a = type(foo) == 'nil'
+local b = typeof(foo) ~= 'nil'
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(2, result);
+    CHECK(toString(result.errors[0]) == "Unknown global 'foo'");
+    CHECK(toString(result.errors[1]) == "Unknown global 'foo'");
 }
 
 TEST_SUITE_END();

@@ -15,16 +15,16 @@ public:
     i32 GetNumCores() const { return _numCores; }
     i32 GetNumThreads() const { return _numThreads; }
 
-    bool IsSSE() const { return _isSSE; }
-    bool IsSSE2() const { return _isSSE2; }
-    bool IsSSE3() const { return _isSSE3; }
-    bool IsSSE41() const { return _isSSE41; }
-    bool IsSSE42() const { return _isSSE42; }
-    bool IsAVX() const { return _isAVX; }
-    bool IsAVX2() const { return _isAVX2; }
-    bool IsHyperThreaded() const { return _isHTT; }
+    bool IsSSE() const { return features.isSSE; }
+    bool IsSSE2() const { return features.isSSE2; }
+    bool IsSSE3() const { return features.isSSE3; }
+    bool IsSSE41() const { return features.isSSE41; }
+    bool IsSSE42() const { return features.isSSE42; }
+    bool IsAVX() const { return features.isAVX; }
+    bool IsAVX2() const { return features.isAVX2; }
+    bool IsHyperThreaded() const { return features.isHTT; }
 
-    void Print();
+    void Print(i32 detailLevel);
 
 private:
     CPUInfo();
@@ -54,12 +54,17 @@ private:
     i32 _numCores;
     i32 _numThreads;
 
-    bool _isHTT;
-    bool _isSSE;
-    bool _isSSE2;
-    bool _isSSE3;
-    bool _isSSE41;
-    bool _isSSE42;
-    bool _isAVX;
-    bool _isAVX2;
+    struct Features
+    {
+        u8 isHTT : 1;
+        u8 isSSE : 1;
+        u8 isSSE2 : 1;
+        u8 isSSE3 : 1;
+        u8 isSSE41 : 1;
+        u8 isSSE42 : 1;
+        u8 isAVX : 1;
+        u8 isAVX2 : 1;
+    };
+
+    Features features;
 };

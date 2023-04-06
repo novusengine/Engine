@@ -2,7 +2,7 @@
 #pragma once
 
 #include "Luau/Ast.h"
-#include "Luau/Connective.h"
+#include "Luau/Refinement.h"
 #include "Luau/Constraint.h"
 #include "Luau/DataFlowGraph.h"
 #include "Luau/Module.h"
@@ -27,13 +27,13 @@ struct DcrLogger;
 struct Inference
 {
     TypeId ty = nullptr;
-    ConnectiveId connective = nullptr;
+    RefinementId refinement = nullptr;
 
     Inference() = default;
 
-    explicit Inference(TypeId ty, ConnectiveId connective = nullptr)
+    explicit Inference(TypeId ty, RefinementId refinement = nullptr)
         : ty(ty)
-        , connective(connective)
+        , refinement(refinement)
     {
     }
 };
@@ -41,13 +41,13 @@ struct Inference
 struct InferencePack
 {
     TypePackId tp = nullptr;
-    std::vector<ConnectiveId> connectives;
+    std::vector<RefinementId> refinements;
 
     InferencePack() = default;
 
-    explicit InferencePack(TypePackId tp, const std::vector<ConnectiveId>& connectives = {})
+    explicit InferencePack(TypePackId tp, const std::vector<RefinementId>& refinements = {})
         : tp(tp)
-        , connectives(connectives)
+        , refinements(refinements)
     {
     }
 };
@@ -74,31 +74,11 @@ struct ConstraintGraphBuilder
     // will enqueue them during solving.
     std::vector<ConstraintPtr> unqueuedConstraints;
 
-    // A mapping of AST node to TypeId.
-    DenseHashMap<const AstExpr*, TypeId> astTypes{nullptr};
-
-    // A mapping of AST node to TypePackId.
-    DenseHashMap<const AstExpr*, TypePackId> astTypePacks{nullptr};
-
-    // If the node was applied as a function, this is the unspecialized type of
-    // that expression.
-    DenseHashMap<const void*, TypeId> astOriginalCallTypes{nullptr};
-
-    // If overload resolution was performed on this element, this is the
-    // overload that was selected.
-    DenseHashMap<const void*, TypeId> astOverloadResolvedTypes{nullptr};
-
-    // Types resolved from type annotations. Analogous to astTypes.
-    DenseHashMap<const AstType*, TypeId> astResolvedTypes{nullptr};
-
-    // Type packs resolved from type annotations. Analogous to astTypePacks.
-    DenseHashMap<const AstTypePack*, TypePackId> astResolvedTypePacks{nullptr};
-
-    // Defining scopes for AST nodes.
+    // The private scope of type aliases for which the type parameters belong to.
     DenseHashMap<const AstStatTypeAlias*, ScopePtr> astTypeAliasDefiningScopes{nullptr};
 
     NotNull<const DataFlowGraph> dfg;
-    ConnectiveArena connectiveArena;
+    RefinementArena refinementArena;
 
     int recursionCount = 0;
 
@@ -152,7 +132,7 @@ struct ConstraintGraphBuilder
      */
     NotNull<Constraint> addConstraint(const ScopePtr& scope, std::unique_ptr<Constraint> c);
 
-    void applyRefinements(const ScopePtr& scope, Location location, ConnectiveId connective);
+    void applyRefinements(const ScopePtr& scope, Location location, RefinementId refinement);
 
     /**
      * The entry point to the ConstraintGraphBuilder. This will construct a set
@@ -182,10 +162,10 @@ struct ConstraintGraphBuilder
     void visit(const ScopePtr& scope, AstStatDeclareFunction* declareFunction);
     void visit(const ScopePtr& scope, AstStatError* error);
 
-    InferencePack checkPack(const ScopePtr& scope, AstArray<AstExpr*> exprs, const std::vector<TypeId>& expectedTypes = {});
-    InferencePack checkPack(const ScopePtr& scope, AstExpr* expr, const std::vector<TypeId>& expectedTypes = {});
+    InferencePack checkPack(const ScopePtr& scope, AstArray<AstExpr*> exprs, const std::vector<std::optional<TypeId>>& expectedTypes = {});
+    InferencePack checkPack(const ScopePtr& scope, AstExpr* expr, const std::vector<std::optional<TypeId>>& expectedTypes = {});
 
-    InferencePack checkPack(const ScopePtr& scope, AstExprCall* call, const std::vector<TypeId>& expectedTypes);
+    InferencePack checkPack(const ScopePtr& scope, AstExprCall* call);
 
     /**
      * Checks an expression that is expected to evaluate to one type.
@@ -207,10 +187,11 @@ struct ConstraintGraphBuilder
     Inference check(const ScopePtr& scope, AstExprBinary* binary, std::optional<TypeId> expectedType);
     Inference check(const ScopePtr& scope, AstExprIfElse* ifElse, std::optional<TypeId> expectedType);
     Inference check(const ScopePtr& scope, AstExprTypeAssertion* typeAssert);
+    Inference check(const ScopePtr& scope, AstExprInterpString* interpString);
     Inference check(const ScopePtr& scope, AstExprTable* expr, std::optional<TypeId> expectedType);
-    std::tuple<TypeId, TypeId, ConnectiveId> checkBinary(const ScopePtr& scope, AstExprBinary* binary, std::optional<TypeId> expectedType);
+    std::tuple<TypeId, TypeId, RefinementId> checkBinary(const ScopePtr& scope, AstExprBinary* binary, std::optional<TypeId> expectedType);
 
-    TypePackId checkLValues(const ScopePtr& scope, AstArray<AstExpr*> exprs);
+    std::vector<TypeId> checkLValues(const ScopePtr& scope, AstArray<AstExpr*> exprs);
 
     TypeId checkLValue(const ScopePtr& scope, AstExpr* expr);
 
@@ -240,23 +221,54 @@ struct ConstraintGraphBuilder
      * Resolves a type from its AST annotation.
      * @param scope the scope that the type annotation appears within.
      * @param ty the AST annotation to resolve.
-     * @param topLevel whether the annotation is a "top-level" annotation.
+     * @param inTypeArguments whether we are resolving a type that's contained within type arguments, `<...>`.
      * @return the type of the AST annotation.
      **/
-    TypeId resolveType(const ScopePtr& scope, AstType* ty, bool topLevel = false);
+    TypeId resolveType(const ScopePtr& scope, AstType* ty, bool inTypeArguments, bool replaceErrorWithFresh = false);
 
     /**
      * Resolves a type pack from its AST annotation.
      * @param scope the scope that the type annotation appears within.
      * @param tp the AST annotation to resolve.
+     * @param inTypeArguments whether we are resolving a type that's contained within type arguments, `<...>`.
      * @return the type pack of the AST annotation.
      **/
-    TypePackId resolveTypePack(const ScopePtr& scope, AstTypePack* tp);
+    TypePackId resolveTypePack(const ScopePtr& scope, AstTypePack* tp, bool inTypeArguments, bool replaceErrorWithFresh = false);
 
-    TypePackId resolveTypePack(const ScopePtr& scope, const AstTypeList& list);
+    /**
+     * Resolves a type pack from its AST annotation.
+     * @param scope the scope that the type annotation appears within.
+     * @param list the AST annotation to resolve.
+     * @param inTypeArguments whether we are resolving a type that's contained within type arguments, `<...>`.
+     * @return the type pack of the AST annotation.
+     **/
+    TypePackId resolveTypePack(const ScopePtr& scope, const AstTypeList& list, bool inTypeArguments, bool replaceErrorWithFresh = false);
 
-    std::vector<std::pair<Name, GenericTypeDefinition>> createGenerics(const ScopePtr& scope, AstArray<AstGenericType> generics);
-    std::vector<std::pair<Name, GenericTypePackDefinition>> createGenericPacks(const ScopePtr& scope, AstArray<AstGenericTypePack> packs);
+    /**
+     * Creates generic types given a list of AST definitions, resolving default
+     * types as required.
+     * @param scope the scope that the generics should belong to.
+     * @param generics the AST generics to create types for.
+     * @param useCache whether to use the generic type cache for the given
+     * scope.
+     * @param addTypes whether to add the types to the scope's
+     * privateTypeBindings map.
+     **/
+    std::vector<std::pair<Name, GenericTypeDefinition>> createGenerics(
+        const ScopePtr& scope, AstArray<AstGenericType> generics, bool useCache = false, bool addTypes = true);
+
+    /**
+     * Creates generic type packs given a list of AST definitions, resolving
+     * default type packs as required.
+     * @param scope the scope that the generic packs should belong to.
+     * @param generics the AST generics to create type packs for.
+     * @param useCache whether to use the generic type pack cache for the given
+     * scope.
+     * @param addTypes whether to add the types to the scope's
+     * privateTypePackBindings map.
+     **/
+    std::vector<std::pair<Name, GenericTypePackDefinition>> createGenericPacks(
+        const ScopePtr& scope, AstArray<AstGenericTypePack> packs, bool useCache = false, bool addTypes = true);
 
     Inference flattenPack(const ScopePtr& scope, Location location, InferencePack pack);
 
@@ -270,10 +282,17 @@ struct ConstraintGraphBuilder
      * initial scan of the AST and note what globals are defined.
      */
     void prepopulateGlobalScope(const ScopePtr& globalScope, AstStatBlock* program);
+
+    /** Given a function type annotation, return a vector describing the expected types of the calls to the function
+     *  For example, calling a function with annotation ((number) -> string & ((string) -> number))
+     *  yields a vector of size 1, with value: [number | string]
+     */
+    std::vector<std::optional<TypeId>> getExpectedCallTypesForFunctionOverloads(const TypeId fnType);
 };
 
 /** Borrow a vector of pointers from a vector of owning pointers to constraints.
  */
 std::vector<NotNull<Constraint>> borrowConstraints(const std::vector<ConstraintPtr>& constraints);
+
 
 } // namespace Luau

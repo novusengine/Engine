@@ -95,6 +95,26 @@ TEST_CASE_FIXTURE(Fixture, "infer_that_function_does_not_return_a_table")
     CHECK_EQ(result.errors[0], (TypeError{Location{Position{5, 8}, Position{5, 24}}, NotATable{typeChecker.numberType}}));
 }
 
+TEST_CASE_FIXTURE(Fixture, "generalize_table_property")
+{
+    CheckResult result = check(R"(
+        local T = {}
+
+        T.foo = function(x)
+            return x
+        end
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(result);
+
+    TypeId t = requireType("T");
+    const TableType* tt = get<TableType>(follow(t));
+    REQUIRE(tt);
+
+    TypeId fooTy = tt->props.at("foo").type;
+    CHECK("<a>(a) -> a" == toString(fooTy));
+}
+
 TEST_CASE_FIXTURE(Fixture, "vararg_functions_should_allow_calls_of_any_types_and_size")
 {
     CheckResult result = check(R"(
@@ -109,8 +129,6 @@ TEST_CASE_FIXTURE(Fixture, "vararg_functions_should_allow_calls_of_any_types_and
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "vararg_function_is_quantified")
 {
-    ScopedFastFlag luauScopelessModule{"LuauScopelessModule", true};
-
     CheckResult result = check(R"(
         local T = {}
         function T.f(...)
@@ -642,7 +660,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "higher_order_function_4")
     )");
 
     LUAU_REQUIRE_NO_ERRORS(result);
-    dumpErrors(result);
 
     /*
      * mergesort takes two arguments: an array of some type T and a function that takes two Ts.
@@ -865,8 +882,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "calling_function_with_anytypepack_doesnt_lea
 
 TEST_CASE_FIXTURE(Fixture, "too_many_return_values")
 {
-    ScopedFastFlag sff{"LuauBetterMessagingOnCountMismatch", true};
-
     CheckResult result = check(R"(
         --!strict
 
@@ -888,8 +903,6 @@ TEST_CASE_FIXTURE(Fixture, "too_many_return_values")
 
 TEST_CASE_FIXTURE(Fixture, "too_many_return_values_in_parentheses")
 {
-    ScopedFastFlag sff{"LuauBetterMessagingOnCountMismatch", true};
-
     CheckResult result = check(R"(
         --!strict
 
@@ -911,8 +924,6 @@ TEST_CASE_FIXTURE(Fixture, "too_many_return_values_in_parentheses")
 
 TEST_CASE_FIXTURE(Fixture, "too_many_return_values_no_function")
 {
-    ScopedFastFlag sff{"LuauBetterMessagingOnCountMismatch", true};
-
     CheckResult result = check(R"(
         --!strict
 
@@ -1412,9 +1423,11 @@ end
 TEST_CASE_FIXTURE(BuiltinsFixture, "function_decl_non_self_sealed_overwrite")
 {
     CheckResult result = check(R"(
-function string.len(): number
-    return 1
-end
+        function string.len(): number
+            return 1
+        end
+
+        local s = string
     )");
 
     LUAU_REQUIRE_NO_ERRORS(result);
@@ -1422,11 +1435,11 @@ end
     // if 'string' library property was replaced with an internal module type, it will be freed and the next check will crash
     frontend.clear();
 
-    result = check(R"(
-print(string.len('hello'))
+    CheckResult result2 = check(R"(
+        print(string.len('hello'))
     )");
 
-    LUAU_REQUIRE_NO_ERRORS(result);
+    LUAU_REQUIRE_NO_ERRORS(result2);
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "function_decl_non_self_sealed_overwrite_2")
@@ -1726,12 +1739,6 @@ foo(string.find("hello", "e"))
 
 TEST_CASE_FIXTURE(Fixture, "luau_subtyping_is_np_hard")
 {
-    ScopedFastFlag sffs[]{
-        {"LuauSubtypeNormalizer", true},
-        {"LuauTypeNormalization2", true},
-        {"LuauOverloadedFunctionSubtypingPerf", true},
-    };
-
     CheckResult result = check(R"(
 --!strict
 
@@ -1834,8 +1841,6 @@ TEST_CASE_FIXTURE(Fixture, "other_things_are_not_related_to_function")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "fuzz_must_follow_in_overload_resolution")
 {
-    ScopedFastFlag luauTypeInferMissingFollows{"LuauTypeInferMissingFollows", true};
-
     CheckResult result = check(R"(
 for _ in function<t0>():(t0)&((()->())&(()->()))
 end do

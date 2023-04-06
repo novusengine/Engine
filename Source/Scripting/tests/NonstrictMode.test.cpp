@@ -194,7 +194,7 @@ TEST_CASE_FIXTURE(Fixture, "inline_table_props_are_also_any")
 
     CHECK_EQ(*typeChecker.anyType, *ttv->props["one"].type);
     CHECK_EQ(*typeChecker.anyType, *ttv->props["two"].type);
-    CHECK_MESSAGE(get<FunctionType>(ttv->props["three"].type), "Should be a function: " << *ttv->props["three"].type);
+    CHECK_MESSAGE(get<FunctionType>(follow(ttv->props["three"].type)), "Should be a function: " << *ttv->props["three"].type);
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "for_in_iterator_variables_are_any")
@@ -253,8 +253,6 @@ TEST_CASE_FIXTURE(Fixture, "delay_function_does_not_require_its_argument_to_retu
 
 TEST_CASE_FIXTURE(Fixture, "inconsistent_module_return_types_are_ok")
 {
-    ScopedFastFlag luauScopelessModule{"LuauScopelessModule", true};
-
     CheckResult result = check(R"(
         --!nonstrict
 

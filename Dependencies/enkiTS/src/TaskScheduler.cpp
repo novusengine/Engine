@@ -40,6 +40,22 @@ namespace
 #define ENKI_FILE_AND_LINE  gc_File, gc_Line
 #endif
 
+
+#ifdef _WIN64
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include "Windows.h"
+#endif
+
+uint32_t enki::GetNumHardwareThreads()
+{
+#ifdef _WIN64
+    return GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+#else
+    return std::thread::hardware_concurrency();
+#endif
+}
+
 namespace enki
 {
     static const int32_t  gc_TaskStartCount          = 2;
@@ -48,6 +64,7 @@ namespace enki
     static const uint32_t gc_SpinCount               = 10;
     static const uint32_t gc_SpinBackOffMulitplier   = 100;
     static const uint32_t gc_MaxNumInitialPartitions = 8;
+    static const uint32_t gc_MaxStolenPartitions     = 1 << gc_PipeSizeLog2;
     static const uint32_t gc_CacheLineSize           = 64;
     // awaiting std::hardware_constructive_interference_size
 };
@@ -101,7 +118,8 @@ namespace enki
     {
         semaphoreid_t*           pWaitNewPinnedTaskSemaphore = nullptr;
         std::atomic<ThreadState> threadState = { ENKI_THREAD_STATE_NONE };
-        char prevent_false_Share[ enki::gc_CacheLineSize - sizeof(std::atomic<ThreadState>) - sizeof(semaphoreid_t*) ];
+        uint32_t                 rndSeed = 0;
+        char prevent_false_Share[ enki::gc_CacheLineSize - sizeof(std::atomic<ThreadState>) - sizeof(semaphoreid_t*) - sizeof( uint32_t ) ]; // required to prevent alignment padding warning
     };
     constexpr size_t SIZEOFTHREADDATASTORE = sizeof( ThreadDataStore ); // for easier inspection
     static_assert( SIZEOFTHREADDATASTORE == enki::gc_CacheLineSize, "ThreadDataStore may exhibit false sharing" );
@@ -120,11 +138,7 @@ namespace
     {
         SubTaskSet splitTask = subTask_;
         uint32_t rangeLeft = subTask_.partition.end - subTask_.partition.start;
-
-        if( rangeToSplit_ > rangeLeft )
-        {
-            rangeToSplit_ = rangeLeft;
-        }
+        rangeToSplit_ = std::min( rangeToSplit_, rangeLeft );
         splitTask.partition.end = subTask_.partition.start + rangeToSplit_;
         subTask_.partition.start = splitTask.partition.end;
         return splitTask;
@@ -312,6 +326,7 @@ void TaskScheduler::StartThreads()
     m_pThreads           = NewArray<std::thread>( m_NumThreads, ENKI_FILE_AND_LINE );
     m_bRunning = true;
     m_bWaitforAllCalled = false;
+    m_bShutdownRequested = false;
 
     // current thread is primary enkiTS thread
     m_pThreadDataStore[0].threadState = ENKI_THREAD_STATE_PRIMARY_REGISTERED;
@@ -332,10 +347,11 @@ void TaskScheduler::StartThreads()
         ++m_NumInternalTaskThreadsRunning;
     }
 
-    // Create Wait New Pinned Task Semaphores
+    // Create Wait New Pinned Task Semaphores and init rndSeed
     for( uint32_t threadNum = 0; threadNum < m_NumThreads; ++threadNum )
     {
         m_pThreadDataStore[threadNum].pWaitNewPinnedTaskSemaphore = SemaphoreNew();
+        m_pThreadDataStore[threadNum].rndSeed = threadNum;
     }
 
     // ensure we have sufficient tasks to equally fill either all threads including main
@@ -356,24 +372,77 @@ void TaskScheduler::StartThreads()
         // ensure m_NumPartitions, m_NumInitialPartitions non zero, can happen if m_NumThreads > 1 && GetNumHardwareThreads() == 1
         m_NumPartitions        = std::max( m_NumPartitions,              (uint32_t)1 );
         m_NumInitialPartitions = std::max( numThreadsToPartitionFor - 1, (uint32_t)1 );
-        if( m_NumInitialPartitions > gc_MaxNumInitialPartitions )
+        m_NumInitialPartitions = std::min( m_NumInitialPartitions, gc_MaxNumInitialPartitions );
+    }
+
+#ifdef _WIN64
+    // x64 bit Windows may support >64 logical processors using processor groups, and only allocate threads to a default group.
+    // We need to detect this and distribute threads accordingly
+    if( GetNumHardwareThreads() > 64 &&                                    // only have processor groups if > 64 hardware threads
+        std::thread::hardware_concurrency() < GetNumHardwareThreads() &&   // if std::thread sees > 64 hardware threads no need to distribute
+        std::thread::hardware_concurrency() < m_NumThreads )               // no need to distrbute if number of threads requested lower than std::thread sees
+    {
+        uint32_t numProcessorGroups = GetActiveProcessorGroupCount();
+        GROUP_AFFINITY mainThreadAffinity;
+        BOOL success = GetThreadGroupAffinity( GetCurrentThread(), &mainThreadAffinity );
+        assert( success );
+        if( success )
         {
-            m_NumInitialPartitions = gc_MaxNumInitialPartitions;
+            uint32_t mainProcessorGroup = mainThreadAffinity.Group;
+            uint32_t currLogicalProcess = GetActiveProcessorCount( mainProcessorGroup ); // we start iteration at end of current process group's threads
+
+            // If more threads are created than there are logical processors then we still want to distribute them evenly amongst groups
+            // so we iterate continously around the groups until we reach m_NumThreads
+            uint32_t group = 0;
+            while( currLogicalProcess < m_NumThreads )
+            {
+                ++group; // start at group 1 since we set currLogicalProcess to start of next group
+                uint32_t currGroup = ( group + mainProcessorGroup ) % numProcessorGroups; // we start at mainProcessorGroup, go round in circles
+                uint32_t groupNumLogicalProcessors = GetActiveProcessorCount( currGroup );
+                assert( groupNumLogicalProcessors <= 64 );
+                uint64_t GROUPMASK = 0xFFFFFFFFFFFFFFFFULL >> (64-groupNumLogicalProcessors); // group mask should not have 1's where there are no processors
+                for( uint32_t groupLogicalProcess = 0; ( groupLogicalProcess < groupNumLogicalProcessors ) && ( currLogicalProcess < m_NumThreads ); ++groupLogicalProcess, ++currLogicalProcess )
+                {
+                    if( currLogicalProcess > m_Config.numExternalTaskThreads + GetNumFirstExternalTaskThread() )
+                    {
+                        auto thread_handle = m_pThreads[currLogicalProcess].native_handle();
+
+                        // From https://learn.microsoft.com/en-us/windows/win32/procthread/processor-groups
+                        // If a thread is assigned to a different group than the process, the process's affinity is updated to include the thread's affinity
+                        // and the process becomes a multi-group process. 
+                        GROUP_AFFINITY threadAffinity;
+                        success = GetThreadGroupAffinity( thread_handle, &threadAffinity );
+                        assert(success); (void)success;
+                        if( threadAffinity.Group != currGroup )
+                        {
+                            threadAffinity.Group = currGroup;
+                            threadAffinity.Mask  = GROUPMASK;
+                            success = SetThreadGroupAffinity( thread_handle, &threadAffinity, nullptr );
+                            assert( success ); (void)success;
+                        }
+                    }
+                }
+            }
         }
     }
+#endif
 
     m_bHaveThreads = true;
 }
 
 void TaskScheduler::StopThreads( bool bWait_ )
 {
+    // we set m_bWaitforAllCalled to true to ensure any task which loop using this status exit
+    m_bWaitforAllCalled.store( true, std::memory_order_release );
+
+    // set status 
+    m_bShutdownRequested.store( true, std::memory_order_release );
+    m_bRunning.store( false, std::memory_order_release );
+
     if( m_bHaveThreads )
     {
-        // wait for them threads quit before deleting data
-        m_bRunning.store( false, std::memory_order_release );
-        m_bWaitforAllCalled.store( false, std::memory_order_release );
 
-
+        // wait for threads to quit before deleting data
         while( bWait_ && m_NumInternalTaskThreadsRunning )
         {
             // keep firing event to ensure all threads pick up state of m_bRunning
@@ -438,6 +507,39 @@ bool TaskScheduler::TryRunTask( uint32_t threadNum_, uint32_t& hintPipeToCheck_i
     return false;
 }
 
+static inline uint32_t RotateLeft( uint32_t value, int32_t count ) 
+{
+	return ( value << count ) | ( value >> ( 32 - count ));
+}
+/*  xxHash variant based on documentation on
+    https://github.com/Cyan4973/xxHash/blob/eec5700f4d62113b47ee548edbc4746f61ffb098/doc/xxhash_spec.md
+
+    Copyright (c) Yann Collet
+
+    Permission is granted to copy and distribute this document for any purpose and without charge, including translations into other languages and incorporation into compilations, provided that the copyright notice and this notice are preserved, and that any substantive changes or deletions from the original are clearly marked. Distribution of this document is unlimited.
+*/
+static inline uint32_t Hash32( uint32_t in_ )
+{
+    static const uint32_t PRIME32_1 = 2654435761U;  // 0b10011110001101110111100110110001
+    static const uint32_t PRIME32_2 = 2246822519U;  // 0b10000101111010111100101001110111
+    static const uint32_t PRIME32_3 = 3266489917U;  // 0b11000010101100101010111000111101
+    static const uint32_t PRIME32_4 =  668265263U;  // 0b00100111110101001110101100101111
+    static const uint32_t PRIME32_5 =  374761393U;  // 0b00010110010101100110011110110001
+    static const uint32_t SEED      = 0; // can configure seed if needed
+
+    // simple hash of nodes, does not check if nodePool is compressed or not.
+    uint32_t acc = SEED + PRIME32_5;
+
+    // add node types to map, and also ensure that fully empty nodes are well distrubuted by hashing the pointer.
+    acc += in_;
+    acc = acc ^ (acc >> 15);
+    acc = acc * PRIME32_2;
+    acc = acc ^ (acc >> 13);
+    acc = acc * PRIME32_3;
+    acc = acc ^ (acc >> 16);
+    return (std::size_t)acc;
+}
+
 bool TaskScheduler::TryRunTask( uint32_t threadNum_, uint32_t priority_, uint32_t& hintPipeToCheck_io_ )
 {
     // Run any tasks for this thread
@@ -447,16 +549,29 @@ bool TaskScheduler::TryRunTask( uint32_t threadNum_, uint32_t priority_, uint32_
     SubTaskSet subTask;
     bool bHaveTask = m_pPipesPerThread[ priority_ ][ threadNum_ ].WriterTryReadFront( &subTask );
 
-    uint32_t threadToCheck = hintPipeToCheck_io_;
+    uint32_t threadToCheckStart = hintPipeToCheck_io_ % m_NumThreads;
+    uint32_t threadToCheck      = threadToCheckStart;
     uint32_t checkCount = 0;
-    while( !bHaveTask && checkCount < m_NumThreads )
+    if( !bHaveTask )
     {
-        threadToCheck = ( hintPipeToCheck_io_ + checkCount ) % m_NumThreads;
-        if( threadToCheck != threadNum_ )
+        bHaveTask = m_pPipesPerThread[ priority_ ][ threadToCheck ].ReaderTryReadBack( &subTask );
+        if( !bHaveTask )
         {
-            bHaveTask = m_pPipesPerThread[ priority_ ][ threadToCheck ].ReaderTryReadBack( &subTask );
+            // To prevent many threads checking the same task pipe for work we pseudorandomly distribute
+            // the starting thread which we start checking for tasks to run
+            uint32_t& rndSeed = m_pThreadDataStore[threadNum_].rndSeed;
+            ++rndSeed;
+            uint32_t threadToCheckOffset = Hash32( rndSeed * threadNum_ ); 
+            while( !bHaveTask && checkCount < m_NumThreads )
+            {
+                threadToCheck = ( threadToCheckOffset + checkCount ) % m_NumThreads;
+                if( threadToCheck != threadNum_ && threadToCheckOffset != threadToCheckStart )
+                {
+                    bHaveTask = m_pPipesPerThread[ priority_ ][ threadToCheck ].ReaderTryReadBack( &subTask );
+                }
+                ++checkCount;
+            }
         }
-        ++checkCount;
     }
         
     if( bHaveTask )
@@ -468,7 +583,16 @@ bool TaskScheduler::TryRunTask( uint32_t threadNum_, uint32_t priority_, uint32_
         if( subTask.pTask->m_RangeToRun < partitionSize )
         {
             SubTaskSet taskToRun = SplitTask( subTask, subTask.pTask->m_RangeToRun );
-            SplitAndAddTask( threadNum_, subTask, subTask.pTask->m_RangeToRun );
+            uint32_t rangeToSplit = subTask.pTask->m_RangeToRun;
+            if( threadNum_ != threadToCheck )
+            {
+                // task was stolen from another thread
+                // in order to ensure other threads can get enough work we need to split into larger ranges
+                // these larger splits are then stolen and split themselves
+                // otherwise other threads must keep stealing from this thread, which may stall when pipe is full
+                rangeToSplit = std::max( rangeToSplit, (subTask.partition.end - subTask.partition.start) / gc_MaxStolenPartitions );
+            }
+            SplitAndAddTask( threadNum_, subTask, rangeToSplit );
             taskToRun.pTask->ExecuteRange( taskToRun.partition, threadNum_ );
             int prevCount = taskToRun.pTask->m_RunningCount.fetch_sub(1,std::memory_order_release );
             if( gc_TaskStartCount == prevCount )
@@ -511,22 +635,23 @@ void TaskScheduler::TaskComplete( ICompletable* pTask_, bool bWakeThreads_, uint
 
     while( pDependent )
     {
-        int prevDeps = pDependent->pTaskToRunOnCompletion->m_DependenciesCompletedCount.fetch_add( 1, std::memory_order_release );
-        ENKI_ASSERT( prevDeps < pDependent->pTaskToRunOnCompletion->m_DependenciesCount );
-        if( pDependent->pTaskToRunOnCompletion->m_DependenciesCount == ( prevDeps + 1 ) )
+        // access pTaskToRunOnCompletion member data before incrementing m_DependenciesCompletedCount so
+        // they do not get deleted when another thread completes the pTaskToRunOnCompletion
+        int32_t dependenciesCount  = pDependent->pTaskToRunOnCompletion->m_DependenciesCount;
+        // get temp copy of pDependent so OnDependenciesComplete can delete task if needed.
+        Dependency* pDependentCurr = pDependent;
+        pDependent                 = pDependent->pNext;
+        int32_t prevDeps = pDependentCurr->pTaskToRunOnCompletion->m_DependenciesCompletedCount.fetch_add( 1, std::memory_order_release );
+        ENKI_ASSERT( prevDeps < dependenciesCount );
+        if( dependenciesCount == ( prevDeps + 1 ) )
         {
-            // get temp copy of pDependent so OnDependenciesComplete can delete task if needed.
-            Dependency* pDependentCurr = pDependent;
-            pDependent = pDependent->pNext;
             // reset dependencies
+            // only safe to access pDependentCurr here after above fetch_add because this is the thread
+            // which calls OnDependenciesComplete after store with memory_order_release
             pDependentCurr->pTaskToRunOnCompletion->m_DependenciesCompletedCount.store(
                 0,
                 std::memory_order_release );
             pDependentCurr->pTaskToRunOnCompletion->OnDependenciesComplete( this, threadNum_ );
-        }
-        else
-        {
-            pDependent = pDependent->pNext;
         }
     }
 }
@@ -679,23 +804,27 @@ bool TaskScheduler::WakeSuspendedThreadsWithPinnedTasks()
 void TaskScheduler::SplitAndAddTask( uint32_t threadNum_, SubTaskSet subTask_, uint32_t rangeToSplit_ )
 {
     int32_t numAdded = 0;
+    int32_t numNewTasksSinceNotification = 0;
     int32_t numRun   = 0;
+
+    int32_t upperBoundNumToAdd = 2 + (int32_t)( ( subTask_.partition.end - subTask_.partition.start ) / rangeToSplit_ );
+
     // ensure that an artificial completion is not registered whilst adding tasks by incrementing count
-    subTask_.pTask->m_RunningCount.fetch_add( 1, std::memory_order_acquire );
+    subTask_.pTask->m_RunningCount.fetch_add( upperBoundNumToAdd, std::memory_order_acquire );
     while( subTask_.partition.start != subTask_.partition.end )
     {
         SubTaskSet taskToAdd = SplitTask( subTask_, rangeToSplit_ );
 
         // add the partition to the pipe
-        ++numAdded;
-        subTask_.pTask->m_RunningCount.fetch_add( 1, std::memory_order_acquire );
+        ++numAdded; ++numNewTasksSinceNotification;
         if( !m_pPipesPerThread[ subTask_.pTask->m_Priority ][ threadNum_ ].WriterTryWriteFront( taskToAdd ) )
         {
-            if( numAdded > 1 )
+            --numAdded; // we were unable to add the task
+            if( numNewTasksSinceNotification > 1 )
             {
                 WakeThreadsForNewTasks();
             }
-            numAdded = 0;
+            numNewTasksSinceNotification = 0;
             // alter range to run the appropriate fraction
             if( taskToAdd.pTask->m_RangeToRun < taskToAdd.partition.end - taskToAdd.partition.start )
             {
@@ -707,8 +836,10 @@ void TaskScheduler::SplitAndAddTask( uint32_t threadNum_, SubTaskSet subTask_, u
             ++numRun;
         }
     }
-    int prevCount = subTask_.pTask->m_RunningCount.fetch_sub( numRun + 1, std::memory_order_release );
-    if( numRun + gc_TaskStartCount == prevCount )
+    int32_t countToRemove = upperBoundNumToAdd - numAdded;
+    ENKI_ASSERT( countToRemove > 0 );
+    int prevCount = subTask_.pTask->m_RunningCount.fetch_sub( countToRemove, std::memory_order_release );
+    if( countToRemove-1 + gc_TaskStartCount == prevCount )
     {
         TaskComplete( subTask_.pTask, false, threadNum_ );
     }
@@ -732,10 +863,11 @@ void TaskScheduler::AddTaskSetToPipeInt( ITaskSet* pTaskSet_, uint32_t threadNum
 
     // divide task up and add to pipe
     pTaskSet_->m_RangeToRun = pTaskSet_->m_SetSize / m_NumPartitions;
-    if( pTaskSet_->m_RangeToRun < pTaskSet_->m_MinRange ) { pTaskSet_->m_RangeToRun = pTaskSet_->m_MinRange; }
+    pTaskSet_->m_RangeToRun = std::max( pTaskSet_->m_RangeToRun, pTaskSet_->m_MinRange );
+    // Note: if m_SetSize is < m_RangeToRun this will be handled by SplitTask and so does not need to be handled here
 
     uint32_t rangeToSplit = pTaskSet_->m_SetSize / m_NumInitialPartitions;
-    if( rangeToSplit < pTaskSet_->m_MinRange ) { rangeToSplit = pTaskSet_->m_MinRange; }
+    rangeToSplit = std::max( rangeToSplit, pTaskSet_->m_MinRange );
 
     SubTaskSet subTask;
     subTask.pTask = pTaskSet_;
@@ -848,7 +980,7 @@ void    TaskScheduler::WaitforTask( const ICompletable* pCompletable_, enki::Tas
         // so we clamp the priorityOfLowestToRun_ to no smaller than the task we're waiting for
         priorityOfLowestToRun_ = std::max( priorityOfLowestToRun_, pCompletable_->m_Priority );
         uint32_t spinCount = 0;
-        while( !pCompletable_->GetIsComplete() )
+        while( !pCompletable_->GetIsComplete() && GetIsRunning() )
         {
             ++spinCount;
             for( int priority = 0; priority <= priorityOfLowestToRun_; ++priority )
@@ -906,7 +1038,7 @@ void TaskScheduler::WaitforAll()
     uint32_t spinCount = 0;
     TaskSchedulerWaitTask dummyWaitTask;
     dummyWaitTask.threadNum = 0;
-    while( bHaveTasks || otherThreadsRunning )
+    while( GetIsRunning() && ( bHaveTasks || otherThreadsRunning ) )
     {
         bHaveTasks = TryRunTask( ourThreadNum, hintPipeToCheck_io );
         ++spinCount;
@@ -998,11 +1130,23 @@ void TaskScheduler::WaitforAll()
     m_bWaitforAllCalled.store( false, std::memory_order_release );
 }
 
-void    TaskScheduler::WaitforAllAndShutdown()
+void TaskScheduler::WaitforAllAndShutdown()
 {
+    m_bWaitforAllCalled.store( true, std::memory_order_release );
+    m_bShutdownRequested.store( true, std::memory_order_release );
     if( m_bHaveThreads )
     {
         WaitforAll();
+        StopThreads(true);
+    }
+}
+
+void TaskScheduler::ShutdownNow()
+{
+    m_bWaitforAllCalled.store( true, std::memory_order_release );
+    m_bShutdownRequested.store( true, std::memory_order_release );
+    if( m_bHaveThreads )
+    {
         StopThreads(true);
     }
 }
@@ -1050,7 +1194,7 @@ template<typename T>
 T* TaskScheduler::NewArray( size_t num_, const char* file_, int line_  )
 {
     T* pRet = (T*)m_Config.customAllocator.alloc( alignof(T), num_*sizeof(T), m_Config.customAllocator.userData, file_, line_ );
-    if( !std::is_pod<T>::value )
+    if( !std::is_trivial<T>::value )
     {
 		T* pCurr = pRet;
         for( size_t i = 0; i < num_; ++i )
@@ -1066,7 +1210,7 @@ T* TaskScheduler::NewArray( size_t num_, const char* file_, int line_  )
 template<typename T>
 void TaskScheduler::DeleteArray( T* p_, size_t num_, const char* file_, int line_ )
 {
-    if( !std::is_pod<T>::value )
+    if( !std::is_trivially_destructible<T>::value )
     {
         size_t i = num_;
         while(i)

@@ -6,23 +6,18 @@ namespace Luau
 namespace CodeGen
 {
 
-class AssemblyBuilderX64;
 struct Label;
+struct IrOp;
+
+namespace X64
+{
+
+class AssemblyBuilderX64;
 struct OperandX64;
+struct IrRegAllocX64;
 
-enum class BuiltinImplType
-{
-    None,
-    UsesFallback, // Uses fallback for unsupported cases
-};
+void emitBuiltin(IrRegAllocX64& regs, AssemblyBuilderX64& build, int bfid, int ra, int arg, IrOp args, int nparams, int nresults);
 
-struct BuiltinImplResult
-{
-    BuiltinImplType type;
-    int actualResultCount;
-};
-
-BuiltinImplResult emitBuiltin(AssemblyBuilderX64& build, int bfid, int nparams, int ra, int arg, OperandX64 args, int nresults, Label& fallback);
-
+} // namespace X64
 } // namespace CodeGen
 } // namespace Luau

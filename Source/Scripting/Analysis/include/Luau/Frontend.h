@@ -162,8 +162,7 @@ struct Frontend
     ScopePtr getGlobalScope();
 
 private:
-    ModulePtr check(const SourceModule& sourceModule, Mode mode, const ScopePtr& environmentScope, std::vector<RequireCycle> requireCycles,
-        bool forAutocomplete = false);
+    ModulePtr check(const SourceModule& sourceModule, Mode mode, std::vector<RequireCycle> requireCycles, bool forAutocomplete = false, bool recordJsonLog = false);
 
     std::pair<SourceNode*, SourceModule*> getSourceNode(const ModuleName& name);
     SourceModule parse(const ModuleName& name, std::string_view src, const ParseOptions& parseOptions);
@@ -201,5 +200,13 @@ public:
 private:
     ScopePtr globalScope;
 };
+
+ModulePtr check(const SourceModule& sourceModule, const std::vector<RequireCycle>& requireCycles, NotNull<BuiltinTypes> builtinTypes,
+    NotNull<InternalErrorReporter> iceHandler, NotNull<ModuleResolver> moduleResolver, NotNull<FileResolver> fileResolver,
+    const ScopePtr& globalScope, FrontendOptions options);
+
+ModulePtr check(const SourceModule& sourceModule, const std::vector<RequireCycle>& requireCycles, NotNull<BuiltinTypes> builtinTypes,
+    NotNull<InternalErrorReporter> iceHandler, NotNull<ModuleResolver> moduleResolver, NotNull<FileResolver> fileResolver,
+    const ScopePtr& globalScope, FrontendOptions options, bool recordJsonLog);
 
 } // namespace Luau
