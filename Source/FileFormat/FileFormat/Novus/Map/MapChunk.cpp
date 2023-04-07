@@ -46,10 +46,10 @@ namespace Map
 		}
 
 		// Water (This data is prepared in the Mh2o::Read, because we need direct access to the buffer in order to convert the data)
-		{
-			u32 numLiquidHeaders = 0;// static_cast<u32>(mh2o.headers.size());
-			output.write(reinterpret_cast<char const*>(&numLiquidHeaders), sizeof(u32)); // Write number of liquid headers
-		}
+		//{
+		//	u32 numLiquidHeaders = 0;// static_cast<u32>(mh2o.headers.size());
+		//	output.write(reinterpret_cast<char const*>(&numLiquidHeaders), sizeof(u32)); // Write number of liquid headers
+		//}
 
 		output.close();
 
@@ -104,13 +104,13 @@ namespace Map
 		}
 
 		// Read Water
-		{
-			u32 NumLiquidHeaders = 0;
-			if (!buffer->GetU32(NumLiquidHeaders))
-				return false;
-
-			// TODO : Read Water
-		}
+		//{
+		//	u32 NumLiquidHeaders = 0;
+		//	if (!buffer->GetU32(NumLiquidHeaders))
+		//		return false;
+		//
+		//	// TODO : Read Water
+		//}
 
 		return true;
 	}
