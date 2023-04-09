@@ -59,6 +59,15 @@ public:
 		ReleaseModeBreakpoint();
 	}
 
+	template <typename... Args>
+	inline static void Assert(bool assertion, std::string message, Args... args)
+	{
+		if (!assertion)
+		{
+			PrintFatal(message, std::forward<Args>(args)...);
+		}
+	}
+
 private:
 };
 PRAGMA_CLANG_DIAGNOSTIC_POP;
