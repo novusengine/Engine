@@ -20,7 +20,7 @@ PRAGMA_NO_PADDING_START;
 	struct MapObjectGroup
 	{
 	public:
-		static constexpr u32 CURRENT_VERSION = 1;
+		static constexpr u32 CURRENT_VERSION = 2;
 
 		struct Flags
 		{
@@ -87,6 +87,8 @@ PRAGMA_NO_PADDING_START;
 
 		struct RenderBatch
 		{
+			u32 startVertex = 0;
+			u16 vertexCount = 0;
 			u32 startIndex = 0;
 			u16 indexCount = 0;
 			u16 materialID = 0;

@@ -1,4 +1,5 @@
 #include "ComplexModel.h"
+#include "MapObject.h"
 #include "FileFormat/Warcraft/Shared.h"
 #include "FileFormat/Warcraft/M2/M2.h"
 
@@ -320,7 +321,6 @@ namespace Model
 		{
 			if (!buffer->Get(out.header))
 				return false;
-
 		}
 
 		// Read Model Header
@@ -330,6 +330,8 @@ namespace Model
 
 			if (!buffer->Get(out.flags))
 				return false;
+
+			out.flags.IsConvertedMapObject = false;
 		}
 
 		// Read Sequences
@@ -790,7 +792,8 @@ namespace Model
 					M2SkinSelection* m2SkinSelection = layout.skin.subMeshes.GetElement(skinBuffer, i);
 
 					renderBatch.groupID = m2SkinSelection->skinSectionID;
-					renderBatch.vertexStart = m2SkinSelection->vertexStart;
+					// This is probably not the ideal solution, but it'll work for now.
+					renderBatch.vertexStart = 0; // m2SkinSelection->vertexStart;
 					renderBatch.vertexCount = m2SkinSelection->vertexCount;
 					renderBatch.indexStart = m2SkinSelection->indexStart + (m2SkinSelection->level * std::numeric_limits<u16>().max()); // "Level" is an incremental value that goes up once when indexStart goes above the numeric limit of u16 (65536)
 					renderBatch.indexCount = m2SkinSelection->indexCount;
@@ -888,34 +891,236 @@ namespace Model
 			}
 		}
 
+		if (!out.PostProcessing())
+			return false;
+
+		return true;
+	}
+
+	bool ComplexModel::FromMapObject(const MapObject& mapObject, ComplexModel& out)
+	{
+		out.flags.IsConvertedMapObject = true;
+
+		// Copy Vertices
+		{
+			u32 vertexOffset = 0;
+			u32 indexOffset = 0;
+			u32 materialOffset = 0;
+			u32 renderBatchOffset = 0;
+
+			for (u32 i = 0; i < mapObject.groups.size(); i++)
+			{
+				const MapObjectGroup& group = mapObject.groups[i];
+
+				u32 numVertices = static_cast<u32>(group.vertices.size());
+				if (numVertices > 0)
+				{
+					out.vertices.resize(vertexOffset + numVertices);
+					out.modelData.vertexLookupIDs.resize(out.vertices.size());
+
+					for (u32 i = 0; i < numVertices; i++)
+					{
+						ComplexModel::Vertex& vertex = out.vertices[vertexOffset + i];
+						const MapObjectGroup::Vertex& mapObjectVertex = group.vertices[i];
+
+						vertex.position = mapObjectVertex.position;
+						vertex.octNormal[0] = mapObjectVertex.octNormal[0];
+						vertex.octNormal[1] = mapObjectVertex.octNormal[1];
+						vertex.uvCoords[0] = hvec2(mapObjectVertex.uv.x, mapObjectVertex.uv.y);
+						vertex.uvCoords[1] = hvec2(mapObjectVertex.uv.z, mapObjectVertex.uv.w);
+
+						for (u32 j = 0; j < 4; j++)
+						{
+							vertex.boneIndices[j] = 0;
+							vertex.boneWeights[j] = 0;
+						}
+
+						out.modelData.vertexLookupIDs[i] = i;
+					}
+				}
+
+				u32 numIndicies = static_cast<u32>(group.indices.size());
+				if (numIndicies > 0)
+				{
+					out.modelData.indices.resize(indexOffset + numIndicies);
+					memcpy(&out.modelData.indices[indexOffset], &group.indices[0], numIndicies * sizeof(u16));
+				}
+
+				u32 numMaterials = static_cast<u32>(mapObject.materials.size());
+				if (numMaterials > 0)
+				{
+					out.materials.resize(materialOffset + numMaterials);
+
+					for (u32 i = 0; i < numMaterials; i++)
+					{
+						ComplexModel::Material& material = out.materials[materialOffset + i];
+						const MapObject::Material& mapObjectMaterial = mapObject.materials[i];
+
+						// Info : There are more flags in the mapObjectMaterial that we might want to add support for
+						material.flags.unLit = mapObjectMaterial.flags.NoLighting;
+						material.flags.unFogged = mapObjectMaterial.flags.NoFog;
+						material.flags.disableBackfaceCulling = mapObjectMaterial.flags.TwoSided;
+						material.flags.depthTest = 0;
+						material.flags.depthWrite = 0;
+
+						u16 blendMode = mapObjectMaterial.blendMode;
+
+						// Convert WMO Blendmode (EGxBlend) -> M2 Blendmode (M2Blend)
+						switch (blendMode)
+						{
+							case 0:
+							case 1:
+							case 2:
+								break;
+
+							case 3:
+							case 4:
+							case 5:
+							{
+								blendMode += 1;
+								break;
+							}
+
+							case 10:
+							{
+								blendMode = 3;
+								break;
+							}
+
+							case 13:
+							{
+								blendMode = 7;
+								break;
+							}
+
+							default:
+							{
+								blendMode = 0;
+								break;
+							}
+						}
+
+						material.blendingMode = static_cast<ComplexModel::Material::BlendingMode>(blendMode);
+					}
+				}
+
+				u32 numRenderBatches = static_cast<u32>(group.renderBatches.size());
+				if (numRenderBatches > 0)
+				{
+					out.modelData.renderBatches.resize(renderBatchOffset + numRenderBatches);
+
+					u32 numAddedVertices = 0;
+					u32 numAddedTextures = 0;
+
+					for (u32 i = 0; i < numRenderBatches; i++)
+					{
+						ComplexModel::RenderBatch& renderBatch = out.modelData.renderBatches[renderBatchOffset + i];
+						const MapObjectGroup::RenderBatch& mapObjectRenderBatch = group.renderBatches[i];
+
+						renderBatch.vertexStart = vertexOffset;
+						renderBatch.vertexCount = 0; // Unused by the renderer
+						renderBatch.indexStart = indexOffset + mapObjectRenderBatch.startIndex;
+						renderBatch.indexCount = mapObjectRenderBatch.indexCount;
+
+						// TODO : Handle Texture Units
+						ComplexModel::TextureUnit& textureUnit = renderBatch.textureUnits.emplace_back();
+						const MapObject::Material& mapObjectMaterial = mapObject.materials[mapObjectRenderBatch.materialID];
+
+						textureUnit.materialIndex = materialOffset + mapObjectRenderBatch.materialID;
+
+						u32 textureIDs[3] = { MapObject::INVALID_TEXTURE_ID, MapObject::INVALID_TEXTURE_ID, MapObject::INVALID_TEXTURE_ID };
+
+						for (u32 i = 0; i < 3; i++)
+						{
+							u32 textureHash = mapObjectMaterial.textureID[i];
+
+							if (textureHash == MapObject::INVALID_TEXTURE_ID)
+								continue;
+
+							textureUnit.textureCount++;
+
+							u32 numTextures = static_cast<u32>(out.textures.size());
+							u32 textureIndex = MapObject::INVALID_TEXTURE_ID;
+
+							for (u32 j = 0; j < numTextures; j++)
+							{
+								const ComplexModel::Texture& texture = out.textures[j];
+								
+								if (texture.textureHash != textureHash)
+									continue;
+
+								textureIndex = j;
+								break;
+							}
+
+							if (textureIndex == MapObject::INVALID_TEXTURE_ID)
+							{
+								ComplexModel::Texture& texture = out.textures.emplace_back();
+
+								texture.type = ComplexModel::Texture::Type::None;
+								texture.flags.wrapX = mapObjectMaterial.flags.ClampTextureS;
+								texture.flags.wrapY = mapObjectMaterial.flags.ClampTextureT;
+								texture.textureHash = textureHash;
+
+								textureIndex = numTextures;
+							}
+
+							textureIDs[i] = textureIndex;
+						}
+
+						u32 textureOffset = static_cast<u32>(out.textureIndexLookupTable.size());
+						for (u32 i = 0; i < textureUnit.textureCount; i++)
+						{
+							out.textureIndexLookupTable.push_back(textureIDs[i]);
+						}
+
+						textureUnit.textureIndexStart = textureOffset;
+					}
+				}
+
+				vertexOffset += numVertices;
+				indexOffset += numIndicies;
+				materialOffset += numMaterials;
+				renderBatchOffset += numRenderBatches;
+			}
+		}
+
+		if (!out.PostProcessing())
+			return false;
+
+		return true;
+	}
+
+	bool ComplexModel::PostProcessing()
+	{
 		// Post Processing On CModel Data
 		{
 			// Adjust Indicies to refer to the global vertex list
-			for (u32 i = 0; i < out.modelData.indices.size(); i++)
+			for (u32 i = 0; i < modelData.indices.size(); i++)
 			{
-				u16& localVertexIndex = out.modelData.indices[i];
+				u16& localVertexIndex = modelData.indices[i];
 
-				if (localVertexIndex >= out.modelData.vertexLookupIDs.size())
+				if (localVertexIndex >= modelData.vertexLookupIDs.size())
 					return false;
 
-				localVertexIndex = out.modelData.vertexLookupIDs[localVertexIndex];
+				localVertexIndex = modelData.vertexLookupIDs[localVertexIndex];
 			}
 
 			// Clone and invert two sided renderbatches so we don't need to have double pipelines
 			{
-				u32 numRenderBatches = static_cast<u32>(out.modelData.renderBatches.size());
+				u32 numRenderBatches = static_cast<u32>(modelData.renderBatches.size());
 				for (u32 i = 0; i < numRenderBatches; i++)
 				{
-					u32 numTextureUnits = static_cast<u32>(out.modelData.renderBatches[i].textureUnits.size());
+					u32 numTextureUnits = static_cast<u32>(modelData.renderBatches[i].textureUnits.size());
 					for (u32 j = 0; j < numTextureUnits; j++)
 					{
-						ComplexModel::TextureUnit& textureUnit = out.modelData.renderBatches[i].textureUnits[j];
-						const Material& material = out.materials[textureUnit.materialIndex];
+						ComplexModel::TextureUnit& textureUnit = modelData.renderBatches[i].textureUnits[j];
+						const Material& material = materials[textureUnit.materialIndex];
 
 						if (material.flags.disableBackfaceCulling)
 						{
-							ComplexModel::RenderBatch& clonedRenderBatch = out.modelData.renderBatches.emplace_back();
-							ComplexModel::RenderBatch& renderBatch = out.modelData.renderBatches[i]; // We can't get this one earlier since the emplace might reallocate
+							ComplexModel::RenderBatch& clonedRenderBatch = modelData.renderBatches.emplace_back();
+							ComplexModel::RenderBatch& renderBatch = modelData.renderBatches[i]; // We can't get this one earlier since the emplace might reallocate
 
 							clonedRenderBatch.groupID = renderBatch.groupID;
 							clonedRenderBatch.indexCount = renderBatch.indexCount;
@@ -924,17 +1129,17 @@ namespace Model
 							clonedRenderBatch.vertexCount = renderBatch.vertexCount;
 							clonedRenderBatch.vertexStart = renderBatch.vertexStart;
 
-							u32 numIndicesBeforeAdd = static_cast<u32>(out.modelData.indices.size());
+							u32 numIndicesBeforeAdd = static_cast<u32>(modelData.indices.size());
 							u32 indexStart = clonedRenderBatch.indexStart;
 							u32 indexCount = clonedRenderBatch.indexCount;
 
-							out.modelData.indices.resize(numIndicesBeforeAdd + indexCount);
+							modelData.indices.resize(numIndicesBeforeAdd + indexCount);
 							for (u32 k = 0; k < indexCount; k++)
 							{
 								u32 dst = numIndicesBeforeAdd + k;
 								u32 src = indexStart + (indexCount - k) - 1; // Read the original indices backwards
 
-								out.modelData.indices[dst] = out.modelData.indices[src];
+								modelData.indices[dst] = modelData.indices[src];
 							}
 
 							clonedRenderBatch.indexStart = numIndicesBeforeAdd;
@@ -945,10 +1150,10 @@ namespace Model
 
 			// Fix Shader ID
 			{
-				u32 numRenderBatches = static_cast<u32>(out.modelData.renderBatches.size());
+				u32 numRenderBatches = static_cast<u32>(modelData.renderBatches.size());
 				for (u32 i = 0; i < numRenderBatches; i++)
 				{
-					ComplexModel::RenderBatch& renderBatch = out.modelData.renderBatches[i];
+					ComplexModel::RenderBatch& renderBatch = modelData.renderBatches[i];
 
 					u32 numTextureUnits = static_cast<u32>(renderBatch.textureUnits.size());
 					for (u32 j = 0; j < numTextureUnits; j++)
@@ -961,13 +1166,13 @@ namespace Model
 					}
 				}
 			}
-			
+
 			// Figure out if the renderbatches are opaque or transparent
-			for (auto& renderBatch : out.modelData.renderBatches)
+			for (auto& renderBatch : modelData.renderBatches)
 			{
 				if (renderBatch.textureUnits.size() > 0)
 				{
-					const Material& material = out.materials[renderBatch.textureUnits[0].materialIndex];
+					const Material& material = materials[renderBatch.textureUnits[0].materialIndex];
 					renderBatch.isTransparent = material.blendingMode != Material::BlendingMode::Opaque && material.blendingMode != Material::BlendingMode::AlphaKey;
 				}
 				else
@@ -1056,13 +1261,16 @@ namespace Model
 	inline constexpr const int operator+ (M2PixelShader const val) { return static_cast<const int>(val); };
 	inline constexpr const int operator+ (M2VertexShader const val) { return static_cast<const int>(val); };
 
-	struct M2Shaders {
+	struct M2Shaders
+	{
 		unsigned int pixel;
 		unsigned int vertex;
 		unsigned int hull;
 		unsigned int domain;
 	};
-	static std::array<M2Shaders, 36> M2ShaderTable = { {
+	static std::array<M2Shaders, 36> M2ShaderTable = 
+	{ 
+		{
 			{ +M2PixelShader::Combiners_Opaque_Mod2xNA_Alpha,              +M2VertexShader::Diffuse_T1_Env, 1, 1 },
 			{ +M2PixelShader::Combiners_Opaque_AddAlpha,                   +M2VertexShader::Diffuse_T1_Env, 1, 1 },
 			{ +M2PixelShader::Combiners_Opaque_AddAlpha_Alpha,             +M2VertexShader::Diffuse_T1_Env, 1, 1 },
@@ -1099,7 +1307,8 @@ namespace Model
 			{ +M2PixelShader::Combiners_Mod_Mod2x,                         +M2VertexShader::Diffuse_EdgeFade_T1_T2, 1, 1 },
 			{ +M2PixelShader::Combiners_Mod,                               +M2VertexShader::Diffuse_EdgeFade_T1, 1, 1 },
 			{ +M2PixelShader::NewUnkCombiner,                              +M2VertexShader::Diffuse_EdgeFade_T1_T2, 1, 1 },
-	} };
+		} 
+	};
 
 	i8 ComplexModel::GetVertexShaderID(i16 shaderID, u16 textureCount)
 	{

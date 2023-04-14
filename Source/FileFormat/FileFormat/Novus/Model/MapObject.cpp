@@ -478,6 +478,8 @@ namespace Model
                         MapObjectGroup::RenderBatch& renderBatch = mapObjectGroup.renderBatches[renderBatchIndex];
                         MapObjectGroup::CullingData& cullingData = mapObjectGroup.cullingData[renderBatchIndex];
 
+                        renderBatch.startVertex = wmoRenderBatch.vertexStartOffset;
+                        renderBatch.vertexCount = wmoRenderBatch.vertexEndOffset - wmoRenderBatch.vertexStartOffset;
                         renderBatch.startIndex = wmoRenderBatch.startIndex;
                         renderBatch.indexCount = wmoRenderBatch.indexCount;
                         renderBatch.materialID = (wmoRenderBatch.materialIDLarge * wmoRenderBatch.flags.UseMaterialIDLarge) + (wmoRenderBatch.materialIDSmall * !wmoRenderBatch.flags.UseMaterialIDLarge);
@@ -490,7 +492,7 @@ namespace Model
                         for (u32 j = start; j < end; j++)
                         {
                             const u16 index = wmoGroup.movi.data[j];
-                            const vec3& position = wmoGroup.movt.data[index].position;
+                            const vec3& position = CoordinateSpaces::ModelPosToNovus(wmoGroup.movt.data[index].position);
 
                             for (u32 vecIndex = 0; vecIndex < 3; vecIndex++)
                             {
@@ -534,7 +536,7 @@ namespace Model
 
                         // Position
                         const vec3& pos = wmoGroup.movt.data[j].position;
-                        vertex.position = vec3(pos.x, pos.y, pos.z);
+                        vertex.position = CoordinateSpaces::ModelPosToNovus(pos);
 
                         // Normal
                         vec3 norm = wmoGroup.monr.data[j].normal;

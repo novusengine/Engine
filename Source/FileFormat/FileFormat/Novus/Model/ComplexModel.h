@@ -17,11 +17,12 @@ namespace M2
 
 namespace Model
 {
-PRAGMA_NO_PADDING_START
+PRAGMA_NO_PADDING_START;
+	struct MapObject;
 	struct ComplexModel
 	{
 	public:
-		static const u32 CURRENT_VERSION = 2;
+		static const u32 CURRENT_VERSION = 3;
 
 		struct Flags
 		{
@@ -41,6 +42,10 @@ PRAGMA_NO_PADDING_START
 			u32 HasNewParticleFormat : 1;
 			u32 Unk0x400 : 1;
 			u32 TextureTransformUseBoneSequences : 1;
+			u32 : 12;
+
+			// Custom Flags
+			u32 IsConvertedMapObject : 1;
 		};
 
 		template <typename T>
@@ -408,10 +413,12 @@ PRAGMA_NO_PADDING_START
 		static bool Read(std::shared_ptr<Bytebuffer>& buffer, ComplexModel& out);
 		static bool ReadHeader(std::shared_ptr<Bytebuffer>& buffer, ModelHeader& out);
 		static bool FromM2(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& skinBuffer, M2::Layout& layout, ComplexModel& out);
+		static bool FromMapObject(const MapObject& mapObject, ComplexModel& out);
 
 	private:
+		bool PostProcessing();
 		static i8 GetVertexShaderID(i16 shaderID, u16 textureCount);
 		static i8 GetPixelShaderID(i16 shaderID, u16 textureCount);
 	};
-PRAGMA_NO_PADDING_END
+PRAGMA_NO_PADDING_END;
 }
