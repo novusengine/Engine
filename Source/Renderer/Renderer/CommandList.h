@@ -68,6 +68,9 @@ namespace Renderer
         void BeginPipeline(ComputePipelineID pipelineID);
         void EndPipeline(ComputePipelineID pipelineID);
 
+        void BeginTimeQuery(TimeQueryID timeQueryID);
+        void EndTimeQuery(TimeQueryID timeQueryID);
+
         void BindDescriptorSet(DescriptorSetSlot slot, const DescriptorSet* descriptorSet, u32 frameIndex);
 
         void SetDepthBias(f32 constantFactor, f32 clamp, f32 slopeFactor);

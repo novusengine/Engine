@@ -19,6 +19,7 @@ namespace Renderer
         class SamplerHandlerVK;
         class SemaphoreHandlerVK;
         class UploadBufferHandlerVK;
+        class TimeQueryHandlerVK;
         struct BindInfo;
         class DescriptorSetBuilderVK;
         struct SwapChainVK;
@@ -63,6 +64,8 @@ namespace Renderer
         [[nodiscard]] TextureID CreateDataTexture(DataTextureDesc& desc) override;
         [[nodiscard]] TextureID CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex) override;
 
+        [[nodiscard]] TimeQueryID CreateTimeQuery(TimeQueryDesc& desc) override;
+
         // Loading
         [[nodiscard]] TextureID LoadTexture(TextureDesc& desc) override;
         [[nodiscard]] TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) override;
@@ -99,6 +102,9 @@ namespace Renderer
         void EndPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) override;
         void BeginPipeline(CommandListID commandListID, ComputePipelineID pipeline) override;
         void EndPipeline(CommandListID commandListID, ComputePipelineID pipeline) override;
+
+        void BeginTimeQuery(CommandListID commandListID, TimeQueryID timeQueryID) override;
+        void EndTimeQuery(CommandListID commandListID, TimeQueryID timeQueryID) override;
 
         void SetDepthBias(CommandListID commandListID, DepthBias depthBias) override;
         void SetScissorRect(CommandListID commandListID, ScissorRect scissorRect) override;
@@ -143,8 +149,13 @@ namespace Renderer
         [[nodiscard]] void* MapBuffer(BufferID buffer) override;
         void UnmapBuffer(BufferID buffer) override;
 
+        // Time Queries
+        [[nodiscard]] const std::string& GetTimeQueryName(TimeQueryID id) override;
+        [[nodiscard]] f32 GetLastTimeQueryDuration(TimeQueryID id) override;
+
         // Utils
         void FlipFrame(u32 frameIndex) override;
+        void ResetTimeQueries(u32 frameIndex) override;
 
         [[nodiscard]] TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) override;
 
@@ -188,6 +199,7 @@ namespace Renderer
         Backend::SamplerHandlerVK* _samplerHandler = nullptr;
         Backend::SemaphoreHandlerVK* _semaphoreHandler = nullptr;
         Backend::UploadBufferHandlerVK* _uploadBufferHandler = nullptr;
+        Backend::TimeQueryHandlerVK* _timeQueryHandler = nullptr;
 
         GraphicsPipelineID _globalDummyPipeline = GraphicsPipelineID::Invalid();
         //Backend::DescriptorSetBuilderVK* _descriptorSetBuilder = nullptr;

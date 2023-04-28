@@ -18,6 +18,7 @@
 #include "Descriptors/SamplerDesc.h"
 #include "Descriptors/SemaphoreDesc.h"
 #include "Descriptors/UploadBuffer.h"
+#include "Descriptors/TimeQueryDesc.h"
 
 class Window;
 
@@ -76,6 +77,8 @@ namespace Renderer
         virtual TextureID CreateDataTexture(DataTextureDesc& desc) = 0;
         virtual TextureID CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex) = 0;
 
+        virtual TimeQueryID CreateTimeQuery(TimeQueryDesc& desc) = 0;
+
         // Loading
         virtual TextureID LoadTexture(TextureDesc& desc) = 0;
         virtual TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) = 0;
@@ -113,6 +116,9 @@ namespace Renderer
         virtual void EndPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) = 0;
         virtual void BeginPipeline(CommandListID commandListID, ComputePipelineID pipeline) = 0;
         virtual void EndPipeline(CommandListID commandListID, ComputePipelineID pipeline) = 0;
+
+        virtual void BeginTimeQuery(CommandListID commandListID, TimeQueryID timeQueryID) = 0;
+        virtual void EndTimeQuery(CommandListID commandListID, TimeQueryID timeQueryID) = 0;
 
         virtual void SetDepthBias(CommandListID commandListID, DepthBias depthBias) = 0;
         virtual void SetScissorRect(CommandListID commandListID, ScissorRect scissorRect) = 0;
@@ -164,8 +170,15 @@ namespace Renderer
         virtual void* MapBuffer(BufferID buffer) = 0;
         virtual void UnmapBuffer(BufferID buffer) = 0;
 
+        // Time Queries
+        virtual const std::string& GetTimeQueryName(TimeQueryID id) = 0;
+        virtual f32 GetLastTimeQueryDuration(TimeQueryID id) = 0;
+
+        const std::vector<TimeQueryID>& GetFrameTimeQueries() { return _frameTimeQueries; }
+
         // Utils
         virtual void FlipFrame(u32 frameIndex) = 0;
+        virtual void ResetTimeQueries(u32 frameIndex) = 0;
 
         virtual TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) = 0;
 
@@ -198,6 +211,8 @@ namespace Renderer
         void EndExecutingCommandlist() { _isExecutingCommandlist = false; };
 
         bool _isExecutingCommandlist = false;
+
+        std::vector<TimeQueryID> _frameTimeQueries;
 
         friend class RenderGraph;
     };

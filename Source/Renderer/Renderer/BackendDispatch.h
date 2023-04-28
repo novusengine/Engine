@@ -33,6 +33,9 @@ namespace Renderer
         static void BeginComputePipeline(Renderer* renderer, CommandListID commandList, const void* data);
         static void EndComputePipeline(Renderer* renderer, CommandListID commandList, const void* data);
 
+        static void BeginTimeQuery(Renderer* renderer, CommandListID commandList, const void* data);
+        static void EndTimeQuery(Renderer* renderer, CommandListID commandList, const void* data);
+
         static void BindDescriptorSet(Renderer* renderer, CommandListID commandList, const void* data);
 
         static void SetDepthBias(Renderer* renderer, CommandListID commandList, const void* data);

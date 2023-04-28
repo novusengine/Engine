@@ -119,6 +119,12 @@ namespace Renderer
 
         _renderer->BeginExecutingCommandlist();
 
+        TimeQueryDesc totalTimeQueryDesc;
+        totalTimeQueryDesc.name = "-- Total --";
+
+        TimeQueryID totalTimeQueryID = _renderer->CreateTimeQuery(totalTimeQueryDesc);
+        commandList.BeginTimeQuery(totalTimeQueryID);
+
         commandList.PushMarker("RenderGraph", Color::PastelBlue);
         for (u32 i = 0; i < data->passes.Count(); i++)
         {
@@ -127,6 +133,12 @@ namespace Renderer
             ZoneScopedC(tracy::Color::Red2);
             ZoneName(pass->_name, pass->_nameLength);
 
+            TimeQueryDesc passTimeQueryDesc;
+            passTimeQueryDesc.name = pass->_name;
+
+            TimeQueryID passTimeQueryID = _renderer->CreateTimeQuery(passTimeQueryDesc);
+            commandList.BeginTimeQuery(passTimeQueryID);
+
             commandList.PushMarker(pass->_name, Color::PastelGreen);
 
             _renderGraphBuilder->PreExecute(commandList, i);
@@ -134,8 +146,11 @@ namespace Renderer
             _renderGraphBuilder->PostExecute(commandList, i);
 
             commandList.PopMarker();
+
+            commandList.EndTimeQuery(passTimeQueryID);
         }
         commandList.PopMarker();
+        commandList.EndTimeQuery(totalTimeQueryID);
 
         {
             ZoneScopedNC("CommandList::Execute", tracy::Color::Red2);

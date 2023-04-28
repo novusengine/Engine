@@ -31,6 +31,7 @@
 #include "DepthImageBarrier.h"
 #include "DrawImgui.h"
 #include "PushConstant.h"
+#include "TimeQuery.h"
 
 #include "Renderer/BackendDispatch.h"
 
@@ -55,6 +56,8 @@ namespace Renderer
         const BackendDispatchFunction EndGraphicsPipeline::DISPATCH_FUNCTION = &BackendDispatch::EndGraphicsPipeline;
         const BackendDispatchFunction BeginComputePipeline::DISPATCH_FUNCTION = &BackendDispatch::BeginComputePipeline;
         const BackendDispatchFunction EndComputePipeline::DISPATCH_FUNCTION = &BackendDispatch::EndComputePipeline;
+        const BackendDispatchFunction BeginTimeQuery::DISPATCH_FUNCTION = &BackendDispatch::BeginTimeQuery;
+        const BackendDispatchFunction EndTimeQuery::DISPATCH_FUNCTION = &BackendDispatch::EndTimeQuery;
         const BackendDispatchFunction SetDepthBias::DISPATCH_FUNCTION = &BackendDispatch::SetDepthBias;
         const BackendDispatchFunction SetScissorRect::DISPATCH_FUNCTION = &BackendDispatch::SetScissorRect;
         const BackendDispatchFunction SetViewport::DISPATCH_FUNCTION = &BackendDispatch::SetViewport;

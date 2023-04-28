@@ -52,7 +52,8 @@ namespace Renderer
             "VK_KHR_draw_indirect_count",
             "VK_KHR_shader_subgroup_extended_types",
             "VK_EXT_descriptor_indexing",
-            "VK_EXT_sampler_filter_minmax"
+            "VK_EXT_sampler_filter_minmax",
+            "VK_EXT_host_query_reset"
         };
 
         RenderDeviceVK::RenderDeviceVK(Window* window)
@@ -219,7 +220,6 @@ namespace Renderer
                 info.pDependencies = dependencies.data();
                 vkCreateRenderPass(_device, &info, nullptr, &_imguiContext->imguiPass);
             }
-
 
             VkDescriptorPoolSize pool_sizes[] =
             {
@@ -403,6 +403,7 @@ namespace Renderer
                 vkGetPhysicalDeviceProperties(_physicalDevice, &deviceProperties);
 
                 _gpuName = deviceProperties.deviceName;
+                _timestampNanosecondsPerIncrement = deviceProperties.limits.timestampPeriod;
             }
             else
             {
@@ -427,10 +428,17 @@ namespace Renderer
                 queueCreateInfo.pQueuePriorities = &queuePriority;
                 queueCreateInfos.push_back(queueCreateInfo);
             }
+
+            _graphicsQueueSupportsTimestamps = indices.graphicsFamilySupportsTimeStamps;
             
+            VkPhysicalDeviceHostQueryResetFeaturesEXT resetFeatures = {};
+            resetFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
+            resetFeatures.hostQueryReset = VK_TRUE;
+
             VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR shaderSubgroupFeatures = {};
             shaderSubgroupFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES_KHR;
             shaderSubgroupFeatures.shaderSubgroupExtendedTypes = true;
+            shaderSubgroupFeatures.pNext = &resetFeatures;
 
             VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexingFeatures = {};
             descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
@@ -770,11 +778,13 @@ namespace Renderer
                 if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
                 {
                     indices.graphicsFamily = i;
+                    indices.graphicsFamilySupportsTimeStamps = queueFamily.timestampValidBits > 0;
                 }
 
                 if (queueFamily.queueCount > 0 && (queueFamily.queueFlags & transferQueueFlags) == transferQueueFlags)
                 {
                     indices.transferFamily = i;
+                    indices.transferFamilySupportsTimeStamps = queueFamily.timestampValidBits > 0;
                 }
                 
                 VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
@@ -786,6 +796,7 @@ namespace Renderer
                 vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
                 if (queueFamily.queueCount > 0 && presentSupport) {
                     indices.presentFamily = i;
+                    indices.presentFamilySupportsTimeStamps = queueFamily.timestampValidBits > 0;
                 }
 
                 vkDestroySurfaceKHR(_instance, surface, nullptr);

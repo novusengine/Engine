@@ -2,6 +2,7 @@
 #include "vk_mem_alloc.h"
 #include "Renderer/Descriptors/ImageDesc.h"
 #include "Renderer/Descriptors/DepthImageDesc.h"
+#include "Renderer/Descriptors/TimeQueryDesc.h"
 
 #include <Base/Types.h>
 
@@ -32,8 +33,13 @@ namespace Renderer
         struct QueueFamilyIndices
         {
             std::optional<uint32_t> graphicsFamily;
+            bool graphicsFamilySupportsTimeStamps;
+
             std::optional<uint32_t> transferFamily;
+            bool transferFamilySupportsTimeStamps;
+
             std::optional<uint32_t> presentFamily;
+            bool presentFamilySupportsTimeStamps;
 
             bool IsComplete()
             {
@@ -131,6 +137,9 @@ namespace Renderer
             VkQueue _transferQueue = VK_NULL_HANDLE;
             VkQueue _presentQueue = VK_NULL_HANDLE;
 
+            bool _graphicsQueueSupportsTimestamps = false;
+            f32 _timestampNanosecondsPerIncrement = 0.0f;
+
             std::vector<SwapChainVK*> _swapChains;
 
             VmaAllocator _allocator;
@@ -149,6 +158,7 @@ namespace Renderer
             friend class CommandListHandlerVK;
             friend class SamplerHandlerVK;
             friend class SemaphoreHandlerVK;
+            friend class TimeQueryHandlerVK;
             friend class UploadBufferHandlerVK;
             friend struct DescriptorAllocatorHandleVK;
             friend class DescriptorAllocatorPoolVKImpl;

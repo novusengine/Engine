@@ -194,6 +194,26 @@ namespace Renderer
 #endif
     }
 
+    void CommandList::BeginTimeQuery(TimeQueryID timeQueryID)
+    {
+        Commands::BeginTimeQuery* command = AddCommand<Commands::BeginTimeQuery>();
+        command->timeQueryID = timeQueryID;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BeginTimeQuery::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::EndTimeQuery(TimeQueryID timeQueryID)
+    {
+        Commands::EndTimeQuery* command = AddCommand<Commands::EndTimeQuery>();
+        command->timeQueryID = timeQueryID;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::EndTimeQuery::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
     void CommandList::BindDescriptorSet(DescriptorSetSlot slot, const DescriptorSet* descriptorSet, u32 frameIndex)
     {
         const std::vector<Descriptor>& descriptors = descriptorSet->GetDescriptors();

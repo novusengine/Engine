@@ -34,6 +34,7 @@
 #include "Commands/DepthImageBarrier.h"
 #include "Commands/DrawImgui.h"
 #include "Commands/PushConstant.h"
+#include "Commands/TimeQuery.h"
 
 #include <tracy/Tracy.hpp>
 
@@ -175,6 +176,20 @@ namespace Renderer
         ZoneScopedC(tracy::Color::Red3);
         const Commands::EndComputePipeline* actualData = static_cast<const Commands::EndComputePipeline*>(data);
         renderer->EndPipeline(commandList, actualData->pipeline);
+    }
+
+    void BackendDispatch::BeginTimeQuery(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginTimeQuery* actualData = static_cast<const Commands::BeginTimeQuery*>(data);
+        renderer->BeginTimeQuery(commandList, actualData->timeQueryID);
+    }
+
+    void BackendDispatch::EndTimeQuery(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::EndTimeQuery* actualData = static_cast<const Commands::EndTimeQuery*>(data);
+        renderer->EndTimeQuery(commandList, actualData->timeQueryID);
     }
 
     void BackendDispatch::BindDescriptorSet(Renderer* renderer, CommandListID commandList, const void* data)

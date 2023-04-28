@@ -16,6 +16,7 @@
 #include "Backend/DescriptorSetBuilderVK.h"
 #include "Backend/FormatConverterVK.h"
 #include "Backend/DebugMarkerUtilVK.h"
+#include "Backend/TimeQueryHandlerVK.h"
 
 #include <Base/Container/SafeVector.h>
 #include <Base/Util/StringUtils.h>
@@ -40,6 +41,7 @@ namespace Renderer
         _samplerHandler = new Backend::SamplerHandlerVK();
         _semaphoreHandler = new Backend::SemaphoreHandlerVK();
         _uploadBufferHandler = new Backend::UploadBufferHandlerVK();
+        _timeQueryHandler = new Backend::TimeQueryHandlerVK();
 
         // Init
         _device->Init();
@@ -47,6 +49,7 @@ namespace Renderer
         _imageHandler->Init(_device, _samplerHandler);
         _textureHandler->Init(_device, _bufferHandler, _uploadBufferHandler, _samplerHandler);
         _shaderHandler->Init(_device);
+        _timeQueryHandler->Init(_device);
         _pipelineHandler->Init(_device, _shaderHandler, _imageHandler);
         _commandListHandler->Init(_device);
         _samplerHandler->Init(_device);
@@ -80,6 +83,7 @@ namespace Renderer
         delete(_commandListHandler);
         delete(_samplerHandler);
         delete(_semaphoreHandler);
+        delete(_timeQueryHandler);
     }
 
     void RendererVK::SetShaderSourceDirectory(const std::string& path)
@@ -199,6 +203,11 @@ namespace Renderer
         return _textureHandler->CreateDataTextureIntoArray(desc, textureArray, arrayIndex);
     }
 
+    TimeQueryID RendererVK::CreateTimeQuery(TimeQueryDesc& desc)
+    {
+        return _timeQueryHandler->CreateTimeQuery(desc);
+    }
+
     TextureID RendererVK::LoadTexture(TextureDesc& desc)
     {
         return _textureHandler->LoadTexture(desc);
@@ -279,12 +288,18 @@ namespace Renderer
         }
 
         _textureHandler->FlipFrame(frameIndex);
+        _timeQueryHandler->FlipFrame(frameIndex);
         _commandListHandler->ResetCommandBuffers();
         _uploadBufferHandler->ExecuteUploadTasks();
         _bufferHandler->OnFrameStart();
 
         vmaSetCurrentFrameIndex(_device->_allocator, frameIndex);
         vmaGetBudget(_device->_allocator, sBudgets);
+    }
+
+    void RendererVK::ResetTimeQueries(u32 frameIndex)
+    {
+        _frameTimeQueries.clear();
     }
 
     TextureID RendererVK::GetTextureID(TextureArrayID textureArrayID, u32 index)
@@ -657,6 +672,20 @@ namespace Renderer
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
         _commandListHandler->SetBoundComputePipeline(commandListID, ComputePipelineID::Invalid());
+    }
+
+    void RendererVK::BeginTimeQuery(CommandListID commandListID, TimeQueryID timeQueryID)
+    {
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        _timeQueryHandler->Begin(commandBuffer, timeQueryID);
+        
+        _frameTimeQueries.push_back(timeQueryID);
+    }
+
+    void RendererVK::EndTimeQuery(CommandListID commandListID, TimeQueryID timeQueryID)
+    {
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        _timeQueryHandler->End(commandBuffer, timeQueryID);
     }
 
     void RendererVK::SetDepthBias(CommandListID commandListID, DepthBias depthBias)
@@ -1672,6 +1701,16 @@ namespace Renderer
     void RendererVK::UnmapBuffer(BufferID buffer)
     {
         vmaUnmapMemory(_device->_allocator, _bufferHandler->GetBufferAllocation(buffer));
+    }
+
+    const std::string& RendererVK::GetTimeQueryName(TimeQueryID id)
+    {
+        return _timeQueryHandler->GetName(id);
+    }
+
+    f32 RendererVK::GetLastTimeQueryDuration(TimeQueryID id)
+    {
+        return _timeQueryHandler->GetLastTime(id);
     }
 
     const std::string& RendererVK::GetGPUName()
