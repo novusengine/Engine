@@ -21,6 +21,7 @@
 #include <Base/Container/SafeVector.h>
 #include <Base/Util/StringUtils.h>
 #include <Base/Util/DebugHandler.h>
+#include <Base/Util/Timer.h>
 
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyVulkan.hpp>
@@ -249,7 +250,7 @@ namespace Renderer
 
     static VmaBudget sBudgets[16] = { { 0 } };
 
-    void RendererVK::FlipFrame(u32 frameIndex)
+    f32 RendererVK::FlipFrame(u32 frameIndex)
     {
         ZoneScopedC(tracy::Color::Red3);
 
@@ -257,7 +258,10 @@ namespace Renderer
         _commandListHandler->FlipFrame();
 
         // Wait on frame fence
+        f32 timeWaited = 0.0f;
         {
+            Timer timer;
+
             ZoneScopedNC("Wait For Fence", tracy::Color::Red3);
 
             VkFence frameFence = _commandListHandler->GetCurrentFence();
@@ -271,6 +275,7 @@ namespace Renderer
             }
 
             vkResetFences(_device->_device, 1, &frameFence);
+            timeWaited = timer.GetLifeTime();
         }
 
         if (_renderSizeChanged)
@@ -295,6 +300,8 @@ namespace Renderer
 
         vmaSetCurrentFrameIndex(_device->_allocator, frameIndex);
         vmaGetBudget(_device->_allocator, sBudgets);
+
+        return timeWaited;
     }
 
     void RendererVK::ResetTimeQueries(u32 frameIndex)
@@ -312,24 +319,19 @@ namespace Renderer
         return _imageHandler->GetImageDesc(ID);
     }
 
-    const DepthImageDesc& RendererVK::GetDepthImageDesc(DepthImageID ID)
+    const DepthImageDesc& RendererVK::GetImageDesc(DepthImageID ID)
     {
-        return _imageHandler->GetDepthImageDesc(ID);
+        return _imageHandler->GetImageDesc(ID);
     }
 
-    uvec2 RendererVK::GetImageDimension(const ImageID id)
+    uvec2 RendererVK::GetImageDimensions(const ImageID id, u32 mipLevel)
     {
-        return _imageHandler->GetDimension(id, 0);
+        return _imageHandler->GetDimensions(id, mipLevel);
     }
 
-    uvec2 RendererVK::GetImageDimension(const ImageID id, u32 mipLevel)
+    uvec2 RendererVK::GetImageDimensions(const DepthImageID id)
     {
-        return _imageHandler->GetDimension(id, mipLevel);
-    }
-
-    uvec2 RendererVK::GetImageDimension(const DepthImageID id)
-    {
-        return _imageHandler->GetDimension(id);
+        return _imageHandler->GetDimensions(id);
     }
 
     CommandListID RendererVK::BeginCommandList()
@@ -577,10 +579,10 @@ namespace Renderer
         uvec2 renderSize = _pipelineHandler->GetRenderPassResolution(pipelineID);
 
         // Transition depth stencil to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-        if (pipelineDesc.depthStencil != RenderPassMutableResource::Invalid())
+        if (pipelineDesc.depthStencil != DepthImageMutableResource::Invalid())
         {
             DepthImageID depthImageID = pipelineDesc.MutableResourceToDepthImageID(pipelineDesc.depthStencil);
-            const DepthImageDesc& depthImageDesc = _imageHandler->GetDepthImageDesc(depthImageID);
+            const DepthImageDesc& depthImageDesc = _imageHandler->GetImageDesc(depthImageID);
 
             u32 imageAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
             // TODO: If we add stencil support we need to selectively add VK_IMAGE_ASPECT_STENCIL_BIT to imageAspect if the depthStencil has a stencil
@@ -623,10 +625,10 @@ namespace Renderer
 
         // Transition depth stencil to DEPTH_STENCIL_READ_ONLY_OPTIMAL
         const GraphicsPipelineDesc& pipelineDesc = _pipelineHandler->GetDescriptor(pipelineID);
-        if (pipelineDesc.depthStencil != RenderPassMutableResource::Invalid())
+        if (pipelineDesc.depthStencil != DepthImageMutableResource::Invalid())
         {
             DepthImageID depthImageID = pipelineDesc.MutableResourceToDepthImageID(pipelineDesc.depthStencil);
-            const DepthImageDesc& depthImageDesc = _imageHandler->GetDepthImageDesc(depthImageID);
+            const DepthImageDesc& depthImageDesc = _imageHandler->GetImageDesc(depthImageID);
 
             u32 imageAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
             // TODO: If we add stencil support we need to selectively add VK_IMAGE_ASPECT_STENCIL_BIT to imageAspect if the depthStencil has a stencil
@@ -1161,7 +1163,7 @@ namespace Renderer
         vkCmdCopyImage(commandBuffer, srcImage, VK_IMAGE_LAYOUT_GENERAL, dstImage, VK_IMAGE_LAYOUT_GENERAL, 1, &imageCopy);
     }
 
-    void RendererVK::CopyDepthImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size)
+    void RendererVK::CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size)
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
 
@@ -1340,11 +1342,11 @@ namespace Renderer
         _device->TransitionImageLayout(commandBuffer, vkImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, imageDesc.depth, imageDesc.mipLevels);
     }
 
-    void RendererVK::DepthImageBarrier(CommandListID commandListID, DepthImageID image)
+    void RendererVK::ImageBarrier(CommandListID commandListID, DepthImageID image)
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         const VkImage& vkImage = _imageHandler->GetImage(image);
-        const DepthImageDesc& imageDesc = _imageHandler->GetDepthImageDesc(image);
+        const DepthImageDesc& imageDesc = _imageHandler->GetImageDesc(image);
 
         u32 imageAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
         // TODO: If we add stencil support we need to selectively add VK_IMAGE_ASPECT_STENCIL_BIT to imageAspect if the depthStencil has a stencil
@@ -1509,24 +1511,24 @@ namespace Renderer
             GraphicsPipelineDesc pipelineDesc;
 
             // We define simple passthrough functions here because we don't have a rendergraph that keeps track of resources while presenting
-            pipelineDesc.ResourceToImageID = [](RenderPassResource resource)
+            pipelineDesc.ResourceToImageID = [](ImageResource resource)
             {
-                return ImageID(static_cast<RenderPassResource::type>(resource));
+                return ImageID(static_cast<ImageResource::type>(resource));
             };
 
-            pipelineDesc.ResourceToDepthImageID = [](RenderPassResource resource)
+            pipelineDesc.ResourceToDepthImageID = [](DepthImageResource resource)
             {
-                return DepthImageID(static_cast<RenderPassResource::type>(resource));
+                return DepthImageID(static_cast<DepthImageResource::type>(resource));
             };
 
-            pipelineDesc.MutableResourceToImageID = [](RenderPassMutableResource resource)
+            pipelineDesc.MutableResourceToImageID = [](ImageMutableResource resource)
             {
-                return ImageID(static_cast<RenderPassResource::type>(resource));
+                return ImageID(static_cast<ImageMutableResource::type>(resource));
             };
 
-            pipelineDesc.MutableResourceToDepthImageID = [](RenderPassMutableResource resource)
+            pipelineDesc.MutableResourceToDepthImageID = [](DepthImageMutableResource resource)
             {
-                return DepthImageID(static_cast<RenderPassResource::type>(resource));
+                return DepthImageID(static_cast<DepthImageMutableResource::type>(resource));
             };
 
             pipelineDesc.states.vertexShader = _shaderHandler->LoadShader(vertexShaderDesc);
@@ -1535,7 +1537,7 @@ namespace Renderer
             pipelineDesc.states.rasterizerState.cullMode = CullMode::BACK;
             pipelineDesc.states.rasterizerState.frontFaceMode = FrontFaceState::COUNTERCLOCKWISE;
 
-            pipelineDesc.renderTargets[0] = RenderPassMutableResource(static_cast<ImageID::type>(swapChain->imageIDs.Get(frameIndex)));
+            pipelineDesc.renderTargets[0] = ImageMutableResource(static_cast<ImageID::type>(swapChain->imageIDs.Get(frameIndex)));
 
             GraphicsPipelineID pipelineID = _pipelineHandler->CreatePipeline(pipelineDesc);
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);

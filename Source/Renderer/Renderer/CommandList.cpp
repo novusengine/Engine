@@ -1,5 +1,7 @@
 #include "CommandList.h"
 #include "Renderer.h"
+#include "RenderGraphResources.h"
+#include "DescriptorSetResource.h"
 
 // Commands
 #include "Commands/Clear.h"
@@ -87,9 +89,10 @@ namespace Renderer
 #endif
     }
 
-    CommandList::CommandList(Renderer* renderer, Memory::Allocator* allocator)
+    CommandList::CommandList(Renderer* renderer, Memory::Allocator* allocator, RenderGraphResources* resources)
         : _renderer(renderer)
         , _allocator(allocator)
+        , _resources(resources)
         , _markerScope(0)
         , _functions(allocator, 32)
         , _data(allocator, 32)
@@ -213,9 +216,11 @@ namespace Renderer
         Commands::EndTimeQuery::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
-
-    void CommandList::BindDescriptorSet(DescriptorSetSlot slot, const DescriptorSet* descriptorSet, u32 frameIndex)
+    
+    void CommandList::BindDescriptorSet(DescriptorSetSlot slot, DescriptorSetResource resource, u32 frameIndex)
     {
+        DescriptorSet* descriptorSet = _resources->GetDescriptorSet(resource.GetID());
+
         const std::vector<Descriptor>& descriptors = descriptorSet->GetDescriptors();
         size_t numDescriptors = descriptors.size();
 
@@ -306,8 +311,10 @@ namespace Renderer
 #endif
     }
 
-    void CommandList::Clear(ImageID imageID, Color color)
+    void CommandList::Clear(ImageMutableResource resource, Color color)
     {
+        ImageID imageID = _resources->GetImage(resource);
+
         Commands::ClearImageColor* command = AddCommand<Commands::ClearImageColor>();
         command->image = imageID;
         command->color = color;
@@ -317,8 +324,10 @@ namespace Renderer
 #endif
     }
 
-    void CommandList::Clear(ImageID imageID, uvec4 values)
+    void CommandList::Clear(ImageMutableResource resource, uvec4 values)
     {
+        ImageID imageID = _resources->GetImage(resource);
+
         Commands::ClearImageUInt* command = AddCommand<Commands::ClearImageUInt>();
         command->image = imageID;
         command->values = values;
@@ -328,8 +337,10 @@ namespace Renderer
 #endif
     }
 
-    void CommandList::Clear(ImageID imageID, ivec4 values)
+    void CommandList::Clear(ImageMutableResource resource, ivec4 values)
     {
+        ImageID imageID = _resources->GetImage(resource);
+
         Commands::ClearImageInt* command = AddCommand<Commands::ClearImageInt>();
         command->image = imageID;
         command->values = values;
@@ -339,10 +350,12 @@ namespace Renderer
 #endif
     }
 
-    void CommandList::Clear(DepthImageID imageID, f32 depth, DepthClearFlags flags, u8 stencil)
+    void CommandList::Clear(DepthImageMutableResource resource, f32 depth, DepthClearFlags flags, u8 stencil)
     {
+        DepthImageID depthImageID = _resources->GetImage(resource);
+
         Commands::ClearDepthImage* command = AddCommand<Commands::ClearDepthImage>();                                                                                                      
-        command->image = imageID;
+        command->image = depthImageID;
         command->depth = depth;
         command->flags = flags;
         command->stencil = stencil;
@@ -568,22 +581,52 @@ namespace Renderer
 #endif
     }
 
-    void CommandList::ImageBarrier(ImageID image)
+    void CommandList::ImageBarrier(ImageResource resource)
     {
-        assert(image != ImageID::Invalid());
+        ImageID imageID = _resources->GetImage(resource);
+
+        assert(imageID != ImageID::Invalid());
         Commands::ImageBarrier* command = AddCommand<Commands::ImageBarrier>();
-        command->image = image;
+        command->image = imageID;
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         Commands::ImageBarrier::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
 
-    void CommandList::ImageBarrier(DepthImageID image)
+    void CommandList::ImageBarrier(ImageMutableResource resource)
     {
-        assert(image != DepthImageID::Invalid());
+        ImageID imageID = _resources->GetImage(resource);
+
+        assert(imageID != ImageID::Invalid());
+        Commands::ImageBarrier* command = AddCommand<Commands::ImageBarrier>();
+        command->image = imageID;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::ImageBarrier::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::ImageBarrier(DepthImageResource resource)
+    {
+        DepthImageID imageID = _resources->GetImage(resource);
+
+        assert(imageID != DepthImageID::Invalid());
         Commands::DepthImageBarrier* command = AddCommand<Commands::DepthImageBarrier>();
-        command->image = image;
+        command->image = imageID;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DepthImageBarrier::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::ImageBarrier(DepthImageMutableResource resource)
+    {
+        DepthImageID imageID = _resources->GetImage(resource);
+
+        assert(imageID != DepthImageID::Invalid());
+        Commands::DepthImageBarrier* command = AddCommand<Commands::DepthImageBarrier>();
+        command->image = imageID;
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         Commands::DepthImageBarrier::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);

@@ -249,7 +249,7 @@ namespace Renderer
             return data.images[static_cast<ImageID::type>(id)].desc;
         }
 
-        const DepthImageDesc& ImageHandlerVK::GetDepthImageDesc(const DepthImageID id)
+        const DepthImageDesc& ImageHandlerVK::GetImageDesc(const DepthImageID id)
         {
             ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
             
@@ -267,7 +267,7 @@ namespace Renderer
             return data.depthImages[static_cast<DepthImageID::type>(id)].desc;
         }
 
-        uvec2 ImageHandlerVK::GetDimension(const ImageID id, u32 mipLevel)
+        uvec2 ImageHandlerVK::GetDimensions(const ImageID id, u32 mipLevel)
         {
             ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
 
@@ -282,7 +282,7 @@ namespace Renderer
                 DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDimension with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
-            auto desc = GetImageDesc(id);
+            const ImageDesc& desc = GetImageDesc(id);
 
             f32 width = desc.dimensions.x;
             f32 height = desc.dimensions.y;
@@ -342,7 +342,7 @@ namespace Renderer
             return { uwidth >> mip, uheight >> mip };
         }
 
-        uvec2 ImageHandlerVK::GetDimension(const DepthImageID id)
+        uvec2 ImageHandlerVK::GetDimensions(const DepthImageID id)
         {
             ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
 
@@ -357,7 +357,7 @@ namespace Renderer
                 DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDimension with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
             }
 
-            auto desc = GetDepthImageDesc(id);
+            const DepthImageDesc& desc = GetImageDesc(id);
 
             f32 width = desc.dimensions.x;
             f32 height = desc.dimensions.y;

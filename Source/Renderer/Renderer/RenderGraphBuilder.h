@@ -20,52 +20,37 @@ namespace Renderer
     class Renderer;
     class CommandList;
     class RenderGraph;
+    class DescriptorSetResource;
 
     class RenderGraphBuilder
     {
     public:
         RenderGraphBuilder(Memory::Allocator* allocator, Renderer* renderer, size_t numPasses);
 
-        enum class WriteMode : u8
-        {
-            RENDERTARGET,
-            UAV
-        };
-
-        enum class LoadMode : u8
-        {
-            LOAD, // Load the contents of the resource
-            DISCARD, // We don't really care
-            CLEAR // Clear the resource of existing data
-        };
-
-        enum class ShaderStage : u8
-        {
-            NONE,
-            VERTEX,
-            PIXEL,
-            COMPUTE
-        };
-
         // Create transient resources
         ImageID Create(ImageDesc& desc);
         DepthImageID Create(DepthImageDesc& desc);
 
         // Reads
-        RenderPassResource Read(ImageID id, ShaderStage shaderStage);
-        RenderPassResource Read(TextureID id, ShaderStage shaderStage);
-        RenderPassResource Read(DepthImageID id, ShaderStage shaderStage);
+        ImageResource Read(ImageID id, PipelineType pipelineType);
+        ImageResource Read(TextureID id, PipelineType pipelineType);
+        DepthImageResource Read(DepthImageID id, PipelineType pipelineType);
 
         // Writes
-        RenderPassMutableResource Write(ImageID id, WriteMode writeMode, LoadMode loadMode);
-        RenderPassMutableResource Write(DepthImageID id, WriteMode writeMode, LoadMode loadMode);
+        ImageMutableResource Write(ImageID id, PipelineType pipelineType, LoadMode loadMode);
+        DepthImageMutableResource Write(DepthImageID id, PipelineType pipelineType, LoadMode loadMode);
+
+        // Uses
+        DescriptorSetResource Use(DescriptorSet& descriptorSet);
 
     private:
-        void PreExecute(CommandList& commandList, u32 passIndex);
-        void PostExecute(CommandList& commandList, u32 passIndex);
+        void PreExecute(CommandList& commandList, u32 currentPassIndex);
+        void PostExecute(CommandList& commandList, u32 currentPassIndex);
         RenderGraphResources& GetResources();
 
         void SetCurrentPassIndex(u32 index) { _currentPassIndex = index; }
+
+        u32 GetNumPlacedBarriers() { return _numPlacedBarriers; }
 
     private:
         Memory::Allocator* _allocator;
@@ -73,6 +58,8 @@ namespace Renderer
 
         RenderGraphResources _resources;
         u32 _currentPassIndex;
+
+        u32 _numPlacedBarriers = 0;
 
         friend class RenderGraph;
     };

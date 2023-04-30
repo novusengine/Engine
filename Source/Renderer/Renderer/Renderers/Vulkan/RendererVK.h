@@ -123,12 +123,12 @@ namespace Renderer
         void AddWaitSemaphore(CommandListID commandListID, SemaphoreID semaphoreID) override;
 
         void CopyImage(CommandListID commandListID, ImageID dstImageID, uvec2 dstPos, u32 dstMipLevel, ImageID srcImageID, uvec2 srcPos, u32 srcMipLevel, uvec2 size) override;
-        void CopyDepthImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) override;
+        void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) override;
         void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
 
         void PipelineBarrier(CommandListID commandListID, PipelineBarrierType type, BufferID buffer) override;
         void ImageBarrier(CommandListID commandListID, ImageID image) override;
-        void DepthImageBarrier(CommandListID commandListID, DepthImageID image) override;
+        void ImageBarrier(CommandListID commandListID, DepthImageID image) override;
 
         void PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size) override;
         void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) override;
@@ -154,18 +154,16 @@ namespace Renderer
         [[nodiscard]] f32 GetLastTimeQueryDuration(TimeQueryID id) override;
 
         // Utils
-        void FlipFrame(u32 frameIndex) override;
+        f32 FlipFrame(u32 frameIndex) override;
         void ResetTimeQueries(u32 frameIndex) override;
 
         [[nodiscard]] TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) override;
 
         [[nodiscard]] const ImageDesc& GetImageDesc(ImageID ID) override;
-        [[nodiscard]] const DepthImageDesc& GetDepthImageDesc(DepthImageID ID) override;
+        [[nodiscard]] const DepthImageDesc& GetImageDesc(DepthImageID ID) override;
 
-        [[nodiscard]] uvec2 GetImageDimension(const ImageID id) override;
-        [[nodiscard]] uvec2 GetImageDimension(const ImageID id, u32 mipLevel) override;
-
-        [[nodiscard]] uvec2 GetImageDimension(const DepthImageID id) override;
+        [[nodiscard]] uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) override;
+        [[nodiscard]] uvec2 GetImageDimensions(const DepthImageID id) override;
 
         [[nodiscard]] const std::string& GetGPUName() override;
         [[nodiscard]] const std::string& GetDebugName(const TextureID textureID) override;

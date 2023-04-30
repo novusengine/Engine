@@ -132,7 +132,7 @@ namespace Renderer
             u8 numAttachments = 0;
             for (int i = 0; i < MAX_RENDER_TARGETS; i++)
             {
-                if (desc.renderTargets[i] == RenderPassMutableResource::Invalid())
+                if (desc.renderTargets[i] == ImageMutableResource::Invalid())
                     break;
 
                 numAttachments++;
@@ -177,7 +177,7 @@ namespace Renderer
                 ImageID imageID = desc.MutableResourceToImageID(desc.renderTargets[i]);
 
                 const ImageDesc& imageDesc = _imageHandler->GetImageDesc(imageID);
-                uvec2 imageResolution = _imageHandler->GetDimension(imageID, 0);
+                uvec2 imageResolution = _imageHandler->GetDimensions(imageID, 0);
 
                 pipeline.resolution = glm::max(pipeline.resolution, imageResolution);
 
@@ -213,12 +213,12 @@ namespace Renderer
             VkAttachmentReference depthDescriptionRef = {};
 
             // If we have a depthstencil, add an attachment for that
-            if (desc.depthStencil != RenderPassMutableResource::Invalid())
+            if (desc.depthStencil != DepthImageMutableResource::Invalid())
             {
                 DepthImageID depthImageID = desc.MutableResourceToDepthImageID(desc.depthStencil);
-                const DepthImageDesc& imageDesc = _imageHandler->GetDepthImageDesc(depthImageID);
+                const DepthImageDesc& imageDesc = _imageHandler->GetImageDesc(depthImageID);
 
-                uvec2 imageResolution = _imageHandler->GetDimension(depthImageID);
+                uvec2 imageResolution = _imageHandler->GetDimensions(depthImageID);
 
                 pipeline.resolution = glm::max(pipeline.resolution, imageResolution);
 
@@ -874,14 +874,13 @@ namespace Renderer
 
             for (int i = 0; i < MAX_RENDER_TARGETS; i++)
             {
-                if (desc.renderTargets[i] == RenderPassMutableResource::Invalid())
+                if (desc.renderTargets[i] == ImageMutableResource::Invalid())
                     break;
 
                 cacheDesc.renderTargets[i] = desc.MutableResourceToImageID(desc.renderTargets[i]);
             }
 
-            RenderPassMutableResource invalidValue = RenderPassMutableResource::Invalid();
-            if (desc.depthStencil != invalidValue)
+            if (desc.depthStencil != DepthImageMutableResource::Invalid())
             {
                 cacheDesc.depthStencil = desc.MutableResourceToDepthImageID(desc.depthStencil);
             }
@@ -954,7 +953,7 @@ namespace Renderer
         {
             u32 numAttachments = pipeline.numRenderTargets;
             
-            if (pipeline.desc.depthStencil != RenderPassMutableResource::Invalid())
+            if (pipeline.desc.depthStencil != DepthImageMutableResource::Invalid())
             {
                 numAttachments += 1;
             }
@@ -968,7 +967,7 @@ namespace Renderer
                 attachmentViews[i] = _imageHandler->GetColorView(imageID);
             }
             // Add depthstencil as attachment
-            if (pipeline.desc.depthStencil != RenderPassMutableResource::Invalid())
+            if (pipeline.desc.depthStencil != DepthImageMutableResource::Invalid())
             {
                 DepthImageID depthImageID = pipeline.desc.MutableResourceToDepthImageID(pipeline.desc.depthStencil);
                 attachmentViews[pipeline.numRenderTargets] = _imageHandler->GetDepthView(depthImageID);

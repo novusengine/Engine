@@ -1,4 +1,5 @@
 #pragma once
+#include "RenderPassResources.h"
 #include "Descriptors/BufferDesc.h"
 #include "Descriptors/SamplerDesc.h"
 #include "Descriptors/TextureDesc.h"
@@ -11,6 +12,8 @@
 
 namespace Renderer
 {
+    class RenderGraphResources;
+
     enum DescriptorType
     {
         DESCRIPTOR_TYPE_BUFFER,
@@ -87,20 +90,14 @@ namespace Renderer
 
         void Bind(StringUtils::StringHash nameHash, TextureArrayID textureArrayID);
 
-        void Bind(StringUtils::StringHash nameHash, ImageID imageID, u32 mipLevel = 0);
-        void BindArray(StringUtils::StringHash nameHash, ImageID imageID, u32 mipLevel, u32 arrayIndex);
-
-        void Bind(StringUtils::StringHash nameHash, DepthImageID imageID);
-        void BindArray(StringUtils::StringHash nameHash, DepthImageID imageID, u32 arrayIndex);
-
-        void BindStorage(StringUtils::StringHash nameHash, ImageID imageID, u32 mipLevel = 0, u32 mipCount = 1);
-        void BindStorageArray(StringUtils::StringHash nameHash, ImageID imageID, u32 mipLevel = 0, u32 mipCount = 1);
-
         const std::vector<Descriptor>& GetDescriptors() const { return _boundDescriptors; }
 
     private:
+        std::vector<Descriptor>& GetMutableDescriptors() { return _boundDescriptors; }
 
     private:
         std::vector<Descriptor> _boundDescriptors;
+
+        friend class DescriptorSetResource;
     };
 }

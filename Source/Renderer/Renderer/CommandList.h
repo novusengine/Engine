@@ -39,6 +39,7 @@ namespace Renderer
 
     class DescriptorSet;
     class CommandList;
+    class RenderGraphResources;
 
     struct ScopedGPUProfilerZone
     {
@@ -52,7 +53,7 @@ namespace Renderer
     class CommandList
     {
     public:
-        CommandList(Renderer* renderer, Memory::Allocator* allocator);
+        CommandList(Renderer* renderer, Memory::Allocator* allocator, RenderGraphResources* resources);
 
         void MarkFrameStart(u32 frameIndex);
 
@@ -71,7 +72,7 @@ namespace Renderer
         void BeginTimeQuery(TimeQueryID timeQueryID);
         void EndTimeQuery(TimeQueryID timeQueryID);
 
-        void BindDescriptorSet(DescriptorSetSlot slot, const DescriptorSet* descriptorSet, u32 frameIndex);
+        void BindDescriptorSet(DescriptorSetSlot slot, DescriptorSetResource resource, u32 frameIndex);
 
         void SetDepthBias(f32 constantFactor, f32 clamp, f32 slopeFactor);
         void SetScissorRect(u32 left, u32 right, u32 top, u32 bottom);
@@ -81,10 +82,10 @@ namespace Renderer
         void SetIndexBuffer(BufferID buffer, IndexFormat indexFormat);
         void SetBuffer(u32 slot, BufferID buffer);
 
-        void Clear(ImageID imageID, Color color);
-        void Clear(ImageID imageID, uvec4 values);
-        void Clear(ImageID imageID, ivec4 values);
-        void Clear(DepthImageID imageID, f32 depth, DepthClearFlags flags = DepthClearFlags::DEPTH, u8 stencil = 0);
+        void Clear(ImageMutableResource resource, Color color);
+        void Clear(ImageMutableResource resource, uvec4 values);
+        void Clear(ImageMutableResource resource, ivec4 values);
+        void Clear(DepthImageMutableResource resource, f32 depth, DepthClearFlags flags = DepthClearFlags::DEPTH, u8 stencil = 0);
 
         void Draw(u32 numVertices, u32 numInstances, u32 vertexOffset, u32 instanceOffset);
         void DrawIndirect(BufferID argumentBuffer, u32 argumentBufferOffset, u32 drawCount);
@@ -107,8 +108,10 @@ namespace Renderer
         void QueueDestroyBuffer(BufferID buffer);
 
         void PipelineBarrier(PipelineBarrierType type, BufferID buffer);
-        void ImageBarrier(ImageID image);
-        void ImageBarrier(DepthImageID image);
+        void ImageBarrier(ImageResource resource);
+        void ImageBarrier(ImageMutableResource resource);
+        void ImageBarrier(DepthImageResource resource);
+        void ImageBarrier(DepthImageMutableResource resource);
 
         void DrawImgui();
 
@@ -150,6 +153,7 @@ namespace Renderer
     private:
         Renderer* _renderer;
         Memory::Allocator* _allocator;
+        RenderGraphResources* _resources;
         u32 _markerScope;
 
         DynamicArray<BackendDispatchFunction> _functions;

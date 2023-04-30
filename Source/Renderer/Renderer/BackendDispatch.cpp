@@ -266,7 +266,7 @@ namespace Renderer
     {
         ZoneScopedC(tracy::Color::Red3);
         const Commands::CopyDepthImage* actualData = static_cast<const Commands::CopyDepthImage*>(data);
-        renderer->CopyDepthImage(commandList, actualData->dstImage, actualData->dstPos, actualData->srcImage, actualData->srcPos, actualData->size);
+        renderer->CopyImage(commandList, actualData->dstImage, actualData->dstPos, actualData->srcImage, actualData->srcPos, actualData->size);
     }
 
     void BackendDispatch::CopyBuffer(Renderer* renderer, CommandListID commandList, const void* data)
@@ -315,7 +315,7 @@ namespace Renderer
     {
         ZoneScopedC(tracy::Color::Red3);
         const Commands::DepthImageBarrier* actualData = static_cast<const Commands::DepthImageBarrier*>(data);
-        renderer->DepthImageBarrier(commandList, actualData->image);
+        renderer->ImageBarrier(commandList, actualData->image);
     }
 
     void BackendDispatch::DrawImgui(Renderer* renderer, CommandListID commandList, const void* data)

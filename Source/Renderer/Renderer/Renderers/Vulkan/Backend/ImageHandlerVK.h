@@ -33,7 +33,7 @@ namespace Renderer
             DepthImageID CreateDepthImage(const DepthImageDesc& desc);
 
             const ImageDesc& GetImageDesc(const ImageID id);
-            const DepthImageDesc& GetDepthImageDesc(const DepthImageID id);
+            const DepthImageDesc& GetImageDesc(const DepthImageID id);
 
             VkImage GetImage(const ImageID id);
             VkImageView GetColorView(const ImageID id);
@@ -41,8 +41,8 @@ namespace Renderer
             VkImageView GetColorView(const ImageID id, u32 mipLevel);
             VkImageView GetColorArrayView(const ImageID id, u32 mipLevel);
 
-            uvec2 GetDimension(const ImageID id, u32 mipLevel);
-            uvec2 GetDimension(const DepthImageID id);
+            uvec2 GetDimensions(const ImageID id, u32 mipLevel);
+            uvec2 GetDimensions(const DepthImageID id);
 
             VkImage GetImage(const DepthImageID id);
             VkImageView GetDepthView(const DepthImageID id);

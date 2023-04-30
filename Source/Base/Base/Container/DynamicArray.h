@@ -50,17 +50,22 @@ public:
         _count--;
     }
 
-    size_t Count()
+    size_t Count() const
     {
         return _count;
     }
 
-    size_t Capacity()
+    size_t Capacity() const
     {
         return _capacity;
     }
 
     T& operator[](size_t index)
+    {
+        return _data[index];
+    }
+
+    const T& operator[](size_t index) const
     {
         return _data[index];
     }

@@ -137,12 +137,12 @@ namespace Renderer
         virtual void AddWaitSemaphore(CommandListID commandListID, SemaphoreID semaphoreID) = 0;
 
         virtual void CopyImage(CommandListID commandListID, ImageID dstImageID, uvec2 dstPos, u32 dstMipLevel, ImageID srcImageID, uvec2 srcPos, u32 srcMipLevel, uvec2 size) = 0;
-        virtual void CopyDepthImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) = 0;
+        virtual void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) = 0;
         virtual void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) = 0;
 
         virtual void PipelineBarrier(CommandListID commandListID, PipelineBarrierType type, BufferID buffer) = 0;
         virtual void ImageBarrier(CommandListID commandListID, ImageID image) = 0;
-        virtual void DepthImageBarrier(CommandListID commandListID, DepthImageID image) = 0;
+        virtual void ImageBarrier(CommandListID commandListID, DepthImageID image) = 0;
 
         virtual void PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size) = 0;
         virtual void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) = 0;
@@ -177,18 +177,16 @@ namespace Renderer
         const std::vector<TimeQueryID>& GetFrameTimeQueries() { return _frameTimeQueries; }
 
         // Utils
-        virtual void FlipFrame(u32 frameIndex) = 0;
+        virtual f32 FlipFrame(u32 frameIndex) = 0; // Returns time waited in seconds
         virtual void ResetTimeQueries(u32 frameIndex) = 0;
 
         virtual TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) = 0;
 
         virtual const ImageDesc& GetImageDesc(ImageID ID) = 0;
-        virtual const DepthImageDesc& GetDepthImageDesc(DepthImageID ID) = 0;
+        virtual const DepthImageDesc& GetImageDesc(DepthImageID ID) = 0;
 
-        virtual uvec2 GetImageDimension(const ImageID id) = 0;
-        virtual uvec2 GetImageDimension(const ImageID id, u32 mipLevel) = 0;
-
-        virtual uvec2 GetImageDimension(const DepthImageID id) = 0;
+        virtual uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) = 0;
+        virtual uvec2 GetImageDimensions(const DepthImageID id) = 0;
 
         virtual const std::string& GetGPUName() = 0;
         virtual const std::string& GetDebugName(const TextureID textureID) = 0;

@@ -104,7 +104,7 @@ namespace Renderer
         RenderGraphData* data = static_cast<RenderGraphData*>(_data);
         RenderGraphResources& resources = _renderGraphBuilder->GetResources();
         
-        CommandList commandList(_renderer, _desc.allocator);
+        CommandList commandList(_renderer, _desc.allocator, &resources);
 
         // Add semaphores
         for (SemaphoreID signalSemaphore : data->signalSemaphores)
@@ -130,6 +130,7 @@ namespace Renderer
         {
             IRenderPass* pass = data->passes[i];
 
+            // Performance timing
             ZoneScopedC(tracy::Color::Red2);
             ZoneName(pass->_name, pass->_nameLength);
 
@@ -151,6 +152,9 @@ namespace Renderer
         }
         commandList.PopMarker();
         commandList.EndTimeQuery(totalTimeQueryID);
+
+        //u32 numPlacedBarriers = _renderGraphBuilder->GetNumPlacedBarriers();
+        //DebugHandler::Print("Num placed barriers: {}", numPlacedBarriers);
 
         {
             ZoneScopedNC("CommandList::Execute", tracy::Color::Red2);

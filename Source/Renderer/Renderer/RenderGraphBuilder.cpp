@@ -4,59 +4,165 @@
 
 namespace Renderer
 {
+
     RenderGraphBuilder::RenderGraphBuilder(Memory::Allocator* allocator, Renderer* renderer, size_t numPasses)
-        : _renderer(renderer)
-        , _resources(allocator, numPasses)
+        : _allocator(allocator)
+        , _renderer(renderer)
+        , _resources(allocator, renderer, numPasses)
     {
 
     }
 
-    void RenderGraphBuilder::PreExecute(CommandList& commandList, u32 passIndex)
+    void RenderGraphBuilder::PreExecute(CommandList& commandList, u32 currentPassIndex)
     {
-        if (!_resources.NeedsPreExecute(passIndex))
+        if (!_resources.NeedsPreExecute(currentPassIndex))
             return;
 
         // Queue up all the clears for this pass
         commandList.PushMarker("RenderGraph::PreExecute", Color::White);
 
-        const DynamicArray<ImageID>& colorClears = _resources.GetColorClears(passIndex);
-
-        for (ImageID image : colorClears)
+        const DynamicArray<ImageMutableResource>& colorClears = _resources.GetColorClears(currentPassIndex);
+        for (ImageMutableResource resource : colorClears)
         {
-            const ImageDesc& imageDesc = _renderer->GetImageDesc(image);
+            ImageID imageID = _resources.GetImage(resource);
+            const ImageDesc& imageDesc = _renderer->GetImageDesc(imageID);
 
             ImageComponentType imageComponentType = ToImageComponentType(imageDesc.format);
 
             if (imageComponentType == ImageComponentType::FLOAT || imageComponentType == ImageComponentType::UNORM || imageComponentType == ImageComponentType::SNORM)
             {
-                commandList.Clear(image, imageDesc.clearColor);
+                commandList.Clear(resource, imageDesc.clearColor);
             }
             else if (imageComponentType == ImageComponentType::UINT)
             {
-                commandList.Clear(image, imageDesc.clearUInts);
+                commandList.Clear(resource, imageDesc.clearUInts);
             }
             else if (imageComponentType == ImageComponentType::SINT)
             {
-                commandList.Clear(image, imageDesc.clearInts);
+                commandList.Clear(resource, imageDesc.clearInts);
             }
             else
             {
                 DebugHandler::PrintFatal("Please implement more of these");
             }
+
+            _resources.SetLastBarrier(imageID, currentPassIndex);
         }
 
-        const DynamicArray<DepthImageID>& depthClears = _resources.GetDepthClears(passIndex);
-
-        for (DepthImageID image : depthClears)
+        const DynamicArray<DepthImageMutableResource>& depthClears = _resources.GetDepthClears(currentPassIndex);
+        for (DepthImageMutableResource resource : depthClears)
         {
-            const DepthImageDesc& imageDesc = _renderer->GetDepthImageDesc(image);
-            commandList.Clear(image, imageDesc.depthClearValue);
+            DepthImageID imageID = _resources.GetImage(resource);
+
+            const DepthImageDesc& imageDesc = _renderer->GetImageDesc(imageID);
+            commandList.Clear(resource, imageDesc.depthClearValue);
+
+            _resources.SetLastBarrier(imageID, currentPassIndex);
         }
 
-        // TODO: Handling between-pass barriers here
-        // If we have .Read operations we need to:
-        // * Check if the same resource had any .Write operations with WriteMode UAV in earlier passes
-        // * If it did, add a Compute-Compute barrier if this read has the shaderstage Compute, otherwise add a Compute-ShaderRead barrier'
+        // Handling between-pass barriers
+        const DynamicArray<TrackedImageAccess>& imageAccesses = _resources.GetImageAccesses(currentPassIndex);
+        for (const TrackedImageAccess& imageAccess : imageAccesses)
+        {
+            u32 lastBarrier = _resources.GetLastBarrier(imageAccess.imageID);
+
+            const DynamicArray<TrackedPassAccess>& passAccesses = _resources.GetPassAccesses(imageAccess.imageID);
+
+            for (i32 i = static_cast<i32>(passAccesses.Count()) - 1; i >= 0; i--)
+            {
+                const TrackedPassAccess& passAccess = passAccesses[i];
+
+                if (passAccess.passIndex >= currentPassIndex)
+                {
+                    // Keep iterating until we get to previous passes
+                    continue;
+                }
+
+                if (passAccess.passIndex < lastBarrier)
+                {
+                    // We've stepped back until our last barrier, the image is already synced
+                    break;
+                }
+
+                if (imageAccess.pipelineType == PipelineType::GRAPHICS  && passAccess.pipelineType == PipelineType::GRAPHICS && imageAccess.accessType == AccessType::WRITE && passAccess.accessType == AccessType::WRITE)
+                {
+                    // We do not need to add ImageBarriers between graphics pipelines that both write to the rendertarget, that is handled by the pipeline
+                    break;
+                }
+
+                if (passAccess.accessType == AccessType::WRITE)
+                {
+                    _resources.SetLastBarrier(imageAccess.imageID, currentPassIndex);
+
+                    if (imageAccess.accessType == AccessType::WRITE)
+                    {
+                        ImageMutableResource resource = _resources.GetMutableResource(imageAccess.imageID);
+                        commandList.ImageBarrier(resource);
+                        _numPlacedBarriers++;
+                    }
+                    else
+                    {
+                        ImageResource resource = _resources.GetResource(imageAccess.imageID);
+                        commandList.ImageBarrier(resource);
+                        _numPlacedBarriers++;
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        const DynamicArray<TrackedDepthImageAccess>& depthImageAccesses = _resources.GetDepthImageAccesses(currentPassIndex);
+        for (const TrackedDepthImageAccess& imageAccess : depthImageAccesses)
+        {
+            u32 lastBarrier = _resources.GetLastBarrier(imageAccess.imageID);
+
+            const DynamicArray<TrackedPassAccess>& passAccesses = _resources.GetPassAccesses(imageAccess.imageID);
+
+            for (i32 i = static_cast<i32>(passAccesses.Count()) - 1; i >= 0; i--)
+            {
+                const TrackedPassAccess& passAccess = passAccesses[i];
+
+                if (passAccess.passIndex >= currentPassIndex)
+                {
+                    // Keep iterating until we get to previous passes
+                    continue;
+                }
+
+                if (passAccess.passIndex < lastBarrier)
+                {
+                    // We've stepped back until our last barrier, the image is already synced
+                    break;
+                }
+
+                if (imageAccess.pipelineType == PipelineType::GRAPHICS && passAccess.pipelineType == PipelineType::GRAPHICS && imageAccess.accessType == AccessType::WRITE && passAccess.accessType == AccessType::WRITE)
+                {
+                    // We do not need to add ImageBarriers between graphics pipelines that both write to the rendertarget, that is handled by the pipeline
+                    break;
+                }
+
+                if (passAccess.accessType == AccessType::WRITE)
+                {
+                    _resources.SetLastBarrier(imageAccess.imageID, currentPassIndex);
+
+                    if (imageAccess.accessType == AccessType::WRITE)
+                    {
+                        DepthImageMutableResource resource = _resources.GetMutableResource(imageAccess.imageID);
+                        commandList.ImageBarrier(resource);
+                        _numPlacedBarriers++;
+                    }
+                    else
+                    {
+                        DepthImageResource resource = _resources.GetResource(imageAccess.imageID);
+                        commandList.ImageBarrier(resource);
+                        _numPlacedBarriers++;
+                    }
+
+                    break;
+                }
+            }
+        }
+        
 
         commandList.PopMarker();
     }
@@ -82,47 +188,64 @@ namespace Renderer
         return DepthImageID::Invalid();
     }
 
-    RenderPassResource RenderGraphBuilder::Read(ImageID id, ShaderStage /*shaderStage*/)
+    ImageResource RenderGraphBuilder::Read(ImageID id, PipelineType pipelineType)
     {
-        RenderPassResource resource = _resources.GetResource(id);
+        ImageResource resource = _resources.GetResource(id);
+
+        _resources.Access(_currentPassIndex, resource, AccessType::READ, pipelineType);
 
         return resource;
     }
 
-    RenderPassResource RenderGraphBuilder::Read(TextureID id, ShaderStage /*shaderStage*/)
+    ImageResource RenderGraphBuilder::Read(TextureID id, PipelineType /*pipelineType*/)
     {
-        RenderPassResource resource = _resources.GetResource(id);
+        ImageResource resource = _resources.GetResource(id);
 
         return resource;
     }
 
-    RenderPassResource RenderGraphBuilder::Read(DepthImageID id, ShaderStage /*shaderStage*/)
+    DepthImageResource RenderGraphBuilder::Read(DepthImageID id, PipelineType pipelineType)
     {
-        RenderPassResource resource = _resources.GetResource(id);
+        DepthImageResource resource = _resources.GetResource(id);
+
+        _resources.Access(_currentPassIndex, resource, AccessType::READ, pipelineType);
 
         return resource;
     }
 
-    RenderPassMutableResource RenderGraphBuilder::Write(ImageID id, WriteMode /*writeMode*/, LoadMode loadMode)
+    ImageMutableResource RenderGraphBuilder::Write(ImageID id, PipelineType pipelineType, LoadMode loadMode)
     {
-        RenderPassMutableResource resource = _resources.GetMutableResource(id);
+        ImageMutableResource resource = _resources.GetMutableResource(id);
 
         if (loadMode == LoadMode::CLEAR)
         {
-            _resources.Clear(_currentPassIndex, id);
+            _resources.Clear(_currentPassIndex, resource);
         }
+
+        _resources.Access(_currentPassIndex, resource, AccessType::WRITE, pipelineType);
 
         return resource;
     }
 
-    RenderPassMutableResource RenderGraphBuilder::Write(DepthImageID id, WriteMode /*writeMode*/, LoadMode loadMode)
+    DepthImageMutableResource RenderGraphBuilder::Write(DepthImageID id, PipelineType pipelineType, LoadMode loadMode)
     {
-        RenderPassMutableResource resource = _resources.GetMutableResource(id);
+        DepthImageMutableResource resource = _resources.GetMutableResource(id);
 
         if (loadMode == LoadMode::CLEAR)
         {
-            _resources.Clear(_currentPassIndex, id);
+            _resources.Clear(_currentPassIndex, resource);
         }
+
+        _resources.Access(_currentPassIndex, resource, AccessType::WRITE, pipelineType);
+
+        return resource;
+    }
+
+    DescriptorSetResource RenderGraphBuilder::Use(DescriptorSet& descriptorSet)
+    {
+        DescriptorSetResource resource = _resources.GetResource(descriptorSet);
+
+        _resources.Use(_currentPassIndex, resource);
 
         return resource;
     }
