@@ -1,5 +1,5 @@
 #pragma once
-#include "FileFormat/Warcraft/Shared.h"
+#include "FileFormat/Shared.h"
 
 #include <Base/Types.h>
 #include <Base/Platform.h>
@@ -14,6 +14,11 @@ PRAGMA_NO_PADDING_START;
 	{
 		u32 size = 0;
 		u32 offset = 0;
+
+		void Init(u32 md21Offset)
+		{
+			offset += md21Offset * (offset > 0);
+		}
 
 		T* Get(const std::shared_ptr<Bytebuffer>& buffer) const
 		{
@@ -38,13 +43,7 @@ PRAGMA_NO_PADDING_START;
 	{
 		M2Array<M2Array<T>> values = { };
 	};
-	template <typename T>
-	struct M2SplineKey
-	{
-		T value = { };
-		T tanIn = { };
-		T tanOut = { };
-	};
+
 	template <typename T>
 	struct FBlock
 	{
@@ -172,12 +171,17 @@ PRAGMA_NO_PADDING_START;
 		vec3 position = { };
 		u16 bone = 0;
 
-		struct
+		union
 		{
-			u16 texture0 : 5;
-			u16 texture1 : 5;
-			u16 texture2 : 5;
-			u16 : 1;
+			u16 textureID;
+
+			struct
+			{
+				u16 texture0 : 5;
+				u16 texture1 : 5;
+				u16 texture2 : 5;
+				u16 : 1;
+			};
 		};
 
 		M2Array<char> unused1 = { };
@@ -268,17 +272,16 @@ PRAGMA_NO_PADDING_START;
 	struct M2Camera
 	{
 		u32 type = 0;
-
-		f32 fov = 0.0f; // Diagonal FOV in radians
 		f32 farClip = 0.0f;
 		f32 nearClip = 0.0f;
 
-		M2Track<M2SplineKey<vec3>> positions = { };
+		M2Track<SplineKey<vec3>> positions = { };
 		vec3 positionBase = { };
-		M2Track<M2SplineKey<vec3>> targetPosition = { };
+		M2Track<SplineKey<vec3>> targetPosition = { };
 		vec3 targetPositionBase = { };
 
-		M2Track<M2SplineKey<f32>> roll = { };
+		M2Track<SplineKey<f32>> roll = { };
+		M2Track<SplineKey<f32>> fov = { };
 	};
 	struct M2Light
 	{
@@ -430,7 +433,8 @@ PRAGMA_NO_PADDING_START;
 		i16 frequency = 0; // Determines how often the animation is played.
 		u16 padding = 0;
 		M2Range repeatRange = { }; // (0,0) == No Repeat, (x, y) == Client picks random number within range
-		u32 blendTime = 0;
+		u16 blendTimeIn = 0;
+		u16 blendTimeOut = 0;
 		M2Bounds bounds = { };
 		i16 nextVariationID = 0; // Specifies the variation id for the next variation for this animation or (-1) for none.
 		u16 nextAliasID = 0; // Specifies the id for the actual animation.
@@ -536,7 +540,7 @@ PRAGMA_NO_PADDING_START;
 		M2Array<char> uniqueName = { };
 		Flags flags = { };
 
-		M2Array<u32> loopingAnimationTimestamps = { };
+		M2Array<u32> loopingSequenceTimestamps = { };
 		M2Array<M2Sequence> sequences = { };
 		M2Array<u16> sequenceIDToAnimationID = { };
 		M2Array<M2CompBone> bones = { };

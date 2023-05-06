@@ -1,5 +1,5 @@
 #include "Wdc3Parser.h"
-#include "FileFormat/Warcraft/Shared.h"
+#include "FileFormat/Shared.h"
 #include "FileFormat/Warcraft/DB2/Wdc3.h"
 
 #include <Base/Memory/Bytebuffer.h>

@@ -1,5 +1,5 @@
 #pragma once
-#include <FileFormat/Warcraft/Shared.h>
+#include "FileFormat/Shared.h"
 
 #include <Base/Types.h>
 #include <Base/Platform.h>

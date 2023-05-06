@@ -1,6 +1,6 @@
 #pragma once
+#include "FileFormat/Shared.h"
 #include "FileFormat/Novus/FileHeader.h"
-#include "FileFormat/Warcraft/Shared.h"
 
 #include <Base/Types.h>
 #include <Base/Platform.h>
@@ -22,7 +22,7 @@ PRAGMA_NO_PADDING_START;
 	struct ComplexModel
 	{
 	public:
-		static const u32 CURRENT_VERSION = 3;
+		static const u32 CURRENT_VERSION = 4;
 
 		struct Flags
 		{
@@ -49,32 +49,34 @@ PRAGMA_NO_PADDING_START;
 		};
 
 		template <typename T>
-		struct ComplexAnimationTrack
+		struct AnimationTrack
 		{
+		public:
 			u32 sequenceID = 0;
 			std::vector<u32> timestamps = { };
 			std::vector<T> values = { };
 		};
+
+		enum class AnimationInterpolationType : u8
+		{
+			NONE,
+			LINEAR,
+			CUBIC_BEZIER_SPLINE, // Only used for M2SplineKey tracks
+			CUBIC_HERMIT_SPLINE // Only used for M2SplineKey tracks
+		};
+
 		template <typename T>
-		struct ComplexAnimationData
+		struct AnimationData
 		{
 		public:
-			enum class InterpolationType : u8
-			{
-				NONE,
-				LINEAR,
-				CUBIC_BEZIER_SPLINE, // Only used for M2SplineKey tracks
-				CUBIC_HERMIT_SPLINE // Only used for M2SplineKey tracks
-			};
-
-			InterpolationType interpolationType = InterpolationType::NONE;
+			AnimationInterpolationType interpolationType = AnimationInterpolationType::NONE;
 			bool isGlobalSequence = false;
 
-			std::vector<ComplexAnimationTrack<T>> tracks;
+			std::vector<AnimationTrack<T>> tracks;
 
 			void Serialize(std::ofstream& stream) const
 			{
-				stream.write(reinterpret_cast<char const*>(&interpolationType), sizeof(InterpolationType));
+				stream.write(reinterpret_cast<char const*>(&interpolationType), sizeof(AnimationInterpolationType));
 				stream.write(reinterpret_cast<char const*>(&isGlobalSequence), sizeof(bool));
 
 				u32 numTracks = static_cast<u32>(tracks.size());
@@ -83,7 +85,7 @@ PRAGMA_NO_PADDING_START;
 
 					for (u32 i = 0; i < numTracks; i++)
 					{
-						const ComplexAnimationTrack<T>& track = tracks[i];
+						const AnimationTrack<T>& track = tracks[i];
 
 						stream.write(reinterpret_cast<char const*>(&track.sequenceID), sizeof(u32));
 
@@ -118,7 +120,7 @@ PRAGMA_NO_PADDING_START;
 
 					for (u32 i = 0; i < numTracks; i++)
 					{
-						ComplexAnimationTrack<T>& track = tracks[i];
+						AnimationTrack<T>& track = tracks[i];
 
 						if (!buffer->GetU32(track.sequenceID))
 							return false;
@@ -234,9 +236,9 @@ PRAGMA_NO_PADDING_START;
 		struct TextureTransform
 		{
 		public:
-			ComplexAnimationData<vec3> translation = { };
-			ComplexAnimationData<quat> rotation = { };
-			ComplexAnimationData<vec3> scale = { };
+			AnimationData<vec3> translation = { };
+			AnimationData<quat> rotation = { };
+			AnimationData<vec3> scale = { };
 		};
 
 		struct Bone
@@ -266,9 +268,9 @@ PRAGMA_NO_PADDING_START;
 			i16 parentBoneID = -1;
 			u16 submeshID = 0;
 
-			ComplexAnimationData<vec3> translation = { };
-			ComplexAnimationData<quat> rotation = { };
-			ComplexAnimationData<vec3> scale = { };
+			AnimationData<vec3> translation = { };
+			AnimationData<quat> rotation = { };
+			AnimationData<vec3> scale = { };
 
 			vec3 pivot = { };
 		};
@@ -350,6 +352,20 @@ PRAGMA_NO_PADDING_START;
 
 			std::vector<TextureUnit> textureUnits = { };
 		};
+		struct Camera
+		{
+			u32 type = 0;
+			f32 farClip = 0.0f;
+			f32 nearClip = 0.0f;
+
+			vec3 positionBase = { };
+			vec3 targetPositionBase = { };
+
+			AnimationData<SplineKey<vec3>> positions = { };
+			AnimationData<SplineKey<vec3>> targetPosition = { };
+			AnimationData<SplineKey<f32>> roll = { };
+			AnimationData<SplineKey<f32>> fov = { };
+		};
 		struct ModelData
 		{
 		public:
@@ -400,6 +416,8 @@ PRAGMA_NO_PADDING_START;
 		std::vector<vec3> collisionVertexPositions = { };
 		std::vector<u16> collisionIndices = { };
 		std::vector<std::array<u8, 2>> collisionNormals = { };
+
+		std::vector<Camera> cameras = { };
 
 		vec3 aabbCenter = { };
 		vec3 aabbExtents = { };

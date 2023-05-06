@@ -72,6 +72,14 @@ struct IntColor
     };
 };
 
+template <typename T>
+struct SplineKey
+{
+    T value = { };
+    T tanIn = { };
+    T tanOut = { };
+};
+
 struct FileChunkToken
 {
 public:
@@ -217,6 +225,10 @@ namespace CoordinateSpaces
     inline vec3 ModelPosToNovus(const vec3& pos)
     {
         return vec3(pos.y, pos.z, -pos.x);
+    }
+    inline vec3 ModelRotToNovus(const vec3& pos)
+    {
+        return vec3(-pos.y, -pos.z, -pos.x);
     }
 }
 

@@ -1,6 +1,6 @@
 #pragma once
+#include "FileFormat/Shared.h"
 #include "FileFormat/Novus/FileHeader.h"
-#include "FileFormat/Warcraft/Shared.h"
 
 #include <Base/Types.h>
 #include <Base/Platform.h>

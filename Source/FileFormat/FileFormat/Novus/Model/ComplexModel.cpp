@@ -1,11 +1,12 @@
 #include "ComplexModel.h"
 #include "MapObject.h"
-#include "FileFormat/Warcraft/Shared.h"
+#include "FileFormat/Shared.h"
 #include "FileFormat/Warcraft/M2/M2.h"
 
 #include <Base/Memory/Bytebuffer.h>
 #include <Base/Util/DebugHandler.h>
 
+#include <glm/gtx/euler_angles.hpp>
 #include <fstream>
 
 using namespace M2;
@@ -596,11 +597,200 @@ namespace Model
 		return true;
 	}
 
+	template <typename T>
+	void GetAnimationTrack(std::shared_ptr<Bytebuffer>& rootBuffer, const Layout& file, ComplexModel::AnimationData<T>& animationData, M2Track<T>& m2Track)
+	{
+		u32 numTracks = m2Track.values.size;
+
+		animationData.interpolationType = static_cast<ComplexModel::AnimationInterpolationType>(m2Track.interpolationType);
+		animationData.isGlobalSequence = m2Track.globalSequence != -1;
+		animationData.tracks.reserve(numTracks);
+
+		// Handle Global Sequence
+		if (animationData.isGlobalSequence)
+		{
+			u32 sequenceID = file.md21.sequences.size + m2Track.globalSequence;
+
+			if (sequenceID < file.md21.sequences.size)
+			{
+				M2Sequence* m2Sequence = file.md21.sequences.GetElement(rootBuffer, sequenceID);
+
+				bool hasExternalAnimationData = !m2Sequence->flags.HasEmbeddedAnimationData;
+				if (hasExternalAnimationData || m2Sequence->flags.IsAlias)
+				{
+					// TODO : Animation is stored externally
+					return;
+				}
+			}
+
+			M2Array<u32>* m2Timestamps = m2Track.timestamps.Get(rootBuffer);
+			M2Array<T>* m2Values = m2Track.values.Get(rootBuffer);
+
+			if (m2Timestamps->size > 0 && m2Values->size > 0)
+			{
+				ComplexModel::AnimationTrack<T>& track = animationData.tracks.emplace_back();
+
+				track.sequenceID = sequenceID;
+
+				track.timestamps.resize(m2Timestamps->size);
+				memcpy(track.timestamps.data(), m2Timestamps->Get(rootBuffer), sizeof(u32) * m2Timestamps->size);
+
+				track.values.resize(m2Values->size);
+				memcpy(track.values.data(), m2Values->Get(rootBuffer), sizeof(T) * m2Values->size);
+			}
+		}
+		// Read All Sequence Tracks
+		else
+		{
+			for (u32 i = 0; i < numTracks; i++)
+			{
+				if (i < file.md21.sequences.size)
+				{
+					M2Sequence* m2Sequence = file.md21.sequences.GetElement(rootBuffer, i);
+
+					bool hasExternalAnimationData = !m2Sequence->flags.HasEmbeddedAnimationData;
+					if (hasExternalAnimationData || m2Sequence->flags.IsAlias)
+					{
+						// TODO : Animation is stored externally
+						continue;
+					}
+				}
+
+				M2Array<u32>* m2Timestamps = m2Track.timestamps.GetElement(rootBuffer, i);
+				M2Array<T>* m2Values = m2Track.values.GetElement(rootBuffer, i);
+
+				if (m2Timestamps->size > 0 && m2Values->size > 0)
+				{
+					ComplexModel::AnimationTrack<T>& track = animationData.tracks.emplace_back();
+
+					track.sequenceID = i;
+
+					track.timestamps.resize(m2Timestamps->size);
+					memcpy(track.timestamps.data(), m2Timestamps->Get(rootBuffer), sizeof(u32) * m2Timestamps->size);
+
+					track.values.resize(m2Values->size);
+					memcpy(track.values.data(), m2Values->Get(rootBuffer), sizeof(T) * m2Values->size);
+				}
+			}
+		}
+	}
+	void ConvertRotationAnimationTrack(ComplexModel::AnimationData<M2CompressedQuaternion>& src, ComplexModel::AnimationData<quat>& dest)
+	{
+		u32 numTracks = static_cast<u32>(src.tracks.size());
+
+		dest.interpolationType = src.interpolationType;
+		dest.isGlobalSequence = src.isGlobalSequence;
+		dest.tracks.resize(numTracks);
+
+		for (u32 i = 0; i < numTracks; i++)
+		{
+			ComplexModel::AnimationTrack<M2CompressedQuaternion>& srcTrack = src.tracks[i];
+			ComplexModel::AnimationTrack<quat>& destTrack = dest.tracks[i];
+
+			destTrack.sequenceID = srcTrack.sequenceID;
+
+			// Copy Timestamps
+			{
+				u32 numTimestamps = static_cast<u32>(srcTrack.values.size());
+				destTrack.timestamps.resize(numTimestamps);
+
+				memcpy(&destTrack.timestamps[0], &srcTrack.timestamps[0], sizeof(u32) * numTimestamps);
+			}
+
+			// Copy Values
+			{
+				u32 numValues = static_cast<u32>(srcTrack.values.size());
+				destTrack.values.resize(numValues);
+
+				for (u32 j = 0; j < numValues; j++)
+				{
+					vec4 rotQuatAsVec4 = srcTrack.values[j].ToVec4();
+					quat rotQuat = quat(rotQuatAsVec4.w, rotQuatAsVec4.x, rotQuatAsVec4.y, rotQuatAsVec4.z);
+
+					vec3 eulerAngles = CoordinateSpaces::ModelRotToNovus(glm::eulerAngles(rotQuat));
+					vec3 placementAngles = vec3(eulerAngles.x, eulerAngles.y, eulerAngles.z);
+
+					glm::mat4 matrix = glm::eulerAngleZYX(placementAngles.z, placementAngles.y, placementAngles.x);
+					destTrack.values[j] = glm::quat_cast(matrix);
+				}
+			}
+		}
+	}
+
 	bool ComplexModel::FromM2(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& skinBuffer, Layout& layout, ComplexModel& out)
 	{
 		out.flags = *reinterpret_cast<ComplexModel::Flags*>(&layout.md21.flags);
 
-		// TODO : Global Sequences, Sequences
+		u32 numGlobalSequences = layout.md21.loopingSequenceTimestamps.size;
+		u32 numSequences = layout.md21.sequences.size;
+
+		// Read Sequences
+		{
+			out.sequences.resize(numSequences + numGlobalSequences);
+
+			for (u32 i = 0; i < layout.md21.sequences.size; i++)
+			{
+				ComplexModel::AnimationSequence& sequence = out.sequences[i];
+				M2Sequence* m2Sequence = layout.md21.sequences.GetElement(rootBuffer, i);
+
+				sequence.id = m2Sequence->id;
+				sequence.subID = m2Sequence->variationID;
+
+				sequence.duration = m2Sequence->duration;
+				sequence.moveSpeed = m2Sequence->moveSpeed;
+
+				sequence.flags.isAlwaysPlaying = false;
+				sequence.flags.isAlias = m2Sequence->flags.IsAlias;
+				sequence.flags.blendTransition = m2Sequence->flags.BlendTransition;
+
+				sequence.frequency = m2Sequence->frequency;
+				sequence.repetitionRange = uvec2(m2Sequence->repeatRange.minimum, m2Sequence->repeatRange.maximum);
+				sequence.blendTimeStart = m2Sequence->blendTimeIn;
+				sequence.blendTimeEnd = m2Sequence->blendTimeOut;
+
+				vec3 aabbMin = CoordinateSpaces::ModelPosToNovus(m2Sequence->bounds.aabb.min);
+				vec3 aabbMax = CoordinateSpaces::ModelPosToNovus(m2Sequence->bounds.aabb.max);
+
+				sequence.aabbCenter = (aabbMin + aabbMax) * 0.5f;
+				sequence.aabbExtents = aabbMax - sequence.aabbCenter;
+				sequence.radius = m2Sequence->bounds.radius;
+
+				sequence.nextVariationID = m2Sequence->nextVariationID;
+				sequence.nextAliasID = m2Sequence->nextAliasID;
+			}
+		}
+
+		// Add Global Sequences (Important GlobalSequences are added at the end, otherwise we have to patch nextVariationId && nextAliasId
+		{
+			for (u32 i = 0; i < numGlobalSequences; i++)
+			{
+				ComplexModel::AnimationSequence& sequence = out.sequences[numSequences + i];
+				sequence.id = -1;
+				sequence.subID = -1;
+
+				sequence.duration = *layout.md21.loopingSequenceTimestamps.GetElement(rootBuffer, i);
+				sequence.moveSpeed = 0;
+
+				sequence.flags.isAlwaysPlaying = true;
+				sequence.flags.isAlias = false;
+				sequence.flags.blendTransition = false;
+
+				sequence.frequency = 0;
+				sequence.repetitionRange = uvec2(0, 0);
+				sequence.blendTimeStart = 0;
+				sequence.blendTimeEnd = 0;
+
+				vec3 aabbMin = CoordinateSpaces::ModelPosToNovus(layout.md21.cullingAABBBounds.aabb.min);
+				vec3 aabbMax = CoordinateSpaces::ModelPosToNovus(layout.md21.cullingAABBBounds.aabb.max);
+
+				sequence.aabbCenter = (aabbMin + aabbMax) * 0.5f;
+				sequence.aabbExtents = aabbMax - sequence.aabbCenter;
+				sequence.radius = 0;
+
+				sequence.nextVariationID = -1;
+				sequence.nextAliasID = -1;
+			}
+		}
 
 		// Read Bones
 		{
@@ -617,19 +807,38 @@ namespace Model
 				bone.parentBoneID = m2Bone->parentBone;
 				bone.submeshID = m2Bone->submeshID;
 
-				// TODO : Read Translation Track
+				// Read Translation Track
 				{
-
+					GetAnimationTrack(rootBuffer, layout, bone.translation, m2Bone->translation);
+					
+					for (AnimationTrack<vec3>& track : bone.translation.tracks)
+					{
+						for (vec3& value : track.values)
+						{
+							value = CoordinateSpaces::ModelPosToNovus(value);
+						}
+					}
 				}
 
-				// TODO : Read Rotation Track
+				// Read Rotation Track
 				{
-
+					AnimationData<M2CompressedQuaternion> rotationTrack;
+					GetAnimationTrack(rootBuffer, layout, rotationTrack, m2Bone->rotation);
+					
+					ConvertRotationAnimationTrack(rotationTrack, bone.rotation);
 				}
 
-				// TODO : Read Scale Track
+				// Read Scale Track
 				{
-
+					GetAnimationTrack(rootBuffer, layout, bone.scale, m2Bone->scale);
+					
+					for (AnimationTrack<vec3>& track : bone.scale.tracks)
+					{
+						for (vec3& value : track.values)
+						{
+							value = CoordinateSpaces::ModelPosToNovus(value);
+						}
+					}
 				}
 
 				bone.pivot = m2Bone->pivot;
@@ -761,6 +970,30 @@ namespace Model
 			}
 		}
 
+		// Read Cameras
+		{
+			u32 numCameras = layout.md21.cameras.size;
+
+			out.cameras.resize(numCameras);
+			for (u32 i = 0; i < numCameras; i++)
+			{
+				ComplexModel::Camera& camera = out.cameras[i];
+				M2Camera* m2Camera = layout.md21.cameras.GetElement(rootBuffer, i);
+
+				camera.type = m2Camera->type;
+				camera.farClip = m2Camera->farClip;
+				camera.nearClip = m2Camera->nearClip;
+
+				camera.positionBase = m2Camera->positionBase;
+				camera.targetPositionBase = m2Camera->targetPositionBase;
+
+				GetAnimationTrack(rootBuffer, layout, camera.positions, m2Camera->positions);
+				GetAnimationTrack(rootBuffer, layout, camera.targetPosition, m2Camera->targetPosition);
+				GetAnimationTrack(rootBuffer, layout, camera.roll, m2Camera->roll);
+				GetAnimationTrack(rootBuffer, layout, camera.fov, m2Camera->fov);
+			}
+		}
+
 		// Read Model Data
 		{
 			// Read Vertex Lookup Ids
@@ -843,28 +1076,13 @@ namespace Model
 				u32 numCollisionVertices = layout.md21.collisionVertices.size;
 				out.collisionVertexPositions.resize(numCollisionVertices);
 
-				vec3 aabbMin = vec3(10000.0f, 10000.0f, 10000.0f);
-				vec3 aabbMax = vec3(-10000.0f, -10000.0f, -10000.0f);
-
 				for (u32 i = 0; i < numCollisionVertices; i++)
 				{
 					vec3 m2CollisionVertexPosition = *layout.md21.collisionVertices.GetElement(rootBuffer, i);
 
 					vec3& vertex = out.collisionVertexPositions[i];
-					vertex = m2CollisionVertexPosition; // vec3(-m2CollisionVertexPosition.x, -m2CollisionVertexPosition.y, m2CollisionVertexPosition.z);
-
-					for (u32 j = 0; j < 3; j++)
-					{
-						if (vertex[j] < aabbMin[j])
-							aabbMin[j] = vertex[j];
-
-						if (vertex[j] > aabbMax[j])
-							aabbMax[j] = vertex[j];
-					}
+					vertex = CoordinateSpaces::ModelPosToNovus(m2CollisionVertexPosition);
 				}
-
-				out.aabbCenter = (aabbMin + aabbMax) * 0.5f;
-				out.aabbExtents = aabbMax - out.aabbCenter;
 
 				u32 numCollisionIndices = layout.md21.collisionIndices.size;
 				out.collisionIndices.resize(numCollisionIndices);
@@ -901,7 +1119,7 @@ namespace Model
 	{
 		out.flags.IsConvertedMapObject = true;
 
-		// Copy Vertices
+		// Generate ComplexModel from MapObject
 		{
 			u32 vertexOffset = 0;
 			u32 indexOffset = 0;
@@ -1180,12 +1398,42 @@ namespace Model
 					renderBatch.isTransparent = false;
 				}
 			}
+
+			// Calculate Bounding Boxes
+			{
+				u32 numVertices = static_cast<u32>(vertices.size());
+
+				vec3 aabbMin = vec3(10000.0f, 10000.0f, 10000.0f);
+				vec3 aabbMax = vec3(-10000.0f, -10000.0f, -10000.0f);
+
+				for (u32 i = 0; i < numVertices; i++)
+				{
+					Vertex& vertex = vertices[i];
+
+					for (u32 j = 0; j < 3; j++)
+					{
+						if (vertex.position[j] < aabbMin[j])
+							aabbMin[j] = vertex.position[j];
+
+						if (vertex.position[j] > aabbMax[j])
+							aabbMax[j] = vertex.position[j];
+					}
+				}
+
+				aabbCenter = (aabbMin + aabbMax) * 0.5f;
+				aabbExtents = aabbMax - aabbCenter;
+
+				cullingData.center = (aabbMin + aabbMax) * 0.5f;
+				cullingData.extents = hvec3(aabbMax) - cullingData.center;
+				cullingData.boundingSphereRadius = 0.0f;
+			}
 		}
 
 		return true;
 	}
 
-	enum class M2PixelShader : int {
+	enum class M2PixelShader : i32
+	{
 		//Wotlk deprecated shaders
 		Combiners_Decal = -1,
 		Combiners_Add = -2,
@@ -1236,7 +1484,8 @@ namespace Model
 		NewUnkCombiner = 36
 	};
 
-	enum class M2VertexShader : int {
+	enum class M2VertexShader : i32
+	{
 		Diffuse_T1 = 0,
 		Diffuse_Env = 1,
 		Diffuse_T1_T2 = 2,
@@ -1258,18 +1507,18 @@ namespace Model
 		BW_Diffuse_T1_T2 = 18,
 	};
 
-	inline constexpr const int operator+ (M2PixelShader const val) { return static_cast<const int>(val); };
-	inline constexpr const int operator+ (M2VertexShader const val) { return static_cast<const int>(val); };
+	inline constexpr const i32 operator+ (M2PixelShader const val) { return static_cast<const i32>(val); };
+	inline constexpr const i32 operator+ (M2VertexShader const val) { return static_cast<const i32>(val); };
 
 	struct M2Shaders
 	{
-		unsigned int pixel;
-		unsigned int vertex;
-		unsigned int hull;
-		unsigned int domain;
+		u32 pixel;
+		u32 vertex;
+		u32 hull;
+		u32 domain;
 	};
 	static std::array<M2Shaders, 36> M2ShaderTable = 
-	{ 
+	{
 		{
 			{ +M2PixelShader::Combiners_Opaque_Mod2xNA_Alpha,              +M2VertexShader::Diffuse_T1_Env, 1, 1 },
 			{ +M2PixelShader::Combiners_Opaque_AddAlpha,                   +M2VertexShader::Diffuse_T1_Env, 1, 1 },

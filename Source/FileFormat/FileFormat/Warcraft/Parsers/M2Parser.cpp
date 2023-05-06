@@ -1,5 +1,5 @@
 #include "M2Parser.h"
-#include "FileFormat/Warcraft/Shared.h"
+#include "FileFormat/Shared.h"
 #include "FileFormat/Warcraft/M2/M2.h"
 
 #include <Base/Util/DebugHandler.h>
@@ -103,6 +103,22 @@ bool Parser::ParseSkinBuffer(std::shared_ptr<Bytebuffer>& buffer, Layout& out)
     return true;
 }
 
+template <typename T>
+static void InitAnimationArray(std::shared_ptr<Bytebuffer>& buffer, M2Track<T>& track, u32 md21Offset)
+{
+    track.timestamps.Init(md21Offset);
+    track.values.Init(md21Offset);
+
+    for (u32 j = 0; j < track.timestamps.size; j++)
+    {
+        M2Array<u32>* timestamps = track.timestamps.GetElement(buffer, j);
+        M2Array<T>* values = track.values.GetElement(buffer, j);
+
+        timestamps->Init(md21Offset);
+        values->Init(md21Offset);
+    }
+}
+
 bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     u32 md21Offset = static_cast<u32>(buffer->readData);
@@ -122,36 +138,55 @@ bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>
 
     // Make offsets absolute
     {
-        layout.md21.uniqueName.offset += md21Offset * (layout.md21.uniqueName.offset > 0);
-        layout.md21.loopingAnimationTimestamps.offset += md21Offset * (layout.md21.loopingAnimationTimestamps.offset > 0);
-        layout.md21.sequences.offset += md21Offset * (layout.md21.sequences.offset > 0);
-        layout.md21.sequenceIDToAnimationID.offset += md21Offset * (layout.md21.sequenceIDToAnimationID.offset > 0);
-        layout.md21.bones.offset += md21Offset * (layout.md21.bones.offset > 0);
-        layout.md21.keyBoneToBoneIndexList.offset += md21Offset * (layout.md21.keyBoneToBoneIndexList.offset > 0);
-        layout.md21.vertices.offset += md21Offset * (layout.md21.vertices.offset > 0);
-        layout.md21.colors.offset += md21Offset * (layout.md21.colors.offset > 0);
-        layout.md21.textures.offset += md21Offset * (layout.md21.textures.offset > 0);
-        layout.md21.textureWeights.offset += md21Offset * (layout.md21.textureWeights.offset > 0);
-        layout.md21.textureTransforms.offset += md21Offset * (layout.md21.textureTransforms.offset > 0);
-        layout.md21.textureSwapTable.offset += md21Offset * (layout.md21.textureSwapTable.offset > 0);
-        layout.md21.materials.offset += md21Offset * (layout.md21.materials.offset > 0);
-        layout.md21.boneCombinationList.offset += md21Offset * (layout.md21.boneCombinationList.offset > 0);
-        layout.md21.textureCombinationList.offset += md21Offset * (layout.md21.textureCombinationList.offset > 0);
-        layout.md21.textureUnitLookupList.offset += md21Offset * (layout.md21.textureUnitLookupList.offset > 0);
-        layout.md21.textureTransparencyLookupList.offset += md21Offset * (layout.md21.textureTransparencyLookupList.offset > 0);
-        layout.md21.textureUVAnimationLookupList.offset += md21Offset * (layout.md21.textureUVAnimationLookupList.offset > 0);
-        layout.md21.collisionIndices.offset += md21Offset * (layout.md21.collisionIndices.offset > 0);
-        layout.md21.collisionVertices.offset += md21Offset * (layout.md21.collisionVertices.offset > 0);
-        layout.md21.collisionNormals.offset += md21Offset * (layout.md21.collisionNormals.offset > 0);
-        layout.md21.attachments.offset += md21Offset * (layout.md21.attachments.offset > 0);
-        layout.md21.attachmentLooukpList.offset += md21Offset * (layout.md21.attachmentLooukpList.offset > 0);
-        layout.md21.events.offset += md21Offset * (layout.md21.events.offset > 0);
-        layout.md21.lights.offset += md21Offset * (layout.md21.lights.offset > 0);
-        layout.md21.cameras.offset += md21Offset * (layout.md21.cameras.offset > 0);
-        layout.md21.cameraLookupList.offset += md21Offset * (layout.md21.cameraLookupList.offset > 0);
-        layout.md21.ribbonEmitters.offset += md21Offset * (layout.md21.ribbonEmitters.offset > 0);
-        layout.md21.particleEmitters.offset += md21Offset * (layout.md21.particleEmitters.offset > 0);
-        layout.md21.textureCombinerCombos.offset += md21Offset * (layout.md21.textureCombinerCombos.offset > 0);
+        layout.md21.uniqueName.Init(md21Offset);
+        layout.md21.loopingSequenceTimestamps.Init(md21Offset);
+        layout.md21.sequences.Init(md21Offset);
+        layout.md21.sequenceIDToAnimationID.Init(md21Offset);
+        layout.md21.bones.Init(md21Offset);
+        layout.md21.keyBoneToBoneIndexList.Init(md21Offset);
+        layout.md21.vertices.Init(md21Offset);
+        layout.md21.colors.Init(md21Offset);
+        layout.md21.textures.Init(md21Offset);
+        layout.md21.textureWeights.Init(md21Offset);
+        layout.md21.textureTransforms.Init(md21Offset);
+        layout.md21.textureSwapTable.Init(md21Offset);
+        layout.md21.materials.Init(md21Offset);
+        layout.md21.boneCombinationList.Init(md21Offset);
+        layout.md21.textureCombinationList.Init(md21Offset);
+        layout.md21.textureUnitLookupList.Init(md21Offset);
+        layout.md21.textureTransparencyLookupList.Init(md21Offset);
+        layout.md21.textureUVAnimationLookupList.Init(md21Offset);
+        layout.md21.collisionIndices.Init(md21Offset);
+        layout.md21.collisionVertices.Init(md21Offset);
+        layout.md21.collisionNormals.Init(md21Offset);
+        layout.md21.attachments.Init(md21Offset);
+        layout.md21.attachmentLooukpList.Init(md21Offset);
+        layout.md21.events.Init(md21Offset);
+        layout.md21.lights.Init(md21Offset);
+        layout.md21.cameras.Init(md21Offset);
+        layout.md21.cameraLookupList.Init(md21Offset);
+        layout.md21.ribbonEmitters.Init(md21Offset);
+        layout.md21.particleEmitters.Init(md21Offset);
+        layout.md21.textureCombinerCombos.Init(md21Offset);
+
+        for (u32 i = 0; i < layout.md21.bones.size; i++)
+        {
+            M2CompBone* bone = layout.md21.bones.GetElement(buffer, i);
+
+            InitAnimationArray(buffer, bone->translation, md21Offset);
+            InitAnimationArray(buffer, bone->rotation, md21Offset);
+            InitAnimationArray(buffer, bone->scale, md21Offset);
+        }
+
+        for (u32 i = 0; i < layout.md21.cameras.size; i++)
+        {
+            M2Camera* camera = layout.md21.cameras.GetElement(buffer, i);
+
+            InitAnimationArray(buffer, camera->positions, md21Offset);
+            InitAnimationArray(buffer, camera->targetPosition, md21Offset);
+            InitAnimationArray(buffer, camera->roll, md21Offset);
+            InitAnimationArray(buffer, camera->fov, md21Offset);
+        }
     }
 
     size_t bytesToSkip = header.size - md21Size;
@@ -159,6 +194,7 @@ bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>
 
     return true;
 }
+
 bool Parser::ReadSFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     u32 bytesToRead = layout.md21.numSkinProfiles * sizeof(u32);

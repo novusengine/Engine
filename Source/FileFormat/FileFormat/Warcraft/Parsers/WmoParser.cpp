@@ -1,5 +1,5 @@
 #include "WmoParser.h"
-#include "FileFormat/Warcraft/Shared.h"
+#include "FileFormat/Shared.h"
 #include "FileFormat/Warcraft/WMO/Wmo.h"
 
 #include <Base/Util/DebugHandler.h>

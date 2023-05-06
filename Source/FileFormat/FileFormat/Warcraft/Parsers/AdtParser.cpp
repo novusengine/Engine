@@ -1,5 +1,5 @@
 #include "AdtParser.h"
-#include "FileFormat/Warcraft/Shared.h"
+#include "FileFormat/Shared.h"
 #include "FileFormat/Warcraft/ADT/Adt.h"
 
 #include <Base/Util/DebugHandler.h>
