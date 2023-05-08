@@ -78,7 +78,6 @@ namespace Renderer
         void SetScissorRect(u32 left, u32 right, u32 top, u32 bottom);
         void SetViewport(f32 topLeftX, f32 topLeftY, f32 width, f32 height, f32 minDepth, f32 maxDepth);
 
-        void SetVertexBuffer(u32 slot, BufferID buffer);
         void SetIndexBuffer(BufferID buffer, IndexFormat indexFormat);
         void SetBuffer(u32 slot, BufferID buffer);
 
@@ -88,13 +87,19 @@ namespace Renderer
         void Clear(DepthImageMutableResource resource, f32 depth, DepthClearFlags flags = DepthClearFlags::DEPTH, u8 stencil = 0);
 
         void Draw(u32 numVertices, u32 numInstances, u32 vertexOffset, u32 instanceOffset);
-        void DrawIndirect(BufferID argumentBuffer, u32 argumentBufferOffset, u32 drawCount);
+        void DrawIndirect(BufferResource argumentResource, u32 argumentBufferOffset, u32 drawCount);
+        void DrawIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset, u32 drawCount);
         void DrawIndexed(u32 numIndices, u32 numInstances, u32 indexOffset, u32 vertexOffset, u32 instanceOffset);
-        void DrawIndexedIndirect(BufferID argumentBuffer, u32 argumentBufferOffset, u32 drawCount);
-        void DrawIndexedIndirectCount(BufferID argumentBuffer, u32 argumentBufferOffset, BufferID drawCountBuffer, u32 drawCountBufferOffset, u32 maxDrawCount);
+        void DrawIndexedIndirect(BufferResource argumentResource, u32 argumentBufferOffset, u32 drawCount);
+        void DrawIndexedIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset, u32 drawCount);
+        void DrawIndexedIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
+        void DrawIndexedIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
+        void DrawIndexedIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
+        void DrawIndexedIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
 
         void Dispatch(u32 numThreadGroupsX, u32 numThreadGroupsY, u32 numThreadGroupsZ);
-        void DispatchIndirect(BufferID argumentBuffer, u32 argumentBufferOffset);
+        void DispatchIndirect(BufferResource argumentResource, u32 argumentBufferOffset);
+        void DispatchIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset);
 
         void AddSignalSemaphore(SemaphoreID semaphoreID);
         void AddWaitSemaphore(SemaphoreID semaphoreID);
@@ -102,17 +107,18 @@ namespace Renderer
         void CopyImage(ImageID dstImage, uvec2 dstPos, u32 dstMipLevel, ImageID srcImage, uvec2 srcPos, u32 srcMipLevel, uvec2 size);
         void CopyDepthImage(DepthImageID dstImage, uvec2 dstPos, DepthImageID srcImage, uvec2 srcPos, uvec2 size);
 
-        void CopyBuffer(BufferID dstBuffer, u64 dstBufferOffset, BufferID srcBuffer, u64 srcBufferOffset, u64 region);
-        void FillBuffer(BufferID dstBuffer, u64 dstBufferOffset, u64 size, u32 data);
-        void UpdateBuffer(BufferID dstBuffer, u64 dstBufferOffset, u64 size, void* data);
-        void QueueDestroyBuffer(BufferID buffer);
+        void CopyBuffer(BufferMutableResource dstBuffer, u64 dstBufferOffset, BufferResource srcBuffer, u64 srcBufferOffset, u64 region);
+        void CopyBuffer(BufferMutableResource dstBuffer, u64 dstBufferOffset, BufferMutableResource srcBuffer, u64 srcBufferOffset, u64 region);
+        void FillBuffer(BufferMutableResource dstBuffer, u64 dstBufferOffset, u64 size, u32 data);
+        void UpdateBuffer(BufferMutableResource dstBuffer, u64 dstBufferOffset, u64 size, void* data);
 
-        void PipelineBarrier(PipelineBarrierType type, BufferID buffer);
         void ImageBarrier(ImageResource resource);
         void ImageBarrier(ImageMutableResource resource);
         void ImageBarrier(DepthImageResource resource);
         void ImageBarrier(DepthImageMutableResource resource);
-
+        void BufferBarrier(BufferResource resource, BufferPassUsage from);
+        void BufferBarrier(BufferMutableResource resource, BufferPassUsage from);
+        
         void DrawImgui();
 
         void PushConstant(void* data, u32 offset, u32 size);
@@ -120,6 +126,8 @@ namespace Renderer
     private:
         // Execute gets friend-called from RenderGraph
         void Execute();
+        // BufferBarrier taking BufferIDs gets friend-called from RenderGraphBuilder
+        void BufferBarrier(BufferID bufferID, BufferPassUsage from);
 
         template<typename Command>
         Command* AddCommand()
@@ -150,11 +158,18 @@ namespace Renderer
             _data.Insert(data);
         }
 
+        void SetCurrentPassIndex(u32 currentPassIndex)
+        {
+            _currentPassIndex = currentPassIndex;
+        }
+
     private:
         Renderer* _renderer;
         Memory::Allocator* _allocator;
         RenderGraphResources* _resources;
         u32 _markerScope;
+
+        u32 _currentPassIndex;
 
         DynamicArray<BackendDispatchFunction> _functions;
         DynamicArray<void*> _data;
@@ -166,5 +181,6 @@ namespace Renderer
 #endif
 
         friend class RenderGraph;
+        friend class RenderGraphBuilder;
     };
 }

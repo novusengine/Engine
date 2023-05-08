@@ -15,4 +15,9 @@ namespace Renderer
 
     STRONG_TYPEDEF(BufferResource, u16);
     STRONG_TYPEDEF(BufferMutableResource, u16);
+
+    inline BufferResource ToBufferResource(BufferMutableResource resource)
+    {
+        return BufferResource(static_cast<BufferResource::type>(resource));
+    }
 }

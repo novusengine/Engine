@@ -1,9 +1,12 @@
 #include "DescriptorSetBuilderVK.h"
 #include "PipelineHandlerVK.h"
 #include "ShaderHandlerVK.h"
+#include "BufferHandlerVK.h"
 #include "RenderDeviceVK.h"
+#include "Renderer/TrackedBufferBitSets.h"
 
 #include <Base/Util/StringUtils.h>
+#include <Base/Memory/StackAllocator.h>
 
 #include <vulkan/vulkan.h>
 
@@ -11,26 +14,32 @@ namespace Renderer
 {
     namespace Backend
     {
-        DescriptorSetBuilderVK::DescriptorSetBuilderVK(GraphicsPipelineID pipelineID, PipelineHandlerVK* pipelineHandler, ShaderHandlerVK* shaderHandler, DescriptorMegaPoolVK* parentPool)
+        DescriptorSetBuilderVK::DescriptorSetBuilderVK(Memory::Allocator* allocator, GraphicsPipelineID pipelineID, PipelineHandlerVK* pipelineHandler, ShaderHandlerVK* shaderHandler, BufferHandlerVK* bufferHandler, DescriptorMegaPoolVK* parentPool)
+            : _allocator(allocator)
         {
             _pipelineType = PipelineType::Graphics;
             _pipelineHandler = pipelineHandler;
             _shaderHandler = shaderHandler;
+            _bufferHandler = bufferHandler;
             _parentPool = parentPool;
             _graphicsPipelineID = pipelineID;
         }
 
-        DescriptorSetBuilderVK::DescriptorSetBuilderVK(ComputePipelineID pipelineID, PipelineHandlerVK* pipelineHandler, ShaderHandlerVK* shaderHandler, DescriptorMegaPoolVK* parentPool)
+        DescriptorSetBuilderVK::DescriptorSetBuilderVK(Memory::Allocator* allocator, ComputePipelineID pipelineID, PipelineHandlerVK* pipelineHandler, ShaderHandlerVK* shaderHandler, BufferHandlerVK* bufferHandler, DescriptorMegaPoolVK* parentPool)
+            : _allocator(allocator)
         {
             _pipelineType = PipelineType::Compute;
             _pipelineHandler = pipelineHandler;
             _shaderHandler = shaderHandler;
+            _bufferHandler = bufferHandler;
             _parentPool = parentPool;
             _computePipelineID = pipelineID;
         }
 
         void DescriptorSetBuilderVK::InitReflectData()
         {
+            ZoneScoped;
+
             if (_pipelineType == PipelineType::Graphics)
             {
                 // Graphics pipeline
@@ -90,10 +99,30 @@ namespace Renderer
                 const Backend::BindReflection& bindReflection = _shaderHandler->GetBindReflection(desc.computeShader);
                 _bindInfos.insert(_bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
             }
+
+            for(u32 i = 0; i < _bindInfos.size(); i++)
+            {
+                _hashedNameToBindInfoIndex.insert_or_assign(_bindInfos[i].nameHash, i);
+            }
+
+        }
+
+        void DescriptorSetBuilderVK::SetBufferPermissions(const TrackedBufferBitSets* bufferPermissions)
+        {
+            ZoneScoped;
+
+            _bufferPermissions = bufferPermissions;
+
+            u32 numBitSets = _bufferPermissions->GetNumBufferSets();
+            _bufferReadAccesses = Memory::Allocator::New<BitSet>(_allocator, _allocator, numBitSets);
+            _bufferWriteAccesses = Memory::Allocator::New<BitSet>(_allocator, _allocator, numBitSets);
+            _bufferAccesses = Memory::Allocator::New<BitSet>(_allocator, _allocator, numBitSets);
         }
 
         void DescriptorSetBuilderVK::BindSampler(i32 set, i32 binding, VkDescriptorImageInfo& imageInfo)
         {
+            ZoneScoped;
+
             for (auto& imageWrite : _imageWrites)
             {
                 if (imageWrite.dstBinding == binding && imageWrite.dstSet == set)
@@ -114,18 +143,23 @@ namespace Renderer
 
         void DescriptorSetBuilderVK::BindSampler(u32 nameHash, VkDescriptorImageInfo& imageInfo)
         {
-            for (auto& bindInfo : _bindInfos)
-            {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindSampler(bindInfo.set, bindInfo.binding, imageInfo);
-                    return;
-                }
-            }
+            ZoneScoped;
+
+            DebugHandler::Assert(imageInfo.sampler != nullptr, "DescriptorSetBuilderVK : BindSampler was passed an imageInfo with a nullptr sampler");
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindSampler(bindInfo.set, bindInfo.binding, imageInfo);
         }
 
         void DescriptorSetBuilderVK::BindImage(i32 set, i32 binding, const VkDescriptorImageInfo& imageInfo, bool imageWrite)
         {
+            ZoneScoped;
+
             for (auto& imageWrite : _imageWrites) 
             {
                 if (imageWrite.dstBinding == binding && imageWrite.dstSet == set)
@@ -150,18 +184,21 @@ namespace Renderer
 
         void DescriptorSetBuilderVK::BindImage(u32 nameHash, const VkDescriptorImageInfo& imageInfo)
         {
-            for (auto& bindInfo : _bindInfos)
-            {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindImage(bindInfo.set, bindInfo.binding, imageInfo);
-                    return;
-                }
-            }
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindImage(bindInfo.set, bindInfo.binding, imageInfo);
         }
 
         void DescriptorSetBuilderVK::BindImageArray(i32 set, i32 binding, VkDescriptorImageInfo* images, i32 count)
         {
+            ZoneScoped;
+
             for (auto& imageWrite : _imageWrites)
             {
                 if (imageWrite.dstBinding == binding && imageWrite.dstSet == set)
@@ -184,18 +221,21 @@ namespace Renderer
 
         void DescriptorSetBuilderVK::BindImageArray(u32 nameHash, VkDescriptorImageInfo* images, i32 count)
         {
-            for (auto& bindInfo : _bindInfos)
-            {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindImageArray(bindInfo.set, bindInfo.binding, images, count);
-                    return;
-                }
-            }
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindImageArray(bindInfo.set, bindInfo.binding, images, count);
         }
 
         void DescriptorSetBuilderVK::BindImageArrayIndex(i32 set, i32 binding, u32 arrayIndex, const VkDescriptorImageInfo& imageInfo, bool imageWrite)
         {
+            ZoneScoped;
+
             for (auto& imageWrite : _imageWrites)
             {
                 if (imageWrite.dstBinding == binding && imageWrite.dstSet == set && imageWrite.dstArrayIndex == arrayIndex)
@@ -221,18 +261,21 @@ namespace Renderer
 
         void DescriptorSetBuilderVK::BindImageArrayIndex(u32 nameHash, const VkDescriptorImageInfo& imageInfo, u32 arrayIndex)
         {
-            for (auto& bindInfo : _bindInfos)
-            {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindImageArrayIndex(bindInfo.set, bindInfo.binding, arrayIndex, imageInfo);
-                    return;
-                }
-            }
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+            
+            BindImageArrayIndex(bindInfo.set, bindInfo.binding, arrayIndex, imageInfo);
         }
         
         void DescriptorSetBuilderVK::BindStorageImage(i32 set, i32 binding, VkDescriptorImageInfo* imageInfos, i32 count)
         {
+            ZoneScoped;
+
             ImageWriteDescriptor newWrite;
             newWrite.dstSet = set;
             newWrite.dstBinding = binding;
@@ -272,30 +315,34 @@ namespace Renderer
 
         void DescriptorSetBuilderVK::BindStorageImage(u32 nameHash, VkDescriptorImageInfo* imageInfos, i32 count)
         {
-            for (auto& bindInfo : _bindInfos)
-            {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindStorageImage(bindInfo.set, bindInfo.binding, imageInfos, count);
-                    return;
-                }
-            }
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindStorageImage(bindInfo.set, bindInfo.binding, imageInfos, count);
         }
 
         void DescriptorSetBuilderVK::BindStorageImageArray(u32 nameHash, VkDescriptorImageInfo* imageInfos, i32 count)
         {
-            for (auto& bindInfo : _bindInfos)
-            {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindStorageImageArray(bindInfo.set, bindInfo.binding, imageInfos, count);
-                    return;
-                }
-            }
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindStorageImageArray(bindInfo.set, bindInfo.binding, imageInfos, count);
         }
 
         void DescriptorSetBuilderVK::BindStorageImageArray(i32 set, i32 binding, VkDescriptorImageInfo* imageInfos, i32 count)
         {
+            ZoneScoped;
+
             for (auto& imageWrite : _imageWrites)
             {
                 if (imageWrite.dstBinding == binding && imageWrite.dstSet == set)
@@ -318,6 +365,8 @@ namespace Renderer
 
         void DescriptorSetBuilderVK::BindBuffer(i32 set, i32 binding, const VkDescriptorBufferInfo& bufferInfo, VkDescriptorType bufferType)
         {
+            ZoneScoped;
+
             for (auto& bufferWrite : _bufferWrites) 
             {
                 if (bufferWrite.dstBinding == binding && bufferWrite.dstSet == set)
@@ -337,20 +386,37 @@ namespace Renderer
             _bufferWrites.push_back(newWrite);
         }
 
-        void DescriptorSetBuilderVK::BindBuffer(u32 nameHash, const VkDescriptorBufferInfo& bufferInfo)
+        void DescriptorSetBuilderVK::BindBuffer(u32 nameHash, const VkDescriptorBufferInfo& bufferInfo, BufferID bufferID)
         {
-            for (auto& bindInfo : _bindInfos)
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindBuffer(bindInfo.set, bindInfo.binding, bufferInfo, bindInfo.descriptorType);
+
+            BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
+
+            _bufferAccesses->Set(bufferIndex);
+            if (bindInfo.isWrite)
             {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindBuffer(bindInfo.set, bindInfo.binding, bufferInfo, bindInfo.descriptorType);
-                    return;
-                }
+                _bufferWriteAccesses->Set(bufferIndex);
             }
+            else
+            {
+                _bufferReadAccesses->Set(bufferIndex);
+            }
+
+            _bufferIndexToBindInfoIndex[bufferIndex] = bindInfoIndex;
         }
 
         void DescriptorSetBuilderVK::BindBufferArrayIndex(i32 set, i32 binding, u32 arrayIndex, const VkDescriptorBufferInfo& bufferInfo, VkDescriptorType bufferType)
         {
+            ZoneScoped;
+
             for (auto& bufferWrite : _bufferWrites)
             {
                 if (bufferWrite.dstBinding == binding && bufferWrite.dstSet == set && bufferWrite.dstArrayIndex == arrayIndex)
@@ -371,21 +437,37 @@ namespace Renderer
             _bufferWrites.push_back(newWrite);
         }
 
-        void DescriptorSetBuilderVK::BindBufferArrayIndex(u32 nameHash, const VkDescriptorBufferInfo& bufferInfo, u32 arrayIndex)
+        void DescriptorSetBuilderVK::BindBufferArrayIndex(u32 nameHash, const VkDescriptorBufferInfo& bufferInfo, u32 arrayIndex, BufferID bufferID)
         {
-            for (auto& bindInfo : _bindInfos)
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindBufferArrayIndex(bindInfo.set, bindInfo.binding, arrayIndex, bufferInfo, bindInfo.descriptorType);
+
+            BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
+
+            _bufferAccesses->Set(bufferIndex);
+            if (bindInfo.isWrite)
             {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    
-                    BindBufferArrayIndex(bindInfo.set, bindInfo.binding, arrayIndex, bufferInfo, bindInfo.descriptorType);
-                    return;
-                }
+                _bufferWriteAccesses->Set(bufferIndex);
             }
+            else
+            {
+                _bufferReadAccesses->Set(bufferIndex);
+            }
+
+            _bufferIndexToBindInfoIndex[bufferIndex] = bindInfoIndex;
         }
 
         void DescriptorSetBuilderVK::BindRayStructure(i32 set, i32 binding, const VkWriteDescriptorSetAccelerationStructureKHR& info)
         {
+            ZoneScoped;
+
             for (auto& bufferWrite : _bufferWrites)
             {
                 if (bufferWrite.dstBinding == binding && bufferWrite.dstSet == set)
@@ -406,18 +488,21 @@ namespace Renderer
 
         void DescriptorSetBuilderVK::BindRayStructure(u32 nameHash, const VkWriteDescriptorSetAccelerationStructureKHR& info)
         {
-            for (auto& bindInfo : _bindInfos)
-            {
-                if (nameHash == bindInfo.nameHash)
-                {
-                    BindRayStructure(bindInfo.set, bindInfo.binding, info);
-                    return;
-                }
-            }
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindRayStructure(bindInfo.set, bindInfo.binding, info);
         }
 
-        void DescriptorSetBuilderVK::UpdateDescriptor(i32 set, VkDescriptorSet& descriptor, RenderDeviceVK& device)
+        void DescriptorSetBuilderVK::UpdateDescriptorSet(i32 set, VkDescriptorSet& descriptor, RenderDeviceVK& device)
         {
+            ZoneScoped;
+
             std::vector<VkWriteDescriptorSet> descriptorWrites;
             descriptorWrites.reserve(20);
 
@@ -482,8 +567,10 @@ namespace Renderer
             vkUpdateDescriptorSets(device._device, static_cast<u32>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
 
-        VkDescriptorSet DescriptorSetBuilderVK::BuildDescriptor(i32 set, DescriptorLifetime lifetime)
+        VkDescriptorSet DescriptorSetBuilderVK::BuildDescriptorSet(i32 set, DescriptorLifetime lifetime)
         {
+            ZoneScoped;
+
             VkDescriptorSetLayout* layout; 
             if (_pipelineType == PipelineType::Graphics)
             {
@@ -513,9 +600,94 @@ namespace Renderer
                 }
             }
 
+            if (_bufferPermissions)
+            {
+                ValidateAccesses();
+            }
+
             VkDescriptorSet newSet = _parentPool->AllocateDescriptor(*layout, lifetime, next);
-            UpdateDescriptor(set, newSet, *_parentPool->_device);
+            UpdateDescriptorSet(set, newSet, *_parentPool->_device);
             return newSet;
+        }
+
+        void DescriptorSetBuilderVK::ValidateAccesses()
+        {
+            ZoneScoped;
+
+            bool didError = false;
+
+            const BitSet& readPermissions = _bufferPermissions->GetReadBitSet();
+            if (!_bufferReadAccesses->IsSubsetOf(readPermissions))
+            {
+                DebugHandler::Print("\n\n--- READS ---");
+
+                BitSet* subtracted = _bufferReadAccesses->NewBitwiseUnset(readPermissions);
+
+                subtracted->ForEachSetBit([&](u32 set, u32 bit) 
+                {
+                    u32 bufferIndex = set * 64 + bit;
+                    BufferID bufferID = BufferID(bufferIndex);
+
+                    const std::string& bufferName = _bufferHandler->GetBufferName(bufferID);
+
+                    u32 bindInfoIndex = _bufferIndexToBindInfoIndex[bufferIndex];
+                    BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+                    
+                    DebugHandler::PrintError("DescriptorSetBuilderVK : Tried to read from BufferID {} (Buffer Name: {}, Binding Name: {}), but RenderPass does not have READ access for that", bufferIndex, bufferName, bindInfo.name);
+                    didError = true;
+                });
+            }
+
+            const BitSet& writePermissions = _bufferPermissions->GetWriteBitSet();
+            if (!_bufferWriteAccesses->IsSubsetOf(writePermissions))
+            {
+                DebugHandler::Print("\n\n--- WRITES ---");
+
+                BitSet* subtracted = _bufferWriteAccesses->NewBitwiseUnset(writePermissions);
+
+                subtracted->ForEachSetBit([&](u32 set, u32 bit)
+                {
+                    u32 bufferIndex = set * 64 + bit;
+                    BufferID bufferID = BufferID(bufferIndex);
+
+                    const std::string& bufferName = _bufferHandler->GetBufferName(bufferID);
+
+                    u32 bindInfoIndex = _bufferIndexToBindInfoIndex[bufferIndex];
+                    BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+                    DebugHandler::PrintError("DescriptorSetBuilderVK : Tried to write to BufferID {} (Buffer Name: {}, Binding Name: {}), but RenderPass does not have WRITE access for that", bufferIndex, bufferName, bindInfo.name);
+                    didError = true;
+                });
+            }
+
+            bool isGraphics = _pipelineType == PipelineType::Graphics;
+            const BitSet& shaderStagePermissions = (isGraphics) ? _bufferPermissions->GetGraphicsBitSet() : _bufferPermissions->GetComputeBitSet();
+            if (!_bufferAccesses->IsSubsetOf(shaderStagePermissions))
+            {
+                std::string stageName = (isGraphics) ? "GRAPHICS" : "COMPUTE";
+                DebugHandler::Print("\n\n--- {} ---", stageName);
+
+                BitSet* subtracted = _bufferAccesses->NewBitwiseUnset(shaderStagePermissions);
+
+                subtracted->ForEachSetBit([&](u32 set, u32 bit)
+                {
+                    u32 bufferIndex = set * 64 + bit;
+                    BufferID bufferID = BufferID(bufferIndex);
+
+                    const std::string& bufferName = _bufferHandler->GetBufferName(bufferID);
+
+                    u32 bindInfoIndex = _bufferIndexToBindInfoIndex[bufferIndex];
+                    BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+                    DebugHandler::PrintError("DescriptorSetBuilderVK : Tried to use BufferID {} (Buffer Name: {}, Binding Name: {}) in a {} pipeline, but RenderPass does not have access for that", bufferIndex, bufferName, bindInfo.name, stageName);
+                    didError = true;
+                });
+            }
+
+            if (didError)
+            {
+                DebugHandler::PrintFatal("DescriptorSetBuilderVK : ValidateAccesses failed to validate the RenderPass");
+            }
         }
 
         VkDescriptorSet DescriptorMegaPoolVK::AllocateDescriptor(VkDescriptorSetLayout layout, DescriptorLifetime lifetime, void* next)

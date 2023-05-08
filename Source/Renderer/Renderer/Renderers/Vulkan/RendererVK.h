@@ -113,7 +113,7 @@ namespace Renderer
         void SetIndexBuffer(CommandListID commandListID, BufferID bufferID, IndexFormat indexFormat) override;
         void SetBuffer(CommandListID commandListID, u32 slot, BufferID buffer) override;
 
-        void BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors) override;
+        void BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors, const TrackedBufferBitSets* bufferPermissions) override;
 
         void MarkFrameStart(CommandListID commandListID, u32 frameIndex) override;
         void BeginTrace(CommandListID commandListID, const tracy::SourceLocationData* sourceLocation) override;
@@ -126,9 +126,9 @@ namespace Renderer
         void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) override;
         void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
 
-        void PipelineBarrier(CommandListID commandListID, PipelineBarrierType type, BufferID buffer) override;
-        void ImageBarrier(CommandListID commandListID, ImageID image) override;
-        void ImageBarrier(CommandListID commandListID, DepthImageID image) override;
+        void ImageBarrier(CommandListID commandListID, ImageID imageID) override;
+        void ImageBarrier(CommandListID commandListID, DepthImageID imageID) override;
+        void BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from) override;
 
         void PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size) override;
         void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) override;
@@ -165,6 +165,8 @@ namespace Renderer
         [[nodiscard]] uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) override;
         [[nodiscard]] uvec2 GetImageDimensions(const DepthImageID id) override;
 
+        [[nodiscard]] std::string GetBufferName(BufferID id) override;
+
         [[nodiscard]] const std::string& GetGPUName() override;
         [[nodiscard]] const std::string& GetDebugName(const TextureID textureID) override;
 
@@ -173,6 +175,7 @@ namespace Renderer
 
         [[nodiscard]] u32 GetNumImages() override;
         [[nodiscard]] u32 GetNumDepthImages() override;
+        [[nodiscard]] u32 GetNumBuffers() override;
 
         void InitImgui() override;
         void DrawImgui(CommandListID commandListID) override;
@@ -181,7 +184,7 @@ namespace Renderer
 
     private:
         [[nodiscard]] bool ReflectDescriptorSet(const std::string& name, u32 nameHash, u32 type, i32& set, const std::vector<Backend::BindInfo>& bindInfos, u32& outBindInfoIndex, VkDescriptorSetLayoutBinding* outDescriptorLayoutBinding);
-        void BindDescriptor(Backend::DescriptorSetBuilderVK* builder, void* imageInfosArraysVoid, Descriptor& descriptor);
+        void BindDescriptor(Backend::DescriptorSetBuilderVK& builder, Descriptor& descriptor);
 
         void RecreateSwapChain(Backend::SwapChainVK* swapChain);
         void CreateDummyPipeline();
@@ -198,6 +201,8 @@ namespace Renderer
         Backend::SemaphoreHandlerVK* _semaphoreHandler = nullptr;
         Backend::UploadBufferHandlerVK* _uploadBufferHandler = nullptr;
         Backend::TimeQueryHandlerVK* _timeQueryHandler = nullptr;
+
+        Memory::StackAllocator _frameAllocator;
 
         GraphicsPipelineID _globalDummyPipeline = GraphicsPipelineID::Invalid();
         //Backend::DescriptorSetBuilderVK* _descriptorSetBuilder = nullptr;

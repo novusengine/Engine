@@ -5,6 +5,8 @@
 
 namespace Renderer
 {
+    class TrackedBufferBitSets;
+
     namespace Commands
     {
         struct BindDescriptorSet
@@ -14,6 +16,8 @@ namespace Renderer
             DescriptorSetSlot slot;
             Descriptor* descriptors;
             u32 numDescriptors;
+
+            const TrackedBufferBitSets* bufferPermissions;
         };
     }
 }

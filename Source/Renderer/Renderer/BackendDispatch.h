@@ -55,11 +55,10 @@ namespace Renderer
         static void CopyBuffer(Renderer* renderer, CommandListID commandList, const void* data);
         static void FillBuffer(Renderer* renderer, CommandListID commandList, const void* data);
         static void UpdateBuffer(Renderer* renderer, CommandListID commandList, const void* data);
-        static void QueueDestroyBuffer(Renderer* renderer, CommandListID commandList, const void* data);
 
-        static void PipelineBarrier(Renderer* renderer, CommandListID commandList, const void* data);
         static void ImageBarrier(Renderer* renderer, CommandListID commandList, const void* data);
         static void DepthImageBarrier(Renderer* renderer, CommandListID commandList, const void* data);
+        static void BufferBarrier(Renderer* renderer, CommandListID commandList, const void* data);
 
         static void DrawImgui(Renderer* renderer, CommandListID commandList, const void* data);
 

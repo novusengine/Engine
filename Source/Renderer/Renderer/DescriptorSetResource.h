@@ -18,6 +18,7 @@ namespace Renderer
         DescriptorSetResource();
         DescriptorSetResource(DescriptorSetID id, RenderGraphResources& renderGraphResources);
 
+        // Image resources
         void Bind(StringUtils::StringHash nameHash, ImageResource resource, u32 mipLevel = 0) const;
         void BindArray(StringUtils::StringHash nameHash, ImageResource resource, u32 mipLevel, u32 arrayIndex) const;
 
@@ -32,6 +33,14 @@ namespace Renderer
 
         void BindStorage(StringUtils::StringHash nameHash, ImageMutableResource resource, u32 mipLevel = 0, u32 mipCount = 1) const;
         void BindStorageArray(StringUtils::StringHash nameHash, ImageMutableResource resource, u32 mipLevel = 0, u32 mipCount = 1) const;
+
+        // Buffer resources
+        void Bind(StringUtils::StringHash nameHash, BufferResource resource);
+        void BindArray(StringUtils::StringHash nameHash, BufferResource resource, u32 arrayIndex);
+
+        void Bind(StringUtils::StringHash nameHash, BufferMutableResource resource);
+        void BindArray(StringUtils::StringHash nameHash, BufferMutableResource resource, u32 arrayIndex);
+
 
         DescriptorSetID GetID() { return _id; }
 

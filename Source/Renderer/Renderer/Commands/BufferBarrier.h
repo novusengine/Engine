@@ -7,12 +7,12 @@ namespace Renderer
 {
     namespace Commands
     {
-        struct PipelineBarrier
+        struct BufferBarrier
         {
             static const BackendDispatchFunction DISPATCH_FUNCTION;
 
-            PipelineBarrierType barrierType;
-            BufferID buffer = BufferID::Invalid();
+            BufferID bufferID = BufferID::Invalid();
+            BufferPassUsage from = BufferPassUsage::NONE;
         };
     }
 }

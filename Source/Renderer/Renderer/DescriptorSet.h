@@ -95,9 +95,14 @@ namespace Renderer
     private:
         std::vector<Descriptor>& GetMutableDescriptors() { return _boundDescriptors; }
 
+        void Lock() { _locked = true; }
+        void Unlock() { _locked = false; }
+
     private:
         std::vector<Descriptor> _boundDescriptors;
+        bool _locked = false;
 
         friend class DescriptorSetResource;
+        friend class RenderGraphBuilder;
     };
 }

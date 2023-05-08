@@ -37,6 +37,9 @@ namespace Renderer
             u32 binding;
             u32 count;
             u32 stageFlags;
+
+            bool isUsed = false;
+            bool isWrite = false;
         };
 
         struct BindInfoPushConstant
@@ -174,6 +177,12 @@ namespace Renderer
                             bindInfo.binding = reflectionBinding->binding;
                             bindInfo.count = reflectionBinding->count;
                             bindInfo.stageFlags = static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
+
+                            if (bindInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+                            {
+                                bindInfo.isUsed = reflectionBinding->accessed;
+                                bindInfo.isWrite = (reflectionBinding->resource_type & SPV_REFLECT_RESOURCE_FLAG_UAV);
+                            }
 
                             bindInfo.name = reflectionBinding->name;
                             bindInfo.nameHash = StringUtils::fnv1a_32(bindInfo.name.c_str(), bindInfo.name.length());
