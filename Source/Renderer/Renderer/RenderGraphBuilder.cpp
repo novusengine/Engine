@@ -209,7 +209,9 @@ namespace Renderer
         {
             ZoneScopedN("Buffer Barriers");
 
-            BitSet temp(_allocator, 2); // TODO: Get numBitSets here
+            u32 numBuffers = _renderer->GetNumBuffers();
+            u32 numBufferSets = Math::FloorToInt(static_cast<f32>(numBuffers) / 64.0f) + 1;
+            BitSet temp(_allocator, numBufferSets); // TODO: Get numBitSets here
 
             // Combine current pass read and write
             const TrackedBufferBitSets& currentPermissions = _resources.GetBufferPermissions(currentPassIndex);
@@ -219,7 +221,6 @@ namespace Renderer
                 ZoneScopedN("Combine BitSets");
 
                 temp.SetEquals(readAccess);
-                temp.BitwiseOR(writeAccess);
 
                 // AND between current pass access and the dirty flags will tell us which buffers need a barrier
                 temp.BitwiseAND(*_dirty);
@@ -260,20 +261,12 @@ namespace Renderer
             // Calculate how this pass affected the dirty sets
             {
                 ZoneScopedN("Affect Dirty");
-                const TrackedBufferBitSets& bufferPermissions = _resources.GetBufferPermissions(currentPassIndex);
-
-                const BitSet& readPermissions = bufferPermissions.GetReadBitSet();
-
-                const BitSet& transferAccess = bufferPermissions.GetTransferBitSet();
-                const BitSet& graphicsAccess = bufferPermissions.GetGraphicsBitSet();
-                const BitSet& computeAccess = bufferPermissions.GetComputeBitSet();
 
                 // First we want to unset any reads that got barriered by this pass
-                _dirty->BitwiseUnset(readPermissions);
+                _dirty->BitwiseUnset(readAccess);
 
                 // Then we want to set any writes made by this pass
-                const BitSet& writePermissions = bufferPermissions.GetWriteBitSet();
-                _dirty->BitwiseOR(writePermissions);
+                _dirty->BitwiseOR(writeAccess);
 
                 {
                     ZoneScopedN("Iterate Bitset");

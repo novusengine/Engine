@@ -135,7 +135,7 @@ namespace Renderer
                 Shader& shader = shaders.back();
                 ReadFile(shaderBinPath, shader.spirv);
                 shader.path = permutationPath;
-                shader.module = CreateShaderModule(shader.spirv);
+                shader.module = CreateShaderModule(shader.spirv, shaderPath);
                 shader.permutationFields = permutationFields;
 
                 // Reflect descriptor sets
@@ -219,7 +219,7 @@ namespace Renderer
             }
             
             void ReadFile(const std::string& filename, ShaderBinary& binary);
-            VkShaderModule CreateShaderModule(const ShaderBinary& binary);
+            VkShaderModule CreateShaderModule(const ShaderBinary& binary, const std::string& debugName);
             bool TryFindExistingShader(const std::string& shaderPath, std::vector<Shader>& shaders, size_t& id);
 
             std::string GetShaderBinPathString(const std::string& shaderPath);

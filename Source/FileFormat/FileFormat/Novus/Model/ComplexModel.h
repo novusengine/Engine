@@ -149,8 +149,8 @@ PRAGMA_NO_PADDING_START;
 
 		struct CullingData
 		{
-			hvec3 center = hvec3(static_cast<f16>(65535.0f));
-			hvec3 extents = hvec3(static_cast<f16>(-65535.0f));
+			hvec3 center = hvec3(static_cast<f16>(0.0f));
+			hvec3 extents = hvec3(static_cast<f16>(65535.0f));
 			f32 boundingSphereRadius = 0.0f;
 		};
 

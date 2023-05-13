@@ -215,7 +215,7 @@ namespace Renderer
         ImageID::type id = static_cast<ImageID::type>(imageID);
         if (!data->imageIDToResource.contains(id))
         {
-            u32 index = data->trackedImages.Count();
+            u32 index = static_cast<u32>(data->trackedImages.Count());
             data->trackedImages.Insert(imageID);
 
             data->imageIDToResource[id] = index;
@@ -231,7 +231,7 @@ namespace Renderer
         DepthImageID::type id = static_cast<DepthImageID::type>(imageID);
         if (!data->depthImageIDToResource.contains(id))
         {
-            u32 index = data->trackedDepthImages.Count();
+            u32 index = static_cast<u32>(data->trackedDepthImages.Count());
             data->trackedDepthImages.Insert(imageID);
 
             data->depthImageIDToResource[id] = index;
@@ -248,7 +248,7 @@ namespace Renderer
         BufferID::type id = static_cast<BufferID::type>(bufferID);
         if (!data->bufferIDToResource.contains(id))
         {
-            u32 index = data->trackedBuffers.Count();
+            u32 index = static_cast<u32>(data->trackedBuffers.Count());
             data->trackedBuffers.Insert(bufferID);
 
             data->bufferIDToResource[id] = index;
@@ -290,7 +290,7 @@ namespace Renderer
         ImageID::type id = static_cast<ImageID::type>(imageID);
         if (!data->imageIDToResource.contains(id))
         {
-            u32 index = data->trackedImages.Count();
+            u32 index = static_cast<u32>(data->trackedImages.Count());
             data->trackedImages.Insert(imageID);
 
             data->imageIDToResource[id] = index;
@@ -306,7 +306,7 @@ namespace Renderer
         DepthImageID::type id = static_cast<DepthImageID::type>(imageID);
         if (!data->depthImageIDToResource.contains(id))
         {
-            u32 index = data->trackedDepthImages.Count();
+            u32 index = static_cast<u32>(data->trackedDepthImages.Count());
             data->trackedDepthImages.Insert(imageID);
 
             data->depthImageIDToResource[id] = index;
@@ -323,7 +323,7 @@ namespace Renderer
         BufferID::type id = static_cast<BufferID::type>(bufferID);
         if (!data->bufferIDToResource.contains(id))
         {
-            u32 index = data->trackedBuffers.Count();
+            u32 index = static_cast<u32>(data->trackedBuffers.Count());
             data->trackedBuffers.Insert(bufferID);
 
             data->bufferIDToResource[id] = index;

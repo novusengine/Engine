@@ -103,7 +103,7 @@ namespace Renderer
             file.close();
         }
 
-        VkShaderModule ShaderHandlerVK::CreateShaderModule(const ShaderBinary& binary)
+        VkShaderModule ShaderHandlerVK::CreateShaderModule(const ShaderBinary& binary, const std::string& debugName)
         {
             ZoneScoped;
             VkShaderModuleCreateInfo createInfo = {};
@@ -121,6 +121,8 @@ namespace Renderer
             {
                 DebugHandler::PrintFatal("Failed to create shader module!");
             }
+
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)shaderModule, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT, debugName.c_str());
 
             return shaderModule;
         }
