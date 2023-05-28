@@ -45,6 +45,8 @@ namespace Renderer
             void TransitionImageLayout(VkCommandBuffer commandBuffer, TextureID textureID, VkImageAspectFlags aspects, VkImageLayout oldLayout, VkImageLayout newLayout);
 
             TextureID GetTextureIDInArray(const TextureArrayID textureArrayID, u32 index);
+			i32 GetTextureHeight(TextureID textureID);
+			i32 GetTextureWidth(TextureID textureID);
             const SafeVector<TextureID>& GetTextureIDsInArray(const TextureArrayID textureArrayID);
 
             bool IsOnionTexture(const TextureID textureID);
