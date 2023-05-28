@@ -318,15 +318,15 @@ namespace Renderer
         return _textureHandler->GetTextureIDInArray(textureArrayID, index);
     }
 
-	i32 RendererVK::GetTextureHeight(TextureID textureID)
-	{
-		return _textureHandler->GetTextureHeight(textureID);
-	}
+    i32 RendererVK::GetTextureHeight(TextureID textureID)
+    {
+        return _textureHandler->GetTextureHeight(textureID);
+    }
 
-	i32 RendererVK::GetTextureWidth(TextureID textureID)
-	{
-		return _textureHandler->GetTextureWidth(textureID);
-	}
+    i32 RendererVK::GetTextureWidth(TextureID textureID)
+    {
+        return _textureHandler->GetTextureWidth(textureID);
+    }
 
     const ImageDesc& RendererVK::GetImageDesc(ImageID ID)
     {

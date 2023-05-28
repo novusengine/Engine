@@ -579,31 +579,31 @@ namespace Renderer
             return data.textures.ReadGet(id)->totalSize;
         }
 
-		i32 TextureHandlerVK::GetTextureHeight(const Renderer::TextureID textureID)
-		{
-			TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
-			TextureID::type id = static_cast<TextureID::type>(textureID);
+        i32 TextureHandlerVK::GetTextureHeight(const Renderer::TextureID textureID)
+        {
+            TextureHandlerVKData &data = static_cast<TextureHandlerVKData &>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
 
-			if (data.textures.Size() <= id)
-			{
-				DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
-			}
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+            }
 
-			return data.textures.ReadGet(id)->height;
-		}
+            return data.textures.ReadGet(id)->height;
+        }
 
-		i32 TextureHandlerVK::GetTextureWidth(const Renderer::TextureID textureID)
-		{
-			TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
-			TextureID::type id = static_cast<TextureID::type>(textureID);
+        i32 TextureHandlerVK::GetTextureWidth(const Renderer::TextureID textureID)
+        {
+            TextureHandlerVKData &data = static_cast<TextureHandlerVKData &>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
 
-			if (data.textures.Size() <= id)
-			{
-				DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
-			}
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+            }
 
-			return data.textures.ReadGet(id)->width;
-		}
+            return data.textures.ReadGet(id)->width;
+        }
 
         u32 TextureHandlerVK::GetTextureArraySize(const TextureArrayID textureArrayID)
         {
