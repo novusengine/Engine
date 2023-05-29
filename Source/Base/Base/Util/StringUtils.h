@@ -19,6 +19,7 @@ namespace StringUtils
     bool BeginsWith(std::string_view const& fullString, std::string_view const& beginning);
     bool EndsWith(std::string const& fullString, std::string const& ending);
     bool Contains(std::string const& fullString, std::string const& substring);
+    bool SearchString(const std::string& ref, const std::string& key, bool insensitive);
 
 #ifdef _WINDOWS
     std::wstring StringToWString(const std::string& s);

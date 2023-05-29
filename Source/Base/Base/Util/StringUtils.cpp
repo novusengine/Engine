@@ -146,6 +146,20 @@ namespace StringUtils
         return fullString.find(substring) != std::string::npos;
     }
 
+    bool SearchString(const std::string& ref, const std::string& key, bool insensitive)
+    {
+        std::string str = ref;
+        std::string substr = key;
+
+        if (insensitive)
+        {
+            std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
+            std::transform(substr.begin(), substr.end(), substr.begin(), [](unsigned char c) { return std::tolower(c); });
+        }
+
+        return Contains(str, substr);
+    }
+
 #ifdef _WINDOWS
     std::wstring StringToWString(const std::string& s)
     {

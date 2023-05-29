@@ -158,6 +158,8 @@ namespace Renderer
         void ResetTimeQueries(u32 frameIndex) override;
 
         [[nodiscard]] TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) override;
+        [[nodiscard]] i32 GetTextureHeight(TextureID textureID) override;
+        [[nodiscard]] i32 GetTextureWidth(TextureID textureID) override;
 
         [[nodiscard]] const ImageDesc& GetImageDesc(ImageID ID) override;
         [[nodiscard]] const DepthImageDesc& GetImageDesc(DepthImageID ID) override;

@@ -182,6 +182,8 @@ namespace Renderer
         virtual void ResetTimeQueries(u32 frameIndex) = 0;
 
         virtual TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) = 0;
+        virtual i32 GetTextureHeight(TextureID textureID) = 0;
+        virtual i32 GetTextureWidth(TextureID textureID) = 0;
 
         virtual const ImageDesc& GetImageDesc(ImageID ID) = 0;
         virtual const DepthImageDesc& GetImageDesc(DepthImageID ID) = 0;
