@@ -581,7 +581,7 @@ namespace Renderer
 
         i32 TextureHandlerVK::GetTextureHeight(const Renderer::TextureID textureID)
         {
-            TextureHandlerVKData &data = static_cast<TextureHandlerVKData &>(*_data);
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
             TextureID::type id = static_cast<TextureID::type>(textureID);
 
             if (data.textures.Size() <= id)
@@ -594,7 +594,7 @@ namespace Renderer
 
         i32 TextureHandlerVK::GetTextureWidth(const Renderer::TextureID textureID)
         {
-            TextureHandlerVKData &data = static_cast<TextureHandlerVKData &>(*_data);
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
             TextureID::type id = static_cast<TextureID::type>(textureID);
 
             if (data.textures.Size() <= id)
