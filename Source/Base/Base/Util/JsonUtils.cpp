@@ -6,27 +6,55 @@
 
 namespace glm
 {
-	void to_json(nlohmann::json& j, const vec4& P) {
+	void to_json(nlohmann::json& j, const vec4& P) 
+	{
 		j = { { "x", P.x }, { "y", P.y }, { "z", P.w }, { "w", P.z } };
 	};
 
-	void from_json(const nlohmann::json& j, vec4& P) {
+	void from_json(const nlohmann::json& j, vec4& P) 
+	{
 		P.x = j.at("x").get<f32>();
 		P.y = j.at("y").get<f32>();
 		P.z = j.at("z").get<f32>();
 		P.w = j.at("w").get<f32>();
 	}
 
-	void to_json(nlohmann::json& j, const ivec4& P) {
+	void to_json(nlohmann::json& j, const ivec4& P) 
+	{
 		j = { { "x", P.x }, { "y", P.y }, { "z", P.w }, { "w", P.z } };
 	};
 
-	void from_json(const nlohmann::json& j, ivec4& P) {
+	void from_json(const nlohmann::json& j, ivec4& P) 
+	{
 		P.x = j.at("x").get<i32>();
 		P.y = j.at("y").get<i32>();
 		P.z = j.at("z").get<i32>();
 		P.w = j.at("w").get<i32>();
 	}
+}
+
+namespace nlohmann 
+{
+	template <>
+	struct adl_serializer<ShowFlag> {
+		static void to_json(json& j, const ShowFlag& flag) 
+		{
+			j = flag == ShowFlag::ENABLED ? "ENABLED" : "DISABLED";
+		}
+
+		static void from_json(const json& j, ShowFlag& flag) 
+		{
+			std::string s = j.get<std::string>();
+			if (s == "ENABLED") 
+			{
+				flag = ShowFlag::ENABLED;
+			}
+			else if (s == "DISABLED") 
+			{
+				flag = ShowFlag::DISABLED;
+			}
+		}
+	};
 }
 
 namespace JsonUtils
@@ -205,6 +233,27 @@ namespace JsonUtils
 				config[parameter->name] = object;
 			}
 		}
+
+		// Load ShowFlags
+		{
+			nlohmann::json& config = json["showflag"];
+			for (i32 i = 0; i < cvarSystem->GetCVarArray<ShowFlag>()->lastCVar; i++)
+			{
+				CVarStorage<ShowFlag>& cvar = cvarSystem->GetCVarArray<ShowFlag>()->cvars[i];
+				CVarParameter* parameter = cvar.parameter;
+
+				nlohmann::json object = nlohmann::json::object();
+				{
+					object["initial"] = cvar.initial;
+					object["current"] = cvar.current;
+					object["type"] = parameter->type;
+					object["flags"] = parameter->flags;
+					object["description"] = parameter->description;
+				}
+
+				config[parameter->name] = object;
+			}
+		}
 	}
 	void LoadJsonIntoCVars(nlohmann::json& json)
 	{
@@ -364,6 +413,39 @@ namespace JsonUtils
 				else
 				{
 					CVarStorage<ivec4>* storage = cvarSystem->GetCVarArray<ivec4>()->GetCurrentStorage(parameter->arrayIndex);
+
+					storage->initial = initial;
+					storage->current = current;
+					parameter->description = description;
+				}
+
+				parameter->type = value["type"].get<CVarType>();
+				parameter->flags = value["flags"].get<CVarFlags>();
+			}
+		}
+
+		// Write ShowFlags
+		{
+			nlohmann::json& config = json["showflag"];
+
+			for (auto it = config.begin(); it != config.end(); it++)
+			{
+				const std::string& key = it.key();
+				nlohmann::json& value = it.value();
+
+				u32 cvarNameHash = StringUtils::fnv1a_32(key.c_str(), key.length());
+				ShowFlag initial = value["initial"].get<ShowFlag>();
+				ShowFlag current = value["current"].get<ShowFlag>();
+				std::string& description = value["description"].get_ref<std::string&>();
+
+				CVarParameter* parameter = cvarSystem->GetCVar(cvarNameHash);
+				if (!parameter)
+				{
+					parameter = cvarSystem->CreateShowFlagCVar(key.c_str(), description.c_str(), initial, current);
+				}
+				else
+				{
+					CVarStorage<ShowFlag>* storage = cvarSystem->GetCVarArray<ShowFlag>()->GetCurrentStorage(parameter->arrayIndex);
 
 					storage->initial = initial;
 					storage->current = current;

@@ -47,6 +47,21 @@ namespace StringUtils
         return line;
     }
 
+    std::string GetFileNameFromPath(std::string const& path)
+    {
+        size_t lastSlashPos = path.find_last_of("/\\");
+        if (lastSlashPos == std::string::npos)
+            lastSlashPos = 0;  // If no '/' or '\\', start from the beginning of the string
+        else
+            lastSlashPos += 1;  // start from the character after the '/' or '\\'
+
+        size_t lastDotPos = path.find_last_of(".");
+        if (lastDotPos == std::string::npos || lastDotPos <= lastSlashPos)
+            lastDotPos = path.length();  // If no '.', the end is the end of the string
+
+        return path.substr(lastSlashPos, lastDotPos - lastSlashPos);
+    }
+
     std::vector<std::string> SplitString(std::string const& string, char delim)
     {
         std::vector<std::string> results;

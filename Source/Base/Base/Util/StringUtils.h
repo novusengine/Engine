@@ -12,6 +12,8 @@ namespace StringUtils
 
     std::string GetLineFromCin();
 
+    std::string GetFileNameFromPath(std::string const& path);
+
     std::vector<std::string> SplitString(std::string const& string, char delim = ' ');
     std::string EscapeString(std::string const& string);
     std::string FormatThousandSeparator(i32 n);

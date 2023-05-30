@@ -34,6 +34,11 @@ ivec4* CVarSystemImpl::GetVecIntCVar(StringUtils::StringHash hash)
     return GetCVarCurrent<ivec4>(hash);
 }
 
+ShowFlag* CVarSystemImpl::GetShowFlagCVar(StringUtils::StringHash hash)
+{
+    return GetCVarCurrent<ShowFlag>(hash);
+}
+
 CVarSystem* CVarSystem::Get()
 {
     static CVarSystemImpl cvarSys{};
@@ -76,6 +81,11 @@ void CVarSystemImpl::SetVecFloatCVar(StringUtils::StringHash hash, const vec4& v
 void CVarSystemImpl::SetVecIntCVar(StringUtils::StringHash hash, const ivec4& value)
 {
     SetCVarCurrent<ivec4>(hash, value);
+}
+
+void CVarSystemImpl::SetShowFlagCVar(StringUtils::StringHash hash, const ShowFlag& value)
+{
+    SetCVarCurrent<ShowFlag>(hash, value);
 }
 
 CVarParameter* CVarSystemImpl::CreateFloatCVar(const char* name, const char* description, f64 defaultValue, f64 currentValue)
@@ -138,6 +148,19 @@ CVarParameter* CVarSystemImpl::CreateVecIntCVar(const char* name, const char* de
     param->type = CVarType::INTVEC;
 
     GetCVarArray<ivec4>()->Add(defaultValue, currentValue, param);
+
+    return param;
+}
+
+CVarParameter* CVarSystemImpl::CreateShowFlagCVar(const char* name, const char* description, const ShowFlag& defaultValue, const ShowFlag& currentValue)
+{
+    CVarParameter* param = InitCVar(name, description);
+    if (!param) return nullptr;
+
+    std::unique_lock lock(mutex_);
+    param->type = CVarType::SHOWFLAG;
+
+    GetCVarArray<ShowFlag>()->Add(defaultValue, currentValue, param);
 
     return param;
 }
@@ -269,4 +292,20 @@ ivec4 AutoCVar_VecInt::Get()
 void AutoCVar_VecInt::Set(const ivec4& val)
 {
     CVarSystemImpl::Get()->GetCVarArray<ivec4>()->SetCurrent(val, index);
+}
+
+AutoCVar_ShowFlag::AutoCVar_ShowFlag(const char* name, const char* description, const ShowFlag& defaultValue)
+{
+    CVarParameter* cvar = CVarSystem::Get()->CreateShowFlagCVar(name, description, defaultValue, defaultValue);
+    index = cvar->arrayIndex;
+}
+
+ShowFlag AutoCVar_ShowFlag::Get()
+{
+    return CVarSystemImpl::Get()->GetCVarArray<ShowFlag>()->GetCurrent(index);
+}
+
+void AutoCVar_ShowFlag::Set(const ShowFlag& val)
+{
+    CVarSystemImpl::Get()->GetCVarArray<ShowFlag>()->SetCurrent(val, index);
 }

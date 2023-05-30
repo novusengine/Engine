@@ -16,6 +16,14 @@ target_include_directories(robin-hood-hashing INTERFACE
     "${CMAKE_CURRENT_LIST_DIR}/robinhood"
 )
 
+## Refl-cpp
+add_library(refl-cpp INTERFACE)
+add_library(refl-cpp::refl-cpp ALIAS refl-cpp)
+
+target_include_directories(refl-cpp INTERFACE
+    "${CMAKE_CURRENT_LIST_DIR}/refl-cpp"
+)
+
 ## entt
 add_library(entt INTERFACE)
 add_library(entt::entt ALIAS entt)
@@ -81,4 +89,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     entt::entt
     type_safe
     spdlog
+    refl-cpp::refl-cpp
 )

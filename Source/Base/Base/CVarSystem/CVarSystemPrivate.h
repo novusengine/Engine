@@ -15,7 +15,8 @@ enum class CVarType : u8
     FLOAT,
     STRING,
     FLOATVEC,
-    INTVEC
+    INTVEC,
+    SHOWFLAG
 };
 
 class CVarParameter
@@ -118,20 +119,23 @@ public:
     CVarParameter* CreateFloatCVar(const char* name, const char* description, f64 defaultValue, f64 currentValue) override final;
     CVarParameter* CreateIntCVar(const char* name, const char* description, i32 defaultValue, i32 currentValue) override final;
     CVarParameter* CreateStringCVar(const char* name, const char* description, const char* defaultValue, const char* currentValue) override final;
-    CVarParameter* CreateVecFloatCVar(const char* name, const char* description, const vec4& defaultValue, const vec4& currentValue)override final;
-    CVarParameter* CreateVecIntCVar(const char* name, const char* description, const ivec4& defaultValue, const ivec4& currentValue)override final;
+    CVarParameter* CreateVecFloatCVar(const char* name, const char* description, const vec4& defaultValue, const vec4& currentValue) override final;
+    CVarParameter* CreateVecIntCVar(const char* name, const char* description, const ivec4& defaultValue, const ivec4& currentValue) override final;
+    CVarParameter* CreateShowFlagCVar(const char* name, const char* description, const ShowFlag& defaultValue, const ShowFlag& currentValue) override final;
 
     f64* GetFloatCVar(StringUtils::StringHash hash) override final;
     i32* GetIntCVar(StringUtils::StringHash hash) override final;
     const char* GetStringCVar(StringUtils::StringHash hash) override final;
     vec4* GetVecFloatCVar(StringUtils::StringHash hash) override final;
     ivec4* GetVecIntCVar(StringUtils::StringHash hash) override final;
+    ShowFlag* GetShowFlagCVar(StringUtils::StringHash hash) override final;
 
     void SetFloatCVar(StringUtils::StringHash hash, f64 value) override final;
     void SetIntCVar(StringUtils::StringHash hash, i32 value) override final;
     void SetStringCVar(StringUtils::StringHash hash, const char* value) override final;
     void SetVecFloatCVar(StringUtils::StringHash hash, const vec4& value) override final;
     void SetVecIntCVar(StringUtils::StringHash hash, const ivec4& value) override final;
+    void SetShowFlagCVar(StringUtils::StringHash hash, const ShowFlag& value) override final;
 
     constexpr static int MAX_INT_CVARS = 1000;
 
@@ -148,6 +152,9 @@ public:
 
     constexpr static int MAX_INTVEC_CVARS = 400;
     CVarArray<ivec4> ivecCVars{ MAX_INTVEC_CVARS };
+
+    constexpr static int MAX_SHOWFLAG_CVARS = 100;
+    CVarArray<ShowFlag> showFlagCVars{ MAX_SHOWFLAG_CVARS };
 
     //using templates with specializations to get the cvar arrays for each type.
     //if you try to use a type that doesnt have specialization, it will trigger the static assert
@@ -182,6 +189,11 @@ public:
     CVarArray<ivec4>* GetCVarArray()
     {
         return &ivecCVars;
+    }
+    template<>
+    CVarArray<ShowFlag>* GetCVarArray()
+    {
+        return &showFlagCVars;
     }
 
     //templated get-set cvar versions for syntax sugar
