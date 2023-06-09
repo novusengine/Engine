@@ -70,6 +70,16 @@ struct Color
         return result;
     }
 
+    static u32 ToU32(const Color& rhs)
+    {
+        u8 a = static_cast<u8>(rhs.a * 255.f);
+        u8 r = static_cast<u8>(rhs.r * 255.f);
+        u8 g = static_cast<u8>(rhs.g * 255.f);
+        u8 b = static_cast<u8>(rhs.b * 255.f);
+
+        return (static_cast<u32>(a) << 24) | (static_cast<u32>(b) << 16) | (static_cast<u32>(g) << 8) | (static_cast<u32>(r));
+    }
+
     static Color Black;
     static Color Blue;
     static Color Clear;
