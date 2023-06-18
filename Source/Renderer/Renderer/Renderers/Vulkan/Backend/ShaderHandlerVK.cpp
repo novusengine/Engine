@@ -1,5 +1,7 @@
 #include "ShaderHandlerVK.h"
-#include "RenderDeviceVK.h"
+
+#include <Renderer/Renderers/Vulkan/Backend/RenderDeviceVK.h>
+#include <Renderer/Renderers/Vulkan/Backend/DebugMarkerUtilVK.h>
 
 #include <Base/Util/StringUtils.h>
 #include <Base/Util/DebugHandler.h>

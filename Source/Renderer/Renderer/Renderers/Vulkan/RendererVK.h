@@ -1,5 +1,8 @@
 #pragma once
-#include "Renderer/Renderer.h"
+#include <Renderer/Renderer.h>
+
+#include <Base/Memory/StackAllocator.h>
+
 #include <array>
 #include <mutex>
 
