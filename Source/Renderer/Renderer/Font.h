@@ -33,19 +33,22 @@ namespace Renderer
         stbtt_fontinfo* fontInfo;
         float scale;
 
-        FontChar& GetChar(char character);
+        FontChar& GetChar(u32 character);
         TextureArrayID GetTextureArray();
 
+        static Font* GetDefaultFont(Renderer* renderer, f32 fontSize);
         static Font* GetFont(Renderer* renderer, const std::string& fontPath, f32 fontSize);
         
     private:
         Font() = default;
 
-        bool InitChar(char character, FontChar& fontChar);
+        bool InitChar(u32 character, FontChar& fontChar);
+
+        static Font* CreateFont(Renderer* renderer, const u8* data, f32 fontSize);
 
     private:
         static robin_hood::unordered_map<u64, Font*> _fonts;
-        robin_hood::unordered_map<char, FontChar> _chars;
+        robin_hood::unordered_map<u32, FontChar> _chars;
 
         TextureArrayID _textureArray = TextureArrayID::Invalid();
 

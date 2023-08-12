@@ -80,6 +80,9 @@ namespace Renderer
         // Unloading
         void UnloadTexture(TextureID textureID) override;
         void UnloadTexturesInArray(TextureArrayID textureArrayID, u32 unloadStartIndex) override;
+        
+        // Misc
+        u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) override;
 
         // Command List Functions
         [[nodiscard]] CommandListID BeginCommandList() override;

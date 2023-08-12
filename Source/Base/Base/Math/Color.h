@@ -70,21 +70,31 @@ struct Color
         return result;
     }
 
-    static Color Black;
-    static Color Blue;
-    static Color Clear;
-    static Color Cyan;
-    static Color Gray;
-    static Color Green;
-    static Color Grey;
-    static Color Magenta;
-    static Color Red;
-    static Color White;
-    static Color Yellow;
-    static Color PastelPurple;
-    static Color PastelBlue;
-    static Color PastelGreen;
-    static Color PastelYellow;
-    static Color PastelOrange;
-    static Color PastelRed;
+    u32 ToU32() const
+    {
+        u32 color = 0;
+        color = (u32)(r * 255.0f) << 24;
+        color |= (u32)(g * 255.0f) << 16;
+        color |= (u32)(b * 255.0f) << 8;
+        color |= (u32)(a * 255.0f) << 0;
+        return color;
+    }
+
+    static const Color Black;
+    static const Color Blue;
+    static const Color Clear;
+    static const Color Cyan;
+    static const Color Gray;
+    static const Color Green;
+    static const Color Grey;
+    static const Color Magenta;
+    static const Color Red;
+    static const Color White;
+    static const Color Yellow;
+    static const Color PastelPurple;
+    static const Color PastelBlue;
+    static const Color PastelGreen;
+    static const Color PastelYellow;
+    static const Color PastelOrange;
+    static const Color PastelRed;
 };
