@@ -1,4 +1,7 @@
 #pragma once
+#include "FileFormat/Novus/ClientDB/ClientDB.h"
+#include "FileFormat/Novus/ClientDB/Definitions.h"
+
 #include <Base/Types.h>
 
 #include <robinhood/robinhood.h>
@@ -21,37 +24,41 @@ namespace Adt
 			Object
 		};
 
-		Parser() { }
-
-		bool TryParse(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& textureBuffer, std::shared_ptr<Bytebuffer>& objectBuffer, const Adt::Wdt& wdt, Adt::Layout& out);
-
-	private:
-		struct ParseContext
+		struct Context
 		{
 			i32 currentMCNKIndex = -1;
+
+			DB::Client::ClientDB<DB::Client::Definitions::LiquidObject>* liquidObjects = nullptr;
+			DB::Client::ClientDB<DB::Client::Definitions::LiquidType>* liquidTypes = nullptr;
+			DB::Client::ClientDB<DB::Client::Definitions::LiquidMaterial>* liquidMaterials = nullptr;
 		};
 
-		bool ParseBufferOrderIndependent(ParseContext& context, ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		Parser() { }
+
+		bool TryParse(Context& parseContext, std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& textureBuffer, std::shared_ptr<Bytebuffer>& objectBuffer, const Adt::Wdt& wdt, Adt::Layout& out);
 
 	private:
-		static bool ReadMVER(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMHDR(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMDID(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMHID(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMDDF(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMODF(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMFBO(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMTXF(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMH2O(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-
-		static bool ReadMCNK(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMCVT(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMCLY(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMCAL(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMCNR(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
-		static bool ReadMCCV(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		bool ParseBufferOrderIndependent(Context& context, ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
 
 	private:
-		static robin_hood::unordered_map<u32, std::function<bool(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, const Adt::Wdt&, Adt::Layout&)>> _adtFileChunkToFunction;
+		static bool ReadMVER(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMHDR(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMDID(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMHID(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMDDF(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMODF(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMFBO(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMTXF(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMH2O(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+
+		static bool ReadMCNK(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMCVT(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMCLY(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMCAL(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMCNR(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+		static bool ReadMCCV(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Adt::Wdt& wdt, Adt::Layout& adt);
+
+	private:
+		static robin_hood::unordered_map<u32, std::function<bool(Context& context, const Parser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, const Adt::Wdt&, Adt::Layout&)>> _adtFileChunkToFunction;
 	};
 }

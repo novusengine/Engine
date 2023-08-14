@@ -6,7 +6,7 @@
 
 using namespace Adt;
 
-robin_hood::unordered_map<u32, std::function<bool(Parser::ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, const Wdt&, Layout&)>> Parser::_adtFileChunkToFunction =
+robin_hood::unordered_map<u32, std::function<bool(Parser::Context& context, const Parser::ParseType parseType, const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, const Wdt&, Layout&)>> Parser::_adtFileChunkToFunction =
 {
     { FileChunkToken("MVER"), Parser::ReadMVER },
     { FileChunkToken("MHDR"), Parser::ReadMHDR },
@@ -53,12 +53,10 @@ robin_hood::unordered_map<u32, std::function<bool(Parser::ParseContext& context,
     { FileChunkToken("MWID"), nullptr }
 };
 
-bool Parser::TryParse(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& textureBuffer, std::shared_ptr<Bytebuffer>& objectBuffer, const Wdt& wdt, Layout& out)
+bool Parser::TryParse(Context& context, std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& textureBuffer, std::shared_ptr<Bytebuffer>& objectBuffer, const Wdt& wdt, Layout& out)
 {
     if (!rootBuffer)
         return false;
-
-    ParseContext context = { };
 
     // Parse Root Buffer
     out.cellInfos.resize(Terrain::CHUNK_NUM_CELLS);
@@ -85,7 +83,7 @@ bool Parser::TryParse(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<B
     return true;
 }
 
-bool Parser::ParseBufferOrderIndependent(ParseContext& context, ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ParseBufferOrderIndependent(Context& context, ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     FileChunkHeader header;
 
@@ -116,14 +114,14 @@ bool Parser::ParseBufferOrderIndependent(ParseContext& context, ParseType parseT
     return true;
 }
 
-bool Parser::ReadMVER(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMVER(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!buffer->Get(layout.mver))
         return false;
 
     return true;
 }
-bool Parser::ReadMHDR(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMHDR(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     u32 mhdrOffset = static_cast<u32>(buffer->readData);
 
@@ -138,49 +136,49 @@ bool Parser::ReadMHDR(ParseContext& context, const Parser::ParseType parseType, 
 
     return true;
 }
-bool Parser::ReadMDID(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMDID(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mdid.data))
         return false;
 
     return true;
 }
-bool Parser::ReadMHID(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMHID(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mhid.data))
         return false;
 
     return true;
 }
-bool Parser::ReadMDDF(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMDDF(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mddf.data))
         return false;
 
     return true;
 }
-bool Parser::ReadMODF(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMODF(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.modf.data))
         return false;
 
     return true;
 }
-bool Parser::ReadMFBO(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMFBO(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!buffer->Get(layout.mfbo))
         return false;
 
     return true;
 }
-bool Parser::ReadMTXF(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMTXF(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.mtxf.data))
         return false;
 
     return true;
 }
-bool Parser::ReadMH2O(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     size_t bufferStartRead = buffer->readData;
 
@@ -251,10 +249,33 @@ bool Parser::ReadMH2O(ParseContext& context, const Parser::ParseType parseType, 
                 const MH2O::LiquidInstance& liquidInstance = layout.mh2o.instances[instanceIndex + j];
 
                 u16 liquidVertexFormat = liquidInstance.liquidVertexFormat;
-                //assert(liquidVertexFormat >= 0 && liquidVertexFormat <= 3);
+                if (liquidVertexFormat >= 42)
+                {
+                    i16 liquidTypeID = -1;
+                    i32 materialID = -1;
 
-                bool hasBitmapData = 0; // liquidInstance.bitmapDataOffset > 0;
-                bool hasVertexData = 0; // liquidInstance.vertexDataOffset > 0 && liquidVertexFormat != 2;
+                    if (context.liquidObjects->HasEntry(liquidVertexFormat))
+                    {
+                        liquidTypeID = context.liquidObjects->GetEntry(liquidVertexFormat).liquidTypeID;
+                    }
+                    else
+                    {
+                        liquidTypeID = liquidInstance.liquidType;
+                    }
+
+                    if (context.liquidTypes->HasEntry(liquidTypeID))
+                    {
+                        materialID = context.liquidTypes->GetEntry(liquidTypeID).materialID;
+
+                        if (context.liquidMaterials->HasEntry(materialID))
+                        {
+                            liquidVertexFormat = context.liquidMaterials->GetEntry(materialID).liquidVertexFormat;
+                        }
+                    }
+                }
+
+                bool hasBitmapData = liquidInstance.bitmapDataOffset > 0;
+                bool hasVertexData = liquidInstance.vertexDataOffset > 0 && liquidVertexFormat != 2 && liquidVertexFormat != 42;
 
                 if (hasBitmapData)
                 {
@@ -291,7 +312,7 @@ bool Parser::ReadMH2O(ParseContext& context, const Parser::ParseType parseType, 
 
     return true;
 }
-bool Parser::ReadMCNK(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMCNK(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     context.currentMCNKIndex++;
 
@@ -306,7 +327,7 @@ bool Parser::ReadMCNK(ParseContext& context, const Parser::ParseType parseType, 
 
     return true;
 }
-bool Parser::ReadMCVT(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMCVT(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -315,7 +336,7 @@ bool Parser::ReadMCVT(ParseContext& context, const Parser::ParseType parseType, 
 
     return true;
 }
-bool Parser::ReadMCLY(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMCLY(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -324,7 +345,7 @@ bool Parser::ReadMCLY(ParseContext& context, const Parser::ParseType parseType, 
 
     return true;
 }
-bool Parser::ReadMCAL(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMCAL(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -424,7 +445,7 @@ bool Parser::ReadMCAL(ParseContext& context, const Parser::ParseType parseType, 
     buffer->SkipRead(header.size);
     return true;
 }
-bool Parser::ReadMCNR(ParseContext& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMCNR(Context& context, const Parser::ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 
@@ -438,7 +459,7 @@ bool Parser::ReadMCNR(ParseContext& context, const Parser::ParseType parseType, 
 
     return true;
 }
-bool Parser::ReadMCCV(ParseContext& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
+bool Parser::ReadMCCV(Context& context, const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, const Wdt& wdt, Layout& layout)
 {
     CellInfo& cellInfo = layout.cellInfos[context.currentMCNKIndex];
 

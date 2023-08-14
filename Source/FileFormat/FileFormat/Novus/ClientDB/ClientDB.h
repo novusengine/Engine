@@ -5,6 +5,7 @@
 #include <Base/Platform.h>
 #include <Base/Container/StringTable.h>
 
+#include <robinhood/robinhood.h>
 #include <vector>
 
 class Bytebuffer;
@@ -22,12 +23,23 @@ namespace DB::Client
 			u32 unused : 32;
 		};
 
+    public:
+        bool HasEntry(u32 entryID)
+        {
+            return idToIndexMap.contains(entryID);
+        }
+        const T& GetEntry(u32 entryID)
+        {
+            return data[idToIndexMap[entryID]];
+        }
+
 	public:
 		FileHeader header = FileHeader(FileHeader::Type::ClientDB, CURRENT_VERSION);
 
 		Flags flags = { };
 		std::vector<T> data = { };
         StringTable stringTable = { };
+        robin_hood::unordered_map<u32, u32> idToIndexMap = { };
 
 	public:
 		bool Save(std::string& path)
