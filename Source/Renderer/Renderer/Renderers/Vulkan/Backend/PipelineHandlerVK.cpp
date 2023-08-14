@@ -8,6 +8,7 @@
 
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/XXHash64.h>
+#include <Base/Memory/Allocator.h>
 
 #include <vulkan/vulkan.h>
 
@@ -74,11 +75,13 @@ namespace Renderer
             std::vector<ComputePipeline> computePipelines;
         };
 
-        void PipelineHandlerVK::Init(RenderDeviceVK* device, ShaderHandlerVK* shaderHandler, ImageHandlerVK* imageHandler)
+        void PipelineHandlerVK::Init(Memory::Allocator* allocator, RenderDeviceVK* device, ShaderHandlerVK* shaderHandler, ImageHandlerVK* imageHandler, BufferHandlerVK* bufferHandler)
         {
+            _allocator = allocator;
             _device = device;
             _shaderHandler = shaderHandler;
             _imageHandler = imageHandler;
+            _bufferHandler = bufferHandler;
             _data = new PipelineHandlerVKData();
         }
 
@@ -624,8 +627,10 @@ namespace Renderer
                 DebugHandler::PrintFatal("Failed to create graphics pipeline!");
             }
 
+            
+
             GraphicsPipelineID pipelineID = GraphicsPipelineID(static_cast<gIDType>(nextID));
-            pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(pipelineID, this, _shaderHandler, _device->_descriptorMegaPool);
+            pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, pipelineID, this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
 
             data.graphicsPipelines.push_back(pipeline);
 
@@ -720,7 +725,7 @@ namespace Renderer
             }
 
             ComputePipelineID pipelineID = ComputePipelineID(static_cast<cIDType>(nextID));
-            pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(pipelineID, this, _shaderHandler, _device->_descriptorMegaPool);
+            pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, pipelineID, this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
 
             data.computePipelines.push_back(pipeline);
 
@@ -855,16 +860,16 @@ namespace Renderer
             return data.computePipelines[static_cast<cIDType>(id)].pipelineLayout;
         }
 
-        DescriptorSetBuilderVK* PipelineHandlerVK::GetDescriptorSetBuilder(GraphicsPipelineID id)
+        DescriptorSetBuilderVK& PipelineHandlerVK::GetDescriptorSetBuilder(GraphicsPipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            return data.graphicsPipelines[static_cast<gIDType>(id)].descriptorSetBuilder;
+            return *data.graphicsPipelines[static_cast<gIDType>(id)].descriptorSetBuilder;
         }
 
-        DescriptorSetBuilderVK* PipelineHandlerVK::GetDescriptorSetBuilder(ComputePipelineID id)
+        DescriptorSetBuilderVK& PipelineHandlerVK::GetDescriptorSetBuilder(ComputePipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            return data.computePipelines[static_cast<cIDType>(id)].descriptorSetBuilder;
+            return *data.computePipelines[static_cast<cIDType>(id)].descriptorSetBuilder;
         }
 
         u64 PipelineHandlerVK::CalculateCacheDescHash(const GraphicsPipelineDesc& desc)

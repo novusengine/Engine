@@ -1,12 +1,16 @@
 #include "ShaderHandlerVK.h"
-#include "RenderDeviceVK.h"
+
+#include <Renderer/Renderers/Vulkan/Backend/RenderDeviceVK.h>
+#include <Renderer/Renderers/Vulkan/Backend/DebugMarkerUtilVK.h>
 
 #include <Base/Util/StringUtils.h>
 #include <Base/Util/DebugHandler.h>
 
 #include <ShaderCooker/ShaderCache.h>
 #include <ShaderCooker/ShaderCompiler.h>
+
 #include <vulkan/vulkan.h>
+#include <tracy/Tracy.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -19,6 +23,7 @@ namespace Renderer
 
         void ShaderHandlerVK::Init(RenderDeviceVK* device)
         {
+            ZoneScoped;
             _device = device;
 
             _shaderCache = new ShaderCooker::ShaderCache();
@@ -49,11 +54,13 @@ namespace Renderer
 
         void ShaderHandlerVK::SetShaderSourceDirectory(const std::string& path)
         {
+            ZoneScoped;
             _shaderCompiler->SetSourceDirPath(path);
         }
 
         void ShaderHandlerVK::ReloadShaders(bool forceRecompileAll)
         {
+            ZoneScoped;
             _forceRecompileAll = forceRecompileAll;
             
             _vertexShaders.clear();
@@ -63,21 +70,25 @@ namespace Renderer
 
         VertexShaderID ShaderHandlerVK::LoadShader(const VertexShaderDesc& desc)
         {
+            ZoneScoped;
             return LoadShader<VertexShaderID>(desc.path, desc.permutationFields, _vertexShaders);
         }
 
         PixelShaderID ShaderHandlerVK::LoadShader(const PixelShaderDesc& desc)
         {
+            ZoneScoped;
             return LoadShader<PixelShaderID>(desc.path, desc.permutationFields, _pixelShaders);
         }
 
         ComputeShaderID ShaderHandlerVK::LoadShader(const ComputeShaderDesc& desc)
         {
+            ZoneScoped;
             return LoadShader<ComputeShaderID>(desc.path, desc.permutationFields, _computeShaders);
         }
 
         void ShaderHandlerVK::ReadFile(const std::string& filename, ShaderBinary& binary)
         {
+            ZoneScoped;
             std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
             if (!file.is_open())
@@ -94,8 +105,9 @@ namespace Renderer
             file.close();
         }
 
-        VkShaderModule ShaderHandlerVK::CreateShaderModule(const ShaderBinary& binary)
+        VkShaderModule ShaderHandlerVK::CreateShaderModule(const ShaderBinary& binary, const std::string& debugName)
         {
+            ZoneScoped;
             VkShaderModuleCreateInfo createInfo = {};
             createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
             createInfo.codeSize = binary.size();
@@ -112,11 +124,14 @@ namespace Renderer
                 DebugHandler::PrintFatal("Failed to create shader module!");
             }
 
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)shaderModule, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT, debugName.c_str());
+
             return shaderModule;
         }
 
         bool ShaderHandlerVK::TryFindExistingShader(const std::string& shaderPath, std::vector<Shader>& shaders, size_t& id)
         {
+            ZoneScoped;
             u32 shaderPathHash = StringUtils::fnv1a_32(shaderPath.c_str(), shaderPath.length());
 
             id = 0;
@@ -134,6 +149,7 @@ namespace Renderer
         
         std::string ShaderHandlerVK::GetPermutationPath(const std::string& shaderPathString, const std::vector<PermutationField>& permutationFields)
         {
+            ZoneScoped;
             std::filesystem::path shaderPath = shaderPathString;
             std::string filename = shaderPath.filename().string();
 
@@ -153,6 +169,7 @@ namespace Renderer
 
         std::filesystem::path GetShaderBinPath(const std::string& shaderPath)
         {
+            ZoneScoped;
             std::string binShaderPath = shaderPath + ".spv";
             std::filesystem::path binPath = std::filesystem::path("Data/shaders/") / binShaderPath;
             return std::filesystem::absolute(binPath.make_preferred());
@@ -160,11 +177,13 @@ namespace Renderer
 
         std::string ShaderHandlerVK::GetShaderBinPathString(const std::string& shaderPath)
         {
+            ZoneScoped;
             return GetShaderBinPath(shaderPath).string();
         }
 
         bool ShaderHandlerVK::NeedsCompile(const std::string& shaderPath)
         {
+            ZoneScoped;
             std::filesystem::path sourcePath = _shaderCompiler->GetSourceDirPath() / shaderPath;
             sourcePath = std::filesystem::absolute(sourcePath.make_preferred());
 
@@ -190,6 +209,7 @@ namespace Renderer
 
         bool ShaderHandlerVK::CompileShader(const std::string& shaderPath)
         {
+            ZoneScoped;
             std::filesystem::path shaderAbsolutePath = _shaderCompiler->GetSourceDirPath() / shaderPath;
             shaderAbsolutePath = std::filesystem::absolute(shaderAbsolutePath.make_preferred());
 

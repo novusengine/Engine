@@ -28,10 +28,9 @@
 #include "Commands/CopyBuffer.h"
 #include "Commands/FillBuffer.h"
 #include "Commands/UpdateBuffer.h"
-#include "Commands/QueueDestroyBuffer.h"
-#include "Commands/PipelineBarrier.h"
 #include "Commands/ImageBarrier.h"
 #include "Commands/DepthImageBarrier.h"
+#include "Commands/BufferBarrier.h"
 #include "Commands/DrawImgui.h"
 #include "Commands/PushConstant.h"
 #include "Commands/TimeQuery.h"
@@ -196,7 +195,7 @@ namespace Renderer
     {
         ZoneScopedC(tracy::Color::Red3);
         const Commands::BindDescriptorSet* actualData = static_cast<const Commands::BindDescriptorSet*>(data);
-        renderer->BindDescriptorSet(commandList, actualData->slot, actualData->descriptors, actualData->numDescriptors);
+        renderer->BindDescriptorSet(commandList, actualData->slot, actualData->descriptors, actualData->numDescriptors, actualData->bufferPermissions);
     }
 
     void BackendDispatch::SetDepthBias(Renderer* renderer, CommandListID commandList, const void* data)
@@ -290,20 +289,6 @@ namespace Renderer
         renderer->UpdateBuffer(commandList, actualData->dstBuffer, actualData->dstBufferOffset, actualData->size, actualData->data);
     }
 
-    void BackendDispatch::QueueDestroyBuffer(Renderer* renderer, CommandListID commandList, const void* data)
-    {
-        ZoneScopedC(tracy::Color::Red3);
-        const Commands::QueueDestroyBuffer* actualData = static_cast<const Commands::QueueDestroyBuffer*>(data);
-        renderer->QueueDestroyBuffer(actualData->buffer);
-    }
-
-    void BackendDispatch::PipelineBarrier(Renderer* renderer, CommandListID commandList, const void* data)
-    {
-        ZoneScopedC(tracy::Color::Red3);
-        const Commands::PipelineBarrier* actualData = static_cast<const Commands::PipelineBarrier*>(data);
-        renderer->PipelineBarrier(commandList, actualData->barrierType, actualData->buffer);
-    }
-
     void BackendDispatch::ImageBarrier(Renderer* renderer, CommandListID commandList, const void* data)
     {
         ZoneScopedC(tracy::Color::Red3);
@@ -318,9 +303,16 @@ namespace Renderer
         renderer->ImageBarrier(commandList, actualData->image);
     }
 
+    void BackendDispatch::BufferBarrier(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BufferBarrier* actualData = static_cast<const Commands::BufferBarrier*>(data);
+        renderer->BufferBarrier(commandList, actualData->bufferID, actualData->from);
+    }
+
     void BackendDispatch::DrawImgui(Renderer* renderer, CommandListID commandList, const void* data)
     {
-        ZoneScopedNC("Imgui Draw", tracy::Color::Red3);
+        ZoneScopedC(tracy::Color::Red3);
 
         renderer->DrawImgui(commandList);
     }

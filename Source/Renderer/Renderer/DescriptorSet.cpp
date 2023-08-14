@@ -5,6 +5,8 @@ namespace Renderer
 {
     void DescriptorSet::Bind(StringUtils::StringHash nameHash, BufferID bufferID)
     {
+        DebugHandler::Assert(!_locked, "DescriptorSet : Tried to Bind a BufferID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+
         for (u32 i = 0; i < _boundDescriptors.size(); i++)
         {
             if (nameHash == _boundDescriptors[i].nameHash)
@@ -23,6 +25,8 @@ namespace Renderer
 
     void DescriptorSet::BindArray(StringUtils::StringHash nameHash, BufferID bufferID, u32 arrayIndex)
     {
+        DebugHandler::Assert(!_locked, "DescriptorSet : Tried to BindArray a BufferID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+
         for (u32 i = 0; i < _boundDescriptors.size(); i++)
         {
             if (nameHash == _boundDescriptors[i].nameHash && arrayIndex == _boundDescriptors[i].arrayIndex)
@@ -44,6 +48,8 @@ namespace Renderer
 
     void DescriptorSet::Bind(StringUtils::StringHash nameHash, SamplerID samplerID)
     {
+        DebugHandler::Assert(!_locked, "DescriptorSet : Tried to Bind a SamplerID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+
         for (u32 i = 0; i < _boundDescriptors.size(); i++)
         {
             if (nameHash == _boundDescriptors[i].nameHash)
@@ -62,6 +68,8 @@ namespace Renderer
 
     void DescriptorSet::Bind(StringUtils::StringHash nameHash, TextureID textureID)
     {
+        DebugHandler::Assert(!_locked, "DescriptorSet : Tried to Bind a TextureID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+
         for (u32 i = 0; i < _boundDescriptors.size(); i++)
         {
             if (nameHash == _boundDescriptors[i].nameHash)
@@ -80,6 +88,8 @@ namespace Renderer
 
     void DescriptorSet::Bind(StringUtils::StringHash nameHash, TextureArrayID textureArrayID)
     {
+        DebugHandler::Assert(!_locked, "DescriptorSet : Tried to Bind a TextureArrayID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+
         for (u32 i = 0; i < _boundDescriptors.size(); i++)
         {
             if (nameHash == _boundDescriptors[i].nameHash)

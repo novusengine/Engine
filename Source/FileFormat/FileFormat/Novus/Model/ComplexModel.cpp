@@ -331,8 +331,6 @@ namespace Model
 
 			if (!buffer->Get(out.flags))
 				return false;
-
-			out.flags.IsConvertedMapObject = false;
 		}
 
 		// Read Sequences
@@ -720,6 +718,7 @@ namespace Model
 	bool ComplexModel::FromM2(std::shared_ptr<Bytebuffer>& rootBuffer, std::shared_ptr<Bytebuffer>& skinBuffer, Layout& layout, ComplexModel& out)
 	{
 		out.flags = *reinterpret_cast<ComplexModel::Flags*>(&layout.md21.flags);
+		out.flags.IsConvertedMapObject = false;
 
 		u32 numGlobalSequences = layout.md21.loopingSequenceTimestamps.size;
 		u32 numSequences = layout.md21.sequences.size;

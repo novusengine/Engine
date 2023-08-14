@@ -522,28 +522,20 @@ namespace Renderer
         TRANSFER_DESTINATION       = (1 << 6),
     };
 
+    enum class BufferPassUsage : u8
+    {
+        NONE,
+        TRANSFER = 1 << 0,
+        GRAPHICS = 1 << 1,
+        COMPUTE = 1 << 2,
+    };
+    DECLARE_GENERIC_BITWISE_OPERATORS(BufferPassUsage);
+
     enum class BufferCPUAccess
     {
         None,
         WriteOnly,
         ReadOnly,
-    };
-
-    enum class PipelineBarrierType
-    {
-        TransferDestToIndirectArguments,
-        TransferDestToComputeShaderRW,
-        TransferDestToVertexBuffer,
-        TransferDestToTransferSrc,
-        TransferDestToTransferDest,
-        ComputeWriteToIndirectArguments,
-        ComputeWriteToVertexBuffer,
-        ComputeWriteToVertexShaderRead,
-        ComputeWriteToPixelShaderRead,
-        ComputeWriteToComputeShaderRead,
-        ComputeWriteToTransferSrc,
-        ComputeWriteToIndexBuffer,
-        AllCommands,
     };
 
     inline ImageComponentType ToImageComponentType(ImageFormat imageFormat)

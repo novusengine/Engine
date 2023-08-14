@@ -36,6 +36,7 @@ namespace Renderer
 {
     class RenderGraph;
     struct RenderGraphDesc;
+    class TrackedBufferBitSets;
 
     class Renderer
     {
@@ -91,6 +92,9 @@ namespace Renderer
         virtual void UnloadTexture(TextureID textureID) = 0;
         virtual void UnloadTexturesInArray(TextureArrayID textureArrayID, u32 unloadStartIndex) = 0;
 
+        // Misc
+        virtual u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;
+
         // Command List Functions
         virtual CommandListID BeginCommandList() = 0;
         virtual void EndCommandList(CommandListID commandListID) = 0;
@@ -127,7 +131,7 @@ namespace Renderer
         virtual void SetIndexBuffer(CommandListID commandListID, BufferID bufferID, IndexFormat indexFormat) = 0;
         virtual void SetBuffer(CommandListID commandListID, u32 slot, BufferID buffer) = 0;
 
-        virtual void BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors) = 0;
+        virtual void BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors, const TrackedBufferBitSets* bufferPermissions) = 0;
 
         virtual void MarkFrameStart(CommandListID commandListID, u32 frameIndex) = 0;
         virtual void BeginTrace(CommandListID commandListID, const tracy::SourceLocationData* sourceLocation) = 0;
@@ -140,9 +144,9 @@ namespace Renderer
         virtual void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) = 0;
         virtual void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) = 0;
 
-        virtual void PipelineBarrier(CommandListID commandListID, PipelineBarrierType type, BufferID buffer) = 0;
-        virtual void ImageBarrier(CommandListID commandListID, ImageID image) = 0;
-        virtual void ImageBarrier(CommandListID commandListID, DepthImageID image) = 0;
+        virtual void ImageBarrier(CommandListID commandListID, ImageID imageID) = 0;
+        virtual void ImageBarrier(CommandListID commandListID, DepthImageID imageID) = 0;
+        virtual void BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from) = 0;
 
         virtual void PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size) = 0;
         virtual void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) = 0;
@@ -181,12 +185,16 @@ namespace Renderer
         virtual void ResetTimeQueries(u32 frameIndex) = 0;
 
         virtual TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) = 0;
+        virtual i32 GetTextureHeight(TextureID textureID) = 0;
+        virtual i32 GetTextureWidth(TextureID textureID) = 0;
 
         virtual const ImageDesc& GetImageDesc(ImageID ID) = 0;
         virtual const DepthImageDesc& GetImageDesc(DepthImageID ID) = 0;
 
         virtual uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) = 0;
         virtual uvec2 GetImageDimensions(const DepthImageID id) = 0;
+
+        virtual std::string GetBufferName(BufferID id) = 0;
 
         virtual const std::string& GetGPUName() = 0;
         virtual const std::string& GetDebugName(const TextureID textureID) = 0;
@@ -196,6 +204,7 @@ namespace Renderer
 
         virtual u32 GetNumImages() = 0;
         virtual u32 GetNumDepthImages() = 0;
+        virtual u32 GetNumBuffers() = 0;
 
         virtual void InitImgui() = 0;
         virtual void DrawImgui(CommandListID commandListID) = 0;

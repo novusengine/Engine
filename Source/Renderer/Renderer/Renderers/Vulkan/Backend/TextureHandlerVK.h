@@ -41,10 +41,14 @@ namespace Renderer
             TextureID CreateDataTexture(const DataTextureDesc& desc);
             TextureID CreateDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex);
 
+            u32 AddTextureToArray(const TextureID textureID, const TextureArrayID textureArrayID);
+
             void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, size_t srcOffset, TextureID dstTextureID);
             void TransitionImageLayout(VkCommandBuffer commandBuffer, TextureID textureID, VkImageAspectFlags aspects, VkImageLayout oldLayout, VkImageLayout newLayout);
 
             TextureID GetTextureIDInArray(const TextureArrayID textureArrayID, u32 index);
+            i32 GetTextureHeight(TextureID textureID);
+            i32 GetTextureWidth(TextureID textureID);
             const SafeVector<TextureID>& GetTextureIDsInArray(const TextureArrayID textureArrayID);
 
             bool IsOnionTexture(const TextureID textureID);
@@ -71,6 +75,8 @@ namespace Renderer
 
             void LoadFile(const std::string& filename, Texture& texture, TextureID textureID);
             void CreateTexture(Texture& texture);
+
+            u32 AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash);
 
         private:
             ITextureHandlerVKData* _data;

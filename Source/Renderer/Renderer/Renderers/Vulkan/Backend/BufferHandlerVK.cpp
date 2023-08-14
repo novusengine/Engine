@@ -16,6 +16,7 @@ namespace Renderer
     {
         struct Buffer
         {
+            std::string name;
             VmaAllocation allocation;
             VkBuffer buffer;
             VkDeviceSize size;
@@ -29,7 +30,7 @@ namespace Renderer
 
         struct BufferHandlerVKData : IBufferHandlerVKData
         {
-            SafeVector<Buffer> buffers;
+            std::vector<Buffer> buffers;
             std::queue<BufferID> returnedBufferIDs;
 
             std::vector<TemporaryBuffer> temporaryBuffers;
@@ -66,24 +67,48 @@ namespace Renderer
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            assert(bufferID != BufferID::Invalid());
-            return data.buffers.ReadGet(static_cast<BufferID::type>(bufferID)).buffer;
+            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBuffer tried to access Invalid BufferID");
+
+            BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
+            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBuffer tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+
+            return data.buffers[bufferIndex].buffer;
         }
 
         VkDeviceSize BufferHandlerVK::GetBufferSize(BufferID bufferID) const
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            assert(bufferID != BufferID::Invalid());
-            return data.buffers.ReadGet(static_cast<BufferID::type>(bufferID)).size;
+            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferSize tried to access Invalid BufferID");
+
+            BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
+            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferSize tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+
+            return data.buffers[bufferIndex].size;
         }
 
         VmaAllocation BufferHandlerVK::GetBufferAllocation(BufferID bufferID) const
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            assert(bufferID != BufferID::Invalid());
-            return data.buffers.ReadGet(static_cast<BufferID::type>(bufferID)).allocation;
+            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferAllocation tried to access Invalid BufferID");
+
+            BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
+            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferAllocation tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+
+            return data.buffers[bufferIndex].allocation;
+        }
+
+        std::string BufferHandlerVK::GetBufferName(BufferID bufferID) const
+        {
+            BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
+
+            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferName tried to access Invalid BufferID");
+
+            BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
+            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferName tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+
+            return data.buffers[bufferIndex].name;
         }
 
         BufferID BufferHandlerVK::CreateBuffer(BufferDesc& desc)
@@ -156,25 +181,18 @@ namespace Renderer
             }
 
             bool failed = false;
-            data.buffers.WriteLock([&](std::vector<Buffer>& buffers)
-            {
-                Buffer& buffer = buffers[(BufferID::type)bufferID];
-                buffer.size = descSize;
 
-                if (vmaCreateBuffer(_device->_allocator, &bufferInfo, &allocInfo, &buffer.buffer, &buffer.allocation, nullptr) != VK_SUCCESS)
-                {
-                    failed = true;
-                    return;
-                }
+            Buffer& buffer = data.buffers[(BufferID::type)bufferID];
+            buffer.size = descSize;
 
-                DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)buffer.buffer, VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT, desc.name.c_str());
-            });
-
-            if (failed)
+            if (vmaCreateBuffer(_device->_allocator, &bufferInfo, &allocInfo, &buffer.buffer, &buffer.allocation, nullptr) != VK_SUCCESS)
             {
                 DebugHandler::PrintFatal("Failed to create buffer!");
                 return BufferID::Invalid();
             }
+
+            buffer.name = desc.name;
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)buffer.buffer, VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT, buffer.name.c_str());
 
             return bufferID;
         }
@@ -194,14 +212,18 @@ namespace Renderer
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            data.buffers.WriteLock([&](std::vector<Buffer>& buffers)
-            {
-                Buffer& buffer = buffers[(BufferID::type)bufferID];
+            Buffer& buffer = data.buffers[(BufferID::type)bufferID];
 
-                vmaDestroyBuffer(_device->_allocator, buffer.buffer, buffer.allocation);
-            });
+            vmaDestroyBuffer(_device->_allocator, buffer.buffer, buffer.allocation);
 
             ReturnBufferID(bufferID);
+        }
+
+        u32 BufferHandlerVK::GetNumBuffers()
+        {
+            BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
+            
+            return static_cast<u32>(data.buffers.size());
         }
 
         BufferID BufferHandlerVK::AcquireNewBufferID()
@@ -219,12 +241,8 @@ namespace Renderer
             else
             {
                 // Else create a new one
-                data.buffers.WriteLock([&](std::vector<Buffer>& buffers)
-                {
-                    bufferID = BufferID(static_cast<BufferID::type>(buffers.size()));
-                    buffers.emplace_back();
-                });
-                
+                bufferID = BufferID(static_cast<BufferID::type>(data.buffers.size()));
+                data.buffers.emplace_back();
             }
 
             return bufferID;

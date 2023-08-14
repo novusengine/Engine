@@ -1,5 +1,5 @@
-// stb_truetype.h - v1.24 - public domain
-// authored from 2009-2020 by Sean Barrett / RAD Game Tools
+// stb_truetype.h - v1.26 - public domain
+// authored from 2009-2021 by Sean Barrett / RAD Game Tools
 //
 // =======================================================================
 //
@@ -53,11 +53,13 @@
 //       Johan Duparc               Thomas Fields
 //       Hou Qiming                 Derek Vinyard
 //       Rob Loach                  Cort Stratton
-//       Kenney Phillis Jr.         Brian Costabile            
-//       Ken Voskuil (kaesve)       
+//       Kenney Phillis Jr.         Brian Costabile
+//       Ken Voskuil (kaesve)
 //
 // VERSION HISTORY
 //
+//   1.26 (2021-08-28) fix broken rasterizer
+//   1.25 (2021-07-11) many fixes
 //   1.24 (2020-02-05) fix warning
 //   1.23 (2020-02-02) query SVG data for glyphs; query whole kerning table (but only kern not GPOS)
 //   1.22 (2019-08-11) minimize missing-glyph duplication; fix kerning if both 'GPOS' and 'kern' are defined
@@ -270,8 +272,8 @@
 ////  SAMPLE PROGRAMS
 ////
 //
-//  Incomplete text-in-3d-api example, which draws quads properly aligned to be lossless
-//
+//  Incomplete text-in-3d-api example, which draws quads properly aligned to be lossless.
+//  See "tests/truetype_demo_win32.c" for a complete version.
 #if 0
 #define STB_TRUETYPE_IMPLEMENTATION  // force following include to generate implementation
 #include "stb_truetype.h"
@@ -297,6 +299,8 @@ void my_stbtt_initfont(void)
 void my_stbtt_print(float x, float y, char* text)
 {
     // assume orthographic projection with units = screen pixels, origin at top left
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, ftex);
     glBegin(GL_QUADS);
@@ -304,10 +308,10 @@ void my_stbtt_print(float x, float y, char* text)
         if (*text >= 32 && *text < 128) {
             stbtt_aligned_quad q;
             stbtt_GetBakedQuad(cdata, 512, 512, *text - 32, &x, &y, &q, 1);//1=opengl & d3d10+,0=d3d9
-            glTexCoord2f(q.s0, q.t1); glVertex2f(q.x0, q.y0);
-            glTexCoord2f(q.s1, q.t1); glVertex2f(q.x1, q.y0);
-            glTexCoord2f(q.s1, q.t0); glVertex2f(q.x1, q.y1);
-            glTexCoord2f(q.s0, q.t0); glVertex2f(q.x0, q.y1);
+            glTexCoord2f(q.s0, q.t0); glVertex2f(q.x0, q.y0);
+            glTexCoord2f(q.s1, q.t0); glVertex2f(q.x1, q.y0);
+            glTexCoord2f(q.s1, q.t1); glVertex2f(q.x1, q.y1);
+            glTexCoord2f(q.s0, q.t1); glVertex2f(q.x0, q.y1);
         }
         ++text;
     }
@@ -531,10 +535,10 @@ extern "C" {
         unsigned char* pixels, int pw, int ph,  // bitmap to be filled in
         int first_char, int num_chars,          // characters to bake
         stbtt_bakedchar* chardata);             // you allocate this, it's num_chars long
-// if return is positive, the first unused row of the bitmap
-// if return is negative, returns the negative of the number of characters that fit
-// if return is 0, no characters fit and no rows were used
-// This uses a very crappy packing.
+    // if return is positive, the first unused row of the bitmap
+    // if return is negative, returns the negative of the number of characters that fit
+    // if return is 0, no characters fit and no rows were used
+    // This uses a very crappy packing.
 
     typedef struct
     {
@@ -547,15 +551,15 @@ extern "C" {
         float* xpos, float* ypos,   // pointers to current position in screen pixel space
         stbtt_aligned_quad* q,      // output: quad to draw
         int opengl_fillrule);       // true if opengl fill rule; false if DX9 or earlier
-// Call GetBakedQuad with char_index = 'character - first_char', and it
-// creates the quad you need to draw and advances the current position.
-//
-// The coordinate system used assumes y increases downwards.
-//
-// Characters will extend both above and below the current position;
-// see discussion of "BASELINE" above.
-//
-// It's inefficient; you might want to c&p it and optimize it.
+    // Call GetBakedQuad with char_index = 'character - first_char', and it
+    // creates the quad you need to draw and advances the current position.
+    //
+    // The coordinate system used assumes y increases downwards.
+    //
+    // Characters will extend both above and below the current position;
+    // see discussion of "BASELINE" above.
+    //
+    // It's inefficient; you might want to c&p it and optimize it.
 
     STBTT_DEF void stbtt_GetScaledFontVMetrics(const unsigned char* fontdata, int index, float size, float* ascent, float* descent, float* lineGap);
     // Query the font vertical metrics without having to create a font first.
@@ -853,6 +857,7 @@ extern "C" {
     STBTT_DEF void stbtt_FreeShape(const stbtt_fontinfo* info, stbtt_vertex* vertices);
     // frees the data allocated above
 
+    STBTT_DEF unsigned char* stbtt_FindSVGDoc(const stbtt_fontinfo* info, int gl);
     STBTT_DEF int stbtt_GetCodepointSVG(const stbtt_fontinfo* info, int unicode_codepoint, const char** svg);
     STBTT_DEF int stbtt_GetGlyphSVG(const stbtt_fontinfo* info, int gl, const char** svg);
     // fills svg with the character's SVG data.
@@ -933,9 +938,9 @@ extern "C" {
         int invert,                   // if non-zero, vertically flip shape
         void* userdata);              // context for to STBTT_MALLOC
 
-//////////////////////////////////////////////////////////////////////////////
-//
-// Signed Distance Function (or Field) rendering
+    //////////////////////////////////////////////////////////////////////////////
+    //
+    // Signed Distance Function (or Field) rendering
 
     STBTT_DEF void stbtt_FreeSDF(unsigned char* bitmap, void* userdata);
     // frees the SDF bitmap allocated below
@@ -1066,7 +1071,7 @@ extern "C" {
     };
 
     enum { // languageID for STBTT_PLATFORM_ID_MICROSOFT; same as LCID...
-           // problematic because there are e.g. 16 english LCIDs and 16 arabic LCIDs
+        // problematic because there are e.g. 16 english LCIDs and 16 arabic LCIDs
         STBTT_MS_LANG_ENGLISH = 0x0409, STBTT_MS_LANG_ITALIAN = 0x0410,
         STBTT_MS_LANG_CHINESE = 0x0804, STBTT_MS_LANG_JAPANESE = 0x0411,
         STBTT_MS_LANG_DUTCH = 0x0413, STBTT_MS_LANG_KOREAN = 0x0412,
@@ -1125,7 +1130,7 @@ typedef int stbtt__test_oversample_pow2[(STBTT_MAX_OVERSAMPLE & (STBTT_MAX_OVERS
 // stbtt__buf helpers to parse data from file
 //
 
-static stbtt_uint8 stbtt__buf_get8(stbtt__buf * b)
+static stbtt_uint8 stbtt__buf_get8(stbtt__buf* b)
 {
     if (b->cursor >= b->size)
         return 0;
@@ -1545,12 +1550,12 @@ STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo* info, int unicode_codep
         search += 2;
 
         {
-            stbtt_uint16 offset, start;
+            stbtt_uint16 offset, start, last;
             stbtt_uint16 item = (stbtt_uint16)((search - endCount) >> 1);
 
-            STBTT_assert(unicode_codepoint <= ttUSHORT(data + endCount + 2 * item));
             start = ttUSHORT(data + index_map + 14 + segcount * 2 + 2 + 2 * item);
-            if (unicode_codepoint < start)
+            last = ttUSHORT(data + endCount + 2 * item);
+            if (unicode_codepoint < start || unicode_codepoint > last)
                 return 0;
 
             offset = ttUSHORT(data + index_map + 14 + segcount * 6 + 2 + 2 * item);
@@ -1634,10 +1639,10 @@ STBTT_DEF int stbtt_GetGlyphBox(const stbtt_fontinfo* info, int glyph_index, int
         int g = stbtt__GetGlyfOffset(info, glyph_index);
         if (g < 0) return 0;
 
-        if (x0)* x0 = ttSHORT(info->data + g + 2);
-        if (y0)* y0 = ttSHORT(info->data + g + 4);
-        if (x1)* x1 = ttSHORT(info->data + g + 6);
-        if (y1)* y1 = ttSHORT(info->data + g + 8);
+        if (x0) *x0 = ttSHORT(info->data + g + 2);
+        if (y0) *y0 = ttSHORT(info->data + g + 4);
+        if (x1) *x1 = ttSHORT(info->data + g + 6);
+        if (y1) *y1 = ttSHORT(info->data + g + 8);
     }
     return 1;
 }
@@ -1831,7 +1836,7 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo* info, int glyph_index, s
         while (more) {
             stbtt_uint16 flags, gidx;
             int comp_num_verts = 0, i;
-            stbtt_vertex* comp_verts = 0, *tmp = 0;
+            stbtt_vertex* comp_verts = 0, * tmp = 0;
             float mtx[6] = { 1,0,0,1,0,0 }, m, n;
 
             flags = ttSHORT(comp); comp += 2;
@@ -1892,7 +1897,7 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo* info, int glyph_index, s
                     if (comp_verts) STBTT_free(comp_verts, info->userdata);
                     return 0;
                 }
-                if (num_vertices > 0) STBTT_memcpy(tmp, vertices, num_vertices * sizeof(stbtt_vertex));
+                if (num_vertices > 0 && vertices) STBTT_memcpy(tmp, vertices, num_vertices * sizeof(stbtt_vertex));
                 STBTT_memcpy(tmp + num_vertices, comp_verts, comp_num_verts * sizeof(stbtt_vertex));
                 if (vertices) STBTT_free(vertices, info->userdata);
                 vertices = tmp;
@@ -2158,7 +2163,7 @@ static int stbtt__run_charstring(const stbtt_fontinfo* info, int glyph_index, st
                     subrs = stbtt__cid_get_glyph_subrs(info, glyph_index);
                 has_subrs = 1;
             }
-            // fallthrough
+            // FALLTHROUGH
         case 0x1D: // callgsubr
             if (sp < 1) return STBTT__CSERR("call(g|)subr stack");
             v = (int)s[--sp];
@@ -2263,7 +2268,7 @@ static int stbtt__run_charstring(const stbtt_fontinfo* info, int glyph_index, st
         } break;
 
         default:
-            if (b0 != 255 && b0 != 28 && (b0 < 32 || b0 > 254))
+            if (b0 != 255 && b0 != 28 && b0 < 32)
                 return STBTT__CSERR("reserved operator");
 
             // push immediate
@@ -2307,10 +2312,10 @@ static int stbtt__GetGlyphInfoT2(const stbtt_fontinfo* info, int glyph_index, in
 {
     stbtt__csctx c = STBTT__CSCTX_INIT(1);
     int r = stbtt__run_charstring(info, glyph_index, &c);
-    if (x0)* x0 = r ? c.min_x : 0;
-    if (y0)* y0 = r ? c.min_y : 0;
-    if (x1)* x1 = r ? c.max_x : 0;
-    if (y1)* y1 = r ? c.max_y : 0;
+    if (x0)  *x0 = r ? c.min_x : 0;
+    if (y0)  *y0 = r ? c.min_y : 0;
+    if (x1)  *x1 = r ? c.max_x : 0;
+    if (y1)  *y1 = r ? c.max_y : 0;
     return r ? c.num_vertices : 0;
 }
 
@@ -2326,12 +2331,12 @@ STBTT_DEF void stbtt_GetGlyphHMetrics(const stbtt_fontinfo* info, int glyph_inde
 {
     stbtt_uint16 numOfLongHorMetrics = ttUSHORT(info->data + info->hhea + 34);
     if (glyph_index < numOfLongHorMetrics) {
-        if (advanceWidth)* advanceWidth = ttSHORT(info->data + info->hmtx + 4 * glyph_index);
-        if (leftSideBearing)* leftSideBearing = ttSHORT(info->data + info->hmtx + 4 * glyph_index + 2);
+        if (advanceWidth)     *advanceWidth = ttSHORT(info->data + info->hmtx + 4 * glyph_index);
+        if (leftSideBearing)  *leftSideBearing = ttSHORT(info->data + info->hmtx + 4 * glyph_index + 2);
     }
     else {
-        if (advanceWidth)* advanceWidth = ttSHORT(info->data + info->hmtx + 4 * (numOfLongHorMetrics - 1));
-        if (leftSideBearing)* leftSideBearing = ttSHORT(info->data + info->hmtx + 4 * numOfLongHorMetrics + 2 * (glyph_index - numOfLongHorMetrics));
+        if (advanceWidth)     *advanceWidth = ttSHORT(info->data + info->hmtx + 4 * (numOfLongHorMetrics - 1));
+        if (leftSideBearing)  *leftSideBearing = ttSHORT(info->data + info->hmtx + 4 * numOfLongHorMetrics + 2 * (glyph_index - numOfLongHorMetrics));
     }
 }
 
@@ -2377,7 +2382,7 @@ STBTT_DEF int stbtt_GetKerningTable(const stbtt_fontinfo* info, stbtt_kerningent
     return length;
 }
 
-static int  stbtt__GetGlyphKernInfoAdvance(const stbtt_fontinfo* info, int glyph1, int glyph2)
+static int stbtt__GetGlyphKernInfoAdvance(const stbtt_fontinfo* info, int glyph1, int glyph2)
 {
     stbtt_uint8* data = info->data + info->kern;
     stbtt_uint32 needle, straw;
@@ -2407,7 +2412,7 @@ static int  stbtt__GetGlyphKernInfoAdvance(const stbtt_fontinfo* info, int glyph
     return 0;
 }
 
-static stbtt_int32  stbtt__GetCoverageIndex(stbtt_uint8* coverageTable, int glyph)
+static stbtt_int32 stbtt__GetCoverageIndex(stbtt_uint8* coverageTable, int glyph)
 {
     stbtt_uint16 coverageFormat = ttUSHORT(coverageTable);
     switch (coverageFormat) {
@@ -2431,7 +2436,8 @@ static stbtt_int32  stbtt__GetCoverageIndex(stbtt_uint8* coverageTable, int glyp
                 return m;
             }
         }
-    } break;
+        break;
+    }
 
     case 2: {
         stbtt_uint16 rangeCount = ttUSHORT(coverageTable + 2);
@@ -2455,12 +2461,10 @@ static stbtt_int32  stbtt__GetCoverageIndex(stbtt_uint8* coverageTable, int glyp
                 return startCoverageIndex + glyph - strawStart;
             }
         }
-    } break;
+        break;
+    }
 
-    default: {
-        // There are no other cases.
-        STBTT_assert(0);
-    } break;
+    default: return -1; // unsupported
     }
 
     return -1;
@@ -2478,9 +2482,8 @@ static stbtt_int32  stbtt__GetGlyphClass(stbtt_uint8* classDefTable, int glyph)
 
         if (glyph >= startGlyphID && glyph < startGlyphID + glyphCount)
             return (stbtt_int32)ttUSHORT(classDef1ValueArray + 2 * (glyph - startGlyphID));
-
-        classDefTable = classDef1ValueArray + 2 * glyphCount;
-    } break;
+        break;
+    }
 
     case 2: {
         stbtt_uint16 classRangeCount = ttUSHORT(classDefTable + 2);
@@ -2502,29 +2505,27 @@ static stbtt_int32  stbtt__GetGlyphClass(stbtt_uint8* classDefTable, int glyph)
             else
                 return (stbtt_int32)ttUSHORT(classRangeRecord + 4);
         }
-
-        classDefTable = classRangeRecords + 6 * classRangeCount;
-    } break;
-
-    default: {
-        // There are no other cases.
-        STBTT_assert(0);
-    } break;
+        break;
     }
 
-    return -1;
+    default:
+        return -1; // Unsupported definition type, return an error.
+    }
+
+    // "All glyphs not assigned to a class fall into class 0". (OpenType spec)
+    return 0;
 }
 
 // Define to STBTT_assert(x) if you want to break on unimplemented formats.
 #define STBTT_GPOS_TODO_assert(x)
 
-static stbtt_int32  stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo* info, int glyph1, int glyph2)
+static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo* info, int glyph1, int glyph2)
 {
     stbtt_uint16 lookupListOffset;
     stbtt_uint8* lookupList;
     stbtt_uint16 lookupCount;
     stbtt_uint8* data;
-    stbtt_int32 i;
+    stbtt_int32 i, sti;
 
     if (!info->gpos) return 0;
 
@@ -2544,37 +2545,32 @@ static stbtt_int32  stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo* info, i
         stbtt_uint16 lookupType = ttUSHORT(lookupTable);
         stbtt_uint16 subTableCount = ttUSHORT(lookupTable + 4);
         stbtt_uint8* subTableOffsets = lookupTable + 6;
-        switch (lookupType) {
-        case 2: { // Pair Adjustment Positioning Subtable
-            stbtt_int32 sti;
-            for (sti = 0; sti < subTableCount; sti++) {
-                stbtt_uint16 subtableOffset = ttUSHORT(subTableOffsets + 2 * sti);
-                stbtt_uint8* table = lookupTable + subtableOffset;
-                stbtt_uint16 posFormat = ttUSHORT(table);
-                stbtt_uint16 coverageOffset = ttUSHORT(table + 2);
-                stbtt_int32 coverageIndex = stbtt__GetCoverageIndex(table + coverageOffset, glyph1);
-                if (coverageIndex == -1) continue;
+        if (lookupType != 2) // Pair Adjustment Positioning Subtable
+            continue;
 
-                switch (posFormat) {
-                case 1: {
-                    stbtt_int32 l, r, m;
-                    int straw, needle;
-                    stbtt_uint16 valueFormat1 = ttUSHORT(table + 4);
-                    stbtt_uint16 valueFormat2 = ttUSHORT(table + 6);
+        for (sti = 0; sti < subTableCount; sti++) {
+            stbtt_uint16 subtableOffset = ttUSHORT(subTableOffsets + 2 * sti);
+            stbtt_uint8* table = lookupTable + subtableOffset;
+            stbtt_uint16 posFormat = ttUSHORT(table);
+            stbtt_uint16 coverageOffset = ttUSHORT(table + 2);
+            stbtt_int32 coverageIndex = stbtt__GetCoverageIndex(table + coverageOffset, glyph1);
+            if (coverageIndex == -1) continue;
+
+            switch (posFormat) {
+            case 1: {
+                stbtt_int32 l, r, m;
+                int straw, needle;
+                stbtt_uint16 valueFormat1 = ttUSHORT(table + 4);
+                stbtt_uint16 valueFormat2 = ttUSHORT(table + 6);
+                if (valueFormat1 == 4 && valueFormat2 == 0) { // Support more formats?
                     stbtt_int32 valueRecordPairSizeInBytes = 2;
                     stbtt_uint16 pairSetCount = ttUSHORT(table + 8);
                     stbtt_uint16 pairPosOffset = ttUSHORT(table + 10 + 2 * coverageIndex);
                     stbtt_uint8* pairValueTable = table + pairPosOffset;
                     stbtt_uint16 pairValueCount = ttUSHORT(pairValueTable);
                     stbtt_uint8* pairValueArray = pairValueTable + 2;
-                    // TODO: Support more formats.
-                    STBTT_GPOS_TODO_assert(valueFormat1 == 4);
-                    if (valueFormat1 != 4) return 0;
-                    STBTT_GPOS_TODO_assert(valueFormat2 == 0);
-                    if (valueFormat2 != 0) return 0;
 
-                    STBTT_assert(coverageIndex < pairSetCount);
-                    STBTT__NOTUSED(pairSetCount);
+                    if (coverageIndex >= pairSetCount) return 0;
 
                     needle = glyph2;
                     r = pairValueCount - 1;
@@ -2597,12 +2593,16 @@ static stbtt_int32  stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo* info, i
                             return xAdvance;
                         }
                     }
-                } break;
+                }
+                else
+                    return 0;
+                break;
+            }
 
-                case 2: {
-                    stbtt_uint16 valueFormat1 = ttUSHORT(table + 4);
-                    stbtt_uint16 valueFormat2 = ttUSHORT(table + 6);
-
+            case 2: {
+                stbtt_uint16 valueFormat1 = ttUSHORT(table + 4);
+                stbtt_uint16 valueFormat2 = ttUSHORT(table + 6);
+                if (valueFormat1 == 4 && valueFormat2 == 0) { // Support more formats?
                     stbtt_uint16 classDef1Offset = ttUSHORT(table + 8);
                     stbtt_uint16 classDef2Offset = ttUSHORT(table + 10);
                     int glyph1class = stbtt__GetGlyphClass(table + classDef1Offset, glyph1);
@@ -2610,36 +2610,25 @@ static stbtt_int32  stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo* info, i
 
                     stbtt_uint16 class1Count = ttUSHORT(table + 12);
                     stbtt_uint16 class2Count = ttUSHORT(table + 14);
-                    STBTT_assert(glyph1class < class1Count);
-                    STBTT_assert(glyph2class < class2Count);
+                    stbtt_uint8* class1Records, * class2Records;
+                    stbtt_int16 xAdvance;
 
-                    // TODO: Support more formats.
-                    STBTT_GPOS_TODO_assert(valueFormat1 == 4);
-                    if (valueFormat1 != 4) return 0;
-                    STBTT_GPOS_TODO_assert(valueFormat2 == 0);
-                    if (valueFormat2 != 0) return 0;
+                    if (glyph1class < 0 || glyph1class >= class1Count) return 0; // malformed
+                    if (glyph2class < 0 || glyph2class >= class2Count) return 0; // malformed
 
-                    if (glyph1class >= 0 && glyph1class < class1Count && glyph2class >= 0 && glyph2class < class2Count) {
-                        stbtt_uint8* class1Records = table + 16;
-                        stbtt_uint8* class2Records = class1Records + 2 * (glyph1class * class2Count);
-                        stbtt_int16 xAdvance = ttSHORT(class2Records + 2 * glyph2class);
-                        return xAdvance;
-                    }
-                } break;
-
-                default: {
-                    // There are no other cases.
-                    STBTT_assert(0);
-                    break;
-                };
+                    class1Records = table + 16;
+                    class2Records = class1Records + 2 * (glyph1class * class2Count);
+                    xAdvance = ttSHORT(class2Records + 2 * glyph2class);
+                    return xAdvance;
                 }
+                else
+                    return 0;
+                break;
             }
-            break;
-        };
 
-        default:
-            // TODO: Implement other stuff.
-            break;
+            default:
+                return 0; // Unsupported position format
+            }
         }
     }
 
@@ -2672,9 +2661,9 @@ STBTT_DEF void stbtt_GetCodepointHMetrics(const stbtt_fontinfo* info, int codepo
 
 STBTT_DEF void stbtt_GetFontVMetrics(const stbtt_fontinfo* info, int* ascent, int* descent, int* lineGap)
 {
-    if (ascent)* ascent = ttSHORT(info->data + info->hhea + 4);
-    if (descent)* descent = ttSHORT(info->data + info->hhea + 6);
-    if (lineGap)* lineGap = ttSHORT(info->data + info->hhea + 8);
+    if (ascent) *ascent = ttSHORT(info->data + info->hhea + 4);
+    if (descent) *descent = ttSHORT(info->data + info->hhea + 6);
+    if (lineGap) *lineGap = ttSHORT(info->data + info->hhea + 8);
 }
 
 STBTT_DEF int  stbtt_GetFontVMetricsOS2(const stbtt_fontinfo* info, int* typoAscent, int* typoDescent, int* typoLineGap)
@@ -2682,9 +2671,9 @@ STBTT_DEF int  stbtt_GetFontVMetricsOS2(const stbtt_fontinfo* info, int* typoAsc
     int tab = stbtt__find_table(info->data, info->fontstart, "OS/2");
     if (!tab)
         return 0;
-    if (typoAscent)* typoAscent = ttSHORT(info->data + tab + 68);
-    if (typoDescent)* typoDescent = ttSHORT(info->data + tab + 70);
-    if (typoLineGap)* typoLineGap = ttSHORT(info->data + tab + 72);
+    if (typoAscent) *typoAscent = ttSHORT(info->data + tab + 68);
+    if (typoDescent) *typoDescent = ttSHORT(info->data + tab + 70);
+    if (typoLineGap) *typoLineGap = ttSHORT(info->data + tab + 72);
     return 1;
 }
 
@@ -2763,17 +2752,17 @@ STBTT_DEF void stbtt_GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo* font, int g
     int x0 = 0, y0 = 0, x1, y1; // =0 suppresses compiler warning
     if (!stbtt_GetGlyphBox(font, glyph, &x0, &y0, &x1, &y1)) {
         // e.g. space character
-        if (ix0)* ix0 = 0;
-        if (iy0)* iy0 = 0;
-        if (ix1)* ix1 = 0;
-        if (iy1)* iy1 = 0;
+        if (ix0) *ix0 = 0;
+        if (iy0) *iy0 = 0;
+        if (ix1) *ix1 = 0;
+        if (iy1) *iy1 = 0;
     }
     else {
         // move to integral bboxes (treating pixels as little squares, what pixels get touched)?
-        if (ix0)* ix0 = STBTT_ifloor(x0 * scale_x + shift_x);
-        if (iy0)* iy0 = STBTT_ifloor(-y1 * scale_y + shift_y);
-        if (ix1)* ix1 = STBTT_iceil(x1 * scale_x + shift_x);
-        if (iy1)* iy1 = STBTT_iceil(-y0 * scale_y + shift_y);
+        if (ix0) *ix0 = STBTT_ifloor(x0 * scale_x + shift_x);
+        if (iy0) *iy0 = STBTT_ifloor(-y1 * scale_y + shift_y);
+        if (ix1) *ix1 = STBTT_iceil(x1 * scale_x + shift_x);
+        if (iy1) *iy1 = STBTT_iceil(-y0 * scale_y + shift_y);
     }
 }
 
@@ -2874,7 +2863,7 @@ typedef struct stbtt__active_edge
 #define STBTT_FIX        (1 << STBTT_FIXSHIFT)
 #define STBTT_FIXMASK    (STBTT_FIX-1)
 
-static stbtt__active_edge * stbtt__new_active(stbtt__hheap * hh, stbtt__edge * e, int off_x, float start_point, void* userdata)
+static stbtt__active_edge* stbtt__new_active(stbtt__hheap* hh, stbtt__edge* e, int off_x, float start_point, void* userdata)
 {
     stbtt__active_edge* z = (stbtt__active_edge*)stbtt__hheap_alloc(hh, sizeof(*z), userdata);
     float dxdy = (e->x1 - e->x0) / (e->y1 - e->y0);
@@ -2896,7 +2885,7 @@ static stbtt__active_edge * stbtt__new_active(stbtt__hheap * hh, stbtt__edge * e
     return z;
 }
 #elif STBTT_RASTERIZER_VERSION == 2
-static stbtt__active_edge * stbtt__new_active(stbtt__hheap * hh, stbtt__edge * e, int off_x, float start_point, void* userdata)
+static stbtt__active_edge* stbtt__new_active(stbtt__hheap* hh, stbtt__edge* e, int off_x, float start_point, void* userdata)
 {
     stbtt__active_edge* z = (stbtt__active_edge*)stbtt__hheap_alloc(hh, sizeof(*z), userdata);
     float dxdy = (e->x1 - e->x0) / (e->y1 - e->y0);
@@ -2921,7 +2910,7 @@ static stbtt__active_edge * stbtt__new_active(stbtt__hheap * hh, stbtt__edge * e
 // note: this routine clips fills that extend off the edges... ideally this
 // wouldn't happen, but it could happen if the truetype glyph bounding boxes
 // are wrong, or if the user supplies a too-small bitmap
-static void stbtt__fill_active_edges(unsigned char* scanline, int len, stbtt__active_edge * e, int max_weight)
+static void stbtt__fill_active_edges(unsigned char* scanline, int len, stbtt__active_edge* e, int max_weight)
 {
     // non-zero winding fill
     int x0 = 0, w = 0;
@@ -3071,7 +3060,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap* result, stbtt__edge* e,
 
 // the edge passed in here does not cross the vertical line at x or the vertical line at x+1
 // (i.e. it has already been clipped to those)
-static void stbtt__handle_clipped_edge(float* scanline, int x, stbtt__active_edge * e, float x0, float y0, float x1, float y1)
+static void stbtt__handle_clipped_edge(float* scanline, int x, stbtt__active_edge* e, float x0, float y0, float x1, float y1)
 {
     if (y0 == y1) return;
     STBTT_assert(y0 < y1);
@@ -3106,6 +3095,23 @@ static void stbtt__handle_clipped_edge(float* scanline, int x, stbtt__active_edg
         STBTT_assert(x0 >= x && x0 <= x + 1 && x1 >= x && x1 <= x + 1);
         scanline[x] += e->direction * (y1 - y0) * (1 - ((x0 - x) + (x1 - x)) / 2); // coverage = 1 - average x position
     }
+}
+
+static float stbtt__sized_trapezoid_area(float height, float top_width, float bottom_width)
+{
+    STBTT_assert(top_width >= 0);
+    STBTT_assert(bottom_width >= 0);
+    return (top_width + bottom_width) / 2.0f * height;
+}
+
+static float stbtt__position_trapezoid_area(float height, float tx0, float tx1, float bx0, float bx1)
+{
+    return stbtt__sized_trapezoid_area(height, tx1 - tx0, bx1 - bx0);
+}
+
+static float stbtt__sized_triangle_area(float height, float width)
+{
+    return height * width / 2;
 }
 
 static void stbtt__fill_active_edges_new(float* scanline, float* scanline_fill, int len, stbtt__active_edge* e, float y_top)
@@ -3166,14 +3172,14 @@ static void stbtt__fill_active_edges_new(float* scanline, float* scanline_fill, 
                     float height;
                     // simple case, only spans one pixel
                     int x = (int)x_top;
-                    height = sy1 - sy0;
+                    height = (sy1 - sy0) * e->direction;
                     STBTT_assert(x >= 0 && x < len);
-                    scanline[x] += e->direction * (1 - ((x_top - x) + (x_bottom - x)) / 2) * height;
-                    scanline_fill[x] += e->direction * height; // everything right of this pixel is filled
+                    scanline[x] += stbtt__position_trapezoid_area(height, x_top, x + 1.0f, x_bottom, x + 1.0f);
+                    scanline_fill[x] += height; // everything right of this pixel is filled
                 }
                 else {
                     int x, x1, x2;
-                    float y_crossing, step, sign, area;
+                    float y_crossing, y_final, step, sign, area;
                     // covers 2+ pixels
                     if (x_top > x_bottom) {
                         // flip scanline vertically; signed area is the same
@@ -3186,29 +3192,79 @@ static void stbtt__fill_active_edges_new(float* scanline, float* scanline_fill, 
                         dy = -dy;
                         t = x0, x0 = xb, xb = t;
                     }
+                    STBTT_assert(dy >= 0);
+                    STBTT_assert(dx >= 0);
 
                     x1 = (int)x_top;
                     x2 = (int)x_bottom;
                     // compute intersection with y axis at x1+1
-                    y_crossing = (x1 + 1 - x0) * dy + y_top;
+                    y_crossing = y_top + dy * (x1 + 1 - x0);
+
+                    // compute intersection with y axis at x2
+                    y_final = y_top + dy * (x2 - x0);
+
+                    //           x1    x_top                            x2    x_bottom
+                    //     y_top  +------|-----+------------+------------+--------|---+------------+
+                    //            |            |            |            |            |            |
+                    //            |            |            |            |            |            |
+                    //       sy0  |      Txxxxx|............|............|............|............|
+                    // y_crossing |            *xxxxx.......|............|............|............|
+                    //            |            |     xxxxx..|............|............|............|
+                    //            |            |     /-   xx*xxxx........|............|............|
+                    //            |            | dy <       |    xxxxxx..|............|............|
+                    //   y_final  |            |     \-     |          xx*xxx.........|............|
+                    //       sy1  |            |            |            |   xxxxxB...|............|
+                    //            |            |            |            |            |            |
+                    //            |            |            |            |            |            |
+                    //  y_bottom  +------------+------------+------------+------------+------------+
+                    //
+                    // goal is to measure the area covered by '.' in each pixel
+
+                    // if x2 is right at the right edge of x1, y_crossing can blow up, github #1057
+                    // @TODO: maybe test against sy1 rather than y_bottom?
+                    if (y_crossing > y_bottom)
+                        y_crossing = y_bottom;
 
                     sign = e->direction;
-                    // area of the rectangle covered from y0..y_crossing
-                    area = sign * (y_crossing - sy0);
-                    // area of the triangle (x_top,y0), (x+1,y0), (x+1,y_crossing)
-                    scanline[x1] += area * (1 - ((x_top - x1) + (x1 + 1 - x1)) / 2);
 
-                    step = sign * dy;
+                    // area of the rectangle covered from sy0..y_crossing
+                    area = sign * (y_crossing - sy0);
+
+                    // area of the triangle (x_top,sy0), (x1+1,sy0), (x1+1,y_crossing)
+                    scanline[x1] += stbtt__sized_triangle_area(area, x1 + 1 - x_top);
+
+                    // check if final y_crossing is blown up; no test case for this
+                    if (y_final > y_bottom) {
+                        y_final = y_bottom;
+                        dy = (y_final - y_crossing) / (x2 - (x1 + 1)); // if denom=0, y_final = y_crossing, so y_final <= y_bottom
+                    }
+
+                    // in second pixel, area covered by line segment found in first pixel
+                    // is always a rectangle 1 wide * the height of that line segment; this
+                    // is exactly what the variable 'area' stores. it also gets a contribution
+                    // from the line segment within it. the THIRD pixel will get the first
+                    // pixel's rectangle contribution, the second pixel's rectangle contribution,
+                    // and its own contribution. the 'own contribution' is the same in every pixel except
+                    // the leftmost and rightmost, a trapezoid that slides down in each pixel.
+                    // the second pixel's contribution to the third pixel will be the
+                    // rectangle 1 wide times the height change in the second pixel, which is dy.
+
+                    step = sign * dy * 1; // dy is dy/dx, change in y for every 1 change in x,
+                    // which multiplied by 1-pixel-width is how much pixel area changes for each step in x
+                    // so the area advances by 'step' every time
+
                     for (x = x1 + 1; x < x2; ++x) {
-                        scanline[x] += area + step / 2;
+                        scanline[x] += area + step / 2; // area of trapezoid is 1*step/2
                         area += step;
                     }
-                    y_crossing += dy * (x2 - (x1 + 1));
+                    STBTT_assert(STBTT_fabs(area) <= 1.01f); // accumulated error from area += step unless we round step down
+                    STBTT_assert(sy1 > y_final - 0.01f);
 
-                    STBTT_assert(STBTT_fabs(area) <= 1.01f);
+                    // area covered in the last pixel is the rectangle from all the pixels to the left,
+                    // plus the trapezoid filled by the line segment in this pixel all the way to the right edge
+                    scanline[x2] += area + sign * stbtt__position_trapezoid_area(sy1 - y_final, (float)x2, x2 + 1.0f, x_bottom, x2 + 1.0f);
 
-                    scanline[x2] += area + sign * (1 - ((x2 - x2) + (x_bottom - x2)) / 2) * (sy1 - y_crossing);
-
+                    // the rest of the line is filled based on the total height of the line segment in this pixel
                     scanline_fill[x2] += sign * (sy1 - sy0);
                 }
             }
@@ -3217,6 +3273,9 @@ static void stbtt__fill_active_edges_new(float* scanline, float* scanline_fill, 
                 // clipping logic. since this does not match the intended use
                 // of this library, we use a different, very slow brute
                 // force implementation
+                // note though that this does happen some of the time because
+                // x_top and x_bottom can be extrapolated at the top & bottom of
+                // the shape and actually lie outside the bounding box
                 int x;
                 for (x = 0; x < len; ++x) {
                     // cases:
@@ -3725,10 +3784,10 @@ STBTT_DEF unsigned char* stbtt_GetGlyphBitmapSubpixel(const stbtt_fontinfo* info
     gbm.h = (iy1 - iy0);
     gbm.pixels = NULL; // in case we error
 
-    if (width)* width = gbm.w;
-    if (height)* height = gbm.h;
-    if (xoff)* xoff = ix0;
-    if (yoff)* yoff = iy0;
+    if (width) *width = gbm.w;
+    if (height) *height = gbm.h;
+    if (xoff) *xoff = ix0;
+    if (yoff) *yoff = iy0;
 
     if (gbm.w && gbm.h) {
         gbm.pixels = (unsigned char*)STBTT_malloc(gbm.w * gbm.h, info->userdata);
@@ -4470,15 +4529,14 @@ static int stbtt__compute_crossings_x(float x, float y, int nverts, stbtt_vertex
     float y_frac;
     int winding = 0;
 
-    orig[0] = x;
-    orig[1] = y;
-
     // make sure y never passes through a vertex of the shape
     y_frac = (float)STBTT_fmod(y, 1.0f);
     if (y_frac < 0.01f)
         y += 0.01f;
     else if (y_frac > 0.99f)
         y -= 0.01f;
+
+    orig[0] = x;
     orig[1] = y;
 
     // test a ray from (-infinity,y) to (x,y)
@@ -4541,7 +4599,7 @@ static float stbtt__cuberoot(float x)
         return  (float)STBTT_pow(x, 1.0f / 3.0f);
 }
 
-// x^3 + c*x^2 + b*x + a = 0
+// x^3 + a*x^2 + b*x + c = 0
 static int stbtt__solve_cubic(float a, float b, float c, float* r)
 {
     float s = -a / 3;
@@ -4597,10 +4655,10 @@ STBTT_DEF unsigned char* stbtt_GetGlyphSDF(const stbtt_fontinfo* info, float sca
     w = (ix1 - ix0);
     h = (iy1 - iy0);
 
-    if (width)* width = w;
-    if (height)* height = h;
-    if (xoff)* xoff = ix0;
-    if (yoff)* yoff = iy0;
+    if (width) *width = w;
+    if (height) *height = h;
+    if (xoff) *xoff = ix0;
+    if (yoff) *yoff = iy0;
 
     // invert for y-downwards bitmaps
     scale_y = -scale_y;
@@ -4649,18 +4707,17 @@ STBTT_DEF unsigned char* stbtt_GetGlyphSDF(const stbtt_fontinfo* info, float sca
                 for (i = 0; i < num_verts; ++i) {
                     float x0 = verts[i].x * scale_x, y0 = verts[i].y * scale_y;
 
-                    // check against every point here rather than inside line/curve primitives -- @TODO: wrong if multiple 'moves' in a row produce a garbage point, and given culling, probably more efficient to do within line/curve
-                    float dist2 = (x0 - sx) * (x0 - sx) + (y0 - sy) * (y0 - sy);
-                    if (dist2 < min_dist * min_dist)
-                        min_dist = (float)STBTT_sqrt(dist2);
-
-                    if (verts[i].type == STBTT_vline) {
+                    if (verts[i].type == STBTT_vline && precompute[i] != 0.0f) {
                         float x1 = verts[i - 1].x * scale_x, y1 = verts[i - 1].y * scale_y;
+
+                        float dist, dist2 = (x0 - sx) * (x0 - sx) + (y0 - sy) * (y0 - sy);
+                        if (dist2 < min_dist * min_dist)
+                            min_dist = (float)STBTT_sqrt(dist2);
 
                         // coarse culling against bbox
                         //if (sx > STBTT_min(x0,x1)-min_dist && sx < STBTT_max(x0,x1)+min_dist &&
                         //    sy > STBTT_min(y0,y1)-min_dist && sy < STBTT_max(y0,y1)+min_dist)
-                        float dist = (float)STBTT_fabs((x1 - x0) * (y0 - sy) - (y1 - y0) * (x0 - sx)) * precompute[i];
+                        dist = (float)STBTT_fabs((x1 - x0) * (y0 - sy) - (y1 - y0) * (x0 - sx)) * precompute[i];
                         STBTT_assert(i != 0);
                         if (dist < min_dist) {
                             // check position along line
@@ -4688,7 +4745,8 @@ STBTT_DEF unsigned char* stbtt_GetGlyphSDF(const stbtt_fontinfo* info, float sca
                             float ax = x1 - x0, ay = y1 - y0;
                             float bx = x0 - 2 * x1 + x2, by = y0 - 2 * y1 + y2;
                             float mx = x0 - sx, my = y0 - sy;
-                            float res[3], px, py, t, it;
+                            float res[3] = { 0.f,0.f,0.f };
+                            float px, py, t, it, dist2;
                             float a_inv = precompute[i];
                             if (a_inv == 0.0) { // if a_inv is 0, it's 2nd degree so use quadratic formula
                                 float a = 3 * (ax * bx + ay * by);
@@ -4717,6 +4775,10 @@ STBTT_DEF unsigned char* stbtt_GetGlyphSDF(const stbtt_fontinfo* info, float sca
                                 float d = (mx * ax + my * ay) * a_inv;
                                 num = stbtt__solve_cubic(b, c, d, res);
                             }
+                            dist2 = (x0 - sx) * (x0 - sx) + (y0 - sy) * (y0 - sy);
+                            if (dist2 < min_dist * min_dist)
+                                min_dist = (float)STBTT_sqrt(dist2);
+
                             if (num >= 1 && res[0] >= 0.0f && res[0] <= 1.0f) {
                                 t = res[0], it = 1.0f - t;
                                 px = it * it * x0 + 2 * t * it * x1 + t * t * x2;
@@ -4983,6 +5045,12 @@ STBTT_DEF int stbtt_CompareUTF8toUTF16_bigendian(const char* s1, int len1, const
 
 // FULL VERSION HISTORY
 //
+//   1.25 (2021-07-11) many fixes
+//   1.24 (2020-02-05) fix warning
+//   1.23 (2020-02-02) query SVG data for glyphs; query whole kerning table (but only kern not GPOS)
+//   1.22 (2019-08-11) minimize missing-glyph duplication; fix kerning if both 'GPOS' and 'kern' are defined
+//   1.21 (2019-02-25) fix warning
+//   1.20 (2019-02-07) PackFontRange skips missing codepoints; GetScaleFontVMetrics()
 //   1.19 (2018-02-11) OpenType GPOS kerning (horizontal only), STBTT_fmod
 //   1.18 (2018-01-29) add missing function
 //   1.17 (2017-07-23) make more arguments const; doc fix

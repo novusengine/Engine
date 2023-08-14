@@ -3,11 +3,14 @@
 
 #include <Base/Memory/Allocator.h>
 #include <Base/Container/DynamicArray.h>
+#include <Base/CVarSystem/CVarSystem.h>
 
 #include <tracy/Tracy.hpp>
 
 namespace Renderer
 {
+    AutoCVar_Int CVAR_RenderGraphPrintNumBarriers("renderGraph.printNumBarriers", "Print number of barriers automatically placed by the Rendergraph", 0, CVarFlags::EditCheckbox);
+
     struct RenderGraphData : IRenderGraphData
     {
         RenderGraphData(Memory::Allocator* allocator)
@@ -80,7 +83,8 @@ namespace Renderer
         RenderGraphData* data = static_cast<RenderGraphData*>(_data);
 
         size_t numPasses = data->passes.Count();
-        _renderGraphBuilder = Memory::Allocator::New<RenderGraphBuilder>(_desc.allocator, _desc.allocator, _renderer, numPasses);
+        u32 numTotalBuffers = _renderer->GetNumBuffers();
+        _renderGraphBuilder = Memory::Allocator::New<RenderGraphBuilder>(_desc.allocator, _desc.allocator, _renderer, numPasses, numTotalBuffers);
 
         for (u32 i = 0; i < data->passes.Count(); i++)
         {
@@ -142,9 +146,10 @@ namespace Renderer
 
             commandList.PushMarker(pass->_name, Color::PastelGreen);
 
-            _renderGraphBuilder->PreExecute(commandList, i);
+            commandList.SetCurrentPassIndex(i);
+            _renderGraphBuilder->PrePass(commandList, i, pass->_name);
             pass->Execute(resources, commandList);
-            _renderGraphBuilder->PostExecute(commandList, i);
+            _renderGraphBuilder->PostPass(commandList, i, pass->_name);
 
             commandList.PopMarker();
 
@@ -153,9 +158,13 @@ namespace Renderer
         commandList.PopMarker();
         commandList.EndTimeQuery(totalTimeQueryID);
 
-        //u32 numPlacedBarriers = _renderGraphBuilder->GetNumPlacedBarriers();
-        //DebugHandler::Print("Num placed barriers: {}", numPlacedBarriers);
-
+        if (CVAR_RenderGraphPrintNumBarriers.Get())
+        {
+            u32 numPlacedImageBarriers = _renderGraphBuilder->GetNumPlacedImageBarriers();
+            u32 numPlacedBufferBarriers = _renderGraphBuilder->GetNumPlacedBufferBarriers();
+            DebugHandler::Print("Image Barriers: {}, Buffer Barriers: {}", numPlacedImageBarriers, numPlacedBufferBarriers);
+        }
+        
         {
             ZoneScopedNC("CommandList::Execute", tracy::Color::Red2);
             commandList.Execute();

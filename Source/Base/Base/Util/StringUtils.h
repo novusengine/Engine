@@ -12,6 +12,8 @@ namespace StringUtils
 
     std::string GetLineFromCin();
 
+    std::string GetFileNameFromPath(std::string const& path);
+
     std::vector<std::string> SplitString(std::string const& string, char delim = ' ');
     std::string EscapeString(std::string const& string);
     std::string FormatThousandSeparator(i32 n);
@@ -19,6 +21,7 @@ namespace StringUtils
     bool BeginsWith(std::string_view const& fullString, std::string_view const& beginning);
     bool EndsWith(std::string const& fullString, std::string const& ending);
     bool Contains(std::string const& fullString, std::string const& substring);
+    bool SearchString(const std::string& ref, const std::string& key, bool insensitive);
 
 #ifdef _WINDOWS
     std::wstring StringToWString(const std::string& s);

@@ -32,6 +32,8 @@ namespace Renderer
     RendererVK::RendererVK(Window* window)
         : _device(new Backend::RenderDeviceVK(window))
     {
+        _frameAllocator.Init(1024 * 1024, "Renderer Allocator");
+
         // Create handlers
         _bufferHandler = new Backend::BufferHandlerVK();
         _imageHandler = new Backend::ImageHandlerVK();
@@ -51,7 +53,7 @@ namespace Renderer
         _textureHandler->Init(_device, _bufferHandler, _uploadBufferHandler, _samplerHandler);
         _shaderHandler->Init(_device);
         _timeQueryHandler->Init(_device);
-        _pipelineHandler->Init(_device, _shaderHandler, _imageHandler);
+        _pipelineHandler->Init(&_frameAllocator, _device, _shaderHandler, _imageHandler, _bufferHandler);
         _commandListHandler->Init(_device);
         _samplerHandler->Init(_device);
         _semaphoreHandler->Init(_device);
@@ -248,6 +250,11 @@ namespace Renderer
         _textureHandler->UnloadTexturesInArray(textureArrayID, unloadStartIndex);
     }
 
+    u32 RendererVK::AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID)
+    {
+        return _textureHandler->AddTextureToArray(textureID, textureArrayID);
+    }
+
     static VmaBudget sBudgets[16] = { { 0 } };
 
     f32 RendererVK::FlipFrame(u32 frameIndex)
@@ -301,6 +308,8 @@ namespace Renderer
         vmaSetCurrentFrameIndex(_device->_allocator, frameIndex);
         vmaGetBudget(_device->_allocator, sBudgets);
 
+        _frameAllocator.Reset();
+
         return timeWaited;
     }
 
@@ -312,6 +321,16 @@ namespace Renderer
     TextureID RendererVK::GetTextureID(TextureArrayID textureArrayID, u32 index)
     {
         return _textureHandler->GetTextureIDInArray(textureArrayID, index);
+    }
+
+    i32 RendererVK::GetTextureHeight(TextureID textureID)
+    {
+        return _textureHandler->GetTextureHeight(textureID);
+    }
+
+    i32 RendererVK::GetTextureWidth(TextureID textureID)
+    {
+        return _textureHandler->GetTextureWidth(textureID);
     }
 
     const ImageDesc& RendererVK::GetImageDesc(ImageID ID)
@@ -332,6 +351,11 @@ namespace Renderer
     uvec2 RendererVK::GetImageDimensions(const DepthImageID id)
     {
         return _imageHandler->GetDimensions(id);
+    }
+
+    std::string RendererVK::GetBufferName(BufferID id)
+    {
+        return _bufferHandler->GetBufferName(id);
     }
 
     CommandListID RendererVK::BeginCommandList()
@@ -796,48 +820,52 @@ namespace Renderer
         return false;
     }
 
-    void RendererVK::BindDescriptor(Backend::DescriptorSetBuilderVK* builder, void* imageInfosArraysVoid, Descriptor& descriptor)
+    void RendererVK::BindDescriptor(Backend::DescriptorSetBuilderVK& builder, Descriptor& descriptor)
     {
-        std::vector<std::vector<VkDescriptorImageInfo>>& imageInfosArrays = *static_cast<std::vector<std::vector<VkDescriptorImageInfo>>*>(imageInfosArraysVoid);
-
         if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_BUFFER)
         {
+            ZoneScopedN("Buffer");
             VkDescriptorBufferInfo bufferInfo = {};
             bufferInfo.buffer = _bufferHandler->GetBuffer(descriptor.bufferID);
             bufferInfo.range = _bufferHandler->GetBufferSize(descriptor.bufferID);
 
-            builder->BindBuffer(descriptor.nameHash, bufferInfo);
+            builder.BindBuffer(descriptor.nameHash, bufferInfo, descriptor.bufferID);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_BUFFER_ARRAY)
         {
+            ZoneScopedN("BufferArray");
             VkDescriptorBufferInfo bufferInfo = {};
             bufferInfo.buffer = _bufferHandler->GetBuffer(descriptor.bufferID);
             bufferInfo.range = _bufferHandler->GetBufferSize(descriptor.bufferID);
 
-            builder->BindBufferArrayIndex(descriptor.nameHash, bufferInfo, descriptor.arrayIndex);
+            builder.BindBufferArrayIndex(descriptor.nameHash, bufferInfo, descriptor.arrayIndex, descriptor.bufferID);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_SAMPLER)
         {
+            ZoneScopedN("Sampler");
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.sampler = _samplerHandler->GetSampler(descriptor.samplerID);
 
-            builder->BindSampler(descriptor.nameHash, imageInfo);
+            builder.BindSampler(descriptor.nameHash, imageInfo);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE)
         {
+            ZoneScopedN("Texture");
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID);
 
-            builder->BindImage(descriptor.nameHash, imageInfo);
+            builder.BindImage(descriptor.nameHash, imageInfo);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE_ARRAY)
         {
+            ZoneScopedN("TextureArray");
             const SafeVector<TextureID>& textureIDs = _textureHandler->GetTextureIDsInArray(descriptor.textureArrayID);
-            std::vector<VkDescriptorImageInfo>& imageInfos = imageInfosArrays.emplace_back();
 
             u32 textureArraySize = _textureHandler->GetTextureArraySize(descriptor.textureArrayID);
-            imageInfos.reserve(textureArraySize);
+            
+            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, textureArraySize);
+            u32 numImageInfos = 0;
             
             u32 numTextures = static_cast<u32>(textureIDs.Size());
 
@@ -849,7 +877,7 @@ namespace Renderer
                 {
                     for (auto textureID : textures)
                     {
-                        VkDescriptorImageInfo& imageInfo = imageInfos.emplace_back();
+                        VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
                         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                         imageInfo.imageView = _textureHandler->GetImageView(textureID);
                         imageInfo.sampler = VK_NULL_HANDLE;
@@ -875,47 +903,53 @@ namespace Renderer
 
             for (u32 i = numTextures; i < textureArraySize; i++)
             {
-                imageInfos.push_back(imageInfoDebugTexture);
+                VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
+                imageInfo = imageInfoDebugTexture;
             }
             
-            builder->BindImageArray(descriptor.nameHash, imageInfos.data(), static_cast<i32>(imageInfos.size()));
+            builder.BindImageArray(descriptor.nameHash, imageInfos, textureArraySize);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_IMAGE)
         {
+            ZoneScopedN("Image");
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
             imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID,descriptor.imageMipLevel);
 
-            builder->BindImage(descriptor.nameHash, imageInfo);
+            builder.BindImage(descriptor.nameHash, imageInfo);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_IMAGE_ARRAY)
         {
+            ZoneScopedN("ImageArray");
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
             imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID, descriptor.imageMipLevel);
 
-            builder->BindImageArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
+            builder.BindImageArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE)
         {
+            ZoneScopedN("DepthImage");
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
             imageInfo.imageView = _imageHandler->GetDepthView(descriptor.depthImageID);
 
-            builder->BindImage(descriptor.nameHash, imageInfo);
+            builder.BindImage(descriptor.nameHash, imageInfo);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE_ARRAY)
         {
+            ZoneScopedN("DepthImageArray");
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
             imageInfo.imageView = _imageHandler->GetDepthView(descriptor.depthImageID);
 
-            builder->BindImageArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
+            builder.BindImageArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_STORAGE_IMAGE)
         {
-            std::vector<VkDescriptorImageInfo>& imageInfos = imageInfosArrays.emplace_back();
-            imageInfos.reserve(descriptor.count);
+            ZoneScopedN("StorageImage");
+            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, descriptor.count);
+            u32 numImageInfos = 0;
 
             const ImageDesc& imageDesc = _imageHandler->GetImageDesc(descriptor.imageID);
 
@@ -925,7 +959,7 @@ namespace Renderer
 
                 if (mipLevel < imageDesc.mipLevels)
                 {
-                    VkDescriptorImageInfo& imageInfo = imageInfos.emplace_back();
+                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
                     imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                     imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID, mipLevel);
                     imageInfo.sampler = VK_NULL_HANDLE;
@@ -933,19 +967,20 @@ namespace Renderer
                 else
                 {
                     // Any imageInfos pointing to mips we don't have should point to the last mip
-                    VkDescriptorImageInfo& imageInfo = imageInfos.emplace_back();
+                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
                     imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                     imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID, imageDesc.mipLevels - 1);
                     imageInfo.sampler = VK_NULL_HANDLE;
                 }
             }
 
-            builder->BindStorageImage(descriptor.nameHash, imageInfos.data(), static_cast<i32>(imageInfos.size()));
+            builder.BindStorageImage(descriptor.nameHash, imageInfos, static_cast<i32>(descriptor.count));
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_STORAGE_IMAGE_ARRAY)
         {
-            std::vector<VkDescriptorImageInfo>& imageInfos = imageInfosArrays.emplace_back();
-            imageInfos.reserve(descriptor.count);
+            ZoneScopedN("StorageImageArray");
+            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, descriptor.count);
+            u32 numImageInfos = 0;
 
             const ImageDesc& imageDesc = _imageHandler->GetImageDesc(descriptor.imageID);
 
@@ -955,7 +990,7 @@ namespace Renderer
 
                 if (mipLevel < imageDesc.mipLevels)
                 {
-                    VkDescriptorImageInfo& imageInfo = imageInfos.emplace_back();
+                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
                     imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                     imageInfo.imageView = _imageHandler->GetColorArrayView(descriptor.imageID, mipLevel);
                     imageInfo.sampler = VK_NULL_HANDLE;
@@ -963,14 +998,14 @@ namespace Renderer
                 else
                 {
                     // Any imageInfos pointing to mips we don't have should point to the last mip
-                    VkDescriptorImageInfo& imageInfo = imageInfos.emplace_back();
+                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
                     imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                     imageInfo.imageView = _imageHandler->GetColorArrayView(descriptor.imageID, imageDesc.mipLevels - 1);
                     imageInfo.sampler = VK_NULL_HANDLE;
                 }
             }
 
-            builder->BindStorageImageArray(descriptor.nameHash, imageInfos.data(), static_cast<i32>(imageInfos.size()));
+            builder.BindStorageImageArray(descriptor.nameHash, imageInfos, static_cast<i32>(descriptor.count));
         }
     }
 
@@ -1006,7 +1041,7 @@ namespace Renderer
         destroyList.buffers.clear();
     }
 
-    void RendererVK::BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors)
+    void RendererVK::BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors, const TrackedBufferBitSets* bufferPermissions)
     {
         ZoneScopedNC("RendererVK::BindDescriptorSet", tracy::Color::Red3);
 
@@ -1021,19 +1056,17 @@ namespace Renderer
                 return;
             }
 
-            std::vector<std::vector<VkDescriptorImageInfo>> imageInfosArrays; // These need to live until builder->BuildDescriptor()
-            imageInfosArrays.reserve(8);
-
-            Backend::DescriptorSetBuilderVK* builder = _pipelineHandler->GetDescriptorSetBuilder(graphicsPipelineID);
+            Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(graphicsPipelineID);
+            builder.SetBufferPermissions(bufferPermissions);
 
             for (u32 i = 0; i < numDescriptors; i++)
             {
                 ZoneScopedNC("BindDescriptor", tracy::Color::Red3);
                 Descriptor& descriptor = descriptors[i];
-                BindDescriptor(builder, &imageInfosArrays, descriptor);
+                BindDescriptor(builder, descriptor);
             }
 
-            VkDescriptorSet descriptorSet = builder->BuildDescriptor(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
+            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
             Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT, DescriptorSetToName(slot));
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(graphicsPipelineID);
@@ -1048,19 +1081,17 @@ namespace Renderer
                 return;
             }
 
-            std::vector<std::vector<VkDescriptorImageInfo>> imageInfosArrays; // These need to live until builder->BuildDescriptor()
-            imageInfosArrays.reserve(8);
-
-            Backend::DescriptorSetBuilderVK* builder = _pipelineHandler->GetDescriptorSetBuilder(computePipelineID);
+            Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(computePipelineID);
+            builder.SetBufferPermissions(bufferPermissions);
 
             for (u32 i = 0; i < numDescriptors; i++)
             {
                 ZoneScopedNC("BindDescriptor", tracy::Color::Red3);
                 Descriptor& descriptor = descriptors[i];
-                BindDescriptor(builder, &imageInfosArrays, descriptor);
+                BindDescriptor(builder, descriptor);
             }
 
-            VkDescriptorSet descriptorSet = builder->BuildDescriptor(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
+            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
             Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT, DescriptorSetToName(slot));
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(computePipelineID);
@@ -1225,114 +1256,6 @@ namespace Renderer
         vkCmdCopyBuffer(commandBuffer, vkSrcBuffer, vkDstBuffer, 1, &copyRegion);
     }
 
-    void RendererVK::PipelineBarrier(CommandListID commandListID, PipelineBarrierType type, BufferID buffer)
-    {
-        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
-
-        VkPipelineStageFlags srcStageMask;
-        VkPipelineStageFlags dstStageMask;
-
-        VkBufferMemoryBarrier bufferBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
-        bufferBarrier.buffer = _bufferHandler->GetBuffer(buffer);
-        bufferBarrier.size = VK_WHOLE_SIZE;
-
-        switch (type)
-        {
-        case PipelineBarrierType::TransferDestToIndirectArguments:
-            srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-            break;
-
-        case PipelineBarrierType::TransferDestToComputeShaderRW:
-            srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-            break;
-
-        case PipelineBarrierType::TransferDestToVertexBuffer:
-            srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-            break;
-
-        case PipelineBarrierType::TransferDestToTransferSrc:
-            srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            break;
-
-        case PipelineBarrierType::TransferDestToTransferDest:
-            srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            break;
-
-        case PipelineBarrierType::ComputeWriteToVertexShaderRead:
-            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            break;
-
-        case PipelineBarrierType::ComputeWriteToPixelShaderRead:
-            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            break;
-
-        case PipelineBarrierType::ComputeWriteToComputeShaderRead:
-            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT;
-            break;
-
-        case PipelineBarrierType::ComputeWriteToIndirectArguments:
-            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-            break;
-
-        case PipelineBarrierType::ComputeWriteToVertexBuffer:
-            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-            break;
-
-        case PipelineBarrierType::ComputeWriteToTransferSrc:
-            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            break;
-
-        case PipelineBarrierType::ComputeWriteToIndexBuffer:
-            srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT;
-            break;
-
-        case PipelineBarrierType::AllCommands:
-            srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-            dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-            bufferBarrier.srcAccessMask = VK_ACCESS_FLAG_BITS_MAX_ENUM;
-            bufferBarrier.dstAccessMask = VK_ACCESS_FLAG_BITS_MAX_ENUM;
-            break;
-        }
-
-        vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
-    }
-
     void RendererVK::ImageBarrier(CommandListID commandListID, ImageID image)
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
@@ -1352,6 +1275,55 @@ namespace Renderer
         // TODO: If we add stencil support we need to selectively add VK_IMAGE_ASPECT_STENCIL_BIT to imageAspect if the depthStencil has a stencil
 
         _device->TransitionImageLayout(commandBuffer, vkImage, imageAspect, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, 1);
+    }
+
+    void RendererVK::BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from)
+    {
+        DebugHandler::Assert(commandListID != CommandListID::Invalid(), "RendererVK : BufferBarrier got invalid commandListID");
+        DebugHandler::Assert(bufferID != BufferID::Invalid(), "RendererVK : BufferBarrier got invalid bufferID");
+        DebugHandler::Assert(from != BufferPassUsage::NONE, "RendererVK : BufferBarrier from BufferPassUsage was NONE");
+
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+
+        VkPipelineStageFlags srcStageMask = 0;
+        VkPipelineStageFlags dstStageMask = 0;
+
+        VkBufferMemoryBarrier bufferBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+        bufferBarrier.buffer = _bufferHandler->GetBuffer(bufferID);
+        bufferBarrier.size = VK_WHOLE_SIZE;
+        bufferBarrier.srcAccessMask = 0;
+        bufferBarrier.dstAccessMask = 0;
+
+        if ((from & BufferPassUsage::TRANSFER) == BufferPassUsage::TRANSFER)
+        {
+            srcStageMask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+            bufferBarrier.srcAccessMask |= VK_ACCESS_TRANSFER_WRITE_BIT;
+        }
+        if ((from & BufferPassUsage::GRAPHICS) == BufferPassUsage::GRAPHICS)
+        {
+            srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
+        }
+        if ((from & BufferPassUsage::COMPUTE) == BufferPassUsage::COMPUTE)
+        {
+            srcStageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
+        }
+
+        // Transfer
+        dstStageMask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+        bufferBarrier.dstAccessMask |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+        
+        // Graphics
+        dstStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+        bufferBarrier.dstAccessMask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+        
+        // Compute
+        dstStageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+        bufferBarrier.dstAccessMask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+        
+
+        vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
     }
 
     void RendererVK::PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size)
@@ -1541,7 +1513,7 @@ namespace Renderer
 
             GraphicsPipelineID pipelineID = _pipelineHandler->CreatePipeline(pipelineDesc);
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);
-            Backend::DescriptorSetBuilderVK* builder = _pipelineHandler->GetDescriptorSetBuilder(pipelineID);
+            Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(pipelineID);
             
             BeginPipeline(commandListID, pipelineID);
 
@@ -1551,14 +1523,14 @@ namespace Renderer
             // Set descriptors
             VkDescriptorImageInfo samplerInfo = {};
             samplerInfo.sampler = _samplerHandler->GetSampler(samplerID);
-            builder->BindSampler("_sampler"_h, samplerInfo);
+            builder.BindSampler("_sampler"_h, samplerInfo);
 
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
             imageInfo.imageView = _imageHandler->GetColorView(imageID);
-            builder->BindImage("_texture"_h, imageInfo);
+            builder.BindImage("_texture"_h, imageInfo);
 
-            VkDescriptorSet descriptorSet = builder->BuildDescriptor(DescriptorSetSlot::GLOBAL, Backend::DescriptorLifetime::PerFrame);
+            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(DescriptorSetSlot::GLOBAL, Backend::DescriptorLifetime::PerFrame);
 
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, DescriptorSetSlot::GLOBAL, 1, &descriptorSet, 0, nullptr);
 
@@ -1664,10 +1636,6 @@ namespace Renderer
 
     void RendererVK::CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range)
     {
-        /*VkBuffer vkDstBuffer = _bufferHandler->GetBuffer(dstBuffer);
-        VkBuffer vkSrcBuffer = _bufferHandler->GetBuffer(srcBuffer);
-        _device->CopyBuffer(vkDstBuffer, dstOffset, vkSrcBuffer, srcOffset, range);*/
-
         _uploadBufferHandler->CopyBufferToBuffer(dstBuffer, dstOffset, srcBuffer, srcOffset, range);
     }
 
@@ -1769,5 +1737,10 @@ namespace Renderer
     u32 RendererVK::GetNumDepthImages()
     {
         return _imageHandler->GetNumDepthImages();
+    }
+
+    u32 RendererVK::GetNumBuffers()
+    {
+        return _bufferHandler->GetNumBuffers();
     }
 }

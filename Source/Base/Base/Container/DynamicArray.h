@@ -9,11 +9,11 @@ template <typename T>
 class DynamicArray
 {
 public:
-    DynamicArray(Memory::Allocator* allocator, size_t capacity = 32)
+    DynamicArray(Memory::Allocator* allocator, size_t capacity = 32, size_t count = 0)
         : _allocator(allocator)
         , _data(nullptr)
-        , _count(0)
         , _capacity(capacity)
+        , _count(count)
     {
         _data = Memory::Allocator::NewArray<T>(allocator, capacity);
     }
@@ -108,6 +108,6 @@ private:
 private:
     Memory::Allocator* _allocator;
     T* _data;
-    size_t _count;
     size_t _capacity;
+    size_t _count;
 };

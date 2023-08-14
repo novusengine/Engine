@@ -24,6 +24,7 @@
 #include <gli/gli.hpp>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <tracy/Tracy.hpp>
+#include <robinhood/robinhood.h>
 
 #include <vector>
 #include <queue>
@@ -66,6 +67,7 @@ namespace Renderer
 
             SafeVector<TextureID>* textures = nullptr;
             SafeVector<u64>* textureHashes = nullptr;
+            robin_hood::unordered_map<TextureID::type, u32>* textureIDToArrayIndex;
         };
 
         struct TextureHandlerVKData : ITextureHandlerVKData
@@ -234,17 +236,7 @@ namespace Renderer
 
             textureID = LoadTexture(desc);
 
-            {
-                ZoneScopedN("TextureArrays WriteLock");
-                data.textureArrays.WriteLock(
-                    [&](std::vector<TextureArray>& textureArrays)
-                    {
-                        TextureArray& textureArray = textureArrays[static_cast<TextureArrayID::type>(textureArrayID)];
-                        arrayIndex = static_cast<u32>(textureArray.textures->Size());
-                        textureArray.textures->PushBack(textureID);
-                        textureArray.textureHashes->PushBack(descHash);
-                    });
-            }
+            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash);
             
             return textureID;
         }
@@ -319,6 +311,8 @@ namespace Renderer
                     textureArray.textureHashes = new SafeVector<u64>();
                     textureArray.textureHashes->Reserve(desc.size);
                     textureArray.size = desc.size;
+                    textureArray.textureIDToArrayIndex = new robin_hood::unordered_map<TextureID::type, u32>();
+
                 });
 
             return TextureArrayID(static_cast<TextureArrayID::type>(nextHandle));
@@ -387,17 +381,30 @@ namespace Renderer
 
             TextureID textureID = CreateDataTexture(desc);
 
-            data.textureArrays.WriteLock(
-                [&](std::vector<TextureArray>& textureArrays)
-                {
-                    TextureArray& textureArray = textureArrays[static_cast<TextureArrayID::type>(textureArrayID)];
-                    arrayIndex = static_cast<u32>(textureArray.textures->Size());
-                    textureArray.textures->PushBack(textureID);
-                    u64 zero = 0;
-                    textureArray.textureHashes->PushBack(zero);
-                });
+            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, 0);
 
             return textureID;
+        }
+
+        u32 TextureHandlerVK::AddTextureToArray(const TextureID textureID, const TextureArrayID textureArrayID)
+        {
+            ZoneScoped;
+
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
+            TextureID::type arrayID = static_cast<TextureID::type>(textureArrayID);
+            
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to add invalid TextureID: {} to array {}", id, arrayID);
+            }
+
+            if (data.textureArrays.Size() <= arrayID)
+            {
+				DebugHandler::PrintFatal("Tried to add TextureID: {} to invalid array {}", id, arrayID);
+			}
+
+            return AddTextureToArrayInternal(textureID, textureArrayID, data.textures.ReadGet(id)->hash);
         }
 
         void TextureHandlerVK::CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, size_t srcOffset, TextureID dstTextureID)
@@ -577,6 +584,32 @@ namespace Renderer
             }
 
             return data.textures.ReadGet(id)->totalSize;
+        }
+
+        i32 TextureHandlerVK::GetTextureHeight(const Renderer::TextureID textureID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
+
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+            }
+
+            return data.textures.ReadGet(id)->height;
+        }
+
+        i32 TextureHandlerVK::GetTextureWidth(const Renderer::TextureID textureID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
+
+            if (data.textures.Size() <= id)
+            {
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+            }
+
+            return data.textures.ReadGet(id)->width;
         }
 
         u32 TextureHandlerVK::GetTextureArraySize(const TextureArrayID textureArrayID)
@@ -809,6 +842,33 @@ namespace Renderer
             }
 
             DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.imageView, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT, texture.debugName.c_str());
+        }
+
+        u32 TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash)
+        {
+            ZoneScoped;
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+
+            u32 arrayIndex = 0;
+            data.textureArrays.WriteLock(
+                [&](std::vector<TextureArray>& textureArrays)
+                {
+                    TextureArray& textureArray = textureArrays[static_cast<TextureArrayID::type>(textureArrayID)];
+
+                    TextureID::type textureIDTyped = static_cast<TextureID::type>(textureID);
+                    if (textureArray.textureIDToArrayIndex->find(textureIDTyped) != textureArray.textureIDToArrayIndex->end())
+                    {
+						arrayIndex = (*textureArray.textureIDToArrayIndex)[textureIDTyped];
+						return;
+					}
+
+                    arrayIndex = static_cast<u32>(textureArray.textures->Size());
+                    textureArray.textures->PushBack(textureID);
+                    textureArray.textureHashes->PushBack(hash);
+					(*textureArray.textureIDToArrayIndex)[textureIDTyped] = arrayIndex;
+                });
+
+            return arrayIndex;
         }
     }
 }

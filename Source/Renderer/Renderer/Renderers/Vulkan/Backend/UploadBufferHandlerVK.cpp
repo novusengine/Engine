@@ -21,7 +21,8 @@ namespace Renderer
         {
             READY, // Ready to be used
             CLOSED, // Closed and waiting for execution
-            SUBMITTED // Has been executed, but hasn't finished executing
+            SUBMITTED, // Has been executed, but hasn't finished executing
+            IN_COMMANDLIST // Has been recorded to a commandlist
         };
 
         enum class UploadTaskType : u8
@@ -161,9 +162,18 @@ namespace Renderer
 
         void UploadBufferHandlerVK::ExecuteUploadTasks()
         {
-            // Debug if this is uploading the non-filled buffers correctly
-
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+
+            for (u32 i = 0; i < data->stagingBuffers.Num; i++)
+            {
+                StagingBuffer& stagingBuffer = data->stagingBuffers.Get(i);
+
+                if (stagingBuffer.bufferStatus == BufferStatus::IN_COMMANDLIST)
+                {
+                    stagingBuffer.totalHandles = 0; // Not sure about this
+                    stagingBuffer.bufferStatus = BufferStatus::READY;
+                }
+            }
 
             if (!data->isDirty)
                 return;
@@ -188,8 +198,9 @@ namespace Renderer
                 if (stagingBuffer.bufferStatus == BufferStatus::READY && stagingBuffer.totalHandles > 0)
                 {
                     ExecuteStagingBuffer(commandBuffer, stagingBuffer);
-                    stagingBuffer.totalHandles = 0; // Not sure about this
                     data->selectedStagingBuffer = (data->selectedStagingBuffer + 1) % data->stagingBuffers.Num;
+
+                    stagingBuffer.bufferStatus = BufferStatus::IN_COMMANDLIST;
                 }
             }
 
@@ -295,6 +306,9 @@ namespace Renderer
                 {
                     {
                         std::scoped_lock lock(stagingBuffer.handleMutex);
+
+                        DebugHandler::Assert(stagingBuffer.bufferStatus == BufferStatus::READY || stagingBuffer.bufferStatus == BufferStatus::CLOSED, "UploadBufferHandlerVK : It seems like the staging buffer got executed while we had an active handle");
+
                         // Decrement the number of active handles into this staging buffer
                         stagingBuffer.activeHandles--;
                     }
@@ -360,6 +374,9 @@ namespace Renderer
                 {
                     {
                         std::scoped_lock lock(stagingBuffer.handleMutex);
+
+                        DebugHandler::Assert(stagingBuffer.bufferStatus == BufferStatus::READY || stagingBuffer.bufferStatus == BufferStatus::CLOSED, "UploadBufferHandlerVK : It seems like the staging buffer got executed while we had an active handle");
+
                         // Decrement the number of active handles into this staging buffer
                         stagingBuffer.activeHandles--;
                     }
@@ -482,7 +499,7 @@ namespace Renderer
                 tries++;
             }
 
-            // If we after 5 seconds couldn't find a stagingbuffer to use, just wait for the next one to be available
+            // If we after 5 attempts couldn't find a stagingbuffer to use, just wait for the next one to be available
             u32 selectedStagingBuffer = data->selectedStagingBuffer;
             StagingBuffer* stagingBuffer = &data->stagingBuffers.Get(selectedStagingBuffer);
 

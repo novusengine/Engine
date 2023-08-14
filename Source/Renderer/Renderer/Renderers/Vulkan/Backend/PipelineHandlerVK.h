@@ -8,6 +8,11 @@
 
 #include <vector>
 
+namespace Memory
+{
+    class Allocator;
+}
+
 namespace Renderer
 {
     namespace Backend
@@ -15,6 +20,7 @@ namespace Renderer
         class RenderDeviceVK;
         class ShaderHandlerVK;
         class ImageHandlerVK;
+        class BufferHandlerVK;
         class DescriptorSetBuilderVK;
         struct GraphicsPipeline;
 
@@ -32,7 +38,7 @@ namespace Renderer
             using cIDType = type_safe::underlying_type<ComputePipelineID>;
 
         public:
-            void Init(RenderDeviceVK* device, ShaderHandlerVK* shaderHandler, ImageHandlerVK* imageHandler);
+            void Init(Memory::Allocator* allocator, RenderDeviceVK* device, ShaderHandlerVK* shaderHandler, ImageHandlerVK* imageHandler, BufferHandlerVK* bufferHandler);
             void DiscardPipelines();
 
             GraphicsPipelineID CreatePipeline(const GraphicsPipelineDesc& desc);
@@ -71,8 +77,8 @@ namespace Renderer
             VkPipelineLayout& GetPipelineLayout(GraphicsPipelineID id);
             VkPipelineLayout& GetPipelineLayout(ComputePipelineID id);
 
-            DescriptorSetBuilderVK* GetDescriptorSetBuilder(GraphicsPipelineID id);
-            DescriptorSetBuilderVK* GetDescriptorSetBuilder(ComputePipelineID id);
+            DescriptorSetBuilderVK& GetDescriptorSetBuilder(GraphicsPipelineID id);
+            DescriptorSetBuilderVK& GetDescriptorSetBuilder(ComputePipelineID id);
 
         private:
             u64 CalculateCacheDescHash(const GraphicsPipelineDesc& desc);
@@ -84,9 +90,12 @@ namespace Renderer
             void CreateFramebuffer(GraphicsPipeline& pipeline);
 
         private:
+            Memory::Allocator* _allocator;
+
             RenderDeviceVK* _device;
-            ImageHandlerVK* _imageHandler;
             ShaderHandlerVK* _shaderHandler;
+            ImageHandlerVK* _imageHandler;
+            BufferHandlerVK* _bufferHandler;
 
             IPipelineHandlerVKData* _data;
         };

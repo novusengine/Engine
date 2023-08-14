@@ -16,6 +16,14 @@ target_include_directories(robin-hood-hashing INTERFACE
     "${CMAKE_CURRENT_LIST_DIR}/robinhood"
 )
 
+## Refl-cpp
+add_library(refl-cpp INTERFACE)
+add_library(refl-cpp::refl-cpp ALIAS refl-cpp)
+
+target_include_directories(refl-cpp INTERFACE
+    "${CMAKE_CURRENT_LIST_DIR}/refl-cpp"
+)
+
 ## entt
 add_library(entt INTERFACE)
 add_library(entt::entt ALIAS entt)
@@ -32,6 +40,14 @@ target_include_directories(glm INTERFACE
     "${CMAKE_CURRENT_LIST_DIR}/glm"
 )
 target_compile_definitions(glm INTERFACE GLM_FORCE_LEFT_HANDED GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+## UTFCPP
+add_library(utfcpp INTERFACE)
+add_library(utfcpp::utfcpp ALIAS utfcpp)
+
+target_include_directories(utfcpp INTERFACE
+    "${CMAKE_CURRENT_LIST_DIR}/utfcpp"
+)
 
 add_subdirectory(glfw)
 add_subdirectory(gli)
@@ -81,4 +97,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     entt::entt
     type_safe
     spdlog
+    refl-cpp::refl-cpp
 )

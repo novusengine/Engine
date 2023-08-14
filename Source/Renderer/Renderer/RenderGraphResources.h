@@ -1,9 +1,11 @@
 #pragma once
 #include "RenderPassResources.h"
+#include "TrackedBufferBitSets.h"
 #include "DescriptorSetResource.h"
 #include "Descriptors/TextureDesc.h"
 #include "Descriptors/ImageDesc.h"
 #include "Descriptors/DepthImageDesc.h"
+#include "Descriptors/BufferDesc.h"
 
 #include <Base/Types.h>
 #include <Base/Memory/Allocator.h>
@@ -18,19 +20,6 @@ namespace Renderer
 
     struct IRenderGraphResourcesData {};
 
-    enum class AccessType : u8
-    {
-        READ,
-        WRITE
-    };
-
-    enum class PipelineType : u8
-    {
-        GRAPHICS,
-        COMPUTE,
-        BOTH
-    };
-
     enum class LoadMode : u8
     {
         LOAD, // Load the contents of the resource
@@ -38,7 +27,7 @@ namespace Renderer
         CLEAR // Clear the resource of existing data
     };
 
-    struct TrackedPassAccess
+    struct TrackedImagePassAccess
     {
         u32 passIndex;
         AccessType accessType;
@@ -57,6 +46,20 @@ namespace Renderer
         DepthImageID imageID;
         AccessType accessType;
         PipelineType pipelineType;
+    };
+
+    struct TrackedBufferPassAccess
+    {
+        u32 passIndex;
+        AccessType accessType;
+        BufferPassUsage bufferPassUsage;
+    };
+
+    struct TrackedBufferAccess
+    {
+        BufferID bufferID;
+        AccessType accessType;
+        BufferPassUsage bufferPassUsage;
     };
 
     class RenderGraphResources
@@ -82,34 +85,38 @@ namespace Renderer
         uvec2 GetImageDimensions(DepthImageMutableResource resource);
 
     private:
-        RenderGraphResources(Memory::Allocator* allocator, Renderer* renderer, size_t numPasses);
+        RenderGraphResources(Memory::Allocator* allocator, Renderer* renderer, size_t numPasses, u32 numTotalBuffers);
 
         ImageID GetImage(ImageResource resource);
         ImageID GetImage(ImageMutableResource resource);
         DepthImageID GetImage(DepthImageResource resource);
         DepthImageID GetImage(DepthImageMutableResource resource);
+
+        BufferID GetBuffer(BufferResource resource);
+        BufferID GetBuffer(BufferMutableResource resource);
+
         DescriptorSet* GetDescriptorSet(DescriptorSetID resource);
 
         ImageResource GetResource(ImageID id);
-        ImageResource GetResource(TextureID id);
         DepthImageResource GetResource(DepthImageID id);
+        BufferResource GetResource(BufferID id);
         DescriptorSetResource GetResource(DescriptorSet& descriptorSet);
 
         ImageMutableResource GetMutableResource(ImageID id);
         DepthImageMutableResource GetMutableResource(DepthImageID id);
+        BufferMutableResource GetMutableResource(BufferID id);
 
         void Clear(u32 passIndex, ImageMutableResource resource);
         void Clear(u32 passIndex, DepthImageMutableResource resource);
 
-        void Access(u32 passIndex, ImageResource resource, AccessType accessType, PipelineType pipelineType);
-        void Access(u32 passIndex, ImageMutableResource resource, AccessType accessType, PipelineType pipelineType);
-        void Access(u32 passIndex, DepthImageResource resource, AccessType accessType, PipelineType pipelineType);
-        void Access(u32 passIndex, DepthImageMutableResource resource, AccessType accessType, PipelineType pipelineType);
+        void Access(u32 passIndex, ImageID imageID, AccessType accessType, PipelineType pipelineType);
+        void Access(u32 passIndex, DepthImageID imageID, AccessType accessType, PipelineType pipelineType);
+        void Access(u32 passIndex, BufferID imageID, AccessType accessType, BufferPassUsage bufferPassUsage);
 
         void Use(u32 passIndex, DescriptorSetResource resource);
 
-        bool NeedsPreExecute(u32 passIndex);
-        bool NeedsPostExecute(u32 passIndex);
+        void EnforceHasAccess(u32 passIndex, BufferResource resource, BufferPassUsage bufferPassUsage);
+        void EnforceHasAccess(u32 passIndex, BufferMutableResource resource, BufferPassUsage bufferPassUsage);
 
         const DynamicArray<ImageMutableResource>& GetColorClears(u32 passIndex);
         const DynamicArray<DepthImageMutableResource>& GetDepthClears(u32 passIndex);
@@ -117,10 +124,12 @@ namespace Renderer
         const DynamicArray<TrackedImageAccess>& GetImageAccesses(u32 passIndex);
         const DynamicArray<TrackedDepthImageAccess>& GetDepthImageAccesses(u32 passIndex);
 
+        const TrackedBufferBitSets& GetBufferPermissions(u32 passIndex);
+
         const DynamicArray<DescriptorSetID>& GetUsedDescriptorSetIDs(u32 passIndex);
 
-        const DynamicArray<TrackedPassAccess>& GetPassAccesses(ImageID imageID);
-        const DynamicArray<TrackedPassAccess>& GetPassAccesses(DepthImageID imageID);
+        const DynamicArray<TrackedImagePassAccess>& GetPassAccesses(ImageID imageID);
+        const DynamicArray<TrackedImagePassAccess>& GetPassAccesses(DepthImageID imageID);
 
         u32 GetLastBarrier(ImageID imageID);
         u32 GetLastBarrier(DepthImageID imageID);

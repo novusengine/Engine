@@ -26,10 +26,13 @@ namespace Renderer
             VkBuffer GetBuffer(BufferID bufferID) const;
             VkDeviceSize GetBufferSize(BufferID bufferID) const;
             VmaAllocation GetBufferAllocation(BufferID bufferID) const;
+            std::string GetBufferName(BufferID bufferID) const;
 
             BufferID CreateBuffer(BufferDesc& desc);
             BufferID CreateTemporaryBuffer(BufferDesc& desc, u32 framesLifetime);
             void DestroyBuffer(BufferID bufferID);
+
+            u32 GetNumBuffers();
 
         private:
             BufferID AcquireNewBufferID();

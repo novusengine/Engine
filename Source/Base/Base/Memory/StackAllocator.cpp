@@ -125,7 +125,7 @@ namespace Memory
 #ifdef _DEBUG
         if (_debug)
         {
-            std::cout << _name << "\tAllocated " << "\t@C " << reinterpret_cast<void*>(currentAddress) << "\t@R " << reinterpret_cast<void*>(nextAddress) << "\tO " << tempOffset << "\tP " << padding << std::endl;
+            DebugHandler::PrintFatal("{0} \tAllocated \t@C {1} \t@R {2} \tO {3} \tP {4}", _name, reinterpret_cast<void*>(currentAddress), reinterpret_cast<void*>(nextAddress), tempOffset, padding);
         }
 #endif
         _peak.store(std::max(_peak.load(), _used.load()));
@@ -160,7 +160,7 @@ namespace Memory
 #ifdef _DEBUG
         if (_debug)
         {
-            std::cout << _name << "\tAllocated " << "\t@C " << reinterpret_cast<void*>(currentAddress) << "\t@R " << reinterpret_cast<void*>(nextAddress) << "\tO " << offset << "\tP " << padding << std::endl;
+            DebugHandler::PrintFatal("{0} \tAllocated \t@C {1} \t@R {2} \tO {3} \tP {4}", _name, reinterpret_cast<void*>(currentAddress), reinterpret_cast<void*>(nextAddress), offset, padding);
         }
 #endif
         _peak.store(std::max(_peak.load(), _used.load()));
@@ -182,7 +182,7 @@ namespace Memory
 #ifdef _DEBUG
         if (_debug)
         {
-            std::cout << _name << "\tReset " << std::endl;
+            DebugHandler::PrintFatal("{0} \tReset", _name);
         }
 #endif
     }
