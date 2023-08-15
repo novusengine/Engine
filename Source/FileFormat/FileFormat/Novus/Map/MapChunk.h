@@ -15,6 +15,44 @@ namespace Adt
 namespace Map
 {
 	PRAGMA_NO_PADDING_START;
+	struct CellLiquidHeader
+	{
+	public:
+		// Packed Format
+		// Bit 1-7 (numInstances)
+		// Bit 8 (hasAttributes)
+		u8 packedData = 0;
+	};
+
+	struct CellLiquidInstance
+	{
+	public:
+		u8 liquidTypeID = 0; // Reference into LiquidType.cdb
+		u8 packedData = 0; // (Bit 1-6 LVF, Bit 7 hasBitmapForLiquid, Bit 8 hasVertexData)
+		u8 packedOffset = 0; // (Bit 1-3 X, Bit 4-8 Y)
+		u8 packedSize = 0; // (Bit 1-3 Width, Bit 4-8 Height)
+
+		f32 height = 0.f;
+	};
+
+	struct CellLiquidAttributes
+	{
+	public:
+		u64 fishableBitmap = 0;
+		u64 fatigueBitmap = 0;
+	};
+
+	struct LiquidInfo
+	{
+	public:
+		std::vector<CellLiquidHeader> headers = { };
+		std::vector<CellLiquidInstance> instances = { };
+		std::vector<CellLiquidAttributes> attributes = { };
+
+		std::vector<u8> bitmapData = { };
+		std::vector<u8> vertexData = { };
+	};
+
 	struct Cell
 	{
 	public:
@@ -80,6 +118,7 @@ namespace Map
 		HeightBox heightBox = { };
 
 		Cell cells[Terrain::CHUNK_NUM_CELLS];
+		LiquidInfo liquidInfo = { };
 
 		u32 chunkAlphaMapTextureHash = Terrain::TEXTURE_ID_INVALID;
 		std::vector<Terrain::Placement> mapObjectPlacements = { };

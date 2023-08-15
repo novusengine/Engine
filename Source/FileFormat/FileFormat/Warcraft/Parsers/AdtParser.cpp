@@ -246,7 +246,7 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
 
             for (u32 j = 0; j < liquidHeader.layerCount; j++)
             {
-                const MH2O::LiquidInstance& liquidInstance = layout.mh2o.instances[instanceIndex + j];
+                MH2O::LiquidInstance& liquidInstance = layout.mh2o.instances[instanceIndex + j];
 
                 u16 liquidVertexFormat = liquidInstance.liquidVertexFormat;
                 if (liquidInstance.liquidType == 2)
@@ -303,6 +303,8 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
                     layout.mh2o.vertexData.resize(vertexDataBeforeAdd + vertexDataToAdd);
                     memcpy(&layout.mh2o.vertexData[vertexDataBeforeAdd], &dataBytes[liquidInstance.vertexDataOffset], vertexDataToAdd);
                 }
+
+                liquidInstance.liquidVertexFormat = liquidVertexFormat;
             }
 
             instanceIndex += liquidHeader.layerCount;
