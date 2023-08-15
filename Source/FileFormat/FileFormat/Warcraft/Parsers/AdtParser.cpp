@@ -249,6 +249,9 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
                 const MH2O::LiquidInstance& liquidInstance = layout.mh2o.instances[instanceIndex + j];
 
                 u16 liquidVertexFormat = liquidInstance.liquidVertexFormat;
+                if (liquidInstance.liquidType == 2)
+                    liquidVertexFormat = 2;
+
                 if (liquidVertexFormat >= 42)
                 {
                     i16 liquidTypeID = -1;
@@ -273,6 +276,7 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
                         }
                     }
                 }
+                assert(liquidVertexFormat >= 0 && liquidVertexFormat <= 3);
 
                 bool hasBitmapData = liquidInstance.bitmapDataOffset > 0;
                 bool hasVertexData = liquidInstance.vertexDataOffset > 0 && liquidVertexFormat != 2 && liquidVertexFormat != 42;
