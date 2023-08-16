@@ -29,6 +29,12 @@ namespace Map
 
 		output.write(reinterpret_cast<char const*>(&chunkAlphaMapTextureHash), sizeof(u32)); // Write alpha map string index
 
+		u32 numMapObjectPlacements = static_cast<u32>(mapObjectPlacements.size());
+		output.write(reinterpret_cast<char const*>(&numMapObjectPlacements), sizeof(u32)); // Write number of map object placements
+
+		u32 numComplexModelPlacements = static_cast<u32>(complexModelPlacements.size());
+		output.write(reinterpret_cast<char const*>(&numComplexModelPlacements), sizeof(u32)); // Write number of complex model placements
+
 		// Water
 		{
 			u32 numLiquidHeaders = static_cast<u32>(liquidInfo.headers.size());
@@ -74,16 +80,10 @@ namespace Map
 
 		// Placements
 		{
-			u32 numMapObjectPlacements = static_cast<u32>(mapObjectPlacements.size());
-			output.write(reinterpret_cast<char const*>(&numMapObjectPlacements), sizeof(u32)); // Write number of map object placements
-
 			if (numMapObjectPlacements > 0)
 			{
 				output.write(reinterpret_cast<char const*>(mapObjectPlacements.data()), numMapObjectPlacements * sizeof(Terrain::Placement)); // Write map object placements
 			}
-
-			u32 numComplexModelPlacements = static_cast<u32>(complexModelPlacements.size());
-			output.write(reinterpret_cast<char const*>(&numComplexModelPlacements), sizeof(u32)); // Write number of complex model placements
 
 			if (numComplexModelPlacements > 0)
 			{
@@ -113,6 +113,12 @@ namespace Map
 			return false;
 
 		if (!buffer->GetU32(out.chunkAlphaMapTextureHash))
+			return false;
+
+		if (!buffer->GetU32(out.numMapObjectPlacements))
+			return false;
+
+		if (!buffer->GetU32(out.numComplexModelPlacements))
 			return false;
 
 		// Read Water
@@ -175,9 +181,7 @@ namespace Map
 
 		// Read Map Object Placements
 		{
-			u32 numPlacements = 0;
-			if (!buffer->GetU32(numPlacements))
-				return false;
+			u32 numPlacements = out.numMapObjectPlacements;
 
 			if (numPlacements)
 			{
@@ -189,9 +193,7 @@ namespace Map
 
 		// Read CModel Placements
 		{
-			u32 numPlacements = 0;
-			if (!buffer->GetU32(numPlacements))
-				return false;
+			u32 numPlacements = out.numComplexModelPlacements;
 
 			if (numPlacements)
 			{
