@@ -110,7 +110,7 @@ namespace Spline
 
         bool DoInterpolation();
         std::vector<SplinePoint> GetPoints() { return _points; };
-        vec3* GetPtrPoints();
+        void GetPointsData(std::vector<vec3>& output);
         void UpdatePoint(i32 position, SplinePoint newPoint);
 
         void AddPoint(const SplinePoint& newPoint, i32 position = -1);

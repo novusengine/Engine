@@ -3,8 +3,7 @@
 
 namespace Spline
 {
-    InterpolatedStorage::InterpolatedStorage(u32 step)
-        : _stepSize(step)
+    InterpolatedStorage::InterpolatedStorage(u32 step) : _stepSize(step)
     {
 
     }
@@ -49,8 +48,12 @@ namespace Spline
 
     const std::vector<vec3>& InterpolatedStorage::GetInterpolatedStorage(u32 splinePoints)
     {
-        bool checkSize = (splinePoints == 0) ?
-            true : (splinePoints * (_stepSize + 1)) == _points.size();
+        bool checkSize = true;
+
+        if (splinePoints != 0)
+        {
+            checkSize = ((splinePoints * (_stepSize + 1)) == _points.size());
+        }
 
         if (IsDirty() || !checkSize)
             return {};
@@ -58,17 +61,13 @@ namespace Spline
         return _points;
     }
 
-    Spline::Spline(InterpolationType type)
-        : _type(type),
-        _storage(0)
+    Spline::Spline(InterpolationType type) : _type(type), _storage(0)
     {
         _storage.Clear();
         _storage.MarkAsDirty();
     }
 
-    Spline::Spline(InterpolationType type, const std::vector<SplinePoint>& points)
-        : _type(type),
-        _storage(0)
+    Spline::Spline(InterpolationType type, const std::vector<SplinePoint>& points) : _type(type), _storage(0)
     {
         _points = points;
 
@@ -114,7 +113,10 @@ namespace Spline
 
     void Spline::SetType(InterpolationType newType)
     {
-        if (newType < InterpolationType::None || newType >= InterpolationType::MAX_TYPE || _type == newType)
+        if (_type == newType)
+            return;
+
+        if (newType < InterpolationType::None || newType >= InterpolationType::MAX_TYPE)
             return;
 
         _type = newType;
@@ -123,7 +125,7 @@ namespace Spline
 
     void Spline::SetAlpha(f32 newAlpha)
     {
-        _alpha = Math::Clamp(newAlpha, 0.f, 1.f);
+        _alpha = Math::Clamp(newAlpha, 0.0f, 1.0f);
         _storage.MarkAsDirty();
     }
 
@@ -132,12 +134,12 @@ namespace Spline
         if (!_storage.IsDirty())
             return false;
 
-        // need to have minimum 2 points
+        // need to have at least 2 points to draw one line
         if (_points.size() < 2 || _step == 0)
             return false;
 
         _storage.Clear();
-        f32 tStep = (1.f) / static_cast<f32>(_step);
+        f32 tStep = (1.0f) / static_cast<f32>(_step);
         if (IsInterpolatedWithControl())
         {
             for (i32 n = 0; n < _points.size() - 1; n++)
@@ -148,7 +150,7 @@ namespace Spline
                 std::vector<vec3> currentPortion;
                 currentPortion.reserve(_step + 1);
 
-                for (u32 i = 0; i < _step + 1; i ++)
+                for (u32 i = 0; i < _step + 1; i++)
                 {
                     f32 t = tStep * static_cast<f32>(i);
                     currentPortion.emplace_back(InterpolateControl(t, currentPoint, nextPoint));
@@ -159,8 +161,13 @@ namespace Spline
         }
         else
         {
-            vec3* ptr = GetPtrPoints();
-            for (i32 n = 0; n < (_points.size() * 3) - 4; n++)
+            std::vector<vec3> inlinePoints;
+            GetPointsData(inlinePoints);
+
+            if (inlinePoints.size() != (_points.size() * 3))
+                return false;
+
+            for (i32 n = 0; n < inlinePoints.size() - 4; n++)
             {
                 std::vector<vec3> currentPortion;
                 currentPortion.reserve(_step + 1);
@@ -168,7 +175,7 @@ namespace Spline
                 for (u32 i = 0; i < _step + 1; i++)
                 {
                     f32 t = tStep * static_cast<f32>(i);
-                    currentPortion.emplace_back(InterpolateCombined(t, ptr, n, _alpha));
+                    currentPortion.emplace_back(InterpolateCombined(t, inlinePoints.data(), n, _alpha));
                 }
 
                 _storage.AddPortion(currentPortion);
@@ -178,18 +185,14 @@ namespace Spline
         return true;
     }
 
-    vec3* Spline::GetPtrPoints()
+    void Spline::GetPointsData(std::vector<vec3>& output)
     {
         if (_points.empty())
-            return nullptr;
+            return;
 
-        vec3* ptr = new vec3[_points.size() * 3];
-        for (i32 i = 0; i < _points.size(); i++)
-        {
-            std::memcpy(ptr + (3 * i), _points[i].combined.data, 3 * sizeof(vec3));
-        }
-
-        return ptr;
+        size_t sizeBefore = output.size();
+        output.resize(sizeBefore + _points.size() * 3);
+        std::memcpy(&output[sizeBefore], _points.data(), _points.size() * 3 * sizeof(vec3));
     }
 
     bool Spline::IsInterpolatedWithControl()
@@ -212,7 +215,7 @@ namespace Spline
 
     vec3 Spline::InterpolateControl(f32 t, const SplinePoint& start, const SplinePoint& end)
     {
-        t = Math::Clamp(t, 0.f, 1.f);
+        t = Math::Clamp(t, 0.0f, 1.0f);
 
         switch (_type)
         {
@@ -229,8 +232,8 @@ namespace Spline
 
     vec3 Spline::InterpolateCombined(f32 t, const vec3* points, const i32 index, f32 alpha)
     {
-        t = Math::Clamp(t, 0.f, 1.f);
-        alpha = Math::Clamp(alpha, 0.f, 1.f);
+        t = Math::Clamp(t, 0.0f, 1.0f);
+        alpha = Math::Clamp(alpha, 0.0f, 1.0f);
 
         switch (_type)
         {
