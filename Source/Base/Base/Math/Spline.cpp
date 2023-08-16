@@ -196,17 +196,17 @@ namespace Spline
     {
         switch (_type)
         {
-        case InterpolationType::BSpline:
-        case InterpolationType::CatmullRom:
-        case InterpolationType::CatmullRom_Uniform:
-        case InterpolationType::CatmullRom_Centripetal:
-        case InterpolationType::CatmullRom_Chordal:
-            return false;
-        case InterpolationType::Hermite:
-        case InterpolationType::Bezier:
-        case InterpolationType::Linear:
-        default:
-            return true;
+            case InterpolationType::BSpline:
+            case InterpolationType::CatmullRom:
+            case InterpolationType::CatmullRom_Uniform:
+            case InterpolationType::CatmullRom_Centripetal:
+            case InterpolationType::CatmullRom_Chordal:
+                return false;
+            case InterpolationType::Hermite:
+            case InterpolationType::Bezier:
+            case InterpolationType::Linear:
+            default:
+                return true;
         }
     }
 
@@ -216,14 +216,14 @@ namespace Spline
 
         switch (_type)
         {
-        case InterpolationType::Linear:
-            return Interpolation::Linear::Lerp(t, start.control.point, end.control.point);
-        case InterpolationType::Bezier:
-            return Interpolation::Bezier::Cubic(t, start.control.point, start.control.exit, end.control.enter, end.control.point);
-        case InterpolationType::Hermite:
-            return Interpolation::Hermite::Cubic(t, start.control.point, end.control.point, start.control.exit, end.control.enter);
-        default:
-            return start.control.point;
+            case InterpolationType::Linear:
+                return Interpolation::Linear::Lerp(t, start.control.point, end.control.point);
+            case InterpolationType::Bezier:
+                return Interpolation::Bezier::Cubic(t, start.control.point, start.control.exit, end.control.enter, end.control.point);
+            case InterpolationType::Hermite:
+                return Interpolation::Hermite::Cubic(t, start.control.point, end.control.point, start.control.exit, end.control.enter);
+            default:
+                return start.control.point;
         }
     }
 
@@ -234,21 +234,22 @@ namespace Spline
 
         switch (_type)
         {
-        case InterpolationType::BSpline:
-            return Interpolation::BSpline::BasisSpline(t, points, index);
-        case InterpolationType::CatmullRom:
-            return Interpolation::CatmullRom::Base(t, alpha, points, index);
-        case InterpolationType::CatmullRom_Uniform:
-            return Interpolation::CatmullRom::Uniform(t, points, index);
-        case InterpolationType::CatmullRom_Centripetal:
-            return Interpolation::CatmullRom::Centripetal(t, points, index);
-        case InterpolationType::CatmullRom_Chordal:
-            return Interpolation::CatmullRom::Chordal(t, points, index);
-        default:
-            break;
+            case InterpolationType::BSpline:
+                return Interpolation::BSpline::BasisSpline(t, points, index);
+            case InterpolationType::CatmullRom:
+                return Interpolation::CatmullRom::Base(t, alpha, points, index);
+            case InterpolationType::CatmullRom_Uniform:
+                return Interpolation::CatmullRom::Uniform(t, points, index);
+            case InterpolationType::CatmullRom_Centripetal:
+                return Interpolation::CatmullRom::Centripetal(t, points, index);
+            case InterpolationType::CatmullRom_Chordal:
+                return Interpolation::CatmullRom::Chordal(t, points, index);
+            default:
+                break;
         }
 
-        return *(points + index);
+        vec3 result = *(points + index);
+        return result;
     }
 
     void Spline::UpdatePoint(i32 position, SplinePoint newPoint)

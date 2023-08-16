@@ -1,5 +1,4 @@
 #pragma once
-
 #include "Base/Types.h"
 
 #include <glm/glm.hpp>
@@ -9,11 +8,6 @@ namespace Spline
 {
     struct InterpolatedStorage
     {
-    protected:
-        bool _dirty = true;
-        u32 _stepSize = 0;
-        std::vector<vec3> _points = {};
-
     public:
         explicit InterpolatedStorage(u32 step);
 
@@ -27,10 +21,16 @@ namespace Spline
 
         [[nodiscard]] bool IsDirty() { return _dirty; };
         [[nodiscard]] const std::vector<vec3>& GetInterpolatedStorage(u32 splinePoints = 0);
+
+    protected:
+        bool _dirty = true;
+        u32 _stepSize = 0;
+        std::vector<vec3> _points = {};
     };
 
     struct SplinePoint
     {
+    public:
         SplinePoint() { };
 
         /*
@@ -100,10 +100,6 @@ namespace Spline
 
     class Spline
     {
-    protected:
-        std::vector<SplinePoint> _points = {};
-        InterpolatedStorage _storage;
-
     public:
         explicit Spline(InterpolationType type);
         Spline(InterpolationType type, const std::vector<SplinePoint>& points);
@@ -129,6 +125,10 @@ namespace Spline
         [[nodiscard]] InterpolationType GetType() { return _type; };
         [[nodiscard]] const u32 GetStep() { return _step; };
         [[nodiscard]] const std::vector<vec3>& GetInterpolatedPoints() { return _storage.GetInterpolatedStorage(); };
+
+    protected:
+        std::vector<SplinePoint> _points = {};
+        InterpolatedStorage _storage;
 
     private:
         InterpolationType _type = InterpolationType::None;

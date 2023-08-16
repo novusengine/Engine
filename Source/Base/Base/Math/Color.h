@@ -77,7 +77,8 @@ struct Color
         u8 g = static_cast<u8>(rhs.g * 255.f);
         u8 b = static_cast<u8>(rhs.b * 255.f);
 
-        return (static_cast<u32>(a) << 24) | (static_cast<u32>(b) << 16) | (static_cast<u32>(g) << 8) | (static_cast<u32>(r));
+        u32 result = (a << 24) | (b << 16) | (g << 8) | (r);
+        return result;
     }
 
     static Color Black;
