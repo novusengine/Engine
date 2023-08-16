@@ -1,8 +1,10 @@
 #pragma once
 
+#include <Base/Types.h>
+
 struct Color
 {
-    Color(float inR, float inG, float inB, float inA = 1.0f)
+    Color(f32 inR, f32 inG, f32 inB, f32 inA = 1.0f)
         : r(inR)
         , g(inG)
         , b(inB)
@@ -20,10 +22,10 @@ struct Color
 
     }
 
-    float r;
-    float g;
-    float b;
-    float a;
+    f32 r;
+    f32 g;
+    f32 b;
+    f32 a;
 
     Color operator+(const Color& rhs)
     {
