@@ -29,22 +29,6 @@ namespace Map
 
 		output.write(reinterpret_cast<char const*>(&chunkAlphaMapTextureHash), sizeof(u32)); // Write alpha map string index
 
-		u32 numMapObjectPlacements = static_cast<u32>(mapObjectPlacements.size());
-		output.write(reinterpret_cast<char const*>(&numMapObjectPlacements), sizeof(u32)); // Write number of map object placements
-
-		if (numMapObjectPlacements > 0)
-		{
-			output.write(reinterpret_cast<char const*>(mapObjectPlacements.data()), numMapObjectPlacements * sizeof(Terrain::Placement)); // Write map object placements
-		}
-
-		u32 numComplexModelPlacements = static_cast<u32>(complexModelPlacements.size());
-		output.write(reinterpret_cast<char const*>(&numComplexModelPlacements), sizeof(u32)); // Write number of complex model placements
-
-		if (numComplexModelPlacements > 0)
-		{
-			output.write(reinterpret_cast<char const*>(complexModelPlacements.data()), numComplexModelPlacements * sizeof(Terrain::Placement)); // Write map object placements
-		}
-
 		// Water
 		{
 			u32 numLiquidHeaders = static_cast<u32>(liquidInfo.headers.size());
@@ -88,6 +72,25 @@ namespace Map
 			}
 		}
 
+		// Placements
+		{
+			u32 numMapObjectPlacements = static_cast<u32>(mapObjectPlacements.size());
+			output.write(reinterpret_cast<char const*>(&numMapObjectPlacements), sizeof(u32)); // Write number of map object placements
+
+			if (numMapObjectPlacements > 0)
+			{
+				output.write(reinterpret_cast<char const*>(mapObjectPlacements.data()), numMapObjectPlacements * sizeof(Terrain::Placement)); // Write map object placements
+			}
+
+			u32 numComplexModelPlacements = static_cast<u32>(complexModelPlacements.size());
+			output.write(reinterpret_cast<char const*>(&numComplexModelPlacements), sizeof(u32)); // Write number of complex model placements
+
+			if (numComplexModelPlacements > 0)
+			{
+				output.write(reinterpret_cast<char const*>(complexModelPlacements.data()), numComplexModelPlacements * sizeof(Terrain::Placement)); // Write map object placements
+			}
+		}
+
 		output.close();
 
 		return true;
@@ -111,34 +114,6 @@ namespace Map
 
 		if (!buffer->GetU32(out.chunkAlphaMapTextureHash))
 			return false;
-
-		// Read Map Object Placements
-		{
-			u32 numPlacements = 0;
-			if (!buffer->GetU32(numPlacements))
-				return false;
-
-			if (numPlacements)
-			{
-				out.mapObjectPlacements.resize(numPlacements);
-				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.mapObjectPlacements[0]), numPlacements * sizeof(Terrain::Placement)))
-					return false;
-			}
-		}
-
-		// Read CModel Placements
-		{
-			u32 numPlacements = 0;
-			if (!buffer->GetU32(numPlacements))
-				return false;
-
-			if (numPlacements)
-			{
-				out.complexModelPlacements.resize(numPlacements);
-				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.complexModelPlacements[0]), numPlacements * sizeof(Terrain::Placement)))
-					return false;
-			}
-		}
 
 		// Read Water
 		{
@@ -194,6 +169,34 @@ namespace Map
 			{
 				out.liquidInfo.vertexData.resize(numLiquidVertexDataBytes);
 				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.vertexData[0]), numLiquidVertexDataBytes * sizeof(u8)))
+					return false;
+			}
+		}
+
+		// Read Map Object Placements
+		{
+			u32 numPlacements = 0;
+			if (!buffer->GetU32(numPlacements))
+				return false;
+
+			if (numPlacements)
+			{
+				out.mapObjectPlacements.resize(numPlacements);
+				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.mapObjectPlacements[0]), numPlacements * sizeof(Terrain::Placement)))
+					return false;
+			}
+		}
+
+		// Read CModel Placements
+		{
+			u32 numPlacements = 0;
+			if (!buffer->GetU32(numPlacements))
+				return false;
+
+			if (numPlacements)
+			{
+				out.complexModelPlacements.resize(numPlacements);
+				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.complexModelPlacements[0]), numPlacements * sizeof(Terrain::Placement)))
 					return false;
 			}
 		}
