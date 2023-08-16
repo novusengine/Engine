@@ -123,9 +123,10 @@ namespace Map
 		u32 numMapObjectPlacements = 0;
 		u32 numComplexModelPlacements = 0;
 
-		LiquidInfo liquidInfo = { };
 		std::vector<Terrain::Placement> mapObjectPlacements = { };
 		std::vector<Terrain::Placement> complexModelPlacements = { };
+
+		LiquidInfo liquidInfo = { };
 
 	public:
 		bool Save(const std::string& path);

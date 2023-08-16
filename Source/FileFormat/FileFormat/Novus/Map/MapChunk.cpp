@@ -35,6 +35,19 @@ namespace Map
 		u32 numComplexModelPlacements = static_cast<u32>(complexModelPlacements.size());
 		output.write(reinterpret_cast<char const*>(&numComplexModelPlacements), sizeof(u32)); // Write number of complex model placements
 
+		// Placements
+		{
+			if (numMapObjectPlacements > 0)
+			{
+				output.write(reinterpret_cast<char const*>(mapObjectPlacements.data()), numMapObjectPlacements * sizeof(Terrain::Placement)); // Write map object placements
+			}
+
+			if (numComplexModelPlacements > 0)
+			{
+				output.write(reinterpret_cast<char const*>(complexModelPlacements.data()), numComplexModelPlacements * sizeof(Terrain::Placement)); // Write map object placements
+			}
+		}
+
 		// Water
 		{
 			u32 numLiquidHeaders = static_cast<u32>(liquidInfo.headers.size());
@@ -78,19 +91,6 @@ namespace Map
 			}
 		}
 
-		// Placements
-		{
-			if (numMapObjectPlacements > 0)
-			{
-				output.write(reinterpret_cast<char const*>(mapObjectPlacements.data()), numMapObjectPlacements * sizeof(Terrain::Placement)); // Write map object placements
-			}
-
-			if (numComplexModelPlacements > 0)
-			{
-				output.write(reinterpret_cast<char const*>(complexModelPlacements.data()), numComplexModelPlacements * sizeof(Terrain::Placement)); // Write map object placements
-			}
-		}
-
 		output.close();
 
 		return true;
@@ -121,64 +121,6 @@ namespace Map
 		if (!buffer->GetU32(out.numComplexModelPlacements))
 			return false;
 
-		// Read Water
-		{
-			u32 numLiquidHeaders = 0;
-			if (!buffer->GetU32(numLiquidHeaders))
-				return false;
-		
-			if (numLiquidHeaders > 0)
-			{
-				out.liquidInfo.headers.resize(numLiquidHeaders);
-				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.headers[0]), numLiquidHeaders * sizeof(CellLiquidHeader)))
-					return false;
-			}
-
-			u32 numLiquidInstances = 0;
-			if (!buffer->GetU32(numLiquidInstances))
-				return false;
-		
-			if (numLiquidInstances > 0)
-			{
-				out.liquidInfo.instances.resize(numLiquidInstances);
-				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.instances[0]), numLiquidInstances * sizeof(CellLiquidInstance)))
-					return false;
-			}
-
-			u32 numLiquidAttributes = 0;
-			if (!buffer->GetU32(numLiquidAttributes))
-				return false;
-		
-			if (numLiquidAttributes > 0)
-			{
-				out.liquidInfo.attributes.resize(numLiquidAttributes);
-				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.attributes[0]), numLiquidAttributes * sizeof(CellLiquidAttributes)))
-					return false;
-			}
-
-			u32 numLiquidBitmapDataBytes = 0;
-			if (!buffer->GetU32(numLiquidBitmapDataBytes))
-				return false;
-		
-			if (numLiquidBitmapDataBytes > 0)
-			{
-				out.liquidInfo.bitmapData.resize(numLiquidBitmapDataBytes);
-				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.bitmapData[0]), numLiquidBitmapDataBytes * sizeof(u8)))
-					return false;
-			}
-
-			u32 numLiquidVertexDataBytes = 0;
-			if (!buffer->GetU32(numLiquidVertexDataBytes))
-				return false;
-		
-			if (numLiquidVertexDataBytes > 0)
-			{
-				out.liquidInfo.vertexData.resize(numLiquidVertexDataBytes);
-				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.vertexData[0]), numLiquidVertexDataBytes * sizeof(u8)))
-					return false;
-			}
-		}
-
 		// Read Map Object Placements
 		{
 			u32 numPlacements = out.numMapObjectPlacements;
@@ -199,6 +141,64 @@ namespace Map
 			{
 				out.complexModelPlacements.resize(numPlacements);
 				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.complexModelPlacements[0]), numPlacements * sizeof(Terrain::Placement)))
+					return false;
+			}
+		}
+
+		// Read Water
+		{
+			u32 numLiquidHeaders = 0;
+			if (!buffer->GetU32(numLiquidHeaders))
+				return false;
+
+			if (numLiquidHeaders > 0)
+			{
+				out.liquidInfo.headers.resize(numLiquidHeaders);
+				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.headers[0]), numLiquidHeaders * sizeof(CellLiquidHeader)))
+					return false;
+			}
+
+			u32 numLiquidInstances = 0;
+			if (!buffer->GetU32(numLiquidInstances))
+				return false;
+
+			if (numLiquidInstances > 0)
+			{
+				out.liquidInfo.instances.resize(numLiquidInstances);
+				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.instances[0]), numLiquidInstances * sizeof(CellLiquidInstance)))
+					return false;
+			}
+
+			u32 numLiquidAttributes = 0;
+			if (!buffer->GetU32(numLiquidAttributes))
+				return false;
+
+			if (numLiquidAttributes > 0)
+			{
+				out.liquidInfo.attributes.resize(numLiquidAttributes);
+				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.attributes[0]), numLiquidAttributes * sizeof(CellLiquidAttributes)))
+					return false;
+			}
+
+			u32 numLiquidBitmapDataBytes = 0;
+			if (!buffer->GetU32(numLiquidBitmapDataBytes))
+				return false;
+
+			if (numLiquidBitmapDataBytes > 0)
+			{
+				out.liquidInfo.bitmapData.resize(numLiquidBitmapDataBytes);
+				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.bitmapData[0]), numLiquidBitmapDataBytes * sizeof(u8)))
+					return false;
+			}
+
+			u32 numLiquidVertexDataBytes = 0;
+			if (!buffer->GetU32(numLiquidVertexDataBytes))
+				return false;
+
+			if (numLiquidVertexDataBytes > 0)
+			{
+				out.liquidInfo.vertexData.resize(numLiquidVertexDataBytes);
+				if (!buffer->GetBytes(reinterpret_cast<u8*>(&out.liquidInfo.vertexData[0]), numLiquidVertexDataBytes * sizeof(u8)))
 					return false;
 			}
 		}
