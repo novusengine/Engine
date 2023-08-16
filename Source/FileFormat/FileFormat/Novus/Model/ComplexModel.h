@@ -55,6 +55,68 @@ PRAGMA_NO_PADDING_START;
 			u32 sequenceID = 0;
 			std::vector<u32> timestamps = { };
 			std::vector<T> values = { };
+
+		public:
+			AnimationTrack() { }
+			AnimationTrack(AnimationTrack<T>& other) : sequenceID(sequenceID)
+			{
+				size_t numTimestamps = other.timestamps.size();
+				if (numTimestamps)
+				{
+					timestamps.resize(numTimestamps);
+					memcpy(timestamps.data(), other.timestamps.data(), numTimestamps * sizeof(u32));
+				}
+
+				size_t numValues = other.values.size();
+				if (numValues)
+				{
+					values.resize(numValues);
+
+					if constexpr (std::is_trivially_copyable<T>::value)
+					{
+						memcpy(values.data(), other.values.data(), numValues * sizeof(T));
+					}
+					else
+					{
+						for (u32 i = 0; i < numValues; i++)
+						{
+							values[i] = other.values[i];
+						}
+					}
+				}
+			}
+			AnimationTrack(AnimationTrack<T>&& other) : sequenceID(other.sequenceID), timestamps(std::move(other.timestamps)), values(std::move(other.values)) { }
+			AnimationTrack<T>& operator=(const AnimationTrack<T>& other)
+			{
+				sequenceID = other.sequenceID;
+
+				size_t numTimestamps = other.timestamps.size();
+				if (numTimestamps)
+				{
+					timestamps.resize(numTimestamps);
+					memcpy(timestamps.data(), other.timestamps.data(), numTimestamps * sizeof(u32));
+				}
+
+				size_t numValues = other.values.size();
+				if (numValues)
+				{
+					values.resize(numValues);
+
+					if constexpr (std::is_trivially_copyable<T>::value)
+					{
+						memcpy(values.data(), other.values.data(), numValues * sizeof(T));
+					}
+					else
+					{
+						for (u32 i = 0; i < numValues; i++)
+						{
+							values[i] = other.values[i];
+						}
+					}
+				}
+
+				return *this;
+			}
 		};
 
 		enum class AnimationInterpolationType : u8
@@ -73,6 +135,39 @@ PRAGMA_NO_PADDING_START;
 			bool isGlobalSequence = false;
 
 			std::vector<AnimationTrack<T>> tracks;
+
+		public:
+			AnimationData() { }
+
+			AnimationData(AnimationData<T>& other)
+			{
+				interpolationType = other.interpolationType;
+				isGlobalSequence = other.isGlobalSequence;
+
+				size_t numTracks = other.tracks.size();
+				tracks.resize(numTracks);
+
+				for (size_t i = 0; i < numTracks; i++)
+				{
+					tracks[i] = other.tracks[i];
+				}
+			}
+			AnimationData(AnimationData<T>&& other) : interpolationType(other.interpolationType), isGlobalSequence(other.isGlobalSequence), tracks(std::move(other.tracks)) { }
+			AnimationData<T>& operator=(const AnimationData<T>& other)
+			{
+				interpolationType = other.interpolationType;
+				isGlobalSequence = other.isGlobalSequence;
+
+				size_t numTracks = other.tracks.size();
+				tracks.resize(numTracks);
+
+				for (size_t i = 0; i < numTracks; i++)
+				{
+					tracks[i] = other.tracks[i];
+				}
+
+				return *this;
+			}
 
 			void Serialize(std::ofstream& stream) const
 			{
@@ -273,6 +368,23 @@ PRAGMA_NO_PADDING_START;
 			AnimationData<vec3> scale = { };
 
 			vec3 pivot = { };
+
+		public:
+			Bone() { }
+			Bone(Bone& other)
+			{
+				primaryBoneIndex = other.primaryBoneIndex;
+				flags = other.flags;
+				parentBoneID = other.parentBoneID;
+				submeshID = other.submeshID;
+
+				translation = other.translation;
+				rotation = other.rotation;
+				scale = other.scale;
+
+
+				pivot = other.pivot;
+			}
 		};
 		struct AnimationSequence
 		{

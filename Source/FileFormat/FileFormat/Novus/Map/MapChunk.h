@@ -118,7 +118,10 @@ namespace Map
 		HeightBox heightBox = { };
 
 		Cell cells[Terrain::CHUNK_NUM_CELLS];
+
 		u32 chunkAlphaMapTextureHash = Terrain::TEXTURE_ID_INVALID;
+		u32 numMapObjectPlacements = 0;
+		u32 numComplexModelPlacements = 0;
 
 		LiquidInfo liquidInfo = { };
 		std::vector<Terrain::Placement> mapObjectPlacements = { };
