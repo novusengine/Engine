@@ -9,6 +9,7 @@
 #include <Base/Memory/StackAllocator.h>
 
 #include <vulkan/vulkan.h>
+#include <tracy/Tracy.hpp>
 
 namespace Renderer
 {

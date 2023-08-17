@@ -1,6 +1,9 @@
 #pragma once
 #include <Base/Types.h>
 
+#include "FileFormat/Novus/ClientDB/ClientDB.h"
+#include "FileFormat/Novus/ClientDB/Definitions.h"
+
 #include <robinhood/robinhood.h>
 #include <vector>
 
@@ -11,7 +14,7 @@ namespace DB2::WDC3
 	class Parser
 	{
 	public:
-		bool TryParse(std::shared_ptr<Bytebuffer> buffer, DB2::WDC3::Layout& out);
+		bool TryParse(std::shared_ptr<Bytebuffer>& buffer, DB2::WDC3::Layout& out);
 		bool TryReadRecord(const DB2::WDC3::Layout& layout, u32 index, u32& outSectionID, u32& outRecordID, u8*& outRecordData);
 
 		template <typename T>
@@ -123,10 +126,45 @@ namespace DB2::WDC3
 		}
 
 		char* GetString(const DB2::WDC3::Layout& db2, u32 recordIndex, u32 fieldIndex);
+		char* GetStringInArr(const DB2::WDC3::Layout& db2, u32 recordIndex, u32 fieldIndex, u32 arrIndex);
 		u32 GetFieldSize(const DB2::WDC3::Layout& db2, u32 fieldIndex);
 
 		bool IsRecordEncrypted(const DB2::WDC3::Layout& db2, u32 recordIndex);
 		u32 GetRecordIDFromIndex(const DB2::WDC3::Layout& db2, u32 recordIndex);
+
+		template <typename T>
+		void RepopulateFromCopyTable(const DB2::WDC3::Layout& db2, std::vector<T>& entries, robin_hood::unordered_map<u32, u32>& lookupTable)
+		{
+			u32 numSections = static_cast<u32>(db2.sections.size());
+
+			for (u32 i = 0; i < numSections; i++)
+			{
+				const DB2::WDC3::Layout::SectionHeader& sectionHeader = db2.sectionHeaders[i];
+				const DB2::WDC3::Layout::Section& section = db2.sections[i];
+
+				if (sectionHeader.copyTableCount == 0)
+					continue;
+
+				lookupTable.reserve(lookupTable.size() + sectionHeader.copyTableCount);
+				entries.reserve(entries.size() + sectionHeader.copyTableCount);
+
+				for (u32 j = 0; j < sectionHeader.copyTableCount; j++)
+				{
+					const DB2::WDC3::Layout::CopyTableEntry& copyTableEntry = section.copyTable[j];
+
+					if (!lookupTable.contains(copyTableEntry.oldRowID))
+						continue;
+
+					u32 rowToCopyIndex = lookupTable[copyTableEntry.oldRowID];
+					const T& rowToCopy = entries[rowToCopyIndex];
+
+					T& rowEntry = entries.emplace_back(rowToCopy);
+					rowEntry.id = copyTableEntry.newRowID;
+
+					lookupTable[rowEntry.id] = static_cast<u32>(entries.size()) - 1u;
+				}
+			}
+		}
 
 	private:
 		u32 RoundBitToNextByte(u32 bits);

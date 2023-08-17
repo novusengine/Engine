@@ -11,5 +11,5 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 	engine::dependencies
 )
 
-set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER ${ROOT_FOLDER} LINKER_LANGUAGE CXX UNITY_BUILD ON)
+set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER ${ROOT_FOLDER} LINKER_LANGUAGE CXX UNITY_BUILD ${UNITY_BUILD_ENABLED})
 create_vs_filters(${BASE_FILES})

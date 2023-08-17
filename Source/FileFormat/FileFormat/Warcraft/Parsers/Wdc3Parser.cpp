@@ -487,7 +487,7 @@ robin_hood::unordered_set<u64> Parser::_cascEncryptionKeyLookup =
 	0xFF7C9A1B789D0D42ULL
 };
 
-bool Parser::TryParse(std::shared_ptr<Bytebuffer> buffer, Layout& out)
+bool Parser::TryParse(std::shared_ptr<Bytebuffer>& buffer, Layout& out)
 {
 	Layout::Header& header = out.header;
 	if (!buffer->Get(header))
@@ -735,6 +735,10 @@ bool Parser::TryReadRecord(const Layout& layout, u32 index, u32& outSectionID, u
 
 char* Parser::GetString(const Layout& layout, u32 recordIndex, u32 fieldIndex)
 {
+	return GetStringInArr(layout, recordIndex, fieldIndex, 0);
+}
+char* Parser::GetStringInArr(const Layout& layout, u32 recordIndex, u32 fieldIndex, u32 arrIndex)
+{
 	PRAGMA_CLANG_DIAGNOSTIC_PUSH;
 	PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wunused-value);
 	const Layout::Header& header = layout.header;
@@ -754,38 +758,43 @@ char* Parser::GetString(const Layout& layout, u32 recordIndex, u32 fieldIndex)
 	// Validate sectionIndex to make sure we're not accessing a non existing section
 	u32 numSections = static_cast<u32>(layout.sections.size());
 	if (sectionIndex >= numSections)
-		return nullptr;
+		return "";
 
 	// Validate fieldIndex to make sure we're not accessing a non existing field
-	if (fieldIndex >= layout.fieldStorageInfos.size())
-		return nullptr;
+	if (fieldIndex >= layout.fieldStorageInfos.size() ||
+		fieldIndex >= layout.fieldStructures.size())
+		return "";
 
 	const Layout::Section& section = layout.sections[sectionIndex];
 	const Layout::FieldStorageInfo& fieldStorageInfo = layout.fieldStorageInfos[fieldIndex];
 
 	// Get Field Value
+	u8* recordData = &section.recordData[localIndex * header.recordSize];
+	u32 fieldOffset = layout.fieldStructures[fieldIndex].offset;
 	u32 fieldOffsetInBytes = fieldStorageInfo.offsetInBits >> 3;
 
-	u8* recordData = &section.recordData[localIndex * header.recordSize];
-	u32 fieldValue = *reinterpret_cast<u32*>(recordData + fieldOffsetInBytes);
+	u32 stringOffset = reinterpret_cast<u32*>(recordData + fieldOffsetInBytes)[arrIndex];
 
-	// Calculate the address to the current field within the record data
-	u32 fieldAddressInGlobalRecordSpace = (recordIndex * header.recordSize) + fieldOffsetInBytes;
-	u32 offsetIntoGlobalStringtableSpace = (fieldAddressInGlobalRecordSpace + fieldValue) - (header.recordSize * header.recordCount);
+	if (stringOffset != 0)
+	{
+		stringOffset += arrIndex * fieldOffset;
+		stringOffset += fieldOffsetInBytes;
+		stringOffset += recordIndex * header.recordSize;
+		stringOffset -= header.recordCount * header.recordSize;
+	}
 
 	u32 strSectionIndex = 0;
-	u32 localStringTableOffset = offsetIntoGlobalStringtableSpace;
 	for (strSectionIndex; strSectionIndex < numSections; strSectionIndex++)
 	{
 		const Layout::SectionHeader& sectionHeader = layout.sectionHeaders[strSectionIndex];
-		if (localStringTableOffset < sectionHeader.stringTableSize)
+		if (stringOffset < sectionHeader.stringTableSize)
 			break;
 
-		localStringTableOffset -= sectionHeader.stringTableSize;
+		stringOffset -= sectionHeader.stringTableSize;
 	}
 
 	const Layout::Section& strSection = layout.sections[strSectionIndex];
-	char* string = reinterpret_cast<char*>(&strSection.stringTableData[localStringTableOffset]);
+	char* string = reinterpret_cast<char*>(&strSection.stringTableData[stringOffset]);
 
 	return string;
 	PRAGMA_CLANG_DIAGNOSTIC_POP;

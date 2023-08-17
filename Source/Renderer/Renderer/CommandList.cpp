@@ -36,6 +36,7 @@
 #include "Commands/BufferBarrier.h"
 #include "Commands/DrawImgui.h"
 #include "Commands/PushConstant.h"
+#include "Commands/TimeQuery.h"
 
 namespace Renderer
 {

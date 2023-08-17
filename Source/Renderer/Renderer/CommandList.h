@@ -7,6 +7,7 @@
 #include "Descriptors/GraphicsPipelineDesc.h"
 #include "Descriptors/ComputePipelineDesc.h"
 #include "Descriptors/SemaphoreDesc.h"
+#include "Descriptors/TimeQueryDesc.h"
 
 #include <Base/Types.h>
 #include <Base/Memory/StackAllocator.h>

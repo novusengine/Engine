@@ -1,6 +1,9 @@
 include_guard(GLOBAL)
 
 # Setup Cached Options
+set(UNITY_BUILD_ENABLED ON CACHE BOOL "")
+
+# Setup Cached Options with force
 set(LUAU_BUILD_CLI OFF CACHE BOOL "" FORCE)
 set(LUAU_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)

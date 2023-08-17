@@ -92,6 +92,9 @@ namespace Renderer
         virtual void UnloadTexture(TextureID textureID) = 0;
         virtual void UnloadTexturesInArray(TextureArrayID textureArrayID, u32 unloadStartIndex) = 0;
 
+        // Misc
+        virtual u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;
+
         // Command List Functions
         virtual CommandListID BeginCommandList() = 0;
         virtual void EndCommandList(CommandListID commandListID) = 0;

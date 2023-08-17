@@ -1,5 +1,7 @@
 #include "DescriptorSetResource.h"
-#include "RenderGraphResources.h"
+
+#include <Renderer/RenderGraphResources.h>
+#include <Renderer/DescriptorSet.h>
 
 namespace Renderer
 {

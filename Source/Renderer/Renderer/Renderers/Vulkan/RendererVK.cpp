@@ -250,6 +250,11 @@ namespace Renderer
         _textureHandler->UnloadTexturesInArray(textureArrayID, unloadStartIndex);
     }
 
+    u32 RendererVK::AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID)
+    {
+        return _textureHandler->AddTextureToArray(textureID, textureArrayID);
+    }
+
     static VmaBudget sBudgets[16] = { { 0 } };
 
     f32 RendererVK::FlipFrame(u32 frameIndex)

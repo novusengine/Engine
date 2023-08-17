@@ -41,6 +41,14 @@ target_include_directories(glm INTERFACE
 )
 target_compile_definitions(glm INTERFACE GLM_FORCE_LEFT_HANDED GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
+## UTFCPP
+add_library(utfcpp INTERFACE)
+add_library(utfcpp::utfcpp ALIAS utfcpp)
+
+target_include_directories(utfcpp INTERFACE
+    "${CMAKE_CURRENT_LIST_DIR}/utfcpp"
+)
+
 add_subdirectory(glfw)
 add_subdirectory(gli)
 add_subdirectory(imgui)
