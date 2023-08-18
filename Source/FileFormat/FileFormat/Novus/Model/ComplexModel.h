@@ -207,35 +207,33 @@ PRAGMA_NO_PADDING_START;
 					return false;
 
 				u32 numTracks = 0;
+				if (!buffer->GetU32(numTracks))
+					return false;
+
+				tracks.resize(numTracks);
+
+				for (u32 i = 0; i < numTracks; i++)
 				{
-					if (!buffer->GetU32(numTracks))
+					AnimationTrack<T>& track = tracks[i];
+
+					if (!buffer->GetU32(track.sequenceID))
 						return false;
 
-					tracks.resize(numTracks);
+					u32 numTimestamps = 0;
+					if (!buffer->GetU32(numTimestamps))
+						return false;
 
-					for (u32 i = 0; i < numTracks; i++)
-					{
-						AnimationTrack<T>& track = tracks[i];
+					track.timestamps.resize(numTimestamps);
+					if (!buffer->GetBytes(reinterpret_cast<u8*>(track.timestamps.data()), numTimestamps * sizeof(u32)))
+						return false;
 
-						if (!buffer->GetU32(track.sequenceID))
-							return false;
+					u32 numValues = 0;
+					if (!buffer->GetU32(numValues))
+						return false;
 
-						u32 numTimestamps = 0;
-						if (!buffer->GetU32(numTimestamps))
-							return false;
-
-						track.timestamps.resize(numTimestamps);
-						if (!buffer->GetBytes(reinterpret_cast<u8*>(track.timestamps.data()), numTimestamps * sizeof(u32)))
-							return false;
-
-						u32 numValues = 0;
-						if (!buffer->GetU32(numValues))
-							return false;
-
-						track.values.resize(numValues);
-						if (!buffer->GetBytes(reinterpret_cast<u8*>(track.values.data()), numValues * sizeof(T)))
-							return false;
-					}
+					track.values.resize(numValues);
+					if (!buffer->GetBytes(reinterpret_cast<u8*>(track.values.data()), numValues * sizeof(T)))
+						return false;
 				}
 
 				return true;

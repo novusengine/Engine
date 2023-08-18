@@ -245,7 +245,7 @@ namespace Model
 
 		// Write Cameras
 		{
-			u32 numElements = modelHeader.numBones;
+			u32 numElements = modelHeader.numCameras;
 
 			if (numElements > 0)
 			{
@@ -513,16 +513,22 @@ namespace Model
 					if (!buffer->GetF32(camera.nearClip))
 						return false;
 
-					if (!camera.positions.Deserialize(buffer.get()))
+					if (!buffer->Get(camera.positionBase))
 						return false;
 
-					if (!camera.targetPositions.Deserialize(buffer.get()))
+					if (!buffer->Get(camera.targetPositionBase))
 						return false;
 
-					if (!camera.roll.Deserialize(buffer.get()))
+					if (!buffer->Deserialize(camera.positions))
 						return false;
 
-					if (!camera.fov.Deserialize(buffer.get()))
+					if (!buffer->Deserialize(camera.targetPositions))
+						return false;
+
+					if (!buffer->Deserialize(camera.roll))
+						return false;
+
+					if (!buffer->Deserialize(camera.fov))
 						return false;
 				}
 			}
