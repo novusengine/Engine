@@ -105,15 +105,15 @@ PRAGMA_NO_PADDING_START;
 		i16 z = 0;
 		i16 w = 0;
 
-		vec4 ToVec4()
+		quat ToQuat()
 		{
-			vec4 vec;
-			vec.x = static_cast<f32>(x < 0 ? x + 32768 : x - 32767) / 32767.f;
-			vec.y = static_cast<f32>(y < 0 ? y + 32768 : y - 32767) / 32767.f;
-			vec.z = static_cast<f32>(z < 0 ? z + 32768 : z - 32767) / 32767.f;
-			vec.w = static_cast<f32>(w < 0 ? w + 32768 : w - 32767) / 32767.f;
+			quat quat;
+			quat.x = static_cast<f32>(x < 0 ? x + 32768 : x - 32767) / 32767.f;
+			quat.y = static_cast<f32>(y < 0 ? y + 32768 : y - 32767) / 32767.f;
+			quat.z = static_cast<f32>(z < 0 ? z + 32768 : z - 32767) / 32767.f;
+			quat.w = static_cast<f32>(w < 0 ? w + 32768 : w - 32767) / 32767.f;
 
-			return vec;
+			return quat;
 		}
 	};
 

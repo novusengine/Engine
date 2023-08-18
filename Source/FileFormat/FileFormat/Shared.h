@@ -226,9 +226,20 @@ namespace CoordinateSpaces
     {
         return vec3(pos.y, pos.z, -pos.x);
     }
-    inline vec3 ModelRotToNovus(const vec3& pos)
+    inline glm::quat ModelRotToNovus(const glm::quat& input)
     {
-        return vec3(-pos.y, -pos.z, -pos.x);
+        // Convert input quaternion to its equivalent rotation matrix
+        glm::mat3 rotMat = glm::mat3(input);
+
+        // Apply the same transformation as for position and scale
+        glm::mat3 transformation(0, 0, -1,
+            1, 0, 0,
+            0, 1, 0);
+
+        glm::mat3 convertedMat = transformation * rotMat * glm::transpose(transformation);
+        // Convert the transformed matrix back to a quaternion
+        glm::quat converted = glm::quat(convertedMat);
+        return converted;
     }
 }
 

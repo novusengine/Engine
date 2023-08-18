@@ -22,7 +22,7 @@ PRAGMA_NO_PADDING_START;
 	struct ComplexModel
 	{
 	public:
-		static const u32 CURRENT_VERSION = 4;
+		static const u32 CURRENT_VERSION = 5;
 
 		struct Flags
 		{
@@ -474,7 +474,7 @@ PRAGMA_NO_PADDING_START;
 			vec3 targetPositionBase = { };
 
 			AnimationData<SplineKey<vec3>> positions = { };
-			AnimationData<SplineKey<vec3>> targetPosition = { };
+			AnimationData<SplineKey<vec3>> targetPositions = { };
 			AnimationData<SplineKey<f32>> roll = { };
 			AnimationData<SplineKey<f32>> fov = { };
 		};
@@ -503,6 +503,7 @@ PRAGMA_NO_PADDING_START;
 
 			u32 numSequences;
 			u32 numBones;
+			u32 numCameras;
 		};
 
 	public:

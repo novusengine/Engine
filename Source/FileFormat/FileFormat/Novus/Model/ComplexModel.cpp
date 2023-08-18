@@ -56,6 +56,7 @@ namespace Model
 
 			modelHeader.numSequences = static_cast<u32>(sequences.size());
 			modelHeader.numBones = static_cast<u32>(bones.size());
+			modelHeader.numCameras = static_cast<u32>(cameras.size());
 		}
 
 		// Write Model Header
@@ -240,12 +241,35 @@ namespace Model
 					output.write(reinterpret_cast<const char*>(&collisionNormals[0]), numCollisionNormals * sizeof(std::array<u8, 2>));
 				}
 			}
+		}
 
-			// Collision AABB
+		// Write Cameras
+		{
+			u32 numElements = modelHeader.numBones;
+
+			if (numElements > 0)
 			{
-				output.write(reinterpret_cast<const char*>(&aabbCenter), sizeof(vec3));
-				output.write(reinterpret_cast<const char*>(&aabbExtents), sizeof(vec3));
+				for (const ComplexModel::Camera& camera : cameras)
+				{
+					output.write(reinterpret_cast<const char*>(&camera.type), sizeof(u32));
+					output.write(reinterpret_cast<const char*>(&camera.farClip), sizeof(f32));
+					output.write(reinterpret_cast<const char*>(&camera.nearClip), sizeof(f32));
+
+					output.write(reinterpret_cast<const char*>(&camera.positionBase), sizeof(vec3));
+					output.write(reinterpret_cast<const char*>(&camera.targetPositionBase), sizeof(vec3));
+
+					camera.positions.Serialize(output);
+					camera.targetPositions.Serialize(output);
+					camera.roll.Serialize(output);
+					camera.fov.Serialize(output);
+				}
 			}
+		}
+
+		// Write AABB
+		{
+			output.write(reinterpret_cast<const char*>(&aabbCenter), sizeof(vec3));
+			output.write(reinterpret_cast<const char*>(&aabbExtents), sizeof(vec3));
 		}
 
 		// Write CullingData
@@ -467,15 +491,50 @@ namespace Model
 				if (!ReadVectorFromBuffer(buffer, out.collisionNormals))
 					return false;
 			}
+		}
 
-			// Read AABB
+		// Read Cameras
+		{
+			u32 numElements = out.modelHeader.numCameras;
+
+			if (numElements)
 			{
-				if (!buffer->Get(out.aabbCenter))
-					return false;
+				out.cameras.resize(numElements);
+				for (u32 i = 0; i < numElements; i++)
+				{
+					ComplexModel::Camera& camera = out.cameras[i];
 
-				if (!buffer->Get(out.aabbExtents))
-					return false;
+					if (!buffer->GetU32(camera.type))
+						return false;
+
+					if (!buffer->GetF32(camera.farClip))
+						return false;
+
+					if (!buffer->GetF32(camera.nearClip))
+						return false;
+
+					if (!camera.positions.Deserialize(buffer.get()))
+						return false;
+
+					if (!camera.targetPositions.Deserialize(buffer.get()))
+						return false;
+
+					if (!camera.roll.Deserialize(buffer.get()))
+						return false;
+
+					if (!camera.fov.Deserialize(buffer.get()))
+						return false;
+				}
 			}
+		}
+
+		// Read AABB
+		{
+			if (!buffer->Get(out.aabbCenter))
+				return false;
+
+			if (!buffer->Get(out.aabbExtents))
+				return false;
 		}
 
 		// Read Culling Data
@@ -702,14 +761,8 @@ namespace Model
 
 				for (u32 j = 0; j < numValues; j++)
 				{
-					vec4 rotQuatAsVec4 = srcTrack.values[j].ToVec4();
-					quat rotQuat = quat(rotQuatAsVec4.w, rotQuatAsVec4.x, rotQuatAsVec4.y, rotQuatAsVec4.z);
-
-					vec3 eulerAngles = CoordinateSpaces::ModelRotToNovus(glm::eulerAngles(rotQuat));
-					vec3 placementAngles = vec3(eulerAngles.x, eulerAngles.y, eulerAngles.z);
-
-					glm::mat4 matrix = glm::eulerAngleZYX(placementAngles.z, placementAngles.y, placementAngles.x);
-					destTrack.values[j] = glm::quat_cast(matrix);
+					quat rotQuat = srcTrack.values[j].ToQuat();
+					destTrack.values[j] = CoordinateSpaces::ModelRotToNovus(rotQuat);
 				}
 			}
 		}
@@ -840,7 +893,7 @@ namespace Model
 					}
 				}
 
-				bone.pivot = m2Bone->pivot;
+				bone.pivot = CoordinateSpaces::ModelPosToNovus(m2Bone->pivot);
 			}
 		}
 
@@ -986,8 +1039,34 @@ namespace Model
 				camera.positionBase = m2Camera->positionBase;
 				camera.targetPositionBase = m2Camera->targetPositionBase;
 
-				GetAnimationTrack(rootBuffer, layout, camera.positions, m2Camera->positions);
-				GetAnimationTrack(rootBuffer, layout, camera.targetPosition, m2Camera->targetPosition);
+				{
+					GetAnimationTrack(rootBuffer, layout, camera.positions, m2Camera->positions);
+
+					for (AnimationTrack<SplineKey<vec3>>& track : camera.positions.tracks)
+					{
+						for (SplineKey<vec3>& splineKey : track.values)
+						{
+							splineKey.value = CoordinateSpaces::ModelPosToNovus(splineKey.value);
+							splineKey.tanIn = CoordinateSpaces::ModelPosToNovus(splineKey.tanIn);
+							splineKey.tanOut = CoordinateSpaces::ModelPosToNovus(splineKey.tanOut);
+						}
+					}
+				}
+
+				{
+					GetAnimationTrack(rootBuffer, layout, camera.targetPositions, m2Camera->targetPosition);
+
+					for (AnimationTrack<SplineKey<vec3>>& track : camera.targetPositions.tracks)
+					{
+						for (SplineKey<vec3>& splineKey : track.values)
+						{
+							splineKey.value = CoordinateSpaces::ModelPosToNovus(splineKey.value);
+							splineKey.tanIn = CoordinateSpaces::ModelPosToNovus(splineKey.tanIn);
+							splineKey.tanOut = CoordinateSpaces::ModelPosToNovus(splineKey.tanOut);
+						}
+					}
+				}
+
 				GetAnimationTrack(rootBuffer, layout, camera.roll, m2Camera->roll);
 				GetAnimationTrack(rootBuffer, layout, camera.fov, m2Camera->fov);
 			}
