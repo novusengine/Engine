@@ -211,7 +211,7 @@ namespace Renderer
             
             if (data.textureArrays.Size() < id)
             {
-                DebugHandler::PrintFatal("TextureHandlerVK::LoadTextureIntoArray : Tried to load texture into array (%u) that doesn't exist", id);
+                DebugHandler::PrintFatal("TextureHandlerVK::LoadTextureIntoArray : Tried to load texture into array ({0}) that doesn't exist", id);
             }
 
             // Check the cache, we only want to do this for LOADED textures though, never CREATED data textures
@@ -220,7 +220,7 @@ namespace Renderer
 
             if (descHash == 0) // What are the odds? All data textures has a 0 hash so we don't wanna go ahead with this, figure out why this happens.
             {
-                DebugHandler::PrintFatal("Calculated texture descriptor hash was 0, this is a big issue! (%s)", desc.path.c_str());
+                DebugHandler::PrintFatal("Calculated texture descriptor hash was 0, this is a big issue! ({0})", desc.path.c_str());
             }
 
             TextureID textureID;
@@ -323,12 +323,12 @@ namespace Renderer
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
             if (desc.width == 0 || desc.height == 0 || desc.layers == 0)
             {
-                DebugHandler::PrintFatal("Invalid DataTexture dimensions! (width %u, height %u, layers %u) (%s)", desc.width, desc.height, desc.layers, desc.debugName.c_str());
+                DebugHandler::PrintFatal("Invalid DataTexture dimensions! (width {0}, height {1}, layers {2}) ({3})", desc.width, desc.height, desc.layers, desc.debugName.c_str());
             }
 
             if (desc.data == nullptr)
             {
-                DebugHandler::PrintFatal("Tried to create a DataTexture with the data being a nullptr! (%s)", desc.debugName.c_str());
+                DebugHandler::PrintFatal("Tried to create a DataTexture with the data being a nullptr! ({0})", desc.debugName.c_str());
             }
 
             size_t nextHandle;
@@ -376,7 +376,7 @@ namespace Renderer
 
             if (static_cast<TextureArrayID::type>(textureArrayID) >= data.textureArrays.Size())
             {
-                DebugHandler::PrintFatal("Tried to create DataTexture (%s) into invalid array", desc.debugName.c_str());
+                DebugHandler::PrintFatal("Tried to create DataTexture ({0}) into invalid array", desc.debugName.c_str());
             }
 
             TextureID textureID = CreateDataTexture(desc);
@@ -396,12 +396,12 @@ namespace Renderer
             
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to add invalid TextureID: {} to array {}", id, arrayID);
+                DebugHandler::PrintFatal("Tried to add invalid TextureID: {0} to array {1}", id, arrayID);
             }
 
             if (data.textureArrays.Size() <= arrayID)
             {
-				DebugHandler::PrintFatal("Tried to add TextureID: {} to invalid array {}", id, arrayID);
+				DebugHandler::PrintFatal("Tried to add TextureID: {0} to invalid array {1}", id, arrayID);
 			}
 
             return AddTextureToArrayInternal(textureID, textureArrayID, data.textures.ReadGet(id)->hash);
@@ -418,7 +418,7 @@ namespace Renderer
                     // Lets make sure this id exists
                     if (textures.size() <= id)
                     {
-                        DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                        DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
                     }
 
                     Texture& texture = *textures[id];
@@ -456,7 +456,7 @@ namespace Renderer
             // Lets make sure this array exists
             if (data.textureArrays.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: {0}", id);
             }
 
             const TextureArray& textureArray = data.textureArrays.ReadGet(id);
@@ -464,7 +464,7 @@ namespace Renderer
             // Lets make sure this index exists in the array
             if (textureArray.textures->Size() <= index)
             {
-                DebugHandler::PrintFatal("Tried to access invalid index %u in TextureArrayID: %u", index, id);
+                DebugHandler::PrintFatal("Tried to access invalid index {0} in TextureArrayID: {1}", index, id);
             }
 
             return textureArray.textures->ReadGet(index);
@@ -478,7 +478,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textureArrays.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: {0}", id);
             }
 
             const SafeVector<TextureID>* textures = nullptr;
@@ -499,7 +499,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->layers != 1;
@@ -513,7 +513,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->image;
@@ -527,7 +527,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->imageView;
@@ -551,7 +551,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             VkDescriptorSet descriptorSet = data.textures.ReadGet(id)->imguiTextureHandle;
@@ -566,7 +566,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->uploadSize;
@@ -580,7 +580,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->totalSize;
@@ -593,7 +593,7 @@ namespace Renderer
 
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->height;
@@ -606,7 +606,7 @@ namespace Renderer
 
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->width;
@@ -620,7 +620,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textureArrays.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: {0}", id);
             }
 
             return data.textureArrays.ReadGet(id).size;
@@ -634,7 +634,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
             const Texture* texture = data.textures.ReadGet(id);
             return ivec2(texture->width, texture->height);
@@ -648,7 +648,7 @@ namespace Renderer
             // Lets make sure this id exists
             if (data.textures.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureID: {0}", id);
             }
 
             return data.textures.ReadGet(id)->debugName;
@@ -689,7 +689,7 @@ namespace Renderer
             TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
             if (data.textureArrays.Size() <= id)
             {
-                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: %u", id);
+                DebugHandler::PrintFatal("Tried to access invalid TextureArrayID: {0}", id);
             }
 
             bool foundTexture = false;
@@ -753,7 +753,7 @@ namespace Renderer
                 gliTexture = gli::load(filename);
                 if (gliTexture.empty())
                 {
-                    DebugHandler::PrintFatal("Failed to load texture (%s)", filename.c_str());
+                    DebugHandler::PrintFatal("Failed to load texture ({0})", filename.c_str());
                 }
 
                 gli::gl gl(gli::gl::PROFILE_GL33);
