@@ -226,6 +226,17 @@ namespace CoordinateSpaces
     {
         return vec3(pos.y, pos.z, -pos.x);
     }
+
+    // Cinematic Camera Coordinate Space
+    // RIGHT HANDED
+    // X = North
+    // Y = West
+    // Z = UP
+    inline vec3 CinematicCameraPosToNovus(const vec3& pos)
+    {
+        return vec3(-pos.y, pos.z, pos.x);
+    }
+
     inline glm::quat ModelRotToNovus(const glm::quat& input)
     {
         // Convert input quaternion to its equivalent rotation matrix

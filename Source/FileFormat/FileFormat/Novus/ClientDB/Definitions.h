@@ -60,4 +60,22 @@ namespace DB::Client::Definitions
         u8 flags;
         u8 liquidVertexFormat;
     };
+
+    struct CinematicCamera
+    {
+    public:
+        u32 id;
+        vec3 endPosition;
+        u32 soundID;
+        f32 rotation;
+        u32 cameraPath;
+    };
+
+    struct CinematicSequence
+    {
+    public:
+        u32 id;
+        u32 soundID;
+        u32 cameraIDs[8];
+    };
 }

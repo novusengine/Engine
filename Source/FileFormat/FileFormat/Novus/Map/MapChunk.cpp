@@ -361,6 +361,8 @@ namespace Map
 			u32 numHeaders = static_cast<u32>(layout.mh2o.headers.size());
 			u32 numInstances = static_cast<u32>(layout.mh2o.instances.size());
 			u32 numAttributes = static_cast<u32>(layout.mh2o.attributes.size());
+			u32 numBitmapBytes = static_cast<u32>(layout.mh2o.bitmapData.size());
+			u32 numVertexBytes = static_cast<u32>(layout.mh2o.vertexData.size());
 
 			out.liquidInfo.headers.resize(numHeaders);
 			out.liquidInfo.instances.resize(numInstances);
@@ -417,8 +419,8 @@ namespace Map
 						u32 bitmapDataBeforeAdd = static_cast<u32>(out.liquidInfo.bitmapData.size());
 						u32 bitmapDataToAdd = (instance.width * instance.height + 7) / 8;
 
-						bool isOffsetWithinBufferRange = (bitmapOffset + bitmapDataToAdd) < static_cast<u32>(layout.mh2o.bitmapData.size());
-						assert(isOffsetWithinBufferRange&& bitmapDataToAdd > 0);
+						bool isOffsetWithinBufferRange = (bitmapOffset + bitmapDataToAdd) <= numBitmapBytes;
+						assert(isOffsetWithinBufferRange && bitmapDataToAdd > 0);
 
 						out.liquidInfo.bitmapData.resize(bitmapDataBeforeAdd + bitmapDataToAdd);
 						memcpy(&out.liquidInfo.bitmapData[bitmapDataBeforeAdd], &layout.mh2o.bitmapData[bitmapOffset], bitmapDataToAdd);
@@ -433,7 +435,7 @@ namespace Map
 						u32 vertexDataBeforeAdd = static_cast<u32>(out.liquidInfo.vertexData.size());
 						u32 vertexDataToAdd = numVertices * formatSize;
 
-						bool isOffsetWithinBufferRange = (vertexDataOffset + vertexDataToAdd) < static_cast<u32>(layout.mh2o.vertexData.capacity());
+						bool isOffsetWithinBufferRange = (vertexDataOffset + vertexDataToAdd) <= numVertexBytes;
 						assert(isOffsetWithinBufferRange && (numVertices > 0 && formatSize > 0));
 
 						out.liquidInfo.vertexData.resize(vertexDataBeforeAdd + vertexDataToAdd);
