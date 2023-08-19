@@ -1042,8 +1042,8 @@ namespace Model
 				camera.farClip = m2Camera->farClip;
 				camera.nearClip = m2Camera->nearClip;
 
-				camera.positionBase = m2Camera->positionBase;
-				camera.targetPositionBase = m2Camera->targetPositionBase;
+				camera.positionBase = CoordinateSpaces::ModelPosToNovus(m2Camera->positionBase);
+				camera.targetPositionBase = CoordinateSpaces::ModelPosToNovus(m2Camera->targetPositionBase);
 
 				{
 					GetAnimationTrack(rootBuffer, layout, camera.positions, m2Camera->positions);
