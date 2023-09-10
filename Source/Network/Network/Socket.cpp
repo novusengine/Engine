@@ -10,6 +10,9 @@
 #pragma comment(lib, "Ws2_32.lib")
 #elif __linux__
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #endif
 
 namespace Network
@@ -26,19 +29,17 @@ namespace Network
 
     Socket::Result Socket::Create(SOCKET socket, Type type, Mode mode, std::shared_ptr<Socket>& out)
     {
+#if WIN32
         if (!IsWinsockInitialized())
         {
-#if WIN32
             WSADATA data;
-            i32 code = WSAStartup(MAKEWORD(2,2), &data);
-#else
-i32 code = 0;
-#endif
+            i32 code = WSAStartup(MAKEWORD(2, 2), &data);
             if (code != 0)
             {
                 DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
             }
         }
+#endif
 
         assert(mode != Mode::NONE);
 
@@ -62,19 +63,17 @@ i32 code = 0;
 
     Socket::Result Socket::Create(Type type, Mode mode, std::shared_ptr<Socket>& out)
     {
+#if WIN32
         if (!IsWinsockInitialized())
         {
-#if WIN32
             WSADATA data;
-            i32 code = WSAStartup(MAKEWORD(2,2), &data);
-#else
-            i32 code = 0;
-#endif
+            i32 code = WSAStartup(MAKEWORD(2, 2), &data);
             if (code != 0)
             {
                 DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
             }
         }
+#endif
 
         assert(mode != Mode::NONE);
 
