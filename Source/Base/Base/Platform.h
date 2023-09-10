@@ -28,8 +28,16 @@
 #elif defined(_MSC_VER)
     #define PRAGMA_ENABLE_OPTIMIZATION _Pragma("optimize(\"\", on)")
     #define PRAGMA_DISABLE_OPTIMIZATION _Pragma("optimize(\"\", off)")
+// causes build to hang
+// after disabling unity this seems to not be issue anymore
+// after that there is issue with implot_items it is unclear whether this is connected to this issue
+//#elif defined(__GNUC__)
+//    #define PRAGMA_ENABLE_OPTIMIZATION _Pragma("GCC optimize(\"O3\")")
+//    #define PRAGMA_DISABLE_OPTIMIZATION _Pragma("GCC optimize(\"O0\")")
+//    #define PRAGMA_ENABLE_OPTIMIZATION __attribute__((optimize("O3")))
+//    #define PRAGMA_DISABLE_OPTIMIZATION __attribute__((optimize("O0")))
 #else
-    static_assert(false, "Please add PRAGMA_ENABLE_OPTIMIZATION/PRAGMA_DISABLE_OPTIMIZATION implementation for whatever compiler you are porting to");
+//    static_assert(false, "Please add PRAGMA_ENABLE_OPTIMIZATION/PRAGMA_DISABLE_OPTIMIZATION implementation for whatever compiler you are porting to");
 #endif
 
 #if WIN32

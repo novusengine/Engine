@@ -384,7 +384,17 @@ PRAGMA_NO_PADDING_START;
 
 				pivot = other.pivot;
 			}
-		};
+            Bone(Bone&& other) noexcept
+                : primaryBoneIndex(std::move(other.primaryBoneIndex)),
+                flags(std::move(other.flags)),
+                parentBoneID(std::move(other.parentBoneID)),
+                submeshID(std::move(other.submeshID)),
+                translation(std::move(other.translation)),
+                rotation(std::move(other.rotation)),
+                scale(std::move(other.scale)),
+                pivot(std::move(other.pivot))
+            {}
+        };
 		struct AnimationSequence
 		{
 		public:

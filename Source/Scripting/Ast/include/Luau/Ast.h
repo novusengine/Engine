@@ -8,6 +8,7 @@
 #include <string>
 
 #include <string.h>
+#include <cstdint>
 
 namespace Luau
 {
