@@ -68,47 +68,11 @@ public:
         return cvars[index].current;
     };
 
-    void SetCurrent(const T& val, i32 index)
-    {
-        cvars[index].current = val;
+    void SetCurrent(const T& val, i32 index);
 
-        bool noEdit = ((u32)cvars[index].parameter->flags & (u32)CVarFlags::Noedit) != 0;
-        bool readOnly = ((u32)cvars[index].parameter->flags & (u32)CVarFlags::EditReadOnly) != 0;
-        if (!noEdit && !readOnly)
-        {
-            CVarSystemImpl::Get()->MarkDirty();
-        }
-    }
+    int Add(const T& value, CVarParameter* param);
 
-    int Add(const T& value, CVarParameter* param)
-    {
-        int index = lastCVar;
-
-        cvars[index].current = value;
-        cvars[index].initial = value;
-        cvars[index].parameter = param;
-
-        param->arrayIndex = index;
-        lastCVar++;
-
-        CVarSystemImpl::Get()->MarkDirty();
-        return index;
-    }
-
-    int Add(const T& initialValue, const T& currentValue, CVarParameter* param)
-    {
-        int index = lastCVar;
-
-        cvars[index].current = currentValue;
-        cvars[index].initial = initialValue;
-        cvars[index].parameter = param;
-
-        param->arrayIndex = index;
-        lastCVar++;
-
-        CVarSystemImpl::Get()->MarkDirty();
-        return index;
-    }
+    int Add(const T& initialValue, const T& currentValue, CVarParameter* param);
 };
 
 class CVarSystemImpl : public CVarSystem
@@ -156,45 +120,8 @@ public:
     constexpr static int MAX_SHOWFLAG_CVARS = 100;
     CVarArray<ShowFlag> showFlagCVars{ MAX_SHOWFLAG_CVARS };
 
-    //using templates with specializations to get the cvar arrays for each type.
-    //if you try to use a type that doesnt have specialization, it will trigger the static assert
     template<typename T>
-    CVarArray<T>* GetCVarArray()
-    {
-        static_assert(false);
-        return nullptr;
-    }
-
-    template<>
-    CVarArray<i32>* GetCVarArray()
-    {
-        return &intCVars2;
-    }
-    template<>
-    CVarArray<f64>* GetCVarArray()
-    {
-        return &floatCVars;
-    }
-    template<>
-    CVarArray<std::string>* GetCVarArray()
-    {
-        return &stringCVars;
-    }
-    template<>
-    CVarArray<vec4>* GetCVarArray()
-    {
-        return &fvecCVars;
-    }
-    template<>
-    CVarArray<ivec4>* GetCVarArray()
-    {
-        return &ivecCVars;
-    }
-    template<>
-    CVarArray<ShowFlag>* GetCVarArray()
-    {
-        return &showFlagCVars;
-    }
+    CVarArray<T>* GetCVarArray();
 
     //templated get-set cvar versions for syntax sugar
     template<typename T>
@@ -221,3 +148,86 @@ private:
 
     std::unordered_map<u32, CVarParameter> savedCVars;
 };
+
+template<typename T>
+void CVarArray<T>::SetCurrent(const T &val, i32 index)
+{
+    cvars[index].current = val;
+
+    bool noEdit = ((u32) cvars[index].parameter->flags & (u32) CVarFlags::Noedit) != 0;
+    bool readOnly = ((u32) cvars[index].parameter->flags & (u32) CVarFlags::EditReadOnly) != 0;
+
+    if (!noEdit && !readOnly) {
+        CVarSystemImpl::Get()->MarkDirty();
+    }
+}
+
+template<typename T>
+int CVarArray<T>::Add(const T &value, CVarParameter *param)
+{
+    int index = lastCVar;
+
+    cvars[index].current = value;
+    cvars[index].initial = value;
+    cvars[index].parameter = param;
+
+    param->arrayIndex = index;
+    lastCVar++;
+
+    CVarSystemImpl::Get()->MarkDirty();
+
+    return index;
+}
+
+template<typename T>
+int CVarArray<T>::Add(const T &initialValue, const T &currentValue, CVarParameter *param)
+{
+    int index = lastCVar;
+
+    cvars[index].current = currentValue;
+    cvars[index].initial = initialValue;
+    cvars[index].parameter = param;
+
+    param->arrayIndex = index;
+    lastCVar++;
+
+    CVarSystemImpl::Get()->MarkDirty();
+
+    return index;
+}
+
+template<>
+CVarArray<i32> *CVarSystemImpl::GetCVarArray()
+{
+    return &intCVars2;
+}
+
+template<>
+CVarArray<f64> *CVarSystemImpl::GetCVarArray()
+{
+    return &floatCVars;
+}
+
+template<>
+CVarArray<std::string> *CVarSystemImpl::GetCVarArray()
+{
+    return &stringCVars;
+}
+
+template<>
+CVarArray<vec4> *CVarSystemImpl::GetCVarArray()
+{
+    return &fvecCVars;
+}
+
+template<>
+CVarArray<ivec4> *CVarSystemImpl::GetCVarArray()
+{
+    return &ivecCVars;
+}
+
+template<>
+CVarArray<ShowFlag> *CVarSystemImpl::GetCVarArray()
+{
+    return &showFlagCVars;
+}

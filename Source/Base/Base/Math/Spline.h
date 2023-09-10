@@ -8,6 +8,9 @@ namespace Spline
 {
     struct InterpolatedStorage
     {
+    private:
+        static const std::vector<vec3> _emptyVector;
+
     public:
         explicit InterpolatedStorage(u32 step);
 

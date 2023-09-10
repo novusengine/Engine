@@ -8,6 +8,7 @@
 #include "Descriptors/ComputePipelineDesc.h"
 #include "Descriptors/SemaphoreDesc.h"
 #include "Descriptors/TimeQueryDesc.h"
+#include "Renderer/DescriptorSetResource.h"
 
 #include <Base/Types.h>
 #include <Base/Memory/StackAllocator.h>

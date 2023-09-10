@@ -8,25 +8,25 @@ using namespace Adt;
 
 robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, Wdt&)>> WdtParser::wdtFileChunkToFunction =
 {
-    { static_cast<u32>('MVER'), WdtParser::ReadMVER },
-    { static_cast<u32>('MPHD'), WdtParser::ReadMPHD },
-    { static_cast<u32>('MAIN'), WdtParser::ReadMAIN },
-    { static_cast<u32>('MAID'), WdtParser::ReadMAID },
-    { static_cast<u32>('MODF'), WdtParser::ReadMODF },
+    { *reinterpret_cast<const u32*>("MVER"), WdtParser::ReadMVER },
+    { *reinterpret_cast<const u32*>("MPHD"), WdtParser::ReadMPHD },
+    { *reinterpret_cast<const u32*>("MAIN"), WdtParser::ReadMAIN },
+    { *reinterpret_cast<const u32*>("MAID"), WdtParser::ReadMAID },
+    { *reinterpret_cast<const u32*>("MODF"), WdtParser::ReadMODF },
 
-    { static_cast<u32>('MWMO'), nullptr },
-    { static_cast<u32>('MANM'), nullptr },
-    { static_cast<u32>('MAOI'), nullptr },
-    { static_cast<u32>('MAOH'), nullptr },
-    { static_cast<u32>('MPL2'), nullptr },
-    { static_cast<u32>('MPL3'), nullptr },
-    { static_cast<u32>('MSLT'), nullptr },
-    { static_cast<u32>('MTEX'), nullptr },
-    { static_cast<u32>('MLTA'), nullptr },
-    { static_cast<u32>('VFOG'), nullptr },
-    { static_cast<u32>('PVPD'), nullptr },
-    { static_cast<u32>('PVMI'), nullptr },
-    { static_cast<u32>('PVBD'), nullptr }
+    { *reinterpret_cast<const u32*>("MWMO"), nullptr },
+    { *reinterpret_cast<const u32*>("MANM"), nullptr },
+    { *reinterpret_cast<const u32*>("MAOI"), nullptr },
+    { *reinterpret_cast<const u32*>("MAOH"), nullptr },
+    { *reinterpret_cast<const u32*>("MPL2"), nullptr },
+    { *reinterpret_cast<const u32*>("MPL3"), nullptr },
+    { *reinterpret_cast<const u32*>("MSLT"), nullptr },
+    { *reinterpret_cast<const u32*>("MTEX"), nullptr },
+    { *reinterpret_cast<const u32*>("MLTA"), nullptr },
+    { *reinterpret_cast<const u32*>("VFOG"), nullptr },
+    { *reinterpret_cast<const u32*>("PVPD"), nullptr },
+    { *reinterpret_cast<const u32*>("PVMI"), nullptr },
+    { *reinterpret_cast<const u32*>("PVBD"), nullptr }
 };
 
 bool WdtParser::TryParse(std::shared_ptr<Bytebuffer>& wdtBuffer, Wdt& out)

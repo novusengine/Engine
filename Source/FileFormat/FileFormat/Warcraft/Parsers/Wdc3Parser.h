@@ -3,6 +3,7 @@
 
 #include "FileFormat/Novus/ClientDB/ClientDB.h"
 #include "FileFormat/Novus/ClientDB/Definitions.h"
+#include "FileFormat/Warcraft/DB2/Wdc3.h"
 
 #include <robinhood/robinhood.h>
 #include <vector>

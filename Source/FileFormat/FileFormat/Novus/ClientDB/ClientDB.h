@@ -4,7 +4,10 @@
 #include <Base/Types.h>
 #include <Base/Platform.h>
 #include <Base/Container/StringTable.h>
+#include <Base/Memory/Bytebuffer.h>
+#include <Base/Util/DebugHandler.h>
 
+#include <fstream>
 #include <robinhood/robinhood.h>
 #include <vector>
 

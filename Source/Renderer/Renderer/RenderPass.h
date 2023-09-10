@@ -55,8 +55,6 @@ namespace Renderer
             _onExecute(_data, resources, commandList);
         }
 
-        bool ShouldRun() { return _shouldRun; }
-
         void DeInit() override
         {
             _onSetup = nullptr;

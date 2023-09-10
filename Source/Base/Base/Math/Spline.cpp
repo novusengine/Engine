@@ -56,7 +56,7 @@ namespace Spline
         }
 
         if (IsDirty() || !checkSize)
-            return {};
+            return _emptyVector;
 
         return _points;
     }

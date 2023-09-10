@@ -6,6 +6,7 @@
 #include <Base/Platform.h>
 
 #include <array>
+#include <fstream>
 #include <vector>
 
 class Bytebuffer;

@@ -1,0 +1,6 @@
+*
+!.gitignore
+!/CMake
+!/Dependencies
+!/Source
+!CMakeLists.txt

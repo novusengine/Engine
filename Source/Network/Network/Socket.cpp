@@ -16,15 +16,24 @@ namespace Network
 {
     SharedPool<Socket> Socket::_pool;
 
+#if WIN32
     Socket::Socket() : _socket(NULL) { }
+#else
+    Socket::Socket() : _socket(0) { }
+#endif
+
     Socket::~Socket() { }
 
     Socket::Result Socket::Create(SOCKET socket, Type type, Mode mode, std::shared_ptr<Socket>& out)
     {
         if (!IsWinsockInitialized())
         {
+#if WIN32
             WSADATA data;
-            i32 code = WSAStartup(MAKEWORD(2, 2), &data);
+            i32 code = WSAStartup(MAKEWORD(2,2), &data);
+#else
+i32 code = 0;
+#endif
             if (code != 0)
             {
                 DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
@@ -55,8 +64,12 @@ namespace Network
     {
         if (!IsWinsockInitialized())
         {
+#if WIN32
             WSADATA data;
-            i32 code = WSAStartup(MAKEWORD(2, 2), &data);
+            i32 code = WSAStartup(MAKEWORD(2,2), &data);
+#else
+            i32 code = 0;
+#endif
             if (code != 0)
             {
                 DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
