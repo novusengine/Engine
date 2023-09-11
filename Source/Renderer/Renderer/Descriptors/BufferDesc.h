@@ -11,7 +11,7 @@ namespace Renderer
     {
         std::string name = "";
         u8 usage;
-        BufferCPUAccess cpuAccess = BufferCPUAccess::None;
+        BufferCPUAccess cpuAccess = BufferCPUAccess::ACCESS_NONE;
         u64 size = 0;
     };
 

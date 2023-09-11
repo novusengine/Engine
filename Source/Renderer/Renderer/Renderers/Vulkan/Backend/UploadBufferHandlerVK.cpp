@@ -134,7 +134,7 @@ namespace Renderer
                 bufferDesc.name = "StagingBuffer" + std::to_string(i);
                 bufferDesc.size = Settings::STAGING_BUFFER_SIZE;
                 bufferDesc.usage = BufferUsage::TRANSFER_SOURCE;
-                bufferDesc.cpuAccess = BufferCPUAccess::WriteOnly;
+                bufferDesc.cpuAccess = BufferCPUAccess::WRITE_ONLY;
 
                 stagingBuffer.buffer = _bufferHandler->CreateBuffer(bufferDesc);
                 stagingBuffer.allocator.Init(Settings::STAGING_BUFFER_SIZE, "StagingBuffer", true, false);

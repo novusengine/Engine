@@ -11,7 +11,11 @@
 
 #pragma warning (push)
 #pragma warning(disable : 4005)
+#if WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
+#else
+#define GLFW_EXPOSE_NATIVE_X11
+#endif
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
@@ -786,7 +790,7 @@ namespace Renderer
                     indices.transferFamily = i;
                     indices.transferFamilySupportsTimeStamps = queueFamily.timestampValidBits > 0;
                 }
-                
+
                 VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
                 surfaceCreateInfo.hwnd = glfwGetWin32Window(_window->GetWindow());
                 VkSurfaceKHR surface;

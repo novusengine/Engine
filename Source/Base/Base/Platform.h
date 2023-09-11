@@ -64,4 +64,5 @@ inline void ReleaseModeBreakpoint()
 
 #if !defined(_MSC_VER)
 #define strcpy_s(dest, count)  strcpy((dest), (count))
+#define printf_s printf
 #endif

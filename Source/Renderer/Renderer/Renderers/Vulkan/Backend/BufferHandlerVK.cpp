@@ -161,11 +161,11 @@ namespace Renderer
             bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             
             VmaMemoryUsage memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY;
-            if (desc.cpuAccess == BufferCPUAccess::ReadOnly)
+            if (desc.cpuAccess == BufferCPUAccess::READ_ONLY)
             {
                 memoryUsage = VMA_MEMORY_USAGE_GPU_TO_CPU;
             }
-            else if (desc.cpuAccess == BufferCPUAccess::WriteOnly)
+            else if (desc.cpuAccess == BufferCPUAccess::WRITE_ONLY)
             {
                 memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY;
             }

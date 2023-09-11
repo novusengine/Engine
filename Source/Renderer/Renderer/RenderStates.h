@@ -533,9 +533,9 @@ namespace Renderer
 
     enum class BufferCPUAccess
     {
-        None,
-        WriteOnly,
-        ReadOnly,
+        ACCESS_NONE,
+        WRITE_ONLY,
+        READ_ONLY,
     };
 
     inline ImageComponentType ToImageComponentType(ImageFormat imageFormat)
