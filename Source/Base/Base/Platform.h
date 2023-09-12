@@ -62,7 +62,8 @@ inline void ReleaseModeBreakpoint()
 #define PRAGMA_NO_PADDING_END _Pragma("pack(pop)")
 #endif
 
-#if !defined(_MSC_VER)
+#if !WIN32
 #define strcpy_s(dest, count)  strcpy((dest), (count))
-#define printf_s printf
+#define printf_s(s, ...) printf((s), __VA_ARGS__)
+#define ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 #endif

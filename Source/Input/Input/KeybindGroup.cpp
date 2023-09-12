@@ -50,7 +50,7 @@ void KeybindGroup::SetActive(bool state)
             if (keybind->isPressed)
             {
                 if (keybind->callback)
-                    keybind->callback(keybind->glfwKey, KeybindAction::Release, KeybindModifier::None);
+                    keybind->callback(keybind->glfwKey, KeybindAction::Release, KeybindModifier::KeybindNone);
 
                 keybind->isPressed = false;
             }
@@ -98,7 +98,7 @@ void KeybindGroup::AddAnyKeyboardCallback(const std::string& keybindName, std::f
         _anyKeyboardInputKeybind->keybindNameHash = StringUtils::fnv1a_32(keybindName.c_str(), keybindName.length());
         _anyKeyboardInputKeybind->glfwKey = 0;
         _anyKeyboardInputKeybind->actionMask = KeybindAction::Press;
-        _anyKeyboardInputKeybind->modifierMask = KeybindModifier::None;
+        _anyKeyboardInputKeybind->modifierMask = KeybindModifier::KeybindNone;
         _anyKeyboardInputKeybind->isPressed = false;
         _anyKeyboardInputKeybind->callback = callback;
     }
@@ -194,10 +194,10 @@ bool KeybindGroup::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMas
 
                 modifierMask &= GLFW_MOD_SHIFT | GLFW_MOD_CONTROL | GLFW_MOD_ALT;
                 KeybindModifier modifiers = static_cast<KeybindModifier>(modifierMask << 1);
-                KeybindModifier modifierExcludingNone = keybind->modifierMask & ~KeybindModifier::None;
+                KeybindModifier modifierExcludingNone = keybind->modifierMask & ~KeybindModifier::KeybindNone;
 
                 bool hasRequiredModifiers = keybind->modifierMask == KeybindModifier::Any ||
-                    ((keybind->modifierMask & KeybindModifier::None) != KeybindModifier::Invalid && modifiers == KeybindModifier::Invalid) ||
+                                            ((keybind->modifierMask & KeybindModifier::KeybindNone) != KeybindModifier::Invalid && modifiers == KeybindModifier::Invalid) ||
                     (modifierExcludingNone & modifiers) == modifierExcludingNone;
 
                 if (actionMask == GLFW_RELEASE &&
@@ -298,10 +298,10 @@ bool KeybindGroup::KeyboardInputCallback(i32 glfwKey, i32 actionMask, i32 modifi
 
                 modifierMask &= GLFW_MOD_SHIFT | GLFW_MOD_CONTROL | GLFW_MOD_ALT;
                 KeybindModifier modifiers = static_cast<KeybindModifier>(modifierMask << 1);
-                KeybindModifier modifierExcludingNone = keybind->modifierMask & ~KeybindModifier::None;
+                KeybindModifier modifierExcludingNone = keybind->modifierMask & ~KeybindModifier::KeybindNone;
 
-                bool hasRequiredModifiers = keybind->modifierMask == KeybindModifier::Any || 
-                                            ((keybind->modifierMask & KeybindModifier::None) != KeybindModifier::Invalid && modifiers == KeybindModifier::Invalid) || 
+                bool hasRequiredModifiers = keybind->modifierMask == KeybindModifier::Any ||
+                                            ((keybind->modifierMask & KeybindModifier::KeybindNone) != KeybindModifier::Invalid && modifiers == KeybindModifier::Invalid) ||
                                             (modifierExcludingNone & modifiers) == modifierExcludingNone;
                 
                 if (actionMask == GLFW_RELEASE  &&

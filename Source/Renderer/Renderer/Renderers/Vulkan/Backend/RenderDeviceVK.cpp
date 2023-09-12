@@ -14,7 +14,7 @@
 #if WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #else
-#define GLFW_EXPOSE_NATIVE_X11
+#define GLFW_EXPOSE_NATIVE_WAYLAND
 #endif
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -791,10 +791,17 @@ namespace Renderer
                     indices.transferFamilySupportsTimeStamps = queueFamily.timestampValidBits > 0;
                 }
 
+                VkSurfaceKHR surface;
+#if WIN32
                 VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
                 surfaceCreateInfo.hwnd = glfwGetWin32Window(_window->GetWindow());
-                VkSurfaceKHR surface;
                 vkCreateWin32SurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &surface);
+#else
+                VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = { VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR };
+                surfaceCreateInfo.display = glfwGetWaylandDisplay();
+                surfaceCreateInfo.surface = glfwGetWaylandWindow(_window->GetWindow());
+                vkCreateWaylandSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &surface);
+#endif
 
                 VkBool32 presentSupport = false;
                 vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);

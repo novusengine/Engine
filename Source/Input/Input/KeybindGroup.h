@@ -17,7 +17,7 @@ enum class KeybindAction
 enum class KeybindModifier
 {
     Invalid,
-    None = 1 << 0,
+    KeybindNone = 1 << 0,
     Shift = 1 << 1,
     Ctrl = 1 << 2,
     Alt = 1 << 3,

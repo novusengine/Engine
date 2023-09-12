@@ -394,6 +394,7 @@ PRAGMA_NO_PADDING_START;
                 scale(std::move(other.scale)),
                 pivot(std::move(other.pivot))
             {}
+            Bone& operator=(const Bone& other) = default;
         };
 		struct AnimationSequence
 		{

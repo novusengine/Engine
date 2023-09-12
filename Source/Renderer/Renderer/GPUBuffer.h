@@ -90,9 +90,6 @@ namespace Renderer
             _isDirty = false;
         }
 
-        std::vector<T>& Get() { return _vector; }
-
-        bool HasDirtyRegions() { return _dirtyRegions.Size() > 0; }
         bool IsValid() { return _buffer != BufferID::Invalid(); }
 
         BufferID GetBuffer() { return _buffer; }

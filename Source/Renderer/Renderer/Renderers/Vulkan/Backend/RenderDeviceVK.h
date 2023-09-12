@@ -11,6 +11,7 @@
 #include <vector>
 #include <optional>
 
+class Window;
 struct GLFWwindow;
 
 namespace tracy
