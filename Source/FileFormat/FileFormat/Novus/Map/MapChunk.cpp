@@ -361,17 +361,26 @@ namespace Map
 			u32 numHeaders = static_cast<u32>(layout.mh2o.headers.size());
 			u32 numInstances = static_cast<u32>(layout.mh2o.instances.size());
 			u32 numAttributes = static_cast<u32>(layout.mh2o.attributes.size());
-			u32 numBitmapBytes = static_cast<u32>(layout.mh2o.bitmapData.size());
-			u32 numVertexBytes = static_cast<u32>(layout.mh2o.vertexData.size());
+			u32 numBitmapDataBytes = static_cast<u32>(layout.mh2o.bitmapData.size());
+			u32 numVertexDataBytes = static_cast<u32>(layout.mh2o.vertexData.size());
 
 			out.liquidInfo.headers.resize(numHeaders);
 			out.liquidInfo.instances.resize(numInstances);
 			out.liquidInfo.attributes.resize(numAttributes);
 
+			if (numBitmapDataBytes)
+			{
+				out.liquidInfo.bitmapData.resize(numBitmapDataBytes);
+				memcpy(out.liquidInfo.bitmapData.data(), layout.mh2o.bitmapData.data(), numBitmapDataBytes);
+			}
+
+			if (numVertexDataBytes)
+			{
+				out.liquidInfo.vertexData.resize(numVertexDataBytes);
+				memcpy(out.liquidInfo.vertexData.data(), layout.mh2o.vertexData.data(), numVertexDataBytes);
+			}
+
 			u32 attributeCounter = 0;
-			u32 instanceCounter = 0;
-			u32 bitmapOffset = 0;
-			u32 vertexDataOffset = 0;
 
 			for (u32 i = 0; i < numHeaders; i++)
 			{
@@ -391,58 +400,26 @@ namespace Map
 					outAttribute.fishableBitmap = attribute.fishableBitmap;
 					outAttribute.fatigueBitmap = attribute.fatigueBitmap;
 				}
+			}
 
-				if (header.layerCount == 0)
-					continue;
+			for (u32 i = 0; i < numInstances; i++)
+			{
+				const Adt::MH2O::LiquidInstance& instance = layout.mh2o.instances[i];
+				CellLiquidInstance& outInstance = out.liquidInfo.instances[i];
 
-				for (u32 j = 0; j < header.layerCount; j++)
-				{
-					u32 instanceIndex = instanceCounter++;
+				u16 liquidVertexFormat = instance.liquidVertexFormat;
 
-                    const Adt::MH2O::LiquidInstance& instance = layout.mh2o.instances[instanceIndex];
-                    CellLiquidInstance& outInstance = out.liquidInfo.instances[instanceIndex];
+				bool hasBitmapData = instance.bitmapDataOffset > 0;
+				bool hasVertexData = instance.vertexDataOffset > 0;
 
-					u16 liquidVertexFormat = instance.liquidVertexFormat;
-					assert(liquidVertexFormat >= 0 && liquidVertexFormat <= 3);
+				outInstance.liquidTypeID = static_cast<u8>(instance.liquidType);
+				outInstance.packedData = static_cast<u8>(instance.liquidVertexFormat) | (hasBitmapData << 6 | hasVertexData << 7);
+				outInstance.height = instance.heightLevel.x;
+				outInstance.packedOffset = instance.offsetX | instance.offsetY << 4;
+				outInstance.packedSize = instance.width | instance.height << 4;
 
-					bool hasBitmapData = instance.bitmapDataOffset > 0;
-					bool hasVertexData = instance.vertexDataOffset > 0 && liquidVertexFormat != 2;
-
-					outInstance.liquidTypeID = static_cast<u8>(instance.liquidType);
-					outInstance.packedData = static_cast<u8>(instance.liquidVertexFormat) | (hasBitmapData << 6 | hasVertexData << 7);
-					outInstance.height = instance.heightLevel.x;
-					outInstance.packedOffset = instance.offsetX | instance.offsetY << 4;
-					outInstance.packedSize = instance.width | instance.height << 4;
-
-					if (hasBitmapData)
-					{
-						u32 bitmapDataBeforeAdd = static_cast<u32>(out.liquidInfo.bitmapData.size());
-						u32 bitmapDataToAdd = (instance.width * instance.height + 7) / 8;
-
-						bool isOffsetWithinBufferRange = (bitmapOffset + bitmapDataToAdd) <= numBitmapBytes;
-						assert(isOffsetWithinBufferRange && bitmapDataToAdd > 0);
-
-						out.liquidInfo.bitmapData.resize(bitmapDataBeforeAdd + bitmapDataToAdd);
-						memcpy(&out.liquidInfo.bitmapData[bitmapDataBeforeAdd], &layout.mh2o.bitmapData[bitmapOffset], bitmapDataToAdd);
-						bitmapOffset += bitmapDataToAdd;
-					}
-
-					if (hasVertexData)
-					{
-						u32 numVertices = (instance.width + 1) * (instance.height + 1);
-						u32 formatSize = ((liquidVertexFormat == 0) * sizeof(Adt::MH2O::LiquidVertexFormat_Height)) + ((liquidVertexFormat == 1 || liquidVertexFormat == 3) * sizeof(Adt::MH2O::LiquidVertexFormat_Height_UV));
-						
-						u32 vertexDataBeforeAdd = static_cast<u32>(out.liquidInfo.vertexData.size());
-						u32 vertexDataToAdd = numVertices * formatSize;
-
-						bool isOffsetWithinBufferRange = (vertexDataOffset + vertexDataToAdd) <= numVertexBytes;
-						assert(isOffsetWithinBufferRange && (numVertices > 0 && formatSize > 0));
-
-						out.liquidInfo.vertexData.resize(vertexDataBeforeAdd + vertexDataToAdd);
-						memcpy(&out.liquidInfo.vertexData[vertexDataBeforeAdd], &layout.mh2o.vertexData[vertexDataOffset], vertexDataToAdd);
-						vertexDataOffset += vertexDataToAdd;
-					}
-                }
+				outInstance.bitmapDataOffset = instance.bitmapDataOffset;
+				outInstance.vertexDataOffset = instance.vertexDataOffset;
 			}
 		}
 
