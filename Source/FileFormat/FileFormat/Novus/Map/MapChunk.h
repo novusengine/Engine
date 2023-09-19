@@ -32,7 +32,10 @@ namespace Map
 		u8 packedOffset = 0; // (Bit 1-3 X, Bit 4-8 Y)
 		u8 packedSize = 0; // (Bit 1-3 Width, Bit 4-8 Height)
 
-		f32 height = 0.f;
+		f32 height = 0.0f;
+
+		u32 bitmapDataOffset = 0;
+		u32 vertexDataOffset = 0;
 	};
 
 	struct CellLiquidAttributes
