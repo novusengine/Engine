@@ -14,7 +14,7 @@
 #if WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #else
-#define GLFW_EXPOSE_NATIVE_WAYLAND
+#define GLFW_EXPOSE_NATIVE_X11
 #endif
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -797,10 +797,10 @@ namespace Renderer
                 surfaceCreateInfo.hwnd = glfwGetWin32Window(_window->GetWindow());
                 vkCreateWin32SurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &surface);
 #else
-                VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = { VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR };
-                surfaceCreateInfo.display = glfwGetWaylandDisplay();
-                surfaceCreateInfo.surface = glfwGetWaylandWindow(_window->GetWindow());
-                vkCreateWaylandSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &surface);
+                VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = { VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR };
+                surfaceCreateInfo.dpy = XOpenDisplay(nullptr);
+                surfaceCreateInfo.window = XRootWindow(surfaceCreateInfo.dpy, DefaultScreen(surfaceCreateInfo.dpy));
+                vkCreateXlibSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &surface);
 #endif
 
                 VkBool32 presentSupport = false;
