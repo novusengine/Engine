@@ -4,70 +4,73 @@
 
 #include <cassert>
 
-bool Window::_glfwInitialized = false;
-
-Window::Window()
-    : _window(nullptr)
+namespace Novus
 {
-    
-}
+    bool Window::_glfwInitialized = false;
 
-Window::~Window()
-{
-    if (_window != nullptr)
+    Window::Window()
+            : _window(nullptr)
     {
-        glfwDestroyWindow(_window);
+
     }
-}
 
-void error_callback(i32 error, const char* description)
-{
-    fprintf(stderr, "Error: %s\n", description);
-}
-
-bool Window::Init(u32 width, u32 height)
-{
-    if (!_glfwInitialized)
+    Window::~Window()
     {
-        if (!glfwInit())
+        if (_window != nullptr)
+        {
+            glfwDestroyWindow(_window);
+        }
+    }
+
+    void error_callback(i32 error, const char* description)
+    {
+        fprintf(stderr, "Error: %s\n", description);
+    }
+
+    bool Window::Init(u32 width, u32 height)
+    {
+        if (!_glfwInitialized)
+        {
+            if (!glfwInit())
+            {
+                assert(false);
+                return false;
+            }
+            glfwSetErrorCallback(error_callback);
+        }
+
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+#if NC_Debug
+        _window = glfwCreateWindow(width, height, "CNovusCore (DEBUG)", NULL, NULL);
+#else
+        _window = glfwCreateWindow(width, height, "CNovusCore", NULL, NULL);
+#endif
+
+        if (!_window)
         {
             assert(false);
             return false;
         }
-        glfwSetErrorCallback(error_callback);
+        glfwSetWindowUserPointer(_window, this);
+
+        return true;
     }
 
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-#if NC_Debug
-    _window = glfwCreateWindow(width, height, "CNovusCore (DEBUG)", NULL, NULL);
-#else
-    _window = glfwCreateWindow(width, height, "CNovusCore", NULL, NULL);
-#endif
-
-    if (!_window)
+    bool Window::Update(f32 deltaTime)
     {
-        assert(false);
-        return false;
+        glfwPollEvents();
+
+        if (glfwWindowShouldClose(_window))
+        {
+            return false;
+        }
+        return true;
     }
-    glfwSetWindowUserPointer(_window, this);
 
-    return true;
-}
-
-bool Window::Update(f32 deltaTime)
-{
-    glfwPollEvents();
-
-    if (glfwWindowShouldClose(_window))
+    void Window::Present()
     {
-        return false;
+        //glfwSwapBuffers(_window);
     }
-    return true;
-}
-
-void Window::Present()
-{
-    //glfwSwapBuffers(_window);
 }

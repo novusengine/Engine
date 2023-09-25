@@ -11,6 +11,9 @@
 #include "vkformat/vk_format.h"
 #include "vk_format_utils.h"
 #define STB_IMAGE_IMPLEMENTATION
+#if __GNUC__
+#define STBI_NO_SIMD
+#endif
 #include "stb_image.h"
 
 #include <Base/Math/Math.h>

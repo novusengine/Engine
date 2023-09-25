@@ -1,4 +1,6 @@
 #pragma once
+#include <Base/Platform.h>
+
 #include "ShaderCooker/Permutation.h"
 #include "ShaderCooker/Token.h"
 

@@ -40,7 +40,7 @@ namespace ShaderCooker
     public:
         IncludeHandler(IDxcUtils* utils)
             : _utils(utils)
-            , m_cRef(1)
+            , _ref(1)
         {
         }
 
@@ -51,23 +51,18 @@ namespace ShaderCooker
 
         ULONG AddRef() override
         {
-            InterlockedIncrement(&m_cRef);
-            return m_cRef;
+            //InterlockedIncrement(&_ref);
+            return _ref.fetch_add(1) + 1;
         }
 
-        PRAGMA_CLANG_DIAGNOSTIC_PUSH;
-        PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wdelete-non-abstract-non-virtual-dtor);
         ULONG Release() override
         {
-            // Decrement the object's internal counter.
-            ULONG ulRefCount = InterlockedDecrement(&m_cRef);
-            if (0 == m_cRef)
+            if (_ref <= 0)
             {
-                delete this;
+                DebugHandler::PrintFatal("Inconsistent call to Release()");
             }
-            return ulRefCount;
+            return _ref.fetch_add(-1) - 1;
         }
-        PRAGMA_CLANG_DIAGNOSTIC_POP;
 
     private:
         HRESULT STDMETHODCALLTYPE LoadSource(
@@ -92,22 +87,11 @@ namespace ShaderCooker
 
         HRESULT QueryInterface(REFIID riid, LPVOID* ppvObj) override
         {
-            // Always set out parameter to NULL, validating it first.
-            if (!ppvObj)
-                return E_INVALIDARG;
-            *ppvObj = NULL;
-            if (riid == IID_IUnknown || riid == __uuidof(IDxcIncludeHandler))
-            {
-                // Increment the reference count and return the pointer.
-                *ppvObj = (LPVOID)this;
-                AddRef();
-                return NOERROR;
-            }
-            return E_NOINTERFACE;
+            return E_FAIL;
         }
 
         IDxcUtils* _utils;
-        volatile ULONG m_cRef;
+        std::atomic<i64> _ref;
 
         std::vector<fs::path> _includeDirectories;
     };
@@ -116,8 +100,8 @@ namespace ShaderCooker
     {
         std::vector<DxcDefine> extraDefines;
 
-        Microsoft::WRL::ComPtr<IDxcUtils> utils;
-        Microsoft::WRL::ComPtr<IDxcCompiler> compiler;
+        CComPtr<IDxcUtils> utils;
+        CComPtr<IDxcCompiler> compiler;
     };
 
     DxcBridge::DxcBridge()
@@ -127,19 +111,19 @@ namespace ShaderCooker
 
         HRESULT r;
 
-        r = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(data->utils.GetAddressOf()));
+        r = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&data->utils));
         if (r != S_OK)
         {
             DebugHandler::PrintFatal("Failed to create DXC Utils");
         }
 
-        r = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(data->compiler.GetAddressOf()));
+        r = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&data->compiler));
         if (r != S_OK)
         {
             DebugHandler::PrintFatal("Failed to create DXC Compiler");
         }
 
-        _includeHandler = new IncludeHandler(data->utils.Get());
+        _includeHandler = new IncludeHandler(data->utils);
     }
 
     DxcBridge::~DxcBridge()
@@ -219,8 +203,8 @@ namespace ShaderCooker
         DxcBridgeData* data = static_cast<DxcBridgeData*>(_data);
 
         HRESULT r;
-        Microsoft::WRL::ComPtr<IDxcBlobEncoding> sourceBlob;
-        r = data->utils->CreateBlob(source.c_str(), static_cast<u32>(source.length()), CP_UTF8, sourceBlob.GetAddressOf());
+        CComPtr<IDxcBlobEncoding> sourceBlob;
+        r = data->utils->CreateBlob(source.c_str(), static_cast<u32>(source.length()), CP_UTF8, &sourceBlob);
 
         if (r != S_OK)
         {
@@ -269,8 +253,10 @@ namespace ShaderCooker
         // Merge default defines and permutation defines
         defines.insert(defines.end(), permutationDefines.begin(), permutationDefines.end());
 
-        Microsoft::WRL::ComPtr<IDxcOperationResult> compileResult;
-        r = data->compiler->Compile(sourceBlob.Get(), path.filename().c_str(), L"main", profile.c_str(), &args[0], sizeof(args) / sizeof(args[0]), defines.data(), static_cast<u32>(defines.size()), _includeHandler, compileResult.GetAddressOf());
+        std::wstring fileName = StringUtils::StringToWString(path.filename());
+
+        CComPtr<IDxcOperationResult> compileResult;
+        r = data->compiler->Compile(sourceBlob, fileName.c_str(), L"main", profile.c_str(), &args[0], sizeof(args) / sizeof(args[0]), defines.data(), static_cast<u32>(defines.size()), _includeHandler, &compileResult);
         if (r != S_OK)
         {
             DebugHandler::PrintFatal("Compiler would not even give us back a result");
@@ -285,8 +271,8 @@ namespace ShaderCooker
 
         if (r < 0)
         {
-            Microsoft::WRL::ComPtr<IDxcBlobEncoding> printBlob;
-            if (compileResult->GetErrorBuffer(printBlob.GetAddressOf()) != S_OK)
+            CComPtr<IDxcBlobEncoding> printBlob;
+            if (compileResult->GetErrorBuffer(&printBlob) != S_OK)
             {
                 DebugHandler::PrintFatal("Compiler gave us an error, but we could not get the text from it");
                 return false;

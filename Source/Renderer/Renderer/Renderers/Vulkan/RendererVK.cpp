@@ -29,7 +29,7 @@
 
 namespace Renderer
 {
-    RendererVK::RendererVK(Window* window)
+    RendererVK::RendererVK(Novus::Window* window)
         : _device(new Backend::RenderDeviceVK(window))
     {
         _frameAllocator.Init(1024 * 1024, "Renderer Allocator");
@@ -68,7 +68,7 @@ namespace Renderer
         CreateDummyPipeline();
     }
 
-    void RendererVK::InitWindow(Window* window)
+    void RendererVK::InitWindow(Novus::Window* window)
     {
         _device->InitWindow(_imageHandler, _semaphoreHandler, window);
     }
@@ -1364,7 +1364,7 @@ namespace Renderer
         }
     }
 
-    void RendererVK::Present(Window* window, ImageID imageID, SemaphoreID semaphoreID)
+    void RendererVK::Present(Novus::Window* window, ImageID imageID, SemaphoreID semaphoreID)
     {
         CommandListID commandListID = _commandListHandler->BeginCommandList(Backend::QueueType::Graphics);
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
@@ -1609,7 +1609,7 @@ namespace Renderer
         }
     }
 
-    void RendererVK::Present(Window* /*window*/, DepthImageID /*image*/, SemaphoreID /*semaphoreID*/)
+    void RendererVK::Present(Novus::Window* /*window*/, DepthImageID /*image*/, SemaphoreID /*semaphoreID*/)
     {
         
     }

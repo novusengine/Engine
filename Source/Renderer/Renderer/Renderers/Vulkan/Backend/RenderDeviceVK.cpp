@@ -60,7 +60,7 @@ namespace Renderer
             "VK_EXT_host_query_reset"
         };
 
-        RenderDeviceVK::RenderDeviceVK(Window* window)
+        RenderDeviceVK::RenderDeviceVK(Novus::Window* window)
             : _window(window)
         {
 
@@ -80,7 +80,7 @@ namespace Renderer
                 InitOnce();
         }
 
-        void RenderDeviceVK::InitWindow(ImageHandlerVK* imageHandler, SemaphoreHandlerVK* semaphoreHandler, Window* window)
+        void RenderDeviceVK::InitWindow(ImageHandlerVK* imageHandler, SemaphoreHandlerVK* semaphoreHandler, Novus::Window* window)
         {
             if (!_initialized)
             {

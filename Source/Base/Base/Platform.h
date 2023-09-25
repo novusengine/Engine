@@ -19,7 +19,7 @@
 #if defined(_MSC_VER)
     #define PRAGMA_MSVC_IGNORE_WARNING(X)   DO_PRAGMA(warning(disable : X))
 #else
-    #define PRAGMA_MSVC_IGNORE_WARNING(X)   (void)
+    #define PRAGMA_MSVC_IGNORE_WARNING(X)
 #endif
 
 #if defined(__clang__)

@@ -5,7 +5,6 @@
 
 #include <robinhood/robinhood.h>
 
-class Window;
 struct GLFWwindow;
 enum class KeybindAction
 {

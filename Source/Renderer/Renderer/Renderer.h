@@ -20,7 +20,10 @@
 #include "Descriptors/UploadBuffer.h"
 #include "Descriptors/TimeQueryDesc.h"
 
-class Window;
+namespace Novus
+{
+    class Window;
+}
 
 namespace tracy
 {
@@ -42,7 +45,7 @@ namespace Renderer
     {
     public:
         virtual void InitDebug() = 0;
-        virtual void InitWindow(Window* window) = 0;
+        virtual void InitWindow(Novus::Window* window) = 0;
         virtual void Deinit() = 0;
 
         virtual void SetShaderSourceDirectory(const std::string& path) = 0;
@@ -153,8 +156,8 @@ namespace Renderer
         virtual void UpdateBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, void* data) = 0;
 
         // Present functions
-        virtual void Present(Window* window, ImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) = 0;
-        virtual void Present(Window* window, DepthImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) = 0;
+        virtual void Present(Novus::Window* window, ImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) = 0;
+        virtual void Present(Novus::Window* window, DepthImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) = 0;
 
         // Staging and memory
         virtual std::shared_ptr<UploadBuffer> CreateUploadBuffer(BufferID targetBuffer, size_t targetOffset, size_t size) = 0;

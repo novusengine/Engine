@@ -121,7 +121,7 @@ public:
     CVarArray<ShowFlag> showFlagCVars{ MAX_SHOWFLAG_CVARS };
 
     template<typename T>
-    CVarArray<T>* GetCVarArray();
+    inline CVarArray<T>* GetCVarArray();
 
     //templated get-set cvar versions for syntax sugar
     template<typename T>
@@ -197,37 +197,37 @@ int CVarArray<T>::Add(const T &initialValue, const T &currentValue, CVarParamete
 }
 
 template<>
-CVarArray<i32> *CVarSystemImpl::GetCVarArray()
+inline CVarArray<i32> *CVarSystemImpl::GetCVarArray()
 {
     return &intCVars2;
 }
 
 template<>
-CVarArray<f64> *CVarSystemImpl::GetCVarArray()
+inline CVarArray<f64> *CVarSystemImpl::GetCVarArray()
 {
     return &floatCVars;
 }
 
 template<>
-CVarArray<std::string> *CVarSystemImpl::GetCVarArray()
+inline CVarArray<std::string> *CVarSystemImpl::GetCVarArray()
 {
     return &stringCVars;
 }
 
 template<>
-CVarArray<vec4> *CVarSystemImpl::GetCVarArray()
+inline CVarArray<vec4> *CVarSystemImpl::GetCVarArray()
 {
     return &fvecCVars;
 }
 
 template<>
-CVarArray<ivec4> *CVarSystemImpl::GetCVarArray()
+inline CVarArray<ivec4> *CVarSystemImpl::GetCVarArray()
 {
     return &ivecCVars;
 }
 
 template<>
-CVarArray<ShowFlag> *CVarSystemImpl::GetCVarArray()
+inline CVarArray<ShowFlag> *CVarSystemImpl::GetCVarArray()
 {
     return &showFlagCVars;
 }

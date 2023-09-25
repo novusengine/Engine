@@ -9,7 +9,6 @@
 
 #include <memory>
 
-class Window;
 class InputManager
 {
 public:

@@ -32,10 +32,10 @@ namespace Renderer
     class RendererVK : public Renderer
     {
     public:
-        RendererVK(Window* window);
+        RendererVK(Novus::Window* window);
 
         void InitDebug() override;
-        void InitWindow(Window* window) override;
+        void InitWindow(Novus::Window* window) override;
         void Deinit() override;
 
         void SetShaderSourceDirectory(const std::string& path) override;
@@ -141,8 +141,8 @@ namespace Renderer
         void UpdateBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, void* data) override;
 
         // Present functions
-        void Present(Window* window, ImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) override;
-        void Present(Window* window, DepthImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) override;
+        void Present(Novus::Window* window, ImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) override;
+        void Present(Novus::Window* window, DepthImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) override;
 
         // Staging and memory
         [[nodiscard]] std::shared_ptr<UploadBuffer> CreateUploadBuffer(BufferID targetBuffer, size_t targetOffset, size_t size) override;
