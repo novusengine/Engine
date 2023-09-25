@@ -182,8 +182,7 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
 {
     u32 bufferStartRead = static_cast<u32>(buffer->readData);
 
-    std::vector<u8> dataBytes(header.size);
-    std::memcpy(dataBytes.data(), buffer->GetReadPointer(), header.size);
+    u8* mh2oBlob = buffer->GetReadPointer();
 
     constexpr u32 LIQUID_HEADER_SIZE = (16 * 16) * sizeof(MH2O::LiquidHeader);
     if (!LoadArrayOfStructs(buffer, LIQUID_HEADER_SIZE, layout.mh2o.headers))
@@ -192,8 +191,8 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
     u32 numHeaders = static_cast<u32>(layout.mh2o.headers.size());
     u32 numInstances = 0;
     u32 numAttributes = 0;
-
-    u32 firstInstanceOffset = std::numeric_limits<u32>().max();
+    u32 numInstancesWithBitmapData = 0;
+    u32 numInstancesWithVertexData = 0;
 
     // Prepass [Gather data]
     {
@@ -204,17 +203,11 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
             if (liquidHeader.layerCount == 0)
                 continue;
 
-            if (liquidHeader.instanceOffset < firstInstanceOffset)
-                firstInstanceOffset = liquidHeader.instanceOffset;
-
-            if (liquidHeader.attributeOffset > 0)
-                numAttributes++;
+            bool hasAttributes = liquidHeader.attributeOffset > 0;
+            numAttributes += 1 * hasAttributes;
 
             numInstances += liquidHeader.layerCount;
         }
-
-        layout.mh2o.instances.resize(numInstances);
-        std::memcpy(layout.mh2o.instances.data(), &dataBytes[firstInstanceOffset], numInstances * sizeof(MH2O::LiquidInstance));
     }
 
     // Process [Read & Convert]
@@ -225,12 +218,7 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
         u32 instanceIndex = 0;
         u32 attributeIndex = 0;
 
-        i32 minBitmapDataOffset = std::numeric_limits<i32>().max();
-        i32 maxBitmapDataOffset = std::numeric_limits<i32>().min();
-
-        i32 minVertexDataOffset = std::numeric_limits<i32>().max();
-        i32 maxVertexDataOffset = std::numeric_limits<i32>().min();
-
+        layout.mh2o.instances.reserve(numInstances);
         layout.mh2o.attributes.resize(numAttributes);
 
         for (u32 i = 0; i < numHeaders; i++)
@@ -240,11 +228,17 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
             bool hasAttributes = liquidHeader.attributeOffset > 0;
             if (hasAttributes)
             {
-                const MH2O::LiquidAttribute* liquidAttributePtr = reinterpret_cast<MH2O::LiquidAttribute*>(&dataBytes[liquidHeader.attributeOffset]);
-                assert(liquidAttributePtr != nullptr);
+                layout.mh2o.attributes[attributeIndex++] = *reinterpret_cast<MH2O::LiquidAttribute*>(&mh2oBlob[liquidHeader.attributeOffset]);
+            }
 
-                MH2O::LiquidAttribute& liquidAttribute = layout.mh2o.attributes[attributeIndex++];
-                liquidAttribute = *liquidAttributePtr;
+            bool hasLayers = liquidHeader.layerCount > 0;
+            if (liquidHeader.layerCount)
+            {
+                u32 numCurrentInstances = static_cast<u32>(layout.mh2o.instances.size());
+                u32 numNewInstances = liquidHeader.layerCount;
+
+                layout.mh2o.instances.resize(numCurrentInstances + numNewInstances);
+                memcpy(&layout.mh2o.instances[numCurrentInstances], &mh2oBlob[liquidHeader.instanceOffset], numNewInstances * sizeof(MH2O::LiquidInstance));
             }
         }
 
@@ -253,66 +247,72 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
         {
             MH2O::LiquidInstance& liquidInstance = layout.mh2o.instances[i];
 
-            if (liquidInstance.bitmapDataOffset != 0)
+            bool hasBitmapData = liquidInstance.bitmapDataOffset > 0;
+            numInstancesWithBitmapData += 1 * hasBitmapData;
+
+            u16 liquidVertexFormat = liquidInstance.liquidVertexFormat;
+
+            if (liquidVertexFormat >= 42)
             {
-                minBitmapDataOffset = glm::min(minBitmapDataOffset, static_cast<i32>(liquidInstance.bitmapDataOffset));
-                maxBitmapDataOffset = glm::max(maxBitmapDataOffset, static_cast<i32>(liquidInstance.bitmapDataOffset));
+                if (liquidInstance.liquidType == 2)
+                {
+                    liquidVertexFormat = 2;
+                }
+                else
+                {
+                    i16 liquidTypeID = -1;
+                    i32 materialID = -1;
+
+                    if (context.liquidObjects->HasEntry(liquidVertexFormat))
+                    {
+                        liquidTypeID = context.liquidObjects->GetEntry(liquidVertexFormat).liquidTypeID;
+                    }
+                    else
+                    {
+                        liquidTypeID = liquidInstance.liquidType;
+                    }
+
+                    if (context.liquidTypes->HasEntry(liquidTypeID))
+                    {
+                        materialID = context.liquidTypes->GetEntry(liquidTypeID).materialID;
+
+                        if (context.liquidMaterials->HasEntry(materialID))
+                        {
+                            liquidVertexFormat = context.liquidMaterials->GetEntry(materialID).liquidVertexFormat;
+                        }
+                    }
+                }
             }
 
-            if (liquidInstance.vertexDataOffset != 0)
+            if (liquidInstance.vertexDataOffset == 0 && liquidInstance.liquidType != 2)
             {
-                minVertexDataOffset = glm::min(minVertexDataOffset, static_cast<i32>(liquidInstance.vertexDataOffset));
-                maxVertexDataOffset = glm::max(maxVertexDataOffset, static_cast<i32>(liquidInstance.vertexDataOffset));
+                liquidVertexFormat = 2;
             }
 
-            //if (hasBitmapData)
-            //{
-            //    u32 bitmapDataBeforeAdd = static_cast<u32>(layout.mh2o.bitmapData.size());
-            //    u32 bitmapDataToAdd = (liquidInstance.width * liquidInstance.height + 7) / 8;
-            //    assert(bitmapDataToAdd > 0);
-            //
-            //    layout.mh2o.bitmapData.resize(bitmapDataBeforeAdd + bitmapDataToAdd);
-            //    memcpy(&layout.mh2o.bitmapData[bitmapDataBeforeAdd], &dataBytes[liquidInstance.bitmapDataOffset], bitmapDataToAdd);
-            //}
-            //
-            //if (hasVertexData)
-            //{
-            //    u32 numVertices = (liquidInstance.width + 1) * (liquidInstance.height + 1);
-            //    u32 formatSize = ((liquidVertexFormat == 0) * sizeof(MH2O::LiquidVertexFormat_Height)) + ((liquidVertexFormat == 1 || liquidVertexFormat == 3) * sizeof(MH2O::LiquidVertexFormat_Height_UV));
-            //    assert(numVertices > 0 && formatSize > 0);
-            //
-            //    u32 vertexDataBeforeAdd = static_cast<u32>(layout.mh2o.vertexData.size());
-            //    u32 vertexDataToAdd = numVertices * formatSize;
-            //
-            //    layout.mh2o.vertexData.resize(vertexDataBeforeAdd + vertexDataToAdd);
-            //    memcpy(&layout.mh2o.vertexData[vertexDataBeforeAdd], &dataBytes[liquidInstance.vertexDataOffset], vertexDataToAdd);
-            //}
+            if (liquidVertexFormat == 2)
+            {
+                liquidInstance.width = 8;
+                liquidInstance.height = 8;
+                liquidInstance.offsetX = 0;
+                liquidInstance.offsetY = 0;
+            }
+
+            bool hasVertexData = liquidInstance.vertexDataOffset > 0 && liquidVertexFormat != 2;
+            numInstancesWithVertexData += 1 * hasVertexData;
+
+            liquidInstance.liquidVertexFormat = liquidVertexFormat;
         }
 
-        bool chunkHasBitmapData = minBitmapDataOffset != std::numeric_limits<i32>().max() && maxBitmapDataOffset != std::numeric_limits<i32>().min();
-        u32 relativeBitmapDataOffset = minBitmapDataOffset - bufferStartRead;
-
-        if (chunkHasBitmapData)
+        if (numInstancesWithBitmapData)
         {
-            u32 numBitmapDataBytes = maxBitmapDataOffset - minBitmapDataOffset;
-            if (numBitmapDataBytes)
-            {
-                layout.mh2o.bitmapData.resize(numBitmapDataBytes);
-                memcpy(layout.mh2o.bitmapData.data(), &dataBytes[minBitmapDataOffset], numBitmapDataBytes);
-            }
+            size_t bitmapDataBytes = numInstancesWithBitmapData * sizeof(u64);
+            layout.mh2o.bitmapData.reserve(bitmapDataBytes);
         }
 
-        bool chunkHasVertexData = minVertexDataOffset != std::numeric_limits<i32>().max() && maxVertexDataOffset != std::numeric_limits<i32>().min();
-        u32 relativeVertexDataOffset = minVertexDataOffset - bufferStartRead;
-
-        if (chunkHasVertexData)
+        if (numInstancesWithVertexData)
         {
-            u32 numVertexDataBytes = maxVertexDataOffset - minVertexDataOffset;
-            if (numVertexDataBytes)
-            {
-                layout.mh2o.vertexData.resize(numVertexDataBytes);
-                memcpy(layout.mh2o.vertexData.data(), &dataBytes[minVertexDataOffset], numVertexDataBytes);
-            }
+            size_t vertexDataBytes = numInstancesWithVertexData * sizeof(f32);
+            layout.mh2o.vertexData.reserve(vertexDataBytes);
         }
 
         // Process Instances
@@ -320,50 +320,42 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
         {
             MH2O::LiquidInstance& liquidInstance = layout.mh2o.instances[i];
 
-            u16 liquidVertexFormat = liquidInstance.liquidVertexFormat;
-            if (liquidVertexFormat == 42 || liquidInstance.liquidType == 2)
-                liquidVertexFormat = 2;
-
-            //if (liquidVertexFormat >= 42)
-            //{
-            //    i16 liquidTypeID = -1;
-            //    i32 materialID = -1;
-            //
-            //    if (context.liquidObjects->HasEntry(liquidVertexFormat))
-            //    {
-            //        liquidTypeID = context.liquidObjects->GetEntry(liquidVertexFormat).liquidTypeID;
-            //    }
-            //    else
-            //    {
-            //        liquidTypeID = liquidInstance.liquidType;
-            //    }
-            //
-            //    if (context.liquidTypes->HasEntry(liquidTypeID))
-            //    {
-            //        materialID = context.liquidTypes->GetEntry(liquidTypeID).materialID;
-            //
-            //        if (context.liquidMaterials->HasEntry(materialID))
-            //        {
-            //            liquidVertexFormat = context.liquidMaterials->GetEntry(materialID).liquidVertexFormat;
-            //        }
-            //    }
-            //}
-
             bool hasBitmapData = liquidInstance.bitmapDataOffset > 0;
-            bool hasVertexData = liquidInstance.vertexDataOffset > 0 && liquidVertexFormat != 2;
-
-            liquidInstance.bitmapDataOffset -= relativeBitmapDataOffset * hasBitmapData;
-
-            if (hasVertexData)
+            if (hasBitmapData)
             {
-                liquidInstance.vertexDataOffset -= relativeVertexDataOffset;
+                u32 numBitmapBytes = (liquidInstance.width * liquidInstance.height + 7) / 8;
+
+                size_t oldBitmapDataSize = layout.mh2o.bitmapData.size();
+                size_t newBitmapDataSize = oldBitmapDataSize + numBitmapBytes;
+
+                layout.mh2o.bitmapData.resize(newBitmapDataSize);
+                memcpy(&layout.mh2o.bitmapData[oldBitmapDataSize], &mh2oBlob[liquidInstance.bitmapDataOffset], numBitmapBytes);
+
+                liquidInstance.bitmapDataOffset = static_cast<u32>(oldBitmapDataSize);
             }
             else
             {
-                liquidInstance.vertexDataOffset = 0;
+                liquidInstance.bitmapDataOffset = std::numeric_limits<u32>().max();
             }
 
-            liquidInstance.liquidVertexFormat = liquidVertexFormat;
+            u32 numVertices = (liquidInstance.width + 1) * (liquidInstance.height + 1);
+            size_t numVertexDataBytes = numVertices * sizeof(f32);
+
+            bool hasVertexData = (liquidInstance.vertexDataOffset > 0 && liquidInstance.vertexDataOffset + numVertexDataBytes < header.size) && liquidInstance.liquidVertexFormat != 2;
+            if (hasVertexData)
+            {
+                size_t oldVertexDataSize = layout.mh2o.vertexData.size();
+                size_t newVertexDataSize = oldVertexDataSize + numVertexDataBytes;
+
+                layout.mh2o.vertexData.resize(newVertexDataSize);
+                memcpy(&layout.mh2o.vertexData[oldVertexDataSize], &mh2oBlob[liquidInstance.vertexDataOffset], numVertexDataBytes);
+
+                liquidInstance.vertexDataOffset = static_cast<u32>(oldVertexDataSize);
+            }
+            else
+            {
+                liquidInstance.vertexDataOffset = std::numeric_limits<u32>().max();
+            }
         }
     }
 
