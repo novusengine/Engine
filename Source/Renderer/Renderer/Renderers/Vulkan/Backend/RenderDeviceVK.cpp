@@ -467,6 +467,9 @@ namespace Renderer
             deviceFeatures.features.geometryShader = VK_TRUE;
             deviceFeatures.features.fillModeNonSolid = VK_TRUE;
             deviceFeatures.features.depthClamp = VK_TRUE;
+#if !WIN32
+            deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
+#endif
             deviceFeatures.pNext = &atomicInt64Features;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
@@ -1303,6 +1306,10 @@ namespace Renderer
 #endif
             extensions.push_back("VK_KHR_get_physical_device_properties2");
             extensions.push_back("VK_EXT_debug_report");
+
+#if !WIN32
+            extensions.push_back("VK_KHR_xlib_surface");
+#endif
 
             return extensions;
         }

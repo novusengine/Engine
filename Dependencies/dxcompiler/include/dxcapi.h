@@ -34,6 +34,10 @@
 #else
 
 #include <dlfcn.h>
+#if !WIN32
+#undef strcpy_s
+#undef ARRAYSIZE
+#endif
 #include "WinAdapter.h"
 #endif
 
