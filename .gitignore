@@ -1,6 +1,8 @@
 *
-!.gitignore
 !/CMake
+!/CMake/*
 !/Dependencies
+!/Dependencies/*
 !/Source
+!/Source/*
 !CMakeLists.txt
