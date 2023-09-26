@@ -88,7 +88,7 @@ namespace Renderer
             }
 
             GLFWwindow* glfwWindow = window->GetWindow();
-            
+
             ivec2 size;
             glfwGetWindowSize(glfwWindow, &size.x, &size.y);
 
@@ -213,7 +213,7 @@ namespace Renderer
                 subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                 subpass.colorAttachmentCount = 1;
                 subpass.pColorAttachments = &color_attachment;
-                
+
                 VkRenderPassCreateInfo info = {};
                 info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
                 info.attachmentCount = 1;
@@ -280,7 +280,7 @@ namespace Renderer
             end_info.commandBufferCount = 1;
             end_info.pCommandBuffers = &command_buffer;
             vkEndCommandBuffer(command_buffer);
-            
+
             vkQueueSubmit(_graphicsQueue, 1, &end_info, VK_NULL_HANDLE);
             vkQueueWaitIdle(_graphicsQueue);
 
@@ -423,7 +423,7 @@ namespace Renderer
             std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.transferFamily.value(), indices.presentFamily.value() };
 
             float queuePriority = 1.0f;
-            for (uint32_t queueFamily : uniqueQueueFamilies) 
+            for (uint32_t queueFamily : uniqueQueueFamilies)
             {
                 VkDeviceQueueCreateInfo queueCreateInfo = {};
                 queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -434,7 +434,7 @@ namespace Renderer
             }
 
             _graphicsQueueSupportsTimestamps = indices.graphicsFamilySupportsTimeStamps;
-            
+
             VkPhysicalDeviceHostQueryResetFeaturesEXT resetFeatures = {};
             resetFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
             resetFeatures.hostQueryReset = VK_TRUE;
@@ -467,9 +467,11 @@ namespace Renderer
             deviceFeatures.features.geometryShader = VK_TRUE;
             deviceFeatures.features.fillModeNonSolid = VK_TRUE;
             deviceFeatures.features.depthClamp = VK_TRUE;
+
 #if !WIN32
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
 #endif
+
             deviceFeatures.pNext = &atomicInt64Features;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
@@ -479,7 +481,7 @@ namespace Renderer
 
             createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
             createInfo.pQueueCreateInfos = queueCreateInfos.data();
-            createInfo.pEnabledFeatures = NULL; 
+            createInfo.pEnabledFeatures = NULL;
             createInfo.pNext = &deviceFeatures;
 
             std::vector<const char*> enabledExtensions;
@@ -1423,7 +1425,7 @@ namespace Renderer
                 curWidth = Math::Max(1, curWidth / 2);
                 curHeight = Math::Max(1, curHeight / 2);
             }
-            
+
             vkCmdCopyBufferToImage(
                 commandBuffer,
                 srcBuffer,
@@ -1466,7 +1468,7 @@ namespace Renderer
                 imageBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
             }
 
-            switch (oldLayout) 
+            switch (oldLayout)
             {
                 case VK_IMAGE_LAYOUT_PREINITIALIZED:
                     imageBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1498,7 +1500,7 @@ namespace Renderer
                     break;
             }
 
-            switch (newLayout) 
+            switch (newLayout)
             {
                 case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
                     imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1530,7 +1532,7 @@ namespace Renderer
                 default:
                     break;
             }
-            
+
             vkCmdPipelineBarrier(commandBuffer, srcFlags, dstFlags, 0, 0, NULL, 0, NULL, 1, &imageBarrier);
         }
     }
