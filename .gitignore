@@ -1,8 +1,11 @@
 *
-!/CMake
+!/CMake/
 !/CMake/*
-!/Dependencies
+!/CMake/**/*
+!/Dependencies/
 !/Dependencies/*
-!/Source
+!/Dependencies/**/*
+!/Source/
 !/Source/*
+!/Source/**/*
 !CMakeLists.txt
