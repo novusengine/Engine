@@ -60,10 +60,4 @@ inline void ReleaseModeBreakpoint()
 #if !WIN32
 #define strcpy_s(dest, count)  strcpy((dest), (count))
 #define ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
-
-template<typename... Args>
-inline void printf_s(const char* format, Args... args) {
-    static_assert(std::is_same_v<const char*, decltype(format)>, "Format must be a string literal");
-    printf(format, args...);
-}
 #endif

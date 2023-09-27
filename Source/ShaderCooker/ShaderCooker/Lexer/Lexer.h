@@ -4,6 +4,7 @@
 #include "ShaderCooker/Permutation.h"
 #include "ShaderCooker/Token.h"
 
+#include <Base/Util/DebugHandler.h>
 #include <robinhood/robinhood.h>
 
 #include <string>
@@ -38,10 +39,7 @@ namespace ShaderCooker
         template<typename... Args>
         static void ReportError(int errorCode, std::string str, Args... args)
         {
-            std::stringstream ss;
-            ss << "Lexer Error " << errorCode << ": " << str << std::endl;
-
-            printf_s(ss.str().c_str(), args...);
+            DebugHandler::PrintError("Lexer Error {0} : {1}", errorCode, str.c_str(), args...);
         }
 
         static robin_hood::unordered_map<std::string_view, Token::Type> _keywordStringToType;
