@@ -98,7 +98,14 @@ namespace Map
 
 	bool Chunk::Read(std::shared_ptr<Bytebuffer>& buffer, Chunk& out)
 	{
-		out = { };
+		out.mapObjectPlacements.clear();
+		out.complexModelPlacements.clear();
+
+		out.liquidInfo.headers.clear();
+		out.liquidInfo.instances.clear();
+		out.liquidInfo.attributes.clear();
+		out.liquidInfo.bitmapData.clear();
+		out.liquidInfo.vertexData.clear();
 
 		if (!buffer->Get(out.header))
 			return false;
@@ -409,8 +416,8 @@ namespace Map
 
 				u16 liquidVertexFormat = instance.liquidVertexFormat;
 
-				bool hasBitmapData = instance.bitmapDataOffset > 0;
-				bool hasVertexData = instance.vertexDataOffset > 0;
+				bool hasBitmapData = instance.bitmapDataOffset != std::numeric_limits<u32>().max();
+				bool hasVertexData = instance.vertexDataOffset != std::numeric_limits<u32>().max();
 
 				outInstance.liquidTypeID = static_cast<u8>(instance.liquidType);
 				outInstance.packedData = static_cast<u8>(instance.liquidVertexFormat) | (hasBitmapData << 6 | hasVertexData << 7);
