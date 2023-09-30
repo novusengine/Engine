@@ -72,26 +72,16 @@ struct Color
         return result;
     }
 
-    static u32 ToU32(const Color& rhs)
-    {
-        u32 a = static_cast<u32>(rhs.a * 255.f);
-        u32 r = static_cast<u32>(rhs.r * 255.f);
-        u32 g = static_cast<u32>(rhs.g * 255.f);
-        u32 b = static_cast<u32>(rhs.b * 255.f);
+    static u32 ToRGBA32(const Color& rhs);
+    static u32 ToABGR32(const Color& rhs);
 
-        u32 result = (a << 24) | (b << 16) | (g << 8) | (r);
-        return result;
-    }
+    u32 ToRGBA32() const;
+    u32 ToABGR32() const;
 
-    u32 ToU32() const
-    {
-        u32 color = 0;
-        color =  static_cast<u32>(r * 255.0f) << 24;
-        color |= static_cast<u32>(g * 255.0f) << 16;
-        color |= static_cast<u32>(b * 255.0f) << 8;
-        color |= static_cast<u32>(a * 255.0f) << 0;
-        return color;
-    }
+    static Color FromRGB32(u32 value, f32 a = 1.0f);
+    static Color FromRGBA32(u32 value);
+    static Color FromBGR32(u32 value, f32 a = 1.0f);
+    static Color FromABGR32(u32 value);
 
     static const Color Black;
     static const Color Blue;
