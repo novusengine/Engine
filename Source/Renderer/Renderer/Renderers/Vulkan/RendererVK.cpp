@@ -1639,6 +1639,20 @@ namespace Renderer
         _uploadBufferHandler->CopyBufferToBuffer(dstBuffer, dstOffset, srcBuffer, srcOffset, range);
     }
 
+    void RendererVK::CopyBufferImmediate(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range)
+    {
+        std::string& dstName = _bufferHandler->GetBufferName(dstBuffer);
+        std::string& srcName = _bufferHandler->GetBufferName(srcBuffer);
+        DebugHandler::PrintWarning("Immediately copying buffer {} into buffer {}, this is bad for performance and should only be used for debugging", srcName, dstName);
+
+        VkCommandBuffer commandList = _device->BeginSingleTimeCommands();
+        
+        VkBufferCopy copyRegion = { srcOffset, dstOffset, range };
+        vkCmdCopyBuffer(commandList, _bufferHandler->GetBuffer(srcBuffer), _bufferHandler->GetBuffer(dstBuffer), 1, &copyRegion);
+
+        _device->EndSingleTimeCommands(commandList);
+    }
+
     void RendererVK::FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data)
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
