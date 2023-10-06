@@ -150,7 +150,10 @@ namespace Renderer
         void SetHasWaitedForUpload() override;
         [[nodiscard]] SemaphoreID GetUploadFinishedSemaphore() override;
 
+        // Uses the upload handler to schedule it for next frames command list
         void CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
+        // Immediately copies using an immediate command list
+        void CopyBufferImmediate(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
 
         [[nodiscard]] void* MapBuffer(BufferID buffer) override;
         void UnmapBuffer(BufferID buffer) override;

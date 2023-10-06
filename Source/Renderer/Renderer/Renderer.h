@@ -171,7 +171,10 @@ namespace Renderer
         [[nodiscard]] BufferID CreateAndFillBuffer(BufferID bufferID, BufferDesc desc, const std::function<void(void*, size_t)>& callback); // Deletes the current BufferID if it's not invalid
         [[nodiscard]] BufferID CreateAndFillBuffer(BufferDesc desc, const std::function<void(void*, size_t)>& callback);
 
+        // Uses the upload handler to schedule it for next frames command list
         virtual void CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) = 0;
+        // Immediately copies using an immediate command list
+        virtual void CopyBufferImmediate(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) = 0;
         void UploadToBuffer(BufferID dstBuffer, u64 dstOffset, void* srcData, u64 srcOffset, u64 srcSize);
 
         virtual void* MapBuffer(BufferID buffer) = 0;

@@ -23,6 +23,11 @@ namespace Renderer
         };
 
     public:
+        GPUVector(bool validateTransfers = false)
+            : _validateTransfers(validateTransfers)
+        {
+        }
+
         void SetDirtyRegion(size_t offset, size_t size)
         {
             size_t allocatedBytes = _allocator.AllocatedBytes();
@@ -72,7 +77,19 @@ namespace Renderer
             if (vectorByteSize == allocatedBytes)
             {
                 // We don't need to resize the buffer, but we might have dirty regions that we need to update
-                UpdateDirtyRegions(renderer);
+                bool hadDirtyRegions = UpdateDirtyRegions(renderer);
+
+                // We can only validate if we didn't have to resize the buffer and if it didn't have dirty regions
+                // That way we know the CPU side should match the GPU side, if the upload worked
+                if (hadDirtyRegions)
+                {
+                    _wantsValidation = _validateTransfers;
+                }
+                else if (_wantsValidation)
+                {
+                    Validate();
+                }
+
                 return false; 
             }
             size_t bufferByteSize = _allocator.Size();
@@ -83,6 +100,8 @@ namespace Renderer
                 ResizeBuffer(renderer, vectorByteSize, true); // This copies everything that was allocated in the old buffer to the new buffer
                 bufferByteSize = _allocator.Size();
                 didResize = true;
+
+                _wantsValidation = _validateTransfers;
             }
             
             // Allocate and upload anything that has been added since last sync
@@ -95,6 +114,8 @@ namespace Renderer
                 {
                     DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector %s", _debugName.c_str());
                 }
+                
+                _wantsValidation = _validateTransfers;
             }
 
 #ifdef NC_Debug
@@ -139,6 +160,8 @@ namespace Renderer
                 ResizeBuffer(renderer, vectorByteSize, false);
                 bufferByteSize = _allocator.Size();
                 didResize = true;
+
+                _wantsValidation = _validateTransfers;
             }
 
             // Allocate the part of the buffer that wasn't allocated before
@@ -151,6 +174,8 @@ namespace Renderer
                 {
                     DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector %s", _debugName.c_str());
                 }
+
+                _wantsValidation = _validateTransfers;
             }
 
             // Then upload the whole buffer
@@ -217,6 +242,8 @@ namespace Renderer
 
         BufferID GetBuffer() { return _buffer; }
 
+        void SetValidation(bool shouldValidate) { _validateTransfers = shouldValidate; }
+
     private:
         void ResizeBuffer(Renderer* renderer, size_t newSize, bool copyOld)
         {
@@ -244,10 +271,10 @@ namespace Renderer
             _buffer = newBuffer;
         }
 
-        void UpdateDirtyRegions(Renderer* renderer)
+        bool UpdateDirtyRegions(Renderer* renderer)
         {
             if (_dirtyRegions.size() == 0)
-                return;
+                return false;
 
             // Sort dirtyRegions by offset
             std::sort(_dirtyRegions.begin(), _dirtyRegions.end(), [](const DirtyRegion& a, const DirtyRegion& b)
@@ -305,6 +332,36 @@ namespace Renderer
             }
 
             _dirtyRegions.clear();
+
+            return true;
+        }
+
+        void Validate()
+        {
+            _wantsValidation = false;
+
+            // Create (or update) the buffer
+            BufferDesc validationDesc;
+            validationDesc.name = _debugName + " Validation Buffer";
+            validationDesc.size = _vector.size() * sizeof(T);
+            validationDesc.usage = BufferUsage::TRANSFER_DESTINATION;
+            validationDesc.cpuAccess = BufferCPUAccess::ReadOnly;
+            _validationBuffer = _renderer->CreateBuffer(_validationBuffer, validationDesc);
+
+            DebugHandler::PrintWarning("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
+
+            // Immediately copy from the GPU buffer to the validation buffer
+            _renderer->CopyBufferImmediate(_validationBuffer, 0, _buffer, 0, validationDesc.size);
+
+            // Map the validation buffer and check for differences
+            const T* validationData = reinterpret_cast<const T*>(_renderer->MapBuffer(_validationBuffer));
+
+            int result = memcmp(_vector.data(), validationData, validationDesc.size);
+            if (result != 0)
+            {
+                DebugHandler::PrintFatal("Validation failed for buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
+            }
+            _renderer->UnmapBuffer(_validationBuffer);
         }
 
         bool _initialized = false;
@@ -313,6 +370,9 @@ namespace Renderer
         BufferRangeAllocator _allocator;
 
         std::string _debugName = "";
+        bool _validateTransfers = false;
+        bool _wantsValidation = false;
+        BufferID _validationBuffer;
         u8 _usage = 0;
 
         std::vector<DirtyRegion> _dirtyRegions;
