@@ -343,12 +343,12 @@ namespace Model
 
                 u32 fileID = layout.modi.data[doodadPlacementInfo.flags.MODIIndex].fileID;
                 decoration.nameID = fileID;
-                decoration.position = vec3(doodadPlacementInfo.position.x, doodadPlacementInfo.position.y, doodadPlacementInfo.position.z);
+                decoration.position = CoordinateSpaces::ModelPosToNovus(doodadPlacementInfo.position);
 
                 vec3 eulerAngles = glm::eulerAngles(doodadPlacementInfo.rotation);
-                vec3 placementAngles = vec3(eulerAngles.x, eulerAngles.y, eulerAngles.z);
+                vec3 placementRotation = glm::radians(CoordinateSpaces::PlacementRotToNovus(eulerAngles));
+                glm::mat4 matrix = glm::eulerAngleYXZ(placementRotation.y, placementRotation.x, placementRotation.z);
 
-                glm::mat4 matrix = glm::eulerAngleZYX(placementAngles.z, placementAngles.y, placementAngles.x);
                 decoration.rotation = glm::quat_cast(matrix);
                 decoration.scale = doodadPlacementInfo.scale;
                 decoration.color = doodadPlacementInfo.color.bgra;
@@ -489,6 +489,7 @@ namespace Model
 
                         const u32 start = renderBatch.startIndex;
                         const u32 end = start + renderBatch.indexCount;
+
                         for (u32 j = start; j < end; j++)
                         {
                             const u16 index = wmoGroup.movi.data[j];

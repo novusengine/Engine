@@ -31,13 +31,14 @@ namespace Model
 		// Set Model Header
 		{
 			modelHeader.numVertices = static_cast<u32>(vertices.size());
-
 			modelHeader.numVertexLookupIDs = static_cast<u32>(modelData.vertexLookupIDs.size());
 			modelHeader.numIndices = static_cast<u32>(modelData.indices.size());
 			modelHeader.numRenderBatches = static_cast<u32>(modelData.renderBatches.size());
 
-			for (auto& renderBatch : modelData.renderBatches)
+			for (u32 i = 0; i < modelHeader.numRenderBatches; i++)
 			{
+				const ComplexModel::RenderBatch& renderBatch = modelData.renderBatches[i];
+
 				if (renderBatch.isTransparent)
 				{
 					modelHeader.numTransparentRenderBatches++;
@@ -57,6 +58,8 @@ namespace Model
 			modelHeader.numSequences = static_cast<u32>(sequences.size());
 			modelHeader.numBones = static_cast<u32>(bones.size());
 			modelHeader.numCameras = static_cast<u32>(cameras.size());
+			modelHeader.numDecorationSets = static_cast<u32>(decorationSets.size());
+			modelHeader.numDecorations = static_cast<u32>(decorations.size());
 		}
 
 		// Write Model Header
@@ -81,8 +84,10 @@ namespace Model
 
 			if (numElements > 0)
 			{
-				for (const ComplexModel::Bone& bone : bones)
+				for (u32 i = 0; i < numElements; i++)
 				{
+					const ComplexModel::Bone& bone = bones[i];
+
 					output.write(reinterpret_cast<const char*>(&bone.primaryBoneIndex), sizeof(i32));
 					output.write(reinterpret_cast<const char*>(&bone.flags), sizeof(u32));
 
@@ -114,7 +119,7 @@ namespace Model
 
 			if (numTextures > 0)
 			{
-				for (u32 i = 0; i < textures.size(); i++)
+				for (u32 i = 0; i < numTextures; i++)
 				{
 					const ComplexModel::Texture& texture = textures[i];
 
@@ -141,7 +146,7 @@ namespace Model
 
 			if (numTextureTransforms > 0)
 			{
-				for (u32 i = 0; i < textureTransforms.size(); i++)
+				for (u32 i = 0; i < numTextureTransforms; i++)
 				{
 					const ComplexModel::TextureTransform& textureTransform = textureTransforms[i];
 
@@ -249,8 +254,10 @@ namespace Model
 
 			if (numElements > 0)
 			{
-				for (const ComplexModel::Camera& camera : cameras)
+				for (u32 i = 0; i < numElements; i++)
 				{
+					const ComplexModel::Camera& camera = cameras[i];
+
 					output.write(reinterpret_cast<const char*>(&camera.type), sizeof(u32));
 					output.write(reinterpret_cast<const char*>(&camera.farClip), sizeof(f32));
 					output.write(reinterpret_cast<const char*>(&camera.nearClip), sizeof(f32));
@@ -263,6 +270,26 @@ namespace Model
 					camera.roll.Serialize(output);
 					camera.fov.Serialize(output);
 				}
+			}
+		}
+
+		// Write Decoration Sets
+		{
+			u32 numElements = modelHeader.numDecorationSets;
+
+			if (numElements > 0)
+			{
+				output.write(reinterpret_cast<const char*>(&decorationSets[0]), numElements * sizeof(DecorationSet));
+			}
+		}
+
+		// Write Decorations
+		{
+			u32 numElements = modelHeader.numDecorations;
+
+			if (numElements > 0)
+			{
+				output.write(reinterpret_cast<const char*>(&decorations[0]), numElements * sizeof(Decoration));
 			}
 		}
 
@@ -305,7 +332,7 @@ namespace Model
 
 				for (u32 i = 0; i < numRenderBatches; i++)
 				{
-					ComplexModel::RenderBatch& renderBatch = modelData.renderBatches[i];
+					const ComplexModel::RenderBatch& renderBatch = modelData.renderBatches[i];
 
 					output.write(reinterpret_cast<const char*>(&renderBatch.groupID), sizeof(u16));
 					output.write(reinterpret_cast<const char*>(&renderBatch.vertexStart), sizeof(u32));
@@ -321,7 +348,7 @@ namespace Model
 
 					for (u32 j = 0; j < numTextureUnits; j++)
 					{
-						ComplexModel::TextureUnit& textureUnit = renderBatch.textureUnits[j];
+						const ComplexModel::TextureUnit& textureUnit = renderBatch.textureUnits[j];
 
 						output.write(reinterpret_cast<const char*>(&textureUnit.flags), sizeof(ComplexModel::TextureUnit::Flags));
 						output.write(reinterpret_cast<const char*>(&textureUnit.shaderID), sizeof(u16));
@@ -340,7 +367,28 @@ namespace Model
 	}
 	bool ComplexModel::Read(std::shared_ptr<Bytebuffer>& buffer, ComplexModel& out)
 	{
-		out = { };
+		out.flags = { };
+		out.sequences.clear();
+		out.bones.clear();
+		out.vertices.clear();
+		out.textures.clear();
+		out.materials.clear();
+		out.textureTransforms.clear();
+		out.textureIndexLookupTable.clear();
+		out.textureUnitLookupTable.clear();
+		out.textureTransparencyLookupTable.clear();
+		out.textureTransformLookupTable.clear();
+		out.textureCombinerCombos.clear();
+		out.collisionVertexPositions.clear();
+		out.collisionIndices.clear();
+		out.collisionNormals.clear();
+		out.cameras.clear();
+		out.decorationSets.clear();
+		out.decorations.clear();
+
+		out.modelData.vertexLookupIDs.clear();
+		out.modelData.indices.clear();
+		out.modelData.renderBatches.clear();
 
 		// Read Header
 		{
@@ -532,6 +580,18 @@ namespace Model
 						return false;
 				}
 			}
+		}
+
+		//  Read Decoration Sets
+		{
+			if (!buffer->GetVector(out.decorationSets, out.modelHeader.numDecorationSets))
+				return false;
+		}
+
+		//  Read Decorations
+		{
+			if (!buffer->GetVector(out.decorations, out.modelHeader.numDecorations))
+				return false;
 		}
 
 		// Read AABB
@@ -1384,6 +1444,38 @@ namespace Model
 				indexOffset += numIndicies;
 				materialOffset += numMaterials;
 				renderBatchOffset += numRenderBatches;
+			}
+		}
+
+		u32 numDecorationSets = static_cast<u32>(mapObject.decorationSets.size());
+		if (numDecorationSets > 0)
+		{
+			out.decorationSets.resize(numDecorationSets);
+			for (u32 i = 0; i < numDecorationSets; i++)
+			{
+				DecorationSet& decorationSet = out.decorationSets[i];
+				const Model::MapObject::DecorationSet& mapObjectDecorationSet = mapObject.decorationSets[i];
+
+				memcpy(decorationSet.name, mapObjectDecorationSet.name, 20);
+				decorationSet.index = mapObjectDecorationSet.index;
+				decorationSet.count = mapObjectDecorationSet.count;
+			}
+		}
+
+		u32 numDecorations = static_cast<u32>(mapObject.decorations.size());
+		if (numDecorations > 0)
+		{
+			out.decorations.resize(numDecorations);
+			for (u32 i = 0; i < numDecorations; i++)
+			{
+				Decoration& decoration = out.decorations[i];
+				const Model::MapObject::Decoration& mapObjectDecoration = mapObject.decorations[i];
+
+				decoration.nameID = mapObjectDecoration.nameID;
+				decoration.position = mapObjectDecoration.position;
+				decoration.rotation = mapObjectDecoration.rotation;
+				decoration.scale = mapObjectDecoration.scale;
+				decoration.color = mapObjectDecoration.color;
 			}
 		}
 

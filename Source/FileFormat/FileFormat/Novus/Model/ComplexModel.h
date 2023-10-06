@@ -22,7 +22,7 @@ PRAGMA_NO_PADDING_START;
 	struct ComplexModel
 	{
 	public:
-		static const u32 CURRENT_VERSION = 5;
+		static const u32 CURRENT_VERSION = 6;
 
 		struct Flags
 		{
@@ -476,6 +476,20 @@ PRAGMA_NO_PADDING_START;
 			AnimationData<SplineKey<f32>> roll = { };
 			AnimationData<SplineKey<f32>> fov = { };
 		};
+		struct Decoration
+		{
+			u32 nameID = 0;
+			vec3 position = vec3(0.0f, 0.0f, 0.0f);
+			quat rotation = quat(1.0f, 0.0f, 0.0f, 0.0f);
+			f32 scale = 0.0f;
+			u32 color = 0;
+		};
+		struct DecorationSet
+		{
+			char name[20] = { 0 };
+			u16 index = 0;
+			u32 count = 0;
+		};
 		struct ModelData
 		{
 		public:
@@ -502,6 +516,9 @@ PRAGMA_NO_PADDING_START;
 			u32 numSequences;
 			u32 numBones;
 			u32 numCameras;
+
+			u32 numDecorationSets;
+			u32 numDecorations;
 		};
 
 	public:
@@ -510,25 +527,27 @@ PRAGMA_NO_PADDING_START;
 
 		Flags flags = { };
 
-		std::vector<AnimationSequence> sequences = { };
-		std::vector<Bone> bones = { };
+		std::vector<AnimationSequence> sequences;
+		std::vector<Bone> bones;
 
-		std::vector<Vertex> vertices = { };
-		std::vector<Texture> textures = { };
-		std::vector<Material> materials = { };
-		std::vector<TextureTransform> textureTransforms = { };
+		std::vector<Vertex> vertices;
+		std::vector<Texture> textures;
+		std::vector<Material> materials;
+		std::vector<TextureTransform> textureTransforms;
 
-		std::vector<u16> textureIndexLookupTable = { };
-		std::vector<u16> textureUnitLookupTable = { };
-		std::vector<u16> textureTransparencyLookupTable = { };
-		std::vector<u16> textureTransformLookupTable = { };
-		std::vector<u16> textureCombinerCombos = { };
+		std::vector<u16> textureIndexLookupTable;
+		std::vector<u16> textureUnitLookupTable;
+		std::vector<u16> textureTransparencyLookupTable;
+		std::vector<u16> textureTransformLookupTable;
+		std::vector<u16> textureCombinerCombos;
 
-		std::vector<vec3> collisionVertexPositions = { };
-		std::vector<u16> collisionIndices = { };
-		std::vector<std::array<u8, 2>> collisionNormals = { };
+		std::vector<vec3> collisionVertexPositions;
+		std::vector<u16> collisionIndices;
+		std::vector<std::array<u8, 2>> collisionNormals;
 
-		std::vector<Camera> cameras = { };
+		std::vector<Camera> cameras;
+		std::vector<DecorationSet> decorationSets;
+		std::vector<Decoration> decorations;
 
 		vec3 aabbCenter = { };
 		vec3 aabbExtents = { };
