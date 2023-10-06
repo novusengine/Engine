@@ -37,6 +37,7 @@ using uvec4 = glm::uvec4;
 using hvec4 = glm::vec<4, f16>;
 using mat3x3 = glm::mat3x3;
 using mat4x4 = glm::mat4x4;
+using mat4a = glm::mat4x3;
 using quat = glm::quat;
 
 #define DECLARE_GENERIC_BITWISE_OPERATORS(T) inline const T operator~ (T a) { return (T)~(i32)a; } \
