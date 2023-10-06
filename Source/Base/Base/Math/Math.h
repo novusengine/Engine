@@ -185,8 +185,8 @@ namespace Math
         return result;
     }
 
-    namespace AffineMatrix {
-
+    namespace AffineMatrix
+    {
         //Multiply 2 affine matrices as if they were mat4x4 matrices
         inline mat4a MatrixMul(const mat4a& m1, const mat4a& m2)
         {
