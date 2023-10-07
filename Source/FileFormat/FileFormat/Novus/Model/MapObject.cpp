@@ -346,8 +346,8 @@ namespace Model
                 decoration.position = CoordinateSpaces::ModelPosToNovus(doodadPlacementInfo.position);
 
                 vec3 eulerAngles = glm::eulerAngles(doodadPlacementInfo.rotation);
-                vec3 placementRotation = glm::radians(CoordinateSpaces::PlacementRotToNovus(eulerAngles));
-                glm::mat4 matrix = glm::eulerAngleYXZ(placementRotation.y, placementRotation.x, placementRotation.z);
+                vec3 placementAngles = CoordinateSpaces::DecorationRotToNovus(eulerAngles);
+                glm::mat4 matrix = glm::eulerAngleYXZ(placementAngles.y, placementAngles.x, placementAngles.z);
 
                 decoration.rotation = glm::quat_cast(matrix);
                 decoration.scale = doodadPlacementInfo.scale;
