@@ -4,6 +4,7 @@
 
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
+#include <imgui/imguizmo/ImGuizmo.h>
 
 InputManager::InputManager()
 {
@@ -140,7 +141,8 @@ void InputManager::CharInputHandler(u32 unicode)
 void InputManager::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMask)
 {
     auto& io = ImGui::GetIO();
-    bool wasConsumed = io.WantCaptureMouse;
+    bool wasConsumed = io.WantCaptureMouse || ImGuizmo::IsOver();
+
     if (wasConsumed)
     {
         if (_mouseInputConsumeInfo.keybindGroupNameHash != consumerInfoNameHashImGui)

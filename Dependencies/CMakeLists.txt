@@ -84,6 +84,14 @@ if(NOT TARGET enkiTS)
     add_library(enkiTS::enkiTS ALIAS enkiTS_proxy)
 endif()
 
+## Base64
+add_library(base64 INTERFACE)
+add_library(base64::base64 ALIAS base64)
+
+target_include_directories(base64 INTERFACE
+    "${CMAKE_CURRENT_LIST_DIR}/base64"
+)
+
 ## engine-dependencies
 
 add_library(${PROJECT_NAME} INTERFACE)
@@ -98,4 +106,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     type_safe
     spdlog
     refl-cpp::refl-cpp
+    base64::base64
 )
