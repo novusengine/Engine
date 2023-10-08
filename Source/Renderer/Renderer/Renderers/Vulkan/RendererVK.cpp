@@ -1641,8 +1641,8 @@ namespace Renderer
 
     void RendererVK::CopyBufferImmediate(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range)
     {
-        std::string& dstName = _bufferHandler->GetBufferName(dstBuffer);
-        std::string& srcName = _bufferHandler->GetBufferName(srcBuffer);
+        std::string dstName = _bufferHandler->GetBufferName(dstBuffer);
+        std::string srcName = _bufferHandler->GetBufferName(srcBuffer);
         DebugHandler::PrintWarning("Immediately copying buffer {} into buffer {}, this is bad for performance and should only be used for debugging", srcName, dstName);
 
         VkCommandBuffer commandList = _device->BeginSingleTimeCommands();
