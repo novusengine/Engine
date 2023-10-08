@@ -41,7 +41,7 @@ namespace DB::Client
 
 		Flags flags = { };
 		std::vector<T> data = { };
-        StringTable stringTable = { };
+        Novus::Container::StringTable stringTable = { };
         robin_hood::unordered_map<u32, u32> idToIndexMap = { };
 
 	public:

@@ -142,8 +142,8 @@ PRAGMA_NO_PADDING_START;
 		struct Decoration
 		{
 			u32 nameID = 0;
-			vec3 position = { };
-			quat rotation = { };
+			vec3 position = vec3(0.0f, 0.0f, 0.0f);
+			quat rotation = quat(1.0f, 0.0f, 0.0f, 0.0f);
 			f32 scale = 0.0f;
 			u32 color = 0;
 		};

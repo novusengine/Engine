@@ -184,4 +184,60 @@ namespace Math
         bool result = componentA || componentB || componentC;
         return result;
     }
+
+    namespace AffineMatrix
+    {
+        //Multiply 2 affine matrices as if they were mat4x4 matrices
+        inline mat4a MatrixMul(const mat4a& m1, const mat4a& m2)
+        {
+            return mat4a(
+                m1[0][0] * m2[0][0] + m1[1][0] * m2[0][1] + m1[2][0] * m2[0][2],
+                m1[0][1] * m2[0][0] + m1[1][1] * m2[0][1] + m1[2][1] * m2[0][2],
+                m1[0][2] * m2[0][0] + m1[1][2] * m2[0][1] + m1[2][2] * m2[0][2],
+
+                m1[0][0] * m2[1][0] + m1[1][0] * m2[1][1] + m1[2][0] * m2[1][2],
+                m1[0][1] * m2[1][0] + m1[1][1] * m2[1][1] + m1[2][1] * m2[1][2],
+                m1[0][2] * m2[1][0] + m1[1][2] * m2[1][1] + m1[2][2] * m2[1][2],
+
+                m1[0][0] * m2[2][0] + m1[1][0] * m2[2][1] + m1[2][0] * m2[2][2],
+                m1[0][1] * m2[2][0] + m1[1][1] * m2[2][1] + m1[2][1] * m2[2][2],
+                m1[0][2] * m2[2][0] + m1[1][2] * m2[2][1] + m1[2][2] * m2[2][2],
+
+                m1[0][0] * m2[3][0] + m1[1][0] * m2[3][1] + m1[2][0] * m2[3][2] + m1[3][0],
+                m1[0][1] * m2[3][0] + m1[1][1] * m2[3][1] + m1[2][1] * m2[3][2] + m1[3][1],
+                m1[0][2] * m2[3][0] + m1[1][2] * m2[3][1] + m1[2][2] * m2[3][2] + m1[3][2]);
+        }
+
+        //apply a scale vector to an affine matrix. equivalent to multiplying the matrix by a scale diagonal matrix
+        inline mat4a ScaleMatrix(const mat4a& m1, const vec3& m2)
+        {
+            return mat4a(
+                m1[0][0] * m2.x,
+                m1[0][1] * m2.x,
+                m1[0][2] * m2.x,
+
+                m1[1][0] * m2.y,
+                m1[1][1] * m2.y,
+                m1[1][2] * m2.y,
+
+                m1[2][0] * m2.z,
+                m1[2][1] * m2.z,
+                m1[2][2] * m2.z,
+
+                m1[3][0],
+                m1[3][1],
+                m1[3][2]);
+        }
+
+        //create a 4x3 affine transform matrix from components
+        inline mat4a TransformMatrix(const vec3& position, const quat& rotation, const vec3& scale)
+        {
+            mat4a rotMatrix = glm::toMat3(rotation);
+
+            mat4a translateMatrix = mat4a{ 1.f };
+            translateMatrix[3] = position;
+
+            return MatrixMul(translateMatrix, ScaleMatrix(rotMatrix, scale));
+        }
+    }
 };

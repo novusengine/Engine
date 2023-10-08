@@ -227,6 +227,16 @@ namespace CoordinateSpaces
         return vec3(pos.y, pos.z, -pos.x);
     }
 
+    // Model Coordinate space (M2 and WMO)
+    // RIGHT HANDED
+    // X = South
+    // Y = East
+    // Z = UP
+    inline vec3 DecorationRotToNovus(const vec3& pos)
+    {
+        return vec3(-pos.y,- pos.z, pos.x);
+    }
+
     // Cinematic Camera Coordinate Space
     // RIGHT HANDED
     // X = North
