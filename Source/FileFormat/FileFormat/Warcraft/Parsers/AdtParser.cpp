@@ -263,22 +263,22 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
                     i16 liquidTypeID = -1;
                     i32 materialID = -1;
 
-                    if (context.liquidObjects->HasEntry(liquidVertexFormat))
+                    if (context.liquidObjects->ContainsEntryWithID(liquidVertexFormat))
                     {
-                        liquidTypeID = context.liquidObjects->GetEntry(liquidVertexFormat).liquidTypeID;
+                        liquidTypeID = context.liquidObjects->GetEntryByID(liquidVertexFormat).liquidTypeID;
                     }
                     else
                     {
                         liquidTypeID = liquidInstance.liquidType;
                     }
 
-                    if (context.liquidTypes->HasEntry(liquidTypeID))
+                    if (context.liquidTypes->ContainsEntryWithID(liquidTypeID))
                     {
-                        materialID = context.liquidTypes->GetEntry(liquidTypeID).materialID;
+                        materialID = context.liquidTypes->GetEntryByID(liquidTypeID).materialID;
 
-                        if (context.liquidMaterials->HasEntry(materialID))
+                        if (context.liquidMaterials->ContainsEntryWithID(materialID))
                         {
-                            liquidVertexFormat = context.liquidMaterials->GetEntry(materialID).liquidVertexFormat;
+                            liquidVertexFormat = context.liquidMaterials->GetEntryByID(materialID).liquidVertexFormat;
                         }
                     }
                 }

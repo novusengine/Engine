@@ -78,4 +78,13 @@ namespace DB::Client::Definitions
         u32 soundID;
         u32 cameraIDs[8];
     };
+
+    // Custom
+    struct CameraSave
+    {
+    public:
+        u32 id;
+        u32 name;
+        u32 code;
+    };
 }

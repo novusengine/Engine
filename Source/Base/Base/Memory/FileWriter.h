@@ -1,5 +1,6 @@
 #pragma once
 #include "Base/Types.h"
+#include "Base/Memory/Bytebuffer.h"
 #include "Base/Util/DebugHandler.h"
 
 #include <fstream>
@@ -17,7 +18,7 @@ public:
 		std::ofstream output(_path, std::ofstream::out | std::ofstream::binary);
 		if (!output)
 		{
-			DebugHandler::PrintError("[FileWriter] Failed to create file (%s). Check admin permissions", _path.string().c_str());
+			DebugHandler::PrintError("[FileWriter] Failed to create file ({0}). Check admin permissions", _path.string().c_str());
 			return false;
 		}
 
