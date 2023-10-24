@@ -540,8 +540,7 @@ namespace Model
                         vertex.position = CoordinateSpaces::ModelPosToNovus(pos);
 
                         // Normal
-                        vec3 norm = wmoGroup.monr.data[j].normal;
-                        vec3 normal = vec3(norm.x, norm.y, norm.z);
+                        vec3 normal = CoordinateSpaces::ModelPosToNovus(glm::normalize(wmoGroup.monr.data[j].normal));
                         vec2 octNormal = OctNormalEncode(normal);
 
                         vertex.octNormal[0] = static_cast<u8>(glm::round(octNormal.x * 255.0f));

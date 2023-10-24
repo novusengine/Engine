@@ -418,6 +418,7 @@ namespace Model
 			if (numElements)
 			{
 				out.bones.resize(numElements);
+
 				for (u32 i = 0; i < numElements; i++)
 				{
 					ComplexModel::Bone& bone = out.bones[i];
@@ -980,7 +981,7 @@ namespace Model
 				vertex.uvCoords[0] = m2Vertex->uvCords[0];
 				vertex.uvCoords[1] = m2Vertex->uvCords[1];
 
-				vec3 normal = glm::normalize(m2Vertex->normal);
+				vec3 normal = CoordinateSpaces::ModelPosToNovus(glm::normalize(m2Vertex->normal));
 				vec2 octNormal = OctNormalEncode(normal);
 				vertex.octNormal[0] = static_cast<u8>(octNormal.x * 255.0f);
 				vertex.octNormal[1] = static_cast<u8>(octNormal.y * 255.0f);
@@ -1370,9 +1371,6 @@ namespace Model
 				if (numRenderBatches > 0)
 				{
 					out.modelData.renderBatches.resize(renderBatchOffset + numRenderBatches);
-
-					u32 numAddedVertices = 0;
-					u32 numAddedTextures = 0;
 
 					for (u32 i = 0; i < numRenderBatches; i++)
 					{

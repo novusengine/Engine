@@ -217,6 +217,16 @@ namespace CoordinateSpaces
         return quat(euler);
     }
 
+    // Terrain Coordinate space (ADT)
+    // RIGHT HANDED
+    // X = North
+    // Y = West
+    // Z = UP
+    inline vec3 TerrainPosToNovus(const vec3& pos)
+    {
+        return vec3(-pos.y, pos.z, pos.x);
+    }
+
     // Model Coordinate space (M2 and WMO)
     // RIGHT HANDED
     // X = South
