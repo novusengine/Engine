@@ -1,4 +1,6 @@
 #pragma once
+#include "Definitions.h"
+
 #include "FileFormat/Novus/FileHeader.h"
 
 #include <Base/Types.h>
@@ -8,71 +10,163 @@
 #include <Base/Memory/FileWriter.h>
 
 #include <robinhood/robinhood.h>
+
+#include <string>
 #include <vector>
 
-class Bytebuffer;
-namespace DB::Client
+namespace ClientDB
 {
-	PRAGMA_NO_PADDING_START;
-	template <class T>
-	struct ClientDB
-	{
-	public:
-		static const u32 CURRENT_VERSION = 1;
+    static const std::string FILE_EXTENSION = ".cdb";
 
-		struct Flags
-		{
-			u32 unused : 32;
-		};
-
-        // Helper Functions
+    struct StorageRaw
+    {
     public:
-        bool ContainsIndex(u32 index)
-        {
-            return index < static_cast<u32>(_data.size());
-        }
-        const T& GetEntryByIndex(u32 index)
-        {
-            return _data[index];
-        }
-        bool ContainsEntryWithID(u32 entryID)
-        {
-            return _idToIndexMap.contains(entryID);
-        }
-        T& GetEntryByID(u32 ID)
-        {
-            return _data[_idToIndexMap[ID]];
-        }
-        T& NewEntry()
-        {
-            bool hasElements = _data.size() > 0;
+        static const u32 CURRENT_VERSION = 1;
 
-            u32 index = Count();
-            T& element = _data.emplace_back();
+        struct Flags
+        {
+            u32 unused : 32;
+        };
 
-            // Set ID, 0 if no elements exist, otherwise _maxID + 1
-            u32* id = reinterpret_cast<u32*>(&element);
-            *id = (_maxID + 1) * hasElements;
-            _maxID += 1 * hasElements;
-
-            _idToIndexMap[*id] = index;
-
-            return element;
+        StorageRaw(const std::string& name)
+        {
+            _name = name;
         }
 
-        void Clear()
+    public:
+        const std::string& GetName() { return _name; }
+        
+        u32 GetSizeOfElement()
         {
-            flags = { };
-
-            _data.clear();
-            _idToIndexMap.clear();
-
-            _stringTable.Clear();
+            return _sizeOfElement;
         }
-        u32 Count()
+        bool IsInitialized()
         {
-            u32 numEntries = static_cast<u32>(_data.size());
-            return numEntries;
+            return GetSizeOfElement() != std::numeric_limits<u32>().max();
+        }
+        bool Init(size_t sizeOfElement)
+        {
+            if (IsInitialized())
+                return false;
+
+            if (sizeOfElement == 0)
+                return false;
+
+            u32 elementSize = static_cast<u32>(sizeOfElement);
+            _sizeOfElement = elementSize;
+
+            u32 numBytes = static_cast<u32>(_data.size());
+            if (numBytes > 0)
+            {
+                u32 numElements = numBytes / elementSize;
+                f32 remainder = glm::mod(static_cast<f32>(numBytes), static_cast<f32>(numElements));
+
+                if (remainder != 0.0f)
+                    return false;
+
+                _idToIndexMap.clear();
+                for (u32 i = 0; i < numElements; i++)
+                {
+                    u32 id = *reinterpret_cast<u32*>(&_data[i * elementSize]);
+
+                    _idToIndexMap[id] = i;
+                    _maxID = glm::max(_maxID, id);
+                }
+            }
+
+            return true;
+        }
+
+        template <typename T>
+        T& GetByIndex(u32 index)
+        {
+            u32 sizeOfElement = GetSizeOfElement();
+            assert(sizeOfElement == sizeof(T));
+
+            u32 offset = index * sizeOfElement;
+            assert(offset < GetDataBytes());
+
+            return *reinterpret_cast<T*>(&_data[offset]);
+        }
+
+        template <typename T>
+        T& GetByID(u32 id)
+        {
+            assert(GetSizeOfElement() == sizeof(T));
+            assert(_idToIndexMap.contains(id));
+
+            u32 index = _idToIndexMap[id];
+
+            return GetByIndex<T>(index);
+        }
+
+        template <typename T>
+        bool Add(T& element)
+        {
+            u32 sizeOfElement = GetSizeOfElement();
+            assert(sizeOfElement == sizeof(T));
+
+            u32 newID = ++_maxID;
+            element.id = newID;
+
+            u32 sizeBeforeAdd = GetDataBytes();
+            _data.resize(sizeBeforeAdd + sizeOfElement);
+            memcpy(&_data[sizeBeforeAdd], &element, sizeOfElement);
+
+            u32 index = sizeBeforeAdd / sizeOfElement;
+            _idToIndexMap[newID] = index;
+
+            MarkDirty();
+            return true;
+        }
+
+        template <typename T>
+        void Replace(u32 id, T& element)
+        {
+            u32 sizeOfElement = GetSizeOfElement();
+            assert(sizeOfElement == sizeof(T));
+
+            element.id = id;
+
+            if (_idToIndexMap.contains(id))
+            {
+                u32 index = _idToIndexMap[id];
+                u32 offset = index * sizeOfElement;
+                assert(offset < GetDataBytes());
+
+                _data[offset] = element;
+            }
+            else
+            {
+                u32 sizeBeforeAdd = GetDataBytes();
+                _data.resize(sizeBeforeAdd + sizeOfElement);
+                memcpy(&_data[sizeBeforeAdd], element, sizeOfElement);
+
+                u32 index = GetDataBytes() / sizeOfElement;
+                _idToIndexMap[newID] = index;
+            }
+
+            MarkDirty();
+        }
+
+        template <typename T>
+        bool Remove(u32 id)
+        {
+            u32 sizeOfElement = GetSizeOfElement();
+            assert(sizeOfElement == sizeof(T));
+
+            if (!_idToIndexMap.contains(id))
+                return false;
+
+            u32 index = _idToIndexMap[id];
+            _idToIndexMap.erase(id);
+
+            u32 offset = index * sizeOfElement;
+            assert(offset < GetDataBytes());
+            *reinterpret_cast<u32*>(&_data[offset]) = std::numeric_limits<u32>().max();
+
+            MarkDirty();
+            return true;
         }
 
         bool HasString(u32 index)
@@ -85,18 +179,47 @@ namespace DB::Client
         }
         u32 AddString(const std::string& string)
         {
-            return _stringTable.AddString(string);
+            u32 numStrings = static_cast<u32>(_stringTable.GetNumStrings());
+
+            u32 stringIndex = _stringTable.AddString(string);
+            if (stringIndex == numStrings)
+                MarkDirty();
+
+            return stringIndex;
         }
 
-        // Save/Read/Write Helper Functions
-    public:
+        u32 Count()
+        {
+            u32 numEntries = static_cast<u32>(_idToIndexMap.size());
+            return numEntries;
+        }
+        u32 GetDataBytes() { return static_cast<u32>(_data.size()); }
+        bool Contains(u32 id)
+        {
+            return _idToIndexMap.contains(id);
+        }
+
+        bool IsDirty() { return _isDirty; }
+        void MarkDirty() { _isDirty = true; }
+        void ClearDirty() { _isDirty = false; }
+
+        void Clear()
+        {
+            flags = { };
+
+            _data.clear();
+            _idToIndexMap.clear();
+            _stringTable.Clear();
+        }
+
+    public: // Save/Read/Write Helper Functions
         size_t GetSerializedSize()
         {
             size_t result = 0;
 
             result += sizeof(FileHeader);
             result += sizeof(Flags);
-            result += sizeof(u32) + (_data.size() * sizeof(T));
+            result += sizeof(u32) + GetDataBytes();
             result += sizeof(u32) + _stringTable.GetNumBytes();
 
             return result;
@@ -113,6 +236,7 @@ namespace DB::Client
             if (!fileWriter.Write())
                 return false;
 
+            ClearDirty();
             return true;
         }
         bool Read(std::shared_ptr<Bytebuffer>& buffer)
@@ -128,26 +252,18 @@ namespace DB::Client
                 _data.clear();
                 _idToIndexMap.clear();
 
-                u32 numElements = 0;
-                if (!buffer->GetU32(numElements))
+                u32 numBytes = 0;
+                if (!buffer->GetU32(numBytes))
                     return false;
 
-                if (numElements)
+                if (numBytes)
                 {
-                    _data.resize(numElements);
+                    _data.resize(numBytes);
 
-                    constexpr size_t elementSize = sizeof(T);
-                    if (!buffer->GetBytes(reinterpret_cast<u8*>(&_data[0]), numElements * elementSize))
+                    if (!buffer->GetBytes(&_data[0], numBytes))
                         return false;
 
-                    for (u32 i = 0; i < numElements; i++)
-                    {
-                        u32 id = *reinterpret_cast<u32*>(&_data[i]);
-                        _idToIndexMap[id] = i;
-
-                        _minID = glm::min(_minID, id);
-                        _maxID = glm::max(_maxID, id);
-                    }
+                    _maxID = std::numeric_limits<u32>().max();
                 }
             }
 
@@ -163,22 +279,53 @@ namespace DB::Client
         }
         bool Write(std::shared_ptr<Bytebuffer>& buffer)
         {
+            u32 sizeOfElement = GetSizeOfElement();
+
+            // Require Init to have been called before writing
+            if (sizeOfElement == std::numeric_limits<u32>().max())
+                return false;
+
             if (!buffer->Put(header))
                 return false;
 
             if (!buffer->Put(flags))
                 return false;
 
-            // Read Elements
+            // Write Elements
             {
-                u32 numElements = static_cast<u32>(_data.size());
-                if (!buffer->PutU32(numElements))
+                u32 numBytes = Count() * sizeOfElement;
+                if (!buffer->PutU32(numBytes))
                     return false;
 
-                if (numElements)
+                if (numBytes)
                 {
-                    if (!buffer->PutBytes(reinterpret_cast<u8*>(&_data[0]), numElements * sizeof(T)))
-                        return false;
+                    struct IdIndexPair
+                    {
+                    public:
+                        u32 id;
+                        u32 index;
+                    };
+
+                    std::vector<IdIndexPair> pairs;
+                    pairs.reserve(Count());
+
+                    for (const auto& pair : _idToIndexMap)
+                    {
+                        IdIndexPair& idIndexPair = pairs.emplace_back();
+                        idIndexPair.id = pair.first;
+                        idIndexPair.index = pair.second;
+                    }
+
+                    std::sort(pairs.begin(), pairs.end(), [&](const IdIndexPair& a, const IdIndexPair& b) { return a.id < b.id; });
+
+                    for (const IdIndexPair& pair : pairs)
+                    {
+                        u32 offset = pair.index * sizeOfElement;
+                        assert(offset < GetDataBytes());
+
+                        if (!buffer->PutBytes(&_data[offset], sizeOfElement))
+                            return false;
+                    }
                 }
             }
 
@@ -188,17 +335,140 @@ namespace DB::Client
             return true;
         }
 
-	public:
-		FileHeader header = FileHeader(FileHeader::Type::ClientDB, CURRENT_VERSION);
-		Flags flags = { };
+    public:
+        FileHeader header = FileHeader(FileHeader::Type::ClientDB, CURRENT_VERSION);
+        Flags flags = { };
 
     private:
-        std::vector<T> _data = { };
-        robin_hood::unordered_map<u32, u32> _idToIndexMap = { };
+        template <class T>
+        friend struct Storage;
+
+        std::string _name;
+
+        u32 _sizeOfElement = std::numeric_limits<u32>().max();
+        std::vector<u8> _data;
+        robin_hood::unordered_map<u32, u32> _idToIndexMap;
         Novus::Container::StringTable _stringTable = { };
 
-        u32 _minID = 0;
         u32 _maxID = 0;
+        bool _isDirty = false;
+    };
+
+	template <class T>
+	struct Storage
+	{
+	public:
+        static_assert(std::is_base_of<Definitions::Base, T>::value, "ClientDB::Storage Type must derive from Base");
+
+        Storage(StorageRaw* storage)
+        {
+            _storage = storage;
+        }
+
+        // Helper Functions
+    public:
+        const std::string& GetName() { return _storage->GetName(); }
+
+        bool Contains(u32 id)
+        {
+            return _storage->Contains(id);
+        }
+
+        T& GetByIndex(u32 index)
+        {
+            return _storage->GetByIndex<T>(index);
+        }
+        T& GetByID(u32 id)
+        {
+            return _storage->GetByID<T>(id);
+        }
+
+        bool Add(T& element)
+        {
+            return _storage->Add<T>(element);
+        }
+        void Replace(u32 id, T& element)
+        {
+            _storage->Replace(id, element);
+        }
+        bool Remove(u32 id)
+        {
+            return _storage->Remove<T>(id);
+        }
+        void Clear()
+        {
+            _storage->Clear();
+        }
+
+        bool HasString(u32 index)
+        {
+            return _storage->HasString(index);
+        }
+        const std::string& GetString(u32 index)
+        {
+            return _storage->GetString(index);
+        }
+        u32 AddString(const std::string& string)
+        {
+            return _storage->AddString(string);
+        }
+
+        u32 Count() { return _storage->Count(); }
+        u32 Size() { return Count(); }
+
+        bool IsValid(const T& element) { return element.id != std::numeric_limits<u32>().max(); }
+
+        bool IsDirty() { return _storage->IsDirty(); }
+        void MarkDirty() { _storage->MarkDirty(); }
+        void ClearDirty() { _storage->ClearDirty(); }
+
+    public:
+        struct Iterator
+        {
+        public:
+            using iterator_category = std::forward_iterator_tag;
+            using difference_type = std::ptrdiff_t;
+            using value_type = T;
+            using pointer = T*;
+            using reference = T&;
+
+            Iterator(pointer ptr) : _ptr(ptr) {}
+
+        public:
+            reference operator*() const { return *_ptr; }
+            pointer operator->() { return _ptr; }
+
+            // Prefix increment
+            Iterator& operator++() { _ptr++; return *this; }
+
+            // Postfix increment
+            Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
+
+            friend bool operator== (const Iterator& a, const Iterator& b) { return a._ptr == b._ptr; };
+            friend bool operator!= (const Iterator& a, const Iterator& b) { return a._ptr != b._ptr; };
+
+        private:
+            pointer _ptr;
+        };
+
+        auto begin() { return Iterator(reinterpret_cast<T*>(_storage->_data.data())); }
+        auto end() { return Iterator(reinterpret_cast<T*>(_storage->_data.data() + _storage->_data.size())); }
+
+    public:
+        bool Save(std::string& path)
+        {
+            return _storage->Save(path);
+        }
+        bool Read(std::shared_ptr<Bytebuffer>& buffer)
+        {
+            return _storage->Read(buffer);
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer)
+        {
+            return _storage->Write(buffer);
+        }
+
+    private:
+        StorageRaw* _storage = nullptr;
 	};
-	PRAGMA_NO_PADDING_END;
 }
