@@ -132,40 +132,6 @@ namespace DB2::WDC3
 		bool IsRecordEncrypted(const DB2::WDC3::Layout& db2, u32 recordIndex);
 		u32 GetRecordIDFromIndex(const DB2::WDC3::Layout& db2, u32 recordIndex);
 
-		template <typename T>
-		void RepopulateFromCopyTable(const DB2::WDC3::Layout& db2, std::vector<T>& entries, robin_hood::unordered_map<u32, u32>& lookupTable)
-		{
-			u32 numSections = static_cast<u32>(db2.sections.size());
-
-			for (u32 i = 0; i < numSections; i++)
-			{
-				const DB2::WDC3::Layout::SectionHeader& sectionHeader = db2.sectionHeaders[i];
-				const DB2::WDC3::Layout::Section& section = db2.sections[i];
-
-				if (sectionHeader.copyTableCount == 0)
-					continue;
-
-				lookupTable.reserve(lookupTable.size() + sectionHeader.copyTableCount);
-				entries.reserve(entries.size() + sectionHeader.copyTableCount);
-
-				for (u32 j = 0; j < sectionHeader.copyTableCount; j++)
-				{
-					const DB2::WDC3::Layout::CopyTableEntry& copyTableEntry = section.copyTable[j];
-
-					if (!lookupTable.contains(copyTableEntry.oldRowID))
-						continue;
-
-					u32 rowToCopyIndex = lookupTable[copyTableEntry.oldRowID];
-					const T& rowToCopy = entries[rowToCopyIndex];
-
-					T& rowEntry = entries.emplace_back(rowToCopy);
-					rowEntry.id = copyTableEntry.newRowID;
-
-					lookupTable[rowEntry.id] = static_cast<u32>(entries.size()) - 1u;
-				}
-			}
-		}
-
 	private:
 		u32 RoundBitToNextByte(u32 bits);
 		bool GetBitValue(const u8* fieldData, u32 bitIndex);

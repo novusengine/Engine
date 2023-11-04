@@ -1,12 +1,22 @@
 #pragma once
 #include <Base/Types.h>
 
+namespace ClientDB
+{
+    struct StorageRaw;
+};
+
 namespace ClientDB::Definitions
 {
     struct Base
     {
     public:
-        u32 id;
+        u32 GetID() const { return _id; }
+
+    private:
+        friend struct ClientDB::StorageRaw;
+
+        u32 _id;
     };
 
     struct Map : public Base

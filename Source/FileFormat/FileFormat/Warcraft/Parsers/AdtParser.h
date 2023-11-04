@@ -6,8 +6,6 @@
 
 #include <robinhood/robinhood.h>
 
-using namespace ClientDB;
-
 class Bytebuffer;
 struct FileChunkHeader;
 
@@ -30,9 +28,9 @@ namespace Adt
 		{
 			i32 currentMCNKIndex = -1;
 
-			Storage<Definitions::LiquidObject>* liquidObjects = nullptr;
-			Storage<Definitions::LiquidType>* liquidTypes = nullptr;
-			Storage<Definitions::LiquidMaterial>* liquidMaterials = nullptr;
+			ClientDB::Storage<ClientDB::Definitions::LiquidObject>* liquidObjects = nullptr;
+			ClientDB::Storage<ClientDB::Definitions::LiquidType>* liquidTypes = nullptr;
+			ClientDB::Storage<ClientDB::Definitions::LiquidMaterial>* liquidMaterials = nullptr;
 		};
 
 		Parser() { }

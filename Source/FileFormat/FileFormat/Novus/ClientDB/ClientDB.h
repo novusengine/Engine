@@ -126,7 +126,7 @@ namespace ClientDB
             u32 sizeOfElement = GetSizeOfElement();
             assert(sizeOfElement == sizeof(T));
 
-            element.id = id;
+            element._id = id;
 
             if (_idToIndexMap.contains(id))
             {
@@ -134,19 +134,36 @@ namespace ClientDB
                 u32 offset = index * sizeOfElement;
                 assert(offset < GetDataBytes());
 
-                _data[offset] = element;
+                *reinterpret_cast<T*>(&_data[offset]) = element;
             }
             else
             {
                 u32 sizeBeforeAdd = GetDataBytes();
                 _data.resize(sizeBeforeAdd + sizeOfElement);
-                memcpy(&_data[sizeBeforeAdd], element, sizeOfElement);
+                memcpy(&_data[sizeBeforeAdd], &element, sizeOfElement);
 
-                u32 index = GetDataBytes() / sizeOfElement;
-                _idToIndexMap[newID] = index;
+                u32 index = sizeBeforeAdd / sizeOfElement;
+                _idToIndexMap[id] = index;
             }
 
             MarkDirty();
+        }
+        template <typename T>
+        bool Copy(u32 idToCopy, u32 idForCopy)
+        {
+            u32 sizeOfElement = GetSizeOfElement();
+            assert(sizeOfElement == sizeof(T));
+
+            if (!_idToIndexMap.contains(idToCopy))
+                return false;
+
+            u32 indexToCopy = _idToIndexMap[idToCopy];
+            T* elementToCopy = reinterpret_cast<T*>(&_data[indexToCopy * sizeOfElement]);
+
+            T copyElement = *elementToCopy;
+            Replace(idForCopy, copyElement);
+
+            return true;
         }
 
         template <typename T>
@@ -210,6 +227,15 @@ namespace ClientDB
             _data.clear();
             _idToIndexMap.clear();
             _stringTable.Clear();
+        }
+        void Reserve(size_t numElements, size_t numStringsPerElement = 0)
+        {
+            u32 sizeOfElement = GetSizeOfElement();
+
+            _data.reserve(numElements * sizeOfElement);
+            _idToIndexMap.reserve(numElements);
+
+            _stringTable.Reserve(numElements * numStringsPerElement);
         }
 
     public: // Save/Read/Write Helper Functions
@@ -389,7 +415,11 @@ namespace ClientDB
         }
         void Replace(u32 id, T& element)
         {
-            _storage->Replace(id, element);
+            _storage->Replace<T>(id, element);
+        }
+        bool Copy(u32 idToCopy, u32 idForCopy)
+        {
+            return _storage->Copy<T>(idToCopy, idForCopy);
         }
         bool Remove(u32 id)
         {
@@ -398,6 +428,10 @@ namespace ClientDB
         void Clear()
         {
             _storage->Clear();
+        }
+        void Reserve(u32 numElements, u32 numStringsPerElement = 0)
+        {
+            _storage->Reserve(numElements, numStringsPerElement);
         }
 
         bool HasString(u32 index)
@@ -455,6 +489,10 @@ namespace ClientDB
         auto end() { return Iterator(reinterpret_cast<T*>(_storage->_data.data() + _storage->_data.size())); }
 
     public:
+        size_t GetSerializedSize()
+        {
+            return _storage->GetSerializedSize();
+        }
         bool Save(std::string& path)
         {
             return _storage->Save(path);
