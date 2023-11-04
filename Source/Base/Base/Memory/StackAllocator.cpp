@@ -112,7 +112,7 @@ namespace Memory
 
             if (_offset + padding + size > _totalSize)
             {
-                DebugHandler::PrintFatal("We overflowed our allocator");
+                DebugHandler::PrintFatal("We overflowed our allocator ({0})", _name);
 
                 return 0;
             }

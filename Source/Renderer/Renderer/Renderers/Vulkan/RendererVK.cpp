@@ -32,7 +32,7 @@ namespace Renderer
     RendererVK::RendererVK(Window* window)
         : _device(new Backend::RenderDeviceVK(window))
     {
-        _frameAllocator.Init(1024 * 1024, "Renderer Allocator");
+        _frameAllocator.Init(4 * 1024 * 1024, "Renderer Allocator");
 
         // Create handlers
         _bufferHandler = new Backend::BufferHandlerVK();
@@ -1756,5 +1756,10 @@ namespace Renderer
     u32 RendererVK::GetNumBuffers()
     {
         return _bufferHandler->GetNumBuffers();
+    }
+
+    bool RendererVK::HasExtendedTextureSupport()
+    {
+        return _device->HasExtendedTextureSupport();
     }
 }

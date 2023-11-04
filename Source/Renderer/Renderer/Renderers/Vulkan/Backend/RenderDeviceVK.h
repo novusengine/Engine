@@ -115,6 +115,8 @@ namespace Renderer
             ImguiContext* GetImguiContext() { return _imguiContext; }
 
             static PFN_vkCmdDrawIndexedIndirectCountKHR fnVkCmdDrawIndexedIndirectCountKHR;
+
+            bool HasExtendedTextureSupport() { return _hasExtendedTextureSupport; }
         private:
             Window* _window;
             uvec2 _mainWindowSize;
@@ -139,6 +141,8 @@ namespace Renderer
 
             bool _graphicsQueueSupportsTimestamps = false;
             f32 _timestampNanosecondsPerIncrement = 0.0f;
+            
+            bool _hasExtendedTextureSupport = false;
 
             std::vector<SwapChainVK*> _swapChains;
 
