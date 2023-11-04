@@ -107,7 +107,7 @@ namespace ClientDB
             assert(sizeOfElement == sizeof(T));
 
             u32 newID = ++_maxID;
-            element.id = newID;
+            element._id = newID;
 
             u32 sizeBeforeAdd = GetDataBytes();
             _data.resize(sizeBeforeAdd + sizeOfElement);
@@ -450,7 +450,7 @@ namespace ClientDB
         u32 Count() { return _storage->Count(); }
         u32 Size() { return Count(); }
 
-        bool IsValid(const T& element) { return element.id != std::numeric_limits<u32>().max(); }
+        bool IsValid(const T& element) { return element.GetID() != std::numeric_limits<u32>().max(); }
 
         bool IsDirty() { return _storage->IsDirty(); }
         void MarkDirty() { _storage->MarkDirty(); }
