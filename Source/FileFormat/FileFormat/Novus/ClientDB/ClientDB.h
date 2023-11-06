@@ -237,6 +237,11 @@ namespace ClientDB
 
             _stringTable.Reserve(numElements * numStringsPerElement);
         }
+        u32 GetMaxID() { return _maxID; }
+        void SetMaxID(u32 maxID)
+        {
+            _maxID = maxID;
+        }
 
     public: // Save/Read/Write Helper Functions
         size_t GetSerializedSize()
