@@ -257,7 +257,7 @@ namespace ClientDB
 
             return result;
         }
-        bool Save(std::string& path)
+        bool Save(const std::string& path)
         {
             size_t size = GetSerializedSize();
             std::shared_ptr<Bytebuffer> resultBuffer = Bytebuffer::BorrowRuntime(size);
