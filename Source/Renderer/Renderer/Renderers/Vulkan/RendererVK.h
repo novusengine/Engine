@@ -193,6 +193,8 @@ namespace Renderer
         void* GetImguiImageHandle(TextureID textureID) override;
         void* GetImguiImageHandle(ImageID imageID) override;
 
+        bool HasExtendedTextureSupport() override;
+
     private:
         [[nodiscard]] bool ReflectDescriptorSet(const std::string& name, u32 nameHash, u32 type, i32& set, const std::vector<Backend::BindInfo>& bindInfos, u32& outBindInfoIndex, VkDescriptorSetLayoutBinding* outDescriptorLayoutBinding);
         void BindDescriptor(Backend::DescriptorSetBuilderVK& builder, Descriptor& descriptor);

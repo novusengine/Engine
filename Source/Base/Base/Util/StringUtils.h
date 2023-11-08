@@ -30,12 +30,14 @@ namespace StringUtils
     inline i32 FormatString(char* buffer, size_t bufferSize, char const* format, Args... args)
     {
         i32 length = -1;
+
     #ifdef _WIN32
         length = sprintf_s(buffer, bufferSize, format, args...);
     #else
         (void)bufferSize; // Get rid of warning
         length = sprintf(buffer, format, args...);
     #endif
+
         assert(length > -1);
         return length;
     }
@@ -53,7 +55,7 @@ namespace StringUtils
 
         for (size_t i = 0; i < size; i++)
         {
-            int c = str[i];
+            i32 c = str[i];
             hash = ((hash << 5) + hash) ^ c;
         }
 
@@ -63,7 +65,8 @@ namespace StringUtils
     constexpr size_t const_strlen(const char* s)
     {
         size_t size = 0;
-        while (s[size]) 
+
+        while (s[size])
         { 
             size++; 
         };
@@ -73,11 +76,10 @@ namespace StringUtils
 
     struct StringHash
     {
-        u32 computedHash;
-
+    public:
         constexpr StringHash(u32 hash) noexcept : computedHash(hash) {}
 
-        constexpr StringHash(const char* s) noexcept: computedHash(0)
+        constexpr StringHash(const char* s) noexcept : computedHash(0)
         {
             computedHash = fnv1a_32(s, const_strlen(s));
         }
@@ -91,15 +93,18 @@ namespace StringUtils
         }
         StringHash(const StringHash& other) = default;
 
-        constexpr operator u32()noexcept { return computedHash; }
+        constexpr operator u32() noexcept { return computedHash; }
+
+    public:
+        u32 computedHash;
     };
 } // namespace StringUtils
 
 constexpr StringUtils::StringHash operator"" _h(char const* s, std::size_t count)
 {
-    return StringUtils::StringHash{ s,count };
+    return StringUtils::StringHash { s, count };
 }
-constexpr unsigned int operator"" _djb2(char const* s, std::size_t count)
+constexpr u32 operator"" _djb2(char const* s, std::size_t count)
 {
-    return static_cast<unsigned int>(StringUtils::hash_djb2(s, static_cast<int>(count)));
+    return static_cast<u32>(StringUtils::hash_djb2(s, static_cast<i32>(count)));
 }

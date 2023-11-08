@@ -6,13 +6,16 @@
 [![Build Status](https://github.com/skypjack/entt/workflows/build/badge.svg)](https://github.com/skypjack/entt/actions)
 [![Coverage](https://codecov.io/gh/skypjack/entt/branch/master/graph/badge.svg)](https://codecov.io/gh/skypjack/entt)
 [![Try online](https://img.shields.io/badge/try-online-brightgreen)](https://godbolt.org/z/zxW73f)
-[![Documentation](https://img.shields.io/badge/docs-docsforge-blue)](http://entt.docsforge.com/)
+[![Vcpkg port](https://img.shields.io/vcpkg/v/entt)](https://vcpkg.link/ports/entt)
+[![Documentation](https://img.shields.io/badge/docs-doxygen-blue)](https://skypjack.github.io/entt/)
 [![Gitter chat](https://badges.gitter.im/skypjack/entt.png)](https://gitter.im/skypjack/entt)
 [![Discord channel](https://img.shields.io/discord/707607951396962417?logo=discord)](https://discord.gg/5BjPWBd)
 [![Donate](https://img.shields.io/badge/donate-paypal-blue.svg)](https://www.paypal.me/skypjack)
 
 > `EnTT` has been a dream so far, we haven't found a single bug to date and it's
 > super easy to work with
+>
+> -- Every EnTT User Ever
 
 `EnTT` is a header-only, tiny and easy to use library for game programming and
 much more written in **modern C++**.<br/>
@@ -78,14 +81,16 @@ codebase has grown as more and more classes and functionalities were added.<br/>
 Here is a brief, yet incomplete list of what it offers today:
 
 * Built-in **RTTI system** mostly similar to the standard one.
-* A `constexpr` utility for human readable **resource names**.
+* A `constexpr` utility for human-readable **resource names**.
 * Minimal **configuration system** built using the monostate pattern.
 * Incredibly fast **entity-component system** with its own _pay for what you
-  use_ policy.
+  use_ policy, unconstrained component types with optional pointer stability and
+  hooks for storage customization.
 * Views and groups to iterate entities and components and allow different access
   patterns, from **perfect SoA** to fully random.
 * A lot of **facilities** built on top of the entity-component system to help
   the users and avoid reinventing the wheel.
+* General purpose **execution graph builder** for optimal scheduling.
 * The smallest and most basic implementation of a **service locator** ever seen.
 * A built-in, non-intrusive and macro-free runtime **reflection system**.
 * **Static polymorphism** made simple and within everyone's reach.
@@ -97,7 +102,7 @@ Here is a brief, yet incomplete list of what it offers today:
 * And **much more**! Check out the
   [**wiki**](https://github.com/skypjack/entt/wiki).
 
-Consider these lists a work in progress as well as the project. The whole API is
+Consider this list a work in progress as well as the project. The whole API is
 fully documented in-code for those who are brave enough to read it.<br/>
 Please, do note that all tools are also DLL-friendly now and run smoothly across
 boundaries.
@@ -339,8 +344,8 @@ The documentation is based on [doxygen](http://www.doxygen.nl/). To build it:
     $ cmake .. -DENTT_BUILD_DOCS=ON
     $ make
 
-The API reference will be created in HTML format within the directory
-`build/docs/html`. To navigate it with your favorite browser:
+The API reference is created in HTML format in the `build/docs/html` directory.
+To navigate it with your favorite browser:
 
     $ cd build
     $ your_favorite_browser docs/html/index.html
@@ -349,10 +354,7 @@ The API reference will be created in HTML format within the directory
 @cond TURN_OFF_DOXYGEN
 -->
 The same version is also available [online](https://skypjack.github.io/entt/)
-for the latest release, that is the last stable tag. If you are looking for
-something more pleasing to the eye, consider reading the nice-looking version
-available on [docsforge](https://entt.docsforge.com/): same documentation, much
-more pleasant to read.<br/>
+for the latest release, that is the last stable tag.<br/>
 Moreover, there exists a [wiki](https://github.com/skypjack/entt/wiki) dedicated
 to the project where users can find all related documentation pages.
 <!--
@@ -362,9 +364,8 @@ to the project where users can find all related documentation pages.
 # Tests
 
 To compile and run the tests, `EnTT` requires *googletest*.<br/>
-`cmake` will download and compile the library before compiling anything else.
-In order to build the tests, set the `CMake` option `ENTT_BUILD_TESTING` to
-`ON`.
+`cmake` downloads and compiles the library before compiling anything else. In
+order to build the tests, set the `CMake` option `ENTT_BUILD_TESTING` to `ON`.
 
 To build the most basic set of tests:
 
@@ -416,7 +417,7 @@ know who has participated so far.
 
 # License
 
-Code and documentation Copyright (c) 2017-2022 Michele Caini.<br/>
+Code and documentation Copyright (c) 2017-2023 Michele Caini.<br/>
 Colorful logo Copyright (c) 2018-2021 Richard Caseres.
 
 Code released under

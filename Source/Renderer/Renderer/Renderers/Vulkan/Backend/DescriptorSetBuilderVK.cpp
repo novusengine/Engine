@@ -1,8 +1,9 @@
 #include "DescriptorSetBuilderVK.h"
-#include "PipelineHandlerVK.h"
-#include "ShaderHandlerVK.h"
 #include "BufferHandlerVK.h"
+#include "PipelineHandlerVK.h"
 #include "RenderDeviceVK.h"
+#include "ShaderHandlerVK.h"
+#include "Renderer/RenderSettings.h"
 #include "Renderer/TrackedBufferBitSets.h"
 
 #include <Base/Util/StringUtils.h>
@@ -584,7 +585,7 @@ namespace Renderer
 
             void* next = nullptr;
             u32 counts[1];
-            counts[0] = 4096;
+            counts[0] = Settings::MAX_TEXTURES;
 
             VkDescriptorSetVariableDescriptorCountAllocateInfo setCounts = {};
             setCounts.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;

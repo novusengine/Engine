@@ -3,8 +3,6 @@
 #include <Base/Util/StringUtils.h>
 
 #include <GLFW/glfw3.h>
-#include <imgui/imgui.h>
-#include <imgui/imguizmo/ImGuizmo.h>
 
 InputManager::InputManager()
 {
@@ -23,10 +21,10 @@ InputManager::InputManager()
     _mouseScrollConsumeInfo.keybindName = consumerInfoNameDefault;
     _mouseScrollConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
 
-    _keyboarInputConsumeInfo.keybindGroupName = consumerInfoNameDefault;
-    _keyboarInputConsumeInfo.keybindGroupNameHash = consumerInfoNameHashDefault;
-    _keyboarInputConsumeInfo.keybindName = consumerInfoNameDefault;
-    _keyboarInputConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
+    _keyboardInputConsumeInfo.keybindGroupName = consumerInfoNameDefault;
+    _keyboardInputConsumeInfo.keybindGroupNameHash = consumerInfoNameHashDefault;
+    _keyboardInputConsumeInfo.keybindName = consumerInfoNameDefault;
+    _keyboardInputConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
 
     _unicodeInputConsumeInfo.keybindGroupName = consumerInfoNameDefault;
     _unicodeInputConsumeInfo.keybindGroupNameHash = consumerInfoNameHashDefault;
@@ -66,24 +64,8 @@ const std::vector<KeybindGroup*>& InputManager::GetKeybindGroups()
 
 void InputManager::KeyboardInputHandler(i32 key, i32 /*scanCode*/, i32 actionMask, i32 modifierMask)
 {
-    auto& io = ImGui::GetIO();
-    bool wasConsumed = io.WantCaptureKeyboard;
-    if (wasConsumed)
-    {
-        if (_keyboarInputConsumeInfo.keybindGroupNameHash != consumerInfoNameHashImGui)
-        {
-            _keyboarInputConsumeInfo.keybindGroupName = consumerInfoNameImGui;
-            _keyboarInputConsumeInfo.keybindGroupNameHash = consumerInfoNameHashImGui;
-
-            _keyboarInputConsumeInfo.keybindName = consumerInfoNameDefault;
-            _keyboarInputConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
-        }
-
-        if (actionMask == GLFW_PRESS)
-            return;
-    }
-
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
+    bool wasConsumed = false;
 
     for (u32 i = 0; i < numKeybinds; i++)
     {
@@ -92,35 +74,20 @@ void InputManager::KeyboardInputHandler(i32 key, i32 /*scanCode*/, i32 actionMas
             continue;
 
         bool previousWasAbsorbed = wasConsumed;
-        wasConsumed |= keybindGroup->KeyboardInputCallback(key, actionMask, modifierMask, wasConsumed, _keyboarInputConsumeInfo);
+        wasConsumed |= keybindGroup->KeyboardInputCallback(key, actionMask, modifierMask, wasConsumed, _keyboardInputConsumeInfo);
 
         if (!previousWasAbsorbed && wasConsumed)
         {
-            if (_keyboarInputConsumeInfo.keybindGroupNameHash != keybindGroup->GetDebugNameHash())
+            if (_keyboardInputConsumeInfo.keybindGroupNameHash != keybindGroup->GetDebugNameHash())
             {
-                _keyboarInputConsumeInfo.keybindGroupName = &keybindGroup->GetDebugName();
-                _keyboarInputConsumeInfo.keybindGroupNameHash = keybindGroup->GetDebugNameHash();
+                _keyboardInputConsumeInfo.keybindGroupName = &keybindGroup->GetDebugName();
+                _keyboardInputConsumeInfo.keybindGroupNameHash = keybindGroup->GetDebugNameHash();
             }
         }
     }
 }
 void InputManager::CharInputHandler(u32 unicode)
 {
-    auto& io = ImGui::GetIO();
-    if (io.WantCaptureKeyboard)
-    {
-        if (_unicodeInputConsumeInfo.keybindGroupNameHash != consumerInfoNameHashImGui)
-        {
-            _unicodeInputConsumeInfo.keybindGroupName = consumerInfoNameImGui;
-            _unicodeInputConsumeInfo.keybindGroupNameHash = consumerInfoNameHashImGui;
-
-            _unicodeInputConsumeInfo.keybindName = consumerInfoNameDefault;
-            _unicodeInputConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
-        }
-
-        return;
-    }
-
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
     for (u32 i = 0; i < numKeybinds; i++)
     {
@@ -140,26 +107,10 @@ void InputManager::CharInputHandler(u32 unicode)
 }
 void InputManager::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMask)
 {
-    auto& io = ImGui::GetIO();
-    bool wasConsumed = io.WantCaptureMouse || ImGuizmo::IsOver();
-
-    if (wasConsumed)
-    {
-        if (_mouseInputConsumeInfo.keybindGroupNameHash != consumerInfoNameHashImGui)
-        {
-            _mouseInputConsumeInfo.keybindGroupName = consumerInfoNameImGui;
-            _mouseInputConsumeInfo.keybindGroupNameHash = consumerInfoNameHashImGui;
-
-            _mouseInputConsumeInfo.keybindName = consumerInfoNameDefault;
-            _mouseInputConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
-        }
-
-        if (actionMask == GLFW_PRESS)
-            return;
-    }
-    
     _mouseState = actionMask == GLFW_RELEASE ? 0 : 1;
+
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
+    bool wasConsumed = false;
 
     for (u32 i = 0; i < numKeybinds; i++)
     {
@@ -184,20 +135,6 @@ void InputManager::MousePositionHandler(f32 x, f32 y)
 {
     _mousePositionX = x;
     _mousePositionY = y;
-
-    auto& io = ImGui::GetIO();
-    if (io.WantCaptureMouse)
-    {
-        if (_mousePositionConsumeInfo.keybindGroupNameHash != consumerInfoNameHashImGui)
-        {
-            _mousePositionConsumeInfo.keybindGroupName = consumerInfoNameImGui;
-            _mousePositionConsumeInfo.keybindGroupNameHash = consumerInfoNameHashImGui;
-
-            _mousePositionConsumeInfo.keybindName = consumerInfoNameDefault;
-            _mousePositionConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
-        }
-        return;
-    }
 
     bool wasConsumed = false;
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
@@ -227,22 +164,8 @@ void InputManager::MousePositionHandler(f32 x, f32 y)
 }
 void InputManager::MouseScrollHandler(f32 x, f32 y)
 {
-    auto& io = ImGui::GetIO();
-    if (io.WantCaptureMouse)
-    {
-        if (_mouseScrollConsumeInfo.keybindGroupNameHash != consumerInfoNameHashImGui)
-        {
-            _mouseScrollConsumeInfo.keybindGroupName = consumerInfoNameImGui;
-            _mouseScrollConsumeInfo.keybindGroupNameHash = consumerInfoNameHashImGui;
-
-            _mouseScrollConsumeInfo.keybindName = consumerInfoNameDefault;
-            _mouseScrollConsumeInfo.keybindNameHash = consumerInfoNameHashDefault;
-        }
-        return;
-    }
-
-    bool wasConsumed = false;
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
+    bool wasConsumed = false;
 
     for (u32 i = 0; i < numKeybinds; i++)
     {

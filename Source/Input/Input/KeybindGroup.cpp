@@ -1,6 +1,7 @@
 #include "KeybindGroup.h"
 #include "InputManager.h"
 
+#include <Base/Util/DebugHandler.h>
 #include <Base/Util/StringUtils.h>
 
 #include <GLFW/glfw3.h>
@@ -87,20 +88,22 @@ bool KeybindGroup::AddKeyboardCallback(const std::string& keybindName, i32 glfwK
     return true;
 }
 
-void KeybindGroup::AddAnyKeyboardCallback(const std::string& keybindName, std::function<KeyboardInputCallbackFunc> callback)
+void KeybindGroup::AddKeyboardInputValidator(const std::string& keybindName, std::function<KeyboardInputCallbackFunc> callback)
 {
-    if (_anyKeyboardInputKeybind)
-        delete _anyKeyboardInputKeybind;
-
-    _anyKeyboardInputKeybind = new Keybind();
+    if (_keyboardInputValidator)
     {
-        _anyKeyboardInputKeybind->keybindName = keybindName;
-        _anyKeyboardInputKeybind->keybindNameHash = StringUtils::fnv1a_32(keybindName.c_str(), keybindName.length());
-        _anyKeyboardInputKeybind->glfwKey = 0;
-        _anyKeyboardInputKeybind->actionMask = KeybindAction::Press;
-        _anyKeyboardInputKeybind->modifierMask = KeybindModifier::KeybindNone;
-        _anyKeyboardInputKeybind->isPressed = false;
-        _anyKeyboardInputKeybind->callback = callback;
+        DebugHandler::PrintFatal("KeybindGroup : Attempted to install KeyboardInputValidator \"{0}\" for KeybindGroup \"{1}\" but KeyboardInputValidator\"{2}\" is already installed", keybindName, _debugName, _keyboardInputValidator->keybindName);
+    }
+
+    _keyboardInputValidator = new Keybind();
+    {
+        _keyboardInputValidator->keybindName = keybindName;
+        _keyboardInputValidator->keybindNameHash = StringUtils::fnv1a_32(keybindName.c_str(), keybindName.length());
+        _keyboardInputValidator->glfwKey = 0;
+        _keyboardInputValidator->actionMask = KeybindAction::Press;
+        _keyboardInputValidator->modifierMask = KeybindModifier::KeybindNone;
+        _keyboardInputValidator->isPressed = false;
+        _keyboardInputValidator->callback = callback;
     }
 }
 
@@ -128,6 +131,42 @@ void KeybindGroup::AddMouseScrollCallback(std::function<MouseScrollUpdateFunc> c
 {
     _mouseScrollUpdateCallback = callback;
 }
+void KeybindGroup::AddMouseInputValidator(const std::string& keybindName, std::function<KeyboardInputCallbackFunc> callback)
+{
+    if (_mouseInputValidator)
+    {
+        DebugHandler::PrintFatal("KeybindGroup : Attempted to install MouseInputValidator \"{0}\" for KeybindGroup \"{1}\" but MouseInputValidator\"{2}\" is already installed", keybindName, _debugName, _mouseInputValidator->keybindName);
+    }
+
+    _mouseInputValidator = new Keybind();
+    {
+        _mouseInputValidator->keybindName = keybindName;
+        _mouseInputValidator->keybindNameHash = StringUtils::fnv1a_32(keybindName.c_str(), keybindName.length());
+        _mouseInputValidator->glfwKey = 0;
+        _mouseInputValidator->actionMask = KeybindAction::Press;
+        _mouseInputValidator->modifierMask = KeybindModifier::None;
+        _mouseInputValidator->isPressed = false;
+        _mouseInputValidator->callback = callback;
+    }
+}
+void KeybindGroup::AddMousePositionValidator(std::function<MousePositionUpdateFunc> callback)
+{
+    if (_mousePositionValidator && callback != nullptr)
+    {
+        DebugHandler::PrintFatal("KeybindGroup : Attempted to install a MousePositionValidator for KeybindGroup \"{0}\" but a MousePositionValidator is already installed", _debugName);
+    }
+
+    _mousePositionValidator = callback;
+}
+void KeybindGroup::AddMouseScrollValidator(std::function<MouseScrollUpdateFunc> callback)
+{
+    if (_mouseScrollValidator && callback != nullptr)
+    {
+        DebugHandler::PrintFatal("KeybindGroup : Attempted to install a MouseScrollValidator for KeybindGroup \"{0}\" but a MouseScrollValidator is already installed", _debugName);
+    }
+
+    _mouseScrollValidator = callback;
+}
 
 bool KeybindGroup::IsKeybindPressed(u32 keybindHash)
 {
@@ -148,22 +187,72 @@ bool KeybindGroup::IsKeybindPressed(u32 keybindHash)
 
 bool KeybindGroup::MousePositionUpdate(f32 x, f32 y, bool wasConsumed, InputConsumedInfo& inputConsumedInfo)
 {
-    if (_mousePositionUpdateCallback && !wasConsumed)
-        return _mousePositionUpdateCallback(x, y);
+    bool positionValidatorResult = false;
+    if (_mousePositionValidator && !wasConsumed)
+    {
+        positionValidatorResult = _mousePositionValidator(x, y);
 
-    return false;
+        if (!positionValidatorResult)
+            return false;
+    }
+
+    if (_mousePositionUpdateCallback && !wasConsumed)
+    {
+        if (_mousePositionUpdateCallback(x, y))
+        {
+            return true;
+        }
+    }
+
+    return positionValidatorResult;
 }
 
 bool KeybindGroup::MouseScrollUpdate(f32 x, f32 y, bool wasConsumed, InputConsumedInfo& inputConsumedInfo)
 {
-    if (_mouseScrollUpdateCallback && !wasConsumed)
-        return _mouseScrollUpdateCallback(x, y);
+    bool scrollValidatorResult = false;
+    if (_mouseScrollValidator && !wasConsumed)
+    {
+        scrollValidatorResult = _mouseScrollValidator(x, y);
 
-    return false;
+        if (!scrollValidatorResult)
+            return false;
+    }
+
+    if (_mouseScrollUpdateCallback && !wasConsumed)
+    {
+        if (_mouseScrollUpdateCallback(x, y))
+            return true;
+    }
+
+    return scrollValidatorResult;
 }
 
 bool KeybindGroup::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMask, bool wasConsumed, InputConsumedInfo& inputConsumedInfo)
 {
+    bool inputValidatorResult = false;
+
+    if (_mouseInputValidator && !wasConsumed)
+    {
+        Keybind* keybind = _mouseInputValidator;
+
+        modifierMask &= GLFW_MOD_SHIFT | GLFW_MOD_CONTROL | GLFW_MOD_ALT;
+        KeybindModifier modifiers = static_cast<KeybindModifier>(modifierMask << 1);
+
+        if (actionMask == GLFW_RELEASE)
+        {
+            inputValidatorResult = keybind->callback(button, KeybindAction::Release, modifiers);
+        }
+        else
+        {
+            inputValidatorResult = keybind->callback(button, KeybindAction::Press, modifiers);
+        }
+
+        if (!inputValidatorResult)
+        {
+            return false;
+        }
+    }
+
     u32 numKeybinds = static_cast<u32>(_keybinds.size());
     for (u32 i = 0; i < numKeybinds; i++)
     {
@@ -227,45 +316,33 @@ bool KeybindGroup::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMas
         }
     }
 
-    return false;
+    return inputValidatorResult;
 }
 
 bool KeybindGroup::KeyboardInputCallback(i32 glfwKey, i32 actionMask, i32 modifierMask, bool wasConsumed, InputConsumedInfo& inputConsumedInfo)
 {
-    if (_anyKeyboardInputKeybind)
+    bool inputValidatorResult = false;
+
+    if (_keyboardInputValidator && !wasConsumed)
     {
-        Keybind* keybind = _anyKeyboardInputKeybind;
+        Keybind* keybind = _keyboardInputValidator;
+
         modifierMask &= GLFW_MOD_SHIFT | GLFW_MOD_CONTROL | GLFW_MOD_ALT;
         KeybindModifier modifiers = static_cast<KeybindModifier>(modifierMask << 1);
 
         if (actionMask == GLFW_RELEASE)
         {
-            if (keybind->callback(glfwKey, KeybindAction::Release, modifiers))
-            {
-                if (inputConsumedInfo.keybindNameHash != consumerInfoNameHashAnyKeyboardInput)
-                {
-                    inputConsumedInfo.keybindName = consumerInfoNameAnyKeyboardInput;
-                    inputConsumedInfo.keybindNameHash = consumerInfoNameHashAnyKeyboardInput;
-                }
-
-                return true;
-            }
+            inputValidatorResult = keybind->callback(glfwKey, KeybindAction::Release, modifiers);
         }
         else
         {
-            if (keybind->callback(glfwKey, KeybindAction::Press, modifiers))
-            {
-                if (inputConsumedInfo.keybindNameHash != consumerInfoNameHashAnyKeyboardInput)
-                {
-                    inputConsumedInfo.keybindName = consumerInfoNameAnyKeyboardInput;
-                    inputConsumedInfo.keybindNameHash = consumerInfoNameHashAnyKeyboardInput;
-                }
-
-                return true;
-            }
+            inputValidatorResult = keybind->callback(glfwKey, KeybindAction::Press, modifiers);
         }
 
-        return false;
+        if (!inputValidatorResult)
+        {
+            return false;
+        }
     }
 
     u32 numKeybinds = static_cast<u32>(_keybinds.size());
@@ -331,7 +408,7 @@ bool KeybindGroup::KeyboardInputCallback(i32 glfwKey, i32 actionMask, i32 modifi
         }
     }
 
-    return false;
+    return inputValidatorResult;
 }
 
 bool KeybindGroup::CharInputCallback(u32 unicode, InputConsumedInfo& inputConsumedInfo)

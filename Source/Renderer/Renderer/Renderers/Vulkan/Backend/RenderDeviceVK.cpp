@@ -1,13 +1,18 @@
 #include "RenderDeviceVK.h"
-#include "vk_format_utils.h"
+
 #include "DebugMarkerUtilVK.h"
-#include "SwapChainVK.h"
+#include "DescriptorSetBuilderVK.h"
 #include "ImageHandlerVK.h"
 #include "SemaphoreHandlerVK.h"
-#include "DescriptorSetBuilderVK.h"
-#include "Renderer/Window.h"
+#include "SwapChainVK.h"
+#include "vk_format_utils.h"
 #include "Renderer/Descriptors/VertexShaderDesc.h"
 #include "Renderer/Descriptors/PixelShaderDesc.h"
+#include "Renderer/RenderSettings.h"
+#include "Renderer/Window.h"
+
+#include <Base/Util/DebugHandler.h>
+#include <Base/Math/Math.h>
 
 #pragma warning (push)
 #pragma warning(disable : 4005)
@@ -21,9 +26,6 @@
 #include <GLFW/glfw3native.h>
 #pragma warning(pop)
 
-#include <Base/Util/DebugHandler.h>
-#include <Base/Math/Math.h>
-
 #include <vulkan/vulkan.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <tracy/TracyVulkan.hpp>
@@ -32,11 +34,12 @@
 #include <set>
 #include <vector>
 
-
 #define ENABLE_VALIDATION_IN_DEBUG 0
 
 namespace Renderer
 {
+    u32 Settings::MAX_TEXTURES = Settings::MAX_TEXTURES_NORMAL;
+
     namespace Backend
     {
         bool RenderDeviceVK::_initialized = false;
@@ -408,6 +411,9 @@ namespace Renderer
 
                 _gpuName = deviceProperties.deviceName;
                 _timestampNanosecondsPerIncrement = deviceProperties.limits.timestampPeriod;
+
+                _hasExtendedTextureSupport = deviceProperties.limits.maxPerStageDescriptorSampledImages > Renderer::Settings::MAX_TEXTURES_NORMAL;
+                Renderer::Settings::MAX_TEXTURES = _hasExtendedTextureSupport ? Renderer::Settings::MAX_TEXTURES_EXTENDED : Renderer::Settings::MAX_TEXTURES_NORMAL;
             }
             else
             {
@@ -732,6 +738,12 @@ namespace Renderer
 
             // Maximum possible size of textures affects graphics quality
             score += deviceProperties.limits.maxImageDimension2D;
+
+            if (deviceProperties.limits.maxPerStageDescriptorSampledImages < Renderer::Settings::MAX_TEXTURES_NORMAL)
+            {
+                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support enough sampled images", deviceProperties.deviceName, 0);
+                return 0;
+            }
 
             if (!deviceFeatures.samplerAnisotropy)
             {

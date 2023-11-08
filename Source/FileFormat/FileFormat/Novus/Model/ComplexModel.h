@@ -19,6 +19,8 @@ namespace M2
 namespace Model
 {
 PRAGMA_NO_PADDING_START;
+	static const std::string FILE_EXTENSION = ".complexmodel";
+
 	struct MapObject;
 	struct ComplexModel
 	{

@@ -286,10 +286,12 @@ namespace Map
 				i8 normalY = cellInfo.mcnr.normals[j].normal[1];
 				i8 normalZ = cellInfo.mcnr.normals[j].normal[2];
 
+				ivec3 normal = CoordinateSpaces::TerrainPosToNovus(vec3(normalX, normalY, normalZ));
+
 				// Make sure to convert to u8 [0 .. 256]
-				cell.vertexData[j].normal[0] = normalX + 127;
-				cell.vertexData[j].normal[1] = normalY + 127;
-				cell.vertexData[j].normal[2] = normalZ + 127;
+				cell.vertexData[j].normal[0] = static_cast<u8>(normal.x) + 127;
+				cell.vertexData[j].normal[1] = static_cast<u8>(normal.y) + 127;
+				cell.vertexData[j].normal[2] = static_cast<u8>(normal.z) + 127;
 
 				// Read Color Data (MCCV)
 				cell.vertexData[j].color[0] = cellInfo.mccv.color[j].red;
@@ -324,6 +326,7 @@ namespace Map
 				Terrain::Placement& placement = out.mapObjectPlacements.emplace_back();
 				placement.uniqueID = placementInfo.uniqueID;
 				placement.nameHash = placementInfo.fileID;
+				placement.doodadSet = placementInfo.doodadSet;
 
 				vec3 centeredPosition = vec3(Terrain::MAP_HALF_SIZE - placementInfo.position.x, placementInfo.position.y, Terrain::MAP_HALF_SIZE - placementInfo.position.z);
 				placement.position = CoordinateSpaces::PlacementPosToNovus(centeredPosition);
@@ -333,7 +336,7 @@ namespace Map
 				placement.rotation = glm::quat_cast(matrix);
 
 				bool hasScale = placementInfo.flags.HasScale;
-				placement.scale = (placementInfo.scale * hasScale) + (1 * !hasScale);
+				placement.scale = (placementInfo.scale * hasScale) + (1024 * !hasScale);
 			}
 		}
 
@@ -413,8 +416,6 @@ namespace Map
 			{
 				const Adt::MH2O::LiquidInstance& instance = layout.mh2o.instances[i];
 				CellLiquidInstance& outInstance = out.liquidInfo.instances[i];
-
-				u16 liquidVertexFormat = instance.liquidVertexFormat;
 
 				bool hasBitmapData = instance.bitmapDataOffset != std::numeric_limits<u32>().max();
 				bool hasVertexData = instance.vertexDataOffset != std::numeric_limits<u32>().max();

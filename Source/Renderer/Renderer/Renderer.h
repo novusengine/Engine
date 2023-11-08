@@ -217,6 +217,8 @@ namespace Renderer
         virtual void* GetImguiImageHandle(TextureID textureID) = 0;
         virtual void* GetImguiImageHandle(ImageID imageID) = 0;
 
+        virtual bool HasExtendedTextureSupport() = 0;
+
     protected:
         Renderer() {}; // Pure virtual class, disallow creation of it
 

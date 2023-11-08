@@ -31,14 +31,14 @@ public:
     const KeybindGroup::InputConsumedInfo& GetMouseInputConsumeInfo() { return _mouseInputConsumeInfo; }
     const KeybindGroup::InputConsumedInfo& GetMousePositionConsumeInfo() { return _mousePositionConsumeInfo; }
     const KeybindGroup::InputConsumedInfo& GetMouseScrollConsumeInfo() { return _mouseScrollConsumeInfo; }
-    const KeybindGroup::InputConsumedInfo& GetKeyboardInputConsumeInfo() { return _keyboarInputConsumeInfo; }
+    const KeybindGroup::InputConsumedInfo& GetKeyboardInputConsumeInfo() { return _keyboardInputConsumeInfo; }
     const KeybindGroup::InputConsumedInfo& GetUnicodeInputConsumeInfo() { return _unicodeInputConsumeInfo; }
 
 private:
     KeybindGroup::InputConsumedInfo _mouseInputConsumeInfo;
     KeybindGroup::InputConsumedInfo _mousePositionConsumeInfo;
     KeybindGroup::InputConsumedInfo _mouseScrollConsumeInfo;
-    KeybindGroup::InputConsumedInfo _keyboarInputConsumeInfo;
+    KeybindGroup::InputConsumedInfo _keyboardInputConsumeInfo;
     KeybindGroup::InputConsumedInfo _unicodeInputConsumeInfo;
 
     const std::string* consumerInfoNameDefault = new std::string("None");

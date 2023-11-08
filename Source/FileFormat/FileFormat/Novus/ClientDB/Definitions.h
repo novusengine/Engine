@@ -1,12 +1,27 @@
 #pragma once
 #include <Base/Types.h>
 
-namespace DB::Client::Definitions
+namespace ClientDB
 {
-    struct Map
+    struct StorageRaw;
+};
+
+namespace ClientDB::Definitions
+{
+    struct Base
     {
     public:
-        u32 id;
+        u32 GetID() const { return _id; }
+
+    private:
+        friend struct ClientDB::StorageRaw;
+
+        u32 _id;
+    };
+
+    struct Map : public Base
+    {
+    public:
         u32 name;
         u32 internalName;
         u32 instanceType;
@@ -15,10 +30,9 @@ namespace DB::Client::Definitions
         u32 maxPlayers;
     };
 
-    struct LiquidObject
+    struct LiquidObject : public Base
     {
     public:
-        u32 id;
         u16 liquidTypeID;
         f32 flowDirection;
         f32 flowSpeed;
@@ -26,10 +40,9 @@ namespace DB::Client::Definitions
         u8 reflection;
     };
 
-    struct LiquidType
+    struct LiquidType : public Base
     {
     public:
-        u32 id;
         u32 name;
         u32 textures[6];
         u16 flags;
@@ -53,29 +66,40 @@ namespace DB::Client::Definitions
         u32 coefficients[4];
     };
 
-    struct LiquidMaterial
+    struct LiquidMaterial : public Base
     {
     public:
-        u32 id;
         u8 flags;
         u8 liquidVertexFormat;
     };
 
-    struct CinematicCamera
+    struct CinematicCamera : public Base
     {
     public:
-        u32 id;
         vec3 endPosition;
         u32 soundID;
         f32 rotation;
         u32 cameraPath;
     };
 
-    struct CinematicSequence
+    struct CinematicSequence : public Base
     {
     public:
-        u32 id;
         u32 soundID;
         u32 cameraIDs[8];
+    };
+
+    // Custom
+    struct CameraSave : public Base
+    {
+    public:
+        u32 name;
+        u32 code;
+    };
+    struct Cursor : public Base
+    {
+    public:
+        u32 name;
+        u32 texturePath;
     };
 }

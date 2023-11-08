@@ -28,9 +28,9 @@ namespace Adt
 		{
 			i32 currentMCNKIndex = -1;
 
-			DB::Client::ClientDB<DB::Client::Definitions::LiquidObject>* liquidObjects = nullptr;
-			DB::Client::ClientDB<DB::Client::Definitions::LiquidType>* liquidTypes = nullptr;
-			DB::Client::ClientDB<DB::Client::Definitions::LiquidMaterial>* liquidMaterials = nullptr;
+			ClientDB::Storage<ClientDB::Definitions::LiquidObject>* liquidObjects = nullptr;
+			ClientDB::Storage<ClientDB::Definitions::LiquidType>* liquidTypes = nullptr;
+			ClientDB::Storage<ClientDB::Definitions::LiquidMaterial>* liquidMaterials = nullptr;
 		};
 
 		Parser() { }
