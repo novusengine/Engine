@@ -144,7 +144,7 @@ void KeybindGroup::AddMouseInputValidator(const std::string& keybindName, std::f
         _mouseInputValidator->keybindNameHash = StringUtils::fnv1a_32(keybindName.c_str(), keybindName.length());
         _mouseInputValidator->glfwKey = 0;
         _mouseInputValidator->actionMask = KeybindAction::Press;
-        _mouseInputValidator->modifierMask = KeybindModifier::None;
+        _mouseInputValidator->modifierMask = KeybindModifier::KeybindNone;
         _mouseInputValidator->isPressed = false;
         _mouseInputValidator->callback = callback;
     }
