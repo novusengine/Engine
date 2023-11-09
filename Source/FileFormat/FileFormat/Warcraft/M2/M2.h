@@ -8,7 +8,6 @@
 
 namespace M2
 {
-PRAGMA_NO_PADDING_START;
 	template <typename T>
 	struct M2Array
 	{
@@ -598,5 +597,4 @@ PRAGMA_NO_PADDING_START;
 		i8 GetVertexShaderID(i16 shaderID, u16 textureCount);
 		i8 GetPixelShaderID(i16 shaderID, u16 textureCount);
 	};
-PRAGMA_NO_PADDING_END;
 }

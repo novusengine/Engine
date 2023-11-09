@@ -50,7 +50,12 @@ bool WdtParser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer,
         auto itr = wdtFileChunkToFunction.find(header.token);
         if (itr == wdtFileChunkToFunction.end())
         {
-            DebugHandler::PrintError("[WdtParser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
+            const char* bytes = reinterpret_cast<const char*>(&header.token);
+
+            std::string_view sv(bytes, 4);
+
+            DebugHandler::PrintError("[WdtParser : Encountered unexpected Chunk {0}", sv);
+
             return false;
         }
 

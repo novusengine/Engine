@@ -51,7 +51,6 @@ namespace Terrain
         u16 scale = 0;
     };
 }
-#pragma pack(push, 1)
 struct FileChunkHeader
 {
     u32 token;
@@ -109,7 +108,6 @@ struct MVER // MVER provides us with the version of this file.
 public:
     u32 version = 0;
 };
-#pragma pack(pop)
 
 template <typename T>
 inline bool LoadArrayOfStructs(std::shared_ptr<Bytebuffer>& buffer, u32 dataSize, std::vector<T>& container)

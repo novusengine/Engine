@@ -2,7 +2,6 @@
 #include <Base/Types.h>
 #include <Base/Platform.h>
 
-PRAGMA_NO_PADDING_START;
 namespace DB2::WDC3::Definitions
 {
 	struct Map
@@ -84,4 +83,3 @@ namespace DB2::WDC3::Definitions
 		u32 flags[3] = { 0 };
 	};*/
 }
-PRAGMA_NO_PADDING_END;

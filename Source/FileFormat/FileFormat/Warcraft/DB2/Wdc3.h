@@ -6,7 +6,6 @@
 
 namespace DB2::WDC3
 {
-PRAGMA_NO_PADDING_START;
 	struct Layout
 	{
 	public:
@@ -179,5 +178,4 @@ PRAGMA_NO_PADDING_START;
 		std::vector<std::vector<u32>> perFieldPalleteData = { };
 		std::vector<Section> sections = { };
 	};
-PRAGMA_NO_PADDING_END;
 }

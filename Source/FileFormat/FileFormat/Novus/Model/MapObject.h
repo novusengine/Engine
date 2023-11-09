@@ -16,7 +16,6 @@ namespace Wmo
 
 namespace Model
 {
-PRAGMA_NO_PADDING_START;
 	struct MapObjectGroup
 	{
 	public:
@@ -169,5 +168,4 @@ PRAGMA_NO_PADDING_START;
 		static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapObject& out);
 		static bool FromWMO(Wmo::Layout& layout, MapObject& out);
 	};
-PRAGMA_NO_PADDING_END;
 }
