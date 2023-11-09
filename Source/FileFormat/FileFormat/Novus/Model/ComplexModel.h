@@ -18,6 +18,7 @@ namespace M2
 
 namespace Model
 {
+PRAGMA_NO_PADDING_START;
 	static const std::string FILE_EXTENSION = ".complexmodel";
 
 	struct MapObject;
@@ -581,4 +582,5 @@ namespace Model
 		static i8 GetVertexShaderID(i16 shaderID, u16 textureCount);
 		static i8 GetPixelShaderID(i16 shaderID, u16 textureCount);
 	};
+PRAGMA_NO_PADDING_END;
 }

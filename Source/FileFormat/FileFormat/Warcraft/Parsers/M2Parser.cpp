@@ -76,7 +76,12 @@ bool Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, La
             if (header.token == 0 && header.size == 0 && buffer->readData == sizeof(FileChunkHeader))
                 return false;
 
-            DebugHandler::PrintError("[Parser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
+            const char* bytes = reinterpret_cast<const char*>(&header.token);
+
+            std::string_view sv(bytes, 4);
+
+            DebugHandler::PrintError("[M2Parser : Encountered unexpected Chunk {0}", sv);
+
             return false;
         }
 

@@ -17,7 +17,7 @@ namespace Map
 		std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
 		if (!output)
 		{
-			DebugHandler::PrintError("Failed to create Terrain Chunk file. Check admin permissions");
+			DebugHandler::PrintError("Failed to create Terrain Chunk file. Check admin permissions {0}", path);
 			return false;
 		}
 

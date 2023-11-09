@@ -88,7 +88,7 @@ public:
 
         if (reversed)
         {
-            _value = static_cast<u32>(bytes[0]) | (static_cast<u32>(bytes[1]) << 8) | (static_cast<u32>(bytes[2]) << 16) | (static_cast<u32>(bytes[3]) << 24);
+            _value = static_cast<u32>(bytes[1]) | (static_cast<u32>(bytes[2]) << 8) | (static_cast<u32>(bytes[3]) << 16) | (static_cast<u32>(bytes[4]) << 24);
         }
         else
         {

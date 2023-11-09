@@ -14,6 +14,7 @@ namespace Adt
 
 namespace Map
 {
+PRAGMA_NO_PADDING_START;
 	struct CellLiquidHeader
 	{
 	public:
@@ -136,4 +137,5 @@ namespace Map
 		static bool Read(std::shared_ptr<Bytebuffer>& buffer, Chunk& out);
 		static bool FromADT(Adt::Layout& layout, Chunk& out);
 	};
+PRAGMA_NO_PADDING_END;
 }

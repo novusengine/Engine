@@ -8,25 +8,25 @@ using namespace Adt;
 
 robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, Wdt&)>> WdtParser::wdtFileChunkToFunction =
 {
-    { *reinterpret_cast<const u32*>("MVER"), WdtParser::ReadMVER },
-    { *reinterpret_cast<const u32*>("MPHD"), WdtParser::ReadMPHD },
-    { *reinterpret_cast<const u32*>("MAIN"), WdtParser::ReadMAIN },
-    { *reinterpret_cast<const u32*>("MAID"), WdtParser::ReadMAID },
-    { *reinterpret_cast<const u32*>("MODF"), WdtParser::ReadMODF },
+    { FileChunkToken("MVER"), WdtParser::ReadMVER },
+    { FileChunkToken("MPHD"), WdtParser::ReadMPHD },
+    { FileChunkToken("MAIN"), WdtParser::ReadMAIN },
+    { FileChunkToken("MAID"), WdtParser::ReadMAID },
+    { FileChunkToken("MODF"), WdtParser::ReadMODF },
 
-    { *reinterpret_cast<const u32*>("MWMO"), nullptr },
-    { *reinterpret_cast<const u32*>("MANM"), nullptr },
-    { *reinterpret_cast<const u32*>("MAOI"), nullptr },
-    { *reinterpret_cast<const u32*>("MAOH"), nullptr },
-    { *reinterpret_cast<const u32*>("MPL2"), nullptr },
-    { *reinterpret_cast<const u32*>("MPL3"), nullptr },
-    { *reinterpret_cast<const u32*>("MSLT"), nullptr },
-    { *reinterpret_cast<const u32*>("MTEX"), nullptr },
-    { *reinterpret_cast<const u32*>("MLTA"), nullptr },
-    { *reinterpret_cast<const u32*>("VFOG"), nullptr },
-    { *reinterpret_cast<const u32*>("PVPD"), nullptr },
-    { *reinterpret_cast<const u32*>("PVMI"), nullptr },
-    { *reinterpret_cast<const u32*>("PVBD"), nullptr }
+    { FileChunkToken("MWMO"), nullptr },
+    { FileChunkToken("MANM"), nullptr },
+    { FileChunkToken("MAOI"), nullptr },
+    { FileChunkToken("MAOH"), nullptr },
+    { FileChunkToken("MPL2"), nullptr },
+    { FileChunkToken("MPL3"), nullptr },
+    { FileChunkToken("MSLT"), nullptr },
+    { FileChunkToken("MTEX"), nullptr },
+    { FileChunkToken("MLTA"), nullptr },
+    { FileChunkToken("VFOG"), nullptr },
+    { FileChunkToken("PVPD"), nullptr },
+    { FileChunkToken("PVMI"), nullptr },
+    { FileChunkToken("PVBD"), nullptr }
 };
 
 bool WdtParser::TryParse(std::shared_ptr<Bytebuffer>& wdtBuffer, Wdt& out)

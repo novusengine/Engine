@@ -88,7 +88,6 @@ namespace Adt
 		f32 heightMap[Terrain::CELL_TOTAL_GRID_SIZE] = { 0.0f };
 	};
 
-#pragma pack(push, 1)
 	struct MCNK // MCNK provides us with all the information we need for a cell.
 	{
 	public:
@@ -133,9 +132,7 @@ namespace Adt
 		vec3 position = vec3(0, 0, 0); // Location is stored as Z, X, Y
 		u32 unused12 = 0;
 		u32 unused13 = 0;
-		u32 unused14 = 0;
 	};
-#pragma pack(pop)
 	struct MH2O // MH2O provides us with multiple lists related to water information.
 	{
 	public:
