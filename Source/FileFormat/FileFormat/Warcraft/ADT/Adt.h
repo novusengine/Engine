@@ -111,8 +111,8 @@ namespace Adt
 		u32 numLayers = 0;
 		u32 numDoodadRefs = 0;
 
-		u32 holesHighRes = 0;
-		u32 pepega = 0;
+		u32 holesHighResA = 0;
+		u32 holesHighResB = 0;
 
 		u32 unused1 = 0;
 		u32 unused2 = 0;

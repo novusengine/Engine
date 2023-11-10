@@ -758,12 +758,12 @@ char* Parser::GetStringInArr(const Layout& layout, u32 recordIndex, u32 fieldInd
 	// Validate sectionIndex to make sure we're not accessing a non existing section
 	u32 numSections = static_cast<u32>(layout.sections.size());
 	if (sectionIndex >= numSections)
-		return new char[1]{'\0'};
+		return nullptr;
 
 	// Validate fieldIndex to make sure we're not accessing a non existing field
 	if (fieldIndex >= layout.fieldStorageInfos.size() ||
 		fieldIndex >= layout.fieldStructures.size())
-		return new char[1]{'\0'};
+		return nullptr;
 
 	const Layout::Section& section = layout.sections[sectionIndex];
 	const Layout::FieldStorageInfo& fieldStorageInfo = layout.fieldStorageInfos[fieldIndex];

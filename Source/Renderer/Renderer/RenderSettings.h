@@ -8,8 +8,8 @@ namespace Renderer
     struct Settings
     {
     public:
-        static const u32 SCREEN_WIDTH = 2560;
-        static const u32 SCREEN_HEIGHT = 1320;
+        static const u32 SCREEN_WIDTH = 1920;
+        static const u32 SCREEN_HEIGHT = 1080;
         static const size_t STAGING_BUFFER_SIZE = 32 * 1024 * 1024; // 32 MB
 
         static const u32 MAX_SHADOW_CASCADES = 8;

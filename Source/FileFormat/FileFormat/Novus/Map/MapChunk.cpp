@@ -227,7 +227,7 @@ namespace Map
 
 			if (mcnk.flags.HighResHoles)
 			{
-                u64 holesHighRes = mcnk.holesHighRes | (static_cast<u64>(mcnk.pepega) << 32);
+                u64 holesHighRes = mcnk.holesHighResA | (static_cast<u64>(mcnk.holesHighResB) << 32);
 
                 cell.hole = holesHighRes;
 			}

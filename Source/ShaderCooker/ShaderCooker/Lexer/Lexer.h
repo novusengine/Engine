@@ -1,9 +1,9 @@
 #pragma once
-#include <Base/Platform.h>
 
 #include "ShaderCooker/Permutation.h"
 #include "ShaderCooker/Token.h"
 
+#include <Base/Platform.h>
 #include <Base/Util/DebugHandler.h>
 
 #include <robinhood/robinhood.h>

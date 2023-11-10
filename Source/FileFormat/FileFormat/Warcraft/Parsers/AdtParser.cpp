@@ -99,7 +99,7 @@ bool Parser::ParseBufferOrderIndependent(Context& context, ParseType parseType, 
 
             std::string_view sv(bytes, 4);
 
-            DebugHandler::PrintError("[AdtParser : Encountered unexpected Chunk {0}", sv);
+            DebugHandler::PrintError("AdtParser : Encountered unexpected Chunk {0}", sv);
 
             return false;
         }

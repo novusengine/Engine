@@ -80,7 +80,7 @@ bool Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, La
 
             std::string_view sv(bytes, 4);
 
-            DebugHandler::PrintError("[M2Parser : Encountered unexpected Chunk {0}", sv);
+            DebugHandler::PrintError("M2Parser : Encountered unexpected Chunk {0}", sv);
 
             return false;
         }
