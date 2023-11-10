@@ -29,7 +29,7 @@
 
 namespace Renderer
 {
-    RendererVK::RendererVK(Window* window)
+    RendererVK::RendererVK(Novus::Window* window)
         : _device(new Backend::RenderDeviceVK(window))
     {
         _frameAllocator.Init(4 * 1024 * 1024, "Renderer Allocator");
@@ -68,7 +68,7 @@ namespace Renderer
         CreateDummyPipeline();
     }
 
-    void RendererVK::InitWindow(Window* window)
+    void RendererVK::InitWindow(Novus::Window* window)
     {
         _device->InitWindow(_imageHandler, _semaphoreHandler, window);
     }
@@ -1364,7 +1364,7 @@ namespace Renderer
         }
     }
 
-    void RendererVK::Present(Window* window, ImageID imageID, SemaphoreID semaphoreID)
+    void RendererVK::Present(Novus::Window* window, ImageID imageID, SemaphoreID semaphoreID)
     {
         CommandListID commandListID = _commandListHandler->BeginCommandList(Backend::QueueType::Graphics);
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
@@ -1609,7 +1609,7 @@ namespace Renderer
         }
     }
 
-    void RendererVK::Present(Window* /*window*/, DepthImageID /*image*/, SemaphoreID /*semaphoreID*/)
+    void RendererVK::Present(Novus::Window* /*window*/, DepthImageID /*image*/, SemaphoreID /*semaphoreID*/)
     {
         
     }
@@ -1641,8 +1641,8 @@ namespace Renderer
 
     void RendererVK::CopyBufferImmediate(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range)
     {
-        std::string& dstName = _bufferHandler->GetBufferName(dstBuffer);
-        std::string& srcName = _bufferHandler->GetBufferName(srcBuffer);
+        std::string dstName = _bufferHandler->GetBufferName(dstBuffer);
+        std::string srcName = _bufferHandler->GetBufferName(srcBuffer);
         DebugHandler::PrintWarning("Immediately copying buffer {} into buffer {}, this is bad for performance and should only be used for debugging", srcName, dstName);
 
         VkCommandBuffer commandList = _device->BeginSingleTimeCommands();

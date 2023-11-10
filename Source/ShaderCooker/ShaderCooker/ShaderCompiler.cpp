@@ -100,7 +100,7 @@ namespace ShaderCooker
             return false;
 
         std::string includePathString = includePath.make_preferred().string();
-        std::transform(includePathString.begin(), includePathString.end(), includePathString.begin(), ::tolower);
+        //std::transform(includePathString.begin(), includePathString.end(), includePathString.begin(), ::tolower);
 
         u32 strHash = StringUtils::fnv1a_32(includePathString.c_str(), includePathString.length());
         _shaderHashToPaths[strHash].push_back(shaderPath);
@@ -183,7 +183,7 @@ namespace ShaderCooker
                     {
                         if (fs::is_regular_file(*itr) && itr->extension() == ".hlsl")
                         {
-                            std::transform(path.begin(), path.end(), path.begin(), ::tolower);
+                            //std::transform(path.begin(), path.end(), path.begin(), ::tolower);
                             u32 strHash = StringUtils::fnv1a_32(path.c_str(), path.length());
 
                             if (HasShader(strHash) == false)

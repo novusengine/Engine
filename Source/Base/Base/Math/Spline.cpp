@@ -55,8 +55,9 @@ namespace Spline
             checkSize = ((splinePoints * (_stepSize + 1)) == _points.size());
         }
 
-        if (IsDirty() || !checkSize)
-            return {};
+        // TODO: Temporel look at what this should actually be doing
+        //if (IsDirty() || !checkSize)
+        //    return _emptyVector;
 
         return _points;
     }

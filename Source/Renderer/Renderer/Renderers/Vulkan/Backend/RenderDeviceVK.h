@@ -11,7 +11,10 @@
 #include <vector>
 #include <optional>
 
-class Window;
+namespace Novus
+{
+    class Window;
+}
 struct GLFWwindow;
 
 namespace tracy
@@ -56,11 +59,11 @@ namespace Renderer
         class RenderDeviceVK
         {
         public:
-            RenderDeviceVK(Window* window);
+            RenderDeviceVK(Novus::Window* window);
             ~RenderDeviceVK();
 
             void Init();
-            void InitWindow(ImageHandlerVK* imageHandler, SemaphoreHandlerVK* semaphoreHandler, Window* window);
+            void InitWindow(ImageHandlerVK* imageHandler, SemaphoreHandlerVK* semaphoreHandler, Novus::Window* window);
 
             u32 GetFrameIndex() { return _frameIndex; }
             void EndFrame() { _frameIndex = (_frameIndex + 1) % FRAME_INDEX_COUNT; }
@@ -118,7 +121,7 @@ namespace Renderer
 
             bool HasExtendedTextureSupport() { return _hasExtendedTextureSupport; }
         private:
-            Window* _window;
+            Novus::Window* _window;
             uvec2 _mainWindowSize;
             vec2 _renderSize = vec2(1, 1);
 

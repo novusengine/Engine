@@ -2027,7 +2027,7 @@ ConstraintGraphBuilder::FunctionSignature ConstraintGraphBuilder::checkFunctionS
 
     std::vector<TypeId> argTypes;
     std::vector<std::optional<FunctionArgument>> argNames;
-    TypePack expectedArgPack;
+    TypePack expectedArgPack{};
 
     const FunctionType* expectedFunction = expectedType ? get<FunctionType>(*expectedType) : nullptr;
 

@@ -8,7 +8,6 @@
 
 namespace Wmo
 {
-PRAGMA_NO_PADDING_START;
 	struct WMOGroupFlags
 	{
 		u32 HasBSPTree : 1;
@@ -434,5 +433,4 @@ PRAGMA_NO_PADDING_START;
 
 		std::vector<WMOGroup> groups = { };
 	};
-PRAGMA_NO_PADDING_END;
 }

@@ -8,25 +8,25 @@ using namespace Adt;
 
 robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, Wdt&)>> WdtParser::wdtFileChunkToFunction =
 {
-    { static_cast<u32>('MVER'), WdtParser::ReadMVER },
-    { static_cast<u32>('MPHD'), WdtParser::ReadMPHD },
-    { static_cast<u32>('MAIN'), WdtParser::ReadMAIN },
-    { static_cast<u32>('MAID'), WdtParser::ReadMAID },
-    { static_cast<u32>('MODF'), WdtParser::ReadMODF },
+    { FileChunkToken("MVER"), WdtParser::ReadMVER },
+    { FileChunkToken("MPHD"), WdtParser::ReadMPHD },
+    { FileChunkToken("MAIN"), WdtParser::ReadMAIN },
+    { FileChunkToken("MAID"), WdtParser::ReadMAID },
+    { FileChunkToken("MODF"), WdtParser::ReadMODF },
 
-    { static_cast<u32>('MWMO'), nullptr },
-    { static_cast<u32>('MANM'), nullptr },
-    { static_cast<u32>('MAOI'), nullptr },
-    { static_cast<u32>('MAOH'), nullptr },
-    { static_cast<u32>('MPL2'), nullptr },
-    { static_cast<u32>('MPL3'), nullptr },
-    { static_cast<u32>('MSLT'), nullptr },
-    { static_cast<u32>('MTEX'), nullptr },
-    { static_cast<u32>('MLTA'), nullptr },
-    { static_cast<u32>('VFOG'), nullptr },
-    { static_cast<u32>('PVPD'), nullptr },
-    { static_cast<u32>('PVMI'), nullptr },
-    { static_cast<u32>('PVBD'), nullptr }
+    { FileChunkToken("MWMO"), nullptr },
+    { FileChunkToken("MANM"), nullptr },
+    { FileChunkToken("MAOI"), nullptr },
+    { FileChunkToken("MAOH"), nullptr },
+    { FileChunkToken("MPL2"), nullptr },
+    { FileChunkToken("MPL3"), nullptr },
+    { FileChunkToken("MSLT"), nullptr },
+    { FileChunkToken("MTEX"), nullptr },
+    { FileChunkToken("MLTA"), nullptr },
+    { FileChunkToken("VFOG"), nullptr },
+    { FileChunkToken("PVPD"), nullptr },
+    { FileChunkToken("PVMI"), nullptr },
+    { FileChunkToken("PVBD"), nullptr }
 };
 
 bool WdtParser::TryParse(std::shared_ptr<Bytebuffer>& wdtBuffer, Wdt& out)
@@ -50,7 +50,12 @@ bool WdtParser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer,
         auto itr = wdtFileChunkToFunction.find(header.token);
         if (itr == wdtFileChunkToFunction.end())
         {
-            DebugHandler::PrintError("[WdtParser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
+            const char* bytes = reinterpret_cast<const char*>(&header.token);
+
+            std::string_view sv(bytes, 4);
+
+            DebugHandler::PrintError("WdtParser : Encountered unexpected Chunk {0}", sv);
+
             return false;
         }
 

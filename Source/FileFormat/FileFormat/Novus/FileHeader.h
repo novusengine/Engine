@@ -4,7 +4,6 @@
 
 #include <limits>
 
-PRAGMA_NO_PADDING_START;
 struct FileHeader
 {
 public:
@@ -41,4 +40,3 @@ public:
 	Type type = Type::Invalid;
 	u32 version = 0;
 };
-PRAGMA_NO_PADDING_END;

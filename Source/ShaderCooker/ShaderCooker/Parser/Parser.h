@@ -2,6 +2,7 @@
 #include "ShaderCooker/ShaderCompiler.h"
 #include "ShaderCooker/Permutation.h"
 #include "ShaderCooker/Token.h"
+#include <Base/Util/DebugHandler.h>
 
 namespace ShaderCooker
 {

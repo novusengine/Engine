@@ -533,7 +533,7 @@ namespace Renderer
 
     enum class BufferCPUAccess
     {
-        None,
+        AccessNone,
         WriteOnly,
         ReadOnly,
     };

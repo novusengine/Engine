@@ -95,7 +95,12 @@ bool Parser::ParseBufferOrderIndependent(Context& context, ParseType parseType, 
         auto itr = _adtFileChunkToFunction.find(header.token);
         if (itr == _adtFileChunkToFunction.end())
         {
-            DebugHandler::PrintError("[Parser : Encountered unexpected Chunk (%.*s)", 4, reinterpret_cast<char*>(&header.token));
+            const char* bytes = reinterpret_cast<const char*>(&header.token);
+
+            std::string_view sv(bytes, 4);
+
+            DebugHandler::PrintError("AdtParser : Encountered unexpected Chunk {0}", sv);
+
             return false;
         }
 

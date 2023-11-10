@@ -10,17 +10,26 @@
 #pragma comment(lib, "Ws2_32.lib")
 #elif __linux__
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #endif
 
 namespace Network
 {
     SharedPool<Socket> Socket::_pool;
 
+#if WIN32
     Socket::Socket() : _socket(NULL) { }
+#else
+    Socket::Socket() : _socket(0) { }
+#endif
+
     Socket::~Socket() { }
 
     Socket::Result Socket::Create(SOCKET socket, Type type, Mode mode, std::shared_ptr<Socket>& out)
     {
+#if WIN32
         if (!IsWinsockInitialized())
         {
             WSADATA data;
@@ -30,6 +39,7 @@ namespace Network
                 DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
             }
         }
+#endif
 
         assert(mode != Mode::NONE);
 
@@ -53,6 +63,7 @@ namespace Network
 
     Socket::Result Socket::Create(Type type, Mode mode, std::shared_ptr<Socket>& out)
     {
+#if WIN32
         if (!IsWinsockInitialized())
         {
             WSADATA data;
@@ -62,6 +73,7 @@ namespace Network
                 DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
             }
         }
+#endif
 
         assert(mode != Mode::NONE);
 

@@ -23,10 +23,8 @@ namespace StringUtils
     bool Contains(std::string const& fullString, std::string const& substring);
     bool SearchString(const std::string& ref, const std::string& key, bool insensitive);
 
-#ifdef _WINDOWS
     std::wstring StringToWString(const std::string& s);
     std::string WStringToString(const std::wstring& wstr);
-#endif
 
     template <typename... Args>
     inline i32 FormatString(char* buffer, size_t bufferSize, char const* format, Args... args)
@@ -68,7 +66,7 @@ namespace StringUtils
     {
         size_t size = 0;
 
-        while (s[size]) 
+        while (s[size])
         { 
             size++; 
         };

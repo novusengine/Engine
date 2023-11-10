@@ -175,33 +175,17 @@ namespace StringUtils
         return Contains(str, substr);
     }
 
-#ifdef _WINDOWS
     std::wstring StringToWString(const std::string& s)
     {
-        // deal with trivial case of empty string
-        if (s.empty())    return std::wstring();
+        std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 
-        // determine required length of new string
-        size_t reqLength = ::MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (i32)s.length(), 0, 0);
-
-        // construct new string of required length
-        std::wstring ret(reqLength, L'\0');
-
-        // convert old string to new string
-        ::MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (i32)s.length(), &ret[0], (i32)ret.length());
-
-        // return new string
-        return ret;
+        return converter.from_bytes(s);
     }
 
     std::string WStringToString(const std::wstring& wstr)
     {
-        if (wstr.empty()) return std::string();
+        std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 
-        i32 size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (i32)wstr.size(), NULL, 0, NULL, NULL);
-        std::string strTo(size_needed, 0);
-        WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (i32)wstr.size(), &strTo[0], size_needed, NULL, NULL);
-        return strTo;
+        return converter.to_bytes(wstr);
     }
-#endif
 }

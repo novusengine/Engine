@@ -8,9 +8,11 @@
 #include <Base/Container/StringTable.h>
 #include <Base/Memory/Bytebuffer.h>
 #include <Base/Memory/FileWriter.h>
+#include <Base/Util/DebugHandler.h>
 
 #include <robinhood/robinhood.h>
 
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -35,7 +37,7 @@ namespace ClientDB
 
     public:
         const std::string& GetName() { return _name; }
-        
+
         u32 GetSizeOfElement()
         {
             return _sizeOfElement;
@@ -255,7 +257,7 @@ namespace ClientDB
 
             return result;
         }
-        bool Save(std::string& path)
+        bool Save(const std::string& path)
         {
             size_t size = GetSerializedSize();
             std::shared_ptr<Bytebuffer> resultBuffer = Bytebuffer::BorrowRuntime(size);

@@ -8,7 +8,6 @@
 
 namespace Adt
 {
-PRAGMA_NO_PADDING_START;
 	struct MCCV // MCCV provides us with vertex shading information for the vertices
 	{
 	public:
@@ -112,7 +111,8 @@ PRAGMA_NO_PADDING_START;
 		u32 numLayers = 0;
 		u32 numDoodadRefs = 0;
 
-		u64 holesHighRes = 0;
+		u32 holesHighResA = 0;
+		u32 holesHighResB = 0;
 
 		u32 unused1 = 0;
 		u32 unused2 = 0;
@@ -438,5 +438,4 @@ PRAGMA_NO_PADDING_START;
 
 		std::vector<CellInfo> cellInfos;
 	};
-PRAGMA_NO_PADDING_END;
 }

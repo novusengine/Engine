@@ -33,5 +33,5 @@ if(NOT TARGET scripting)
 endif()
 
 if(NOT TARGET shadercooker)
-    add_subdirectory(Shadercooker)
+    add_subdirectory(ShaderCooker)
 endif()

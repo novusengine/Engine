@@ -17,7 +17,7 @@ namespace Map
 		std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
 		if (!output)
 		{
-			DebugHandler::PrintError("Failed to create Terrain Chunk file. Check admin permissions");
+			DebugHandler::PrintError("Failed to create Terrain Chunk file. Check admin permissions {0}", path);
 			return false;
 		}
 
@@ -227,7 +227,9 @@ namespace Map
 
 			if (mcnk.flags.HighResHoles)
 			{
-				cell.hole = mcnk.holesHighRes;
+                u64 holesHighRes = mcnk.holesHighResA | (static_cast<u64>(mcnk.holesHighResB) << 32);
+
+                cell.hole = holesHighRes;
 			}
 			else
 			{

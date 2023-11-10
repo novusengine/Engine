@@ -111,7 +111,7 @@ namespace ShaderCooker
         shaderPath = shaderPath.make_preferred();
 
         std::string shaderPathString = shaderPath.string();
-        std::transform(shaderPathString.begin(), shaderPathString.end(), shaderPathString.begin(), ::tolower);
+        //std::transform(shaderPathString.begin(), shaderPathString.end(), shaderPathString.begin(), ::tolower);
 
         u32 shaderPathHash = StringUtils::fnv1a_32(shaderPathString.c_str(), shaderPathString.length());
         std::time_t lastWriteTime = to_time_t(fs::last_write_time(shaderPath));
@@ -131,7 +131,7 @@ namespace ShaderCooker
         shaderPath = shaderPath.make_preferred();
 
         std::string shaderPathString = shaderPath.string();
-        std::transform(shaderPathString.begin(), shaderPathString.end(), shaderPathString.begin(), ::tolower);
+        //std::transform(shaderPathString.begin(), shaderPathString.end(), shaderPathString.begin(), ::tolower);
 
         u32 shaderPathHash = StringUtils::fnv1a_32(shaderPathString.c_str(), shaderPathString.length());
         std::time_t lastWriteTime = to_time_t(fs::last_write_time(shaderPath));
