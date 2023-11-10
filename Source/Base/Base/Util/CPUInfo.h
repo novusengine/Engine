@@ -22,12 +22,14 @@ public:
     bool IsSSE42() const { return features.isSSE42; }
     bool IsAVX() const { return features.isAVX; }
     bool IsAVX2() const { return features.isAVX2; }
+    bool isAVX512F() const { return features.isAVX512F; }
     bool IsHyperThreaded() const { return features.isHTT; }
 
     void Print(i32 detailLevel);
 
 private:
     CPUInfo();
+    i32 cpu_numcpus();
 
 private:
     static bool _initialized;
@@ -41,6 +43,7 @@ private:
     static const u32 SSE42_POS = 0x00100000;
     static const u32 AVX_POS = 0x10000000;
     static const u32 AVX2_POS = 0x00000020;
+    static const u32 AVX512F_POS = 1u << 15; // Bit 16
     static const u32 LVL_NUM = 0x000000FF;
     static const u32 LVL_TYPE = 0x0000FF00;
     static const u32 LVL_CORES = 0x0000FFFF;
@@ -50,9 +53,9 @@ private:
     std::string _modelName;
     std::string _prettyName;
 
-    i32 _numThreadsPerCore;
-    i32 _numCores;
-    i32 _numThreads;
+    i32 _numThreadsPerCore = 0;
+    i32 _numCores = 0;
+    i32 _numThreads = -1;
 
     struct Features
     {
@@ -64,6 +67,7 @@ private:
         u8 isSSE42 : 1;
         u8 isAVX : 1;
         u8 isAVX2 : 1;
+        u8 isAVX512F : 1;
     };
 
     Features features;
