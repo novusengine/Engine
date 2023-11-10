@@ -111,7 +111,8 @@ namespace Adt
 		u32 numLayers = 0;
 		u32 numDoodadRefs = 0;
 
-		u64 holesHighRes = 0;
+		u32 holesHighRes = 0;
+		u32 pepega = 0;
 
 		u32 unused1 = 0;
 		u32 unused2 = 0;
@@ -132,6 +133,7 @@ namespace Adt
 		vec3 position = vec3(0, 0, 0); // Location is stored as Z, X, Y
 		u32 unused12 = 0;
 		u32 unused13 = 0;
+		u32 unused14 = 0;
 	};
 	struct MH2O // MH2O provides us with multiple lists related to water information.
 	{

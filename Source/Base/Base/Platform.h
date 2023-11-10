@@ -49,12 +49,23 @@ inline void ReleaseModeBreakpoint()
 }
 #endif
 
-#ifdef WIN32
+#if defined(__clang__)
 #define PRAGMA_NO_PADDING_START __pragma(pack(push, 1))
 #define PRAGMA_NO_PADDING_END __pragma(pack(pop))
-#else
+
+#define PACKED
+#elif defined(_MSC_VER)
+#define PRAGMA_NO_PADDING_START __pragma(pack(push, 1))
+#define PRAGMA_NO_PADDING_END __pragma(pack(pop))
+
+#define PACKED
+#elif defined(__GNUC__)
 #define PRAGMA_NO_PADDING_START _Pragma("pack(push, 1)")
 #define PRAGMA_NO_PADDING_END _Pragma("pack(pop)")
+
+#define PACKED __attribute__((packed))
+#else
+static_assert(false, "Please add PRAGMA_ENABLE_OPTIMIZATION/PRAGMA_DISABLE_OPTIMIZATION implementation for whatever compiler you are porting to");
 #endif
 
 #if !WIN32

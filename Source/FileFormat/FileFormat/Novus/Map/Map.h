@@ -7,7 +7,6 @@
 
 namespace Map
 {
-PRAGMA_NO_PADDING_START;
 	struct Layout
 	{
 	public:
@@ -24,5 +23,4 @@ PRAGMA_NO_PADDING_START;
 		Flags flags = { };
 		Terrain::Placement placement = { };
 	};
-PRAGMA_NO_PADDING_END;
 }
