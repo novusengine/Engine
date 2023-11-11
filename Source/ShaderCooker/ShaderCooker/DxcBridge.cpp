@@ -6,9 +6,11 @@
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/StringUtils.h>
 
-// NOTE: This will need edits to add Linux support to ShaderCooker
 #ifdef _WINDOWS
+#include <atlbase.h>
 #include <wrl/client.h>
+#else
+#include <WinAdapter.h>
 #endif
 #include "dxcapi.h"
 
@@ -253,7 +255,8 @@ namespace ShaderCooker
         // Merge default defines and permutation defines
         defines.insert(defines.end(), permutationDefines.begin(), permutationDefines.end());
 
-        std::wstring fileName = StringUtils::StringToWString(path.filename());
+        std::string filenameAsStr = path.filename().string();
+        std::wstring fileName = StringUtils::StringToWString(filenameAsStr);
 
         CComPtr<IDxcOperationResult> compileResult;
         r = data->compiler->Compile(sourceBlob, fileName.c_str(), L"main", profile.c_str(), &args[0], sizeof(args) / sizeof(args[0]), defines.data(), static_cast<u32>(defines.size()), _includeHandler, &compileResult);

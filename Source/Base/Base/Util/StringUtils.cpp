@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <iomanip>
+#include <codecvt>
 
 #ifdef _WINDOWS
 #include <Windows.h>
