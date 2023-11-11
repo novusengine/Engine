@@ -7,10 +7,10 @@
 
 namespace Map
 {
-	struct Layout
+	struct MapHeader
 	{
 	public:
-		static const u32 CURRENT_VERSION = 1;
+		static const u32 CURRENT_VERSION = 2;
 
 		struct Flags
 		{
@@ -18,9 +18,12 @@ namespace Map
 		};
 
 	public:
-		FileHeader header = FileHeader(FileHeader::Type::Map, CURRENT_VERSION);
+		FileHeader header = FileHeader(FileHeader::Type::MapHeader, CURRENT_VERSION);
 
 		Flags flags = { };
 		Terrain::Placement placement = { };
+
+	public:
+		static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapHeader& out);
 	};
 }

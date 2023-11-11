@@ -394,6 +394,9 @@ namespace Model
 		{
 			if (!buffer->Get(out.header))
 				return false;
+
+			if (out.header.type != FileHeader::Type::ComplexModel || out.header.version != ComplexModel::CURRENT_VERSION)
+				return false;
 		}
 
 		// Read Model Header
