@@ -110,6 +110,9 @@ namespace Map
 		if (!buffer->Get(out.header))
 			return false;
 
+		if (out.header.type != FileHeader::Type::MapChunk || out.header.version != Chunk::CURRENT_VERSION)
+			return false;
+
 		if (!buffer->Get(out.heightHeader))
 			return false;
 

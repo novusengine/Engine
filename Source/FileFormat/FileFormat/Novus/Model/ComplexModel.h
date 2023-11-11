@@ -24,7 +24,7 @@ namespace Model
 	struct ComplexModel
 	{
 	public:
-		static const u32 CURRENT_VERSION = 6;
+		static const u32 CURRENT_VERSION = 7;
 
 		struct Flags
 		{

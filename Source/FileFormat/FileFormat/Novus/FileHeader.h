@@ -11,7 +11,7 @@ public:
 	{
 		Invalid = -1,
 		ClientDB,
-		Map,
+		MapHeader,
 		MapChunk,
 		MapObject,
 		MapObjectGroup,

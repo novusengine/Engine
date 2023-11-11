@@ -19,7 +19,7 @@ namespace Model
 	struct MapObjectGroup
 	{
 	public:
-		static constexpr u32 CURRENT_VERSION = 2;
+		static constexpr u32 CURRENT_VERSION = 3;
 
 		struct Flags
 		{
