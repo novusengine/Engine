@@ -14,6 +14,8 @@ namespace Adt
 
 namespace Map
 {
+	static const std::string CHUNK_FILE_EXTENSION = ".chunk";
+
 	struct CellLiquidHeader
 	{
 	public:
