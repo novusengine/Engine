@@ -7,6 +7,8 @@
 
 namespace Map
 {
+	static const std::string HEADER_FILE_EXTENSION = ".map";
+
 	struct MapHeader
 	{
 	public:
@@ -24,6 +26,7 @@ namespace Map
 		Terrain::Placement placement = { };
 
 	public:
+		bool Save(const std::string& path);
 		static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapHeader& out);
 	};
 }

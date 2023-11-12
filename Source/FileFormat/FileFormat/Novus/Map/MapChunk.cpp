@@ -13,11 +13,10 @@ namespace Map
 {
 	bool Chunk::Save(const std::string& path)
 	{
-		// Create a file
 		std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
 		if (!output)
 		{
-			DebugHandler::PrintError("Failed to create Terrain Chunk file. Check admin permissions {0}", path);
+			DebugHandler::PrintError("Failed to create Map Chunk file. Check admin permissions {0}", path);
 			return false;
 		}
 
