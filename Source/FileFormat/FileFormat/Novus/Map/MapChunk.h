@@ -71,7 +71,8 @@ namespace Map
 		public:
 			u8 normal[3] = { 0, 0, 0 };
 			u8 color[3] = { 0, 0, 0 };
-			f16 height = f16(0);
+			u8 padding[2] = { 0, 0 };
+			f32 height = 0.0f;
 		};
 
 	public:
@@ -79,8 +80,8 @@ namespace Map
 
 		u16 areaID = 0;
 
-		f16 cellMinHeight = f16(10000);
-		f16 cellMaxHeight = f16(-10000);
+		f32 cellMinHeight = 10000.0f;
+		f32 cellMaxHeight = -10000.0f;
 
 		VertexData vertexData[Terrain::CELL_TOTAL_GRID_SIZE];
 
@@ -92,7 +93,7 @@ namespace Map
 	struct Chunk
 	{
 	public:
-		static const u32 CURRENT_VERSION = 4;
+		static const u32 CURRENT_VERSION = 5;
 
 		struct HeightHeader
 		{

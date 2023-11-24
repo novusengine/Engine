@@ -58,6 +58,7 @@ namespace Renderer
             "VK_KHR_maintenance3",
             "VK_KHR_draw_indirect_count",
             "VK_KHR_shader_subgroup_extended_types",
+            "VK_KHR_16bit_storage",
             "VK_EXT_descriptor_indexing",
             "VK_EXT_sampler_filter_minmax",
             "VK_EXT_host_query_reset"
@@ -461,12 +462,19 @@ namespace Renderer
             atomicInt64Features.shaderBufferInt64Atomics = VK_TRUE;
             atomicInt64Features.pNext = &descriptorIndexingFeatures;
 
+            VkPhysicalDevice16BitStorageFeaturesKHR storage16BitFeatures = {};
+            storage16BitFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES_KHR;
+            storage16BitFeatures.storageBuffer16BitAccess = VK_TRUE;
+            storage16BitFeatures.uniformAndStorageBuffer16BitAccess = VK_TRUE;
+            storage16BitFeatures.pNext = &atomicInt64Features;
+
             VkPhysicalDeviceFeatures2 deviceFeatures = {};
             deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             deviceFeatures.features.samplerAnisotropy = VK_TRUE;
             deviceFeatures.features.fragmentStoresAndAtomics = VK_TRUE;
             deviceFeatures.features.vertexPipelineStoresAndAtomics = VK_TRUE;
             deviceFeatures.features.shaderInt64 = VK_TRUE;
+            deviceFeatures.features.shaderInt16 = VK_TRUE;
             deviceFeatures.features.multiDrawIndirect = VK_TRUE;
             deviceFeatures.features.drawIndirectFirstInstance = VK_TRUE;
             deviceFeatures.features.independentBlend = VK_TRUE;
@@ -478,7 +486,7 @@ namespace Renderer
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
 #endif
 
-            deviceFeatures.pNext = &atomicInt64Features;
+            deviceFeatures.pNext = &storage16BitFeatures;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
 

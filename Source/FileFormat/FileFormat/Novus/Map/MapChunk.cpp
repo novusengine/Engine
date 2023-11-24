@@ -278,8 +278,8 @@ namespace Map
 			{
 				f32 height = cellBaseHeight + cellInfo.mcvt.heightMap[j];
 
-				cell.cellMinHeight = glm::min(cell.cellMinHeight, static_cast<f16>(height));
-				cell.cellMaxHeight = glm::max(cell.cellMaxHeight, static_cast<f16>(height));
+				cell.cellMinHeight = glm::min(cell.cellMinHeight, height);
+				cell.cellMaxHeight = glm::max(cell.cellMaxHeight, height);
 				cell.vertexData[j].height = height;
 
 				out.heightHeader.gridMinHeight = glm::min(out.heightHeader.gridMinHeight, height);
