@@ -54,6 +54,7 @@ add_subdirectory(gli)
 add_subdirectory(imgui)
 add_subdirectory(typesafe)
 add_subdirectory(spdlog)
+add_subdirectory(Catch2)
 
 if(NOT TARGET tracy)
     add_subdirectory(TracyProfiler)
@@ -107,4 +108,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     spdlog
     refl-cpp::refl-cpp
     base64::base64
+    Catch2::Catch2
 )
