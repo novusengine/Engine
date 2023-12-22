@@ -457,7 +457,11 @@ namespace ClientDB
         u32 Count() { return _storage->Count(); }
         u32 Size() { return Count(); }
 
-        bool IsValid(const T& element) { return element.GetID() != std::numeric_limits<u32>().max(); }
+        bool IsValid(const T& element)
+        {
+            u32 elementID = element.GetID();
+            return elementID != std::numeric_limits<u32>().max() && elementID < _storage->_maxID;
+        }
 
         bool IsDirty() { return _storage->IsDirty(); }
         void MarkDirty() { _storage->MarkDirty(); }
