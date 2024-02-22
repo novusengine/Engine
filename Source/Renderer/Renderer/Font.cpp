@@ -10,6 +10,8 @@
 
 #include <filesystem>
 
+#undef CreateFont
+
 namespace Renderer
 {
     robin_hood::unordered_map<u64, Font*> Font::_fonts;

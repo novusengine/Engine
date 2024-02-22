@@ -19,10 +19,8 @@ namespace DB2::WDC3
 		bool TryReadRecord(const DB2::WDC3::Layout& layout, u32 index, u32& outSectionID, u32& outRecordID, u8*& outRecordData);
 
 		template <typename T>
-		const T* GetField(const DB2::WDC3::Layout& layout, const u32 sectionID, const u32 recordID, const u8* recordData, u32 fieldIndex)
+		const T GetField(const DB2::WDC3::Layout& layout, const u32 sectionID, const u32 recordID, const u8* recordData, u32 fieldIndex)
 		{
-			const T* result = nullptr;
-
 			const Layout::FieldStorageInfo& fieldStorageInfo = layout.fieldStorageInfos[fieldIndex];
 			//u32 bytesToRead = fieldStorageInfo.sizeInBits >> 0x3; // This converts from Bits -> Bytes
 
@@ -43,9 +41,7 @@ namespace DB2::WDC3
 						u32 byteOffset = fieldStorageInfo.offsetInBits >> 3; // This converts from Bits -> Bytes
 
 						const u8* fieldData = &recordData[byteOffset];
-						result = reinterpret_cast<const T*>(fieldData);
-
-						break;
+						return *reinterpret_cast<const T*>(fieldData);
 					}
 
 					case Layout::FieldStorageInfo::CompressionType::Bitpacked:
@@ -66,10 +62,8 @@ namespace DB2::WDC3
 							unpackedBits = *reinterpret_cast<u32*>(&unpackedBitsSigned);
 						}
 
-						const u8* fieldData = reinterpret_cast<u8*>(&unpackedBits);
-						result = reinterpret_cast<const T*>(fieldData);
-
-						break;
+						T result = static_cast<T>(unpackedBits);
+						return result;
 					}
 
 					case Layout::FieldStorageInfo::CompressionType::CommonData:
@@ -83,10 +77,7 @@ namespace DB2::WDC3
 								value = itr->second;
 						}
 
-						const u8* fieldData = reinterpret_cast<const u8*>(&value);
-						result = reinterpret_cast<const T*>(fieldData);
-
-						break;
+						return *reinterpret_cast<const T*>(&value);
 					}
 
 					case Layout::FieldStorageInfo::CompressionType::BitpackedIndexed:
@@ -104,7 +95,7 @@ namespace DB2::WDC3
 							assert(palleteIndex <= palleteMaxIndex);
 
 							const u8* fieldData = reinterpret_cast<const u8*>(&fieldPalleteData[palleteIndex]);
-							result = reinterpret_cast<const T*>(fieldData);
+							return *reinterpret_cast<const T*>(fieldData);
 						}
 						else
 						{
@@ -113,7 +104,7 @@ namespace DB2::WDC3
 							// We must multiply palleteIndex with arrayCount here, because the pallete data stores "arrayCount" of values for every "unique" set of values.
 							u32 palleteArrayIndex = palleteIndex * arrayCount;
 							const u8* fieldData = reinterpret_cast<const u8*>(&fieldPalleteData[palleteArrayIndex]);
-							result = reinterpret_cast<const T*>(fieldData);
+							return *reinterpret_cast<const T*>(fieldData);
 						}
 
 						break;
@@ -123,7 +114,81 @@ namespace DB2::WDC3
 				}
 			}
 
-			return result;
+			return T();
+		}
+
+		template <typename T>
+		const T* GetFieldPtr(const DB2::WDC3::Layout& layout, const u32 sectionID, const u32 recordID, const u8* recordData, u32 fieldIndex)
+		{
+			const Layout::FieldStorageInfo& fieldStorageInfo = layout.fieldStorageInfos[fieldIndex];
+			//u32 bytesToRead = fieldStorageInfo.sizeInBits >> 0x3; // This converts from Bits -> Bytes
+
+			if (layout.header.flags.HasOffsetMap)
+			{
+				// Read Sparse Field Data Here
+				//const u8* fieldData = &recordData[0];
+				//if (!TryParseSparseField(layout, sectionID, fieldData, bytesToRead))
+				//	return false;
+			}
+			else
+			{
+				// Read Field Data Here based on CompressionType
+				switch (fieldStorageInfo.compressionType)
+				{
+					case Layout::FieldStorageInfo::CompressionType::None:
+					{
+						u32 byteOffset = fieldStorageInfo.offsetInBits >> 3; // This converts from Bits -> Bytes
+
+						const u8* fieldData = &recordData[byteOffset];
+						return reinterpret_cast<const T*>(fieldData);
+					}
+
+					case Layout::FieldStorageInfo::CompressionType::Bitpacked:
+					case Layout::FieldStorageInfo::CompressionType::BitpackedSigned:
+					{
+						DebugHandler::PrintFatal("GetFieldPtr: Bitpacked and BitpackedSigned is not supported for GetFieldPtr");
+					}
+
+					case Layout::FieldStorageInfo::CompressionType::CommonData:
+					{
+						DebugHandler::PrintFatal("GetFieldPtr: CommonData is not supported for GetFieldPtr");
+					}
+
+					case Layout::FieldStorageInfo::CompressionType::BitpackedIndexed:
+					case Layout::FieldStorageInfo::CompressionType::BitpackedIndexedArray:
+					{
+						u32 bitOffset = fieldStorageInfo.offsetInBits;
+						u32 bitsToRead = fieldStorageInfo.fieldBitpackedIndexed.bitpackingSizeInBits;
+
+						const std::vector<u32>& fieldPalleteData = layout.perFieldPalleteData[fieldIndex];
+						u32 palleteMaxIndex = static_cast<u32>(fieldPalleteData.size()) - 1;
+						u32 palleteIndex = GetU32FromBits(recordData, bitOffset, bitsToRead);
+
+						if (fieldStorageInfo.compressionType == Layout::FieldStorageInfo::CompressionType::BitpackedIndexed)
+						{
+							assert(palleteIndex <= palleteMaxIndex);
+
+							const u8* fieldData = reinterpret_cast<const u8*>(&fieldPalleteData[palleteIndex]);
+							return reinterpret_cast<const T*>(fieldData);
+						}
+						else
+						{
+							u32 arrayCount = fieldStorageInfo.fieldBitpackedIndexedArray.arrayCount;
+
+							// We must multiply palleteIndex with arrayCount here, because the pallete data stores "arrayCount" of values for every "unique" set of values.
+							u32 palleteArrayIndex = palleteIndex * arrayCount;
+							const u8* fieldData = reinterpret_cast<const u8*>(&fieldPalleteData[palleteArrayIndex]);
+							return reinterpret_cast<const T*>(fieldData);
+						}
+
+						break;
+					}
+
+					default: break;
+				}
+			}
+
+			return nullptr;
 		}
 
 		char* GetString(const DB2::WDC3::Layout& db2, u32 recordIndex, u32 fieldIndex);

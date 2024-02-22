@@ -2,6 +2,8 @@
 
 #include "RenderDeviceVK.h"
 
+#include <Base/Util/StringUtils.h>
+
 namespace Renderer
 {
     namespace Backend

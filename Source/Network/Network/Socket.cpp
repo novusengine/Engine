@@ -15,6 +15,8 @@
 #include <unistd.h>
 #endif
 
+#include <limits>
+
 namespace Network
 {
     SharedPool<Socket> Socket::_pool;

@@ -6,7 +6,7 @@
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/StringUtils.h>
 
-#ifdef _WINDOWS
+#ifdef WIN32
 #include <atlbase.h>
 #include <wrl/client.h>
 #else
@@ -54,7 +54,7 @@ namespace ShaderCooker
         ULONG AddRef() override
         {
             //InterlockedIncrement(&_ref);
-            return _ref.fetch_add(1) + 1;
+            return static_cast<ULONG>(_ref.fetch_add(1) + 1);
         }
 
         ULONG Release() override
@@ -63,7 +63,7 @@ namespace ShaderCooker
             {
                 DebugHandler::PrintFatal("Inconsistent call to Release()");
             }
-            return _ref.fetch_add(-1) - 1;
+            return static_cast<ULONG>(_ref.fetch_add(-1) - 1);
         }
 
     private:
