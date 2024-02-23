@@ -16,43 +16,43 @@ class DebugHandler
 {
 public:
 	template <typename... Args>
-	inline static void Print(spdlog::level::level_enum level, std::string message, Args... args)
+	inline static void Print(spdlog::level::level_enum level, const std::string& message, Args... args)
 	{
 		spdlog::log(level, message, std::forward<Args>(args)...);
 	}
 
 	template <typename... Args>
-	inline static void Print(std::string message, Args... args)
+	inline static void Print(const std::string& message, Args... args)
 	{
 		Print(spdlog::level::level_enum::info, message, std::forward<Args>(args)...);
 	}
 
 	template <typename... Args>
-	inline static void PrintTrace(std::string message, Args... args)
+	inline static void PrintTrace(const std::string& message, Args... args)
 	{
 		Print(spdlog::level::level_enum::trace, message, std::forward<Args>(args)...);
 	}
 
 	template <typename... Args>
-	inline static void PrintDebug(std::string message, Args... args)
+	inline static void PrintDebug(const std::string& message, Args... args)
 	{
 		Print(spdlog::level::level_enum::debug, message, std::forward<Args>(args)...);
 	}
 
 	template <typename... Args>
-	inline static void PrintWarning(std::string message, Args... args)
+	inline static void PrintWarning(const std::string& message, Args... args)
 	{
 		Print(spdlog::level::level_enum::warn, message, std::forward<Args>(args)...);
 	}
 
 	template <typename... Args>
-	inline static void PrintError(std::string message, Args... args)
+	inline static void PrintError(const std::string& message, Args... args)
 	{
 		Print(spdlog::level::level_enum::err, message, std::forward<Args>(args)...);
 	}
 
 	template <typename... Args>
-	inline static void PrintFatal(std::string message, Args... args)
+	inline static void PrintFatal(const std::string& message, Args... args)
 	{
 		Print(spdlog::level::level_enum::critical, message, std::forward<Args>(args)...);
 
@@ -60,7 +60,7 @@ public:
 	}
 
 	template <typename... Args>
-	inline static void Assert(bool assertion, std::string message, Args... args)
+	inline static void Assert(bool assertion, const std::string& message, Args... args)
 	{
 		if (!assertion)
 		{

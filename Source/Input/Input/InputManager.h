@@ -5,7 +5,6 @@
 #include <Base/Util/StringUtils.h>
 
 #include <robinhood/robinhood.h>
-#include <GLFW/glfw3.h>
 
 #include <memory>
 

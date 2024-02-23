@@ -1,6 +1,9 @@
 #pragma once
 #include "Base/Types.h"
 
+#include <vector>
+#include <string_view>
+
 namespace StringUtils
 {
     // This function assumes src to be a zero terminated sanitized string with
@@ -18,7 +21,7 @@ namespace StringUtils
     std::string EscapeString(std::string const& string);
     std::string FormatThousandSeparator(i32 n);
 
-    bool BeginsWith(std::string_view const& fullString, std::string_view const& beginning);
+    bool BeginsWith(const std::string_view& fullString, const std::string_view& beginning);
     bool EndsWith(std::string const& fullString, std::string const& ending);
     bool Contains(std::string const& fullString, std::string const& substring);
     bool SearchString(const std::string& ref, const std::string& key, bool insensitive);

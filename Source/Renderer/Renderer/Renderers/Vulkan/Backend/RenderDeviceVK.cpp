@@ -27,6 +27,11 @@
 #pragma warning(pop)
 
 #include <vulkan/vulkan.h>
+
+#if WIN32
+#include <vulkan/vulkan_win32.h>
+#endif
+
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <tracy/TracyVulkan.hpp>
 

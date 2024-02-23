@@ -1,0 +1,26 @@
+-- Dependencies
+Engine.dependencyDir = path.getabsolute("Dependencies/", Engine.rootDir)
+
+print("-- Creating Dependencies --")
+Engine.dependencyGroup = "Engine/Dependencies"
+group (Engine.dependencyGroup)
+include("vulkan.lua")
+include("base64/base64.lua")
+include("catch2/catch2.lua")
+include("dxcompiler/dxcompiler.lua")
+include("enkiTS/enkiTS.lua")
+include("entt/entt.lua")
+include("glfw/glfw.lua")
+include("gli/gli.lua")
+include("glm/glm.lua")
+include("imgui/imgui.lua")
+include("json/json.lua")
+include("refl-cpp/refl-cpp.lua")
+include("robinhood/robinhood.lua")
+include("spdlog/spdlog.lua")
+include("tracyprofiler/tracy.lua")
+include("typesafe/typesafe.lua")
+include("utfcpp/utfcpp.lua")
+include("luau/luau.lua")
+group "Engine"
+print("-- Finished with Dependencies --\n")

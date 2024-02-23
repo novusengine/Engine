@@ -9,7 +9,9 @@ namespace Terrain
     /*
         - Map     is made up of chunks
         - Chunks are made up of cells
-        - Cells  are made up of patches    */
+        - Cells  are made up of patches
+    */
+
     constexpr u16 CHUNK_INVALID_ID                  = std::numeric_limits<u16>().max();
     constexpr f32 CHUNK_SIZE                        = 533.3333f;
     constexpr f32 CHUNK_HALF_SIZE                   = CHUNK_SIZE / 2.0f;

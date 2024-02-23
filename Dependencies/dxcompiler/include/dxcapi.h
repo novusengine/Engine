@@ -30,7 +30,7 @@
 #define CROSS_PLATFORM_UUIDOF(interface, spec)                                 \
   struct __declspec(uuid(spec)) interface;
 #endif
-
+#include <Unknwnbase.h>
 #else
 
 #include <dlfcn.h>
