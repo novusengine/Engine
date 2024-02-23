@@ -9,10 +9,13 @@ Engine.Init = function(self, rootDir, buildDir, binDir)
     self.buildDir = buildDir
     self.binDir = binDir
 
-    local buildSettings = path.getabsolute("BuildSettings.lua", self.rootDir)
     local projectUtils = path.getabsolute("ProjectUtil.lua", self.rootDir)
-    include(buildSettings)
     include(projectUtils)
+
+    local buildSettings = path.getabsolute("BuildSettings.lua", self.rootDir)
+    local silentFailOnDuplicateSetting = not Engine.isRoot
+    InitBuildSettings(silentFailOnDuplicateSetting)
+    include(buildSettings)
 
     print("\n-- Directory Info (" .. self.name .. ") --")
     print(" Root Directory : " .. self.rootDir)
@@ -23,7 +26,7 @@ Engine.Init = function(self, rootDir, buildDir, binDir)
     if (Engine.isRoot) then
         workspace "Engine"
             location (buildDir)
-            configurations { "debug", "release" }
+            configurations { "Debug", "RelDebug", "Release" }
 
             filter "system:Windows"
                 system "windows"
@@ -46,8 +49,8 @@ if HasRoot == nil then
     HasRoot = true
 
     local rootDir = path.getabsolute(".")
-    local buildDir = path.getabsolute("build/", rootDir)
-    local binDir = path.getabsolute("bin/", buildDir)
+    local buildDir = path.getabsolute("Build/", rootDir)
+    local binDir = path.getabsolute("Bin/", buildDir)
 
     Engine.isRoot = true
     Engine:Init(rootDir, buildDir, binDir)

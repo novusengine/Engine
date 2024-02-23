@@ -1,7 +1,3 @@
-local isMSVC = BuildSettings:Get("Using MSVC")
-local multithreadedCompilation = BuildSettings:Get("Multithreaded Compilation")
-local multithreadedCoreCount = BuildSettings:Get("Multithreaded Core Count")
-
 function ProjectTemplate(name, projectType, sourceDir, binDir, dependencies, defs, cppVersion)
     local internalName = "Project-" .. name
     if _G[internalName] ~= nil then
@@ -114,19 +110,34 @@ function ProjectTemplate(name, projectType, sourceDir, binDir, dependencies, def
             end
         end
 
-        filter "configurations:debug"
+        filter "configurations:Debug"
+            runtime "Debug"
             symbols "On"
             defines { "NC_DEBUG" }
 
-        filter "configurations:release"
+        filter "configurations:RelDebug"
             defines { "NC_RELEASE" }
+            runtime "Release"
+            symbols "On"
             optimize "On"
+
+        filter "configurations:Release"
+            defines { "NC_RELEASE" }
+            runtime "Release"
+            symbols "Off"
+            optimize "Full"
+            flags { "NoBufferSecurityCheck", "NoRuntimeChecks" }
 
         filter "platforms:Win64"
             system "Windows"
             architecture "x86_64"
             defines { "WIN32", "WINDOWS" }
 
+    local isMSVC = BuildSettings:Get("Using MSVC")
+    local multithreadedCompilation = BuildSettings:Get("Multithreaded Compilation")
+    local multithreadedCoreCount = BuildSettings:Get("Multithreaded Core Count")
+
+    if multithreadedCompilation then
         if isMSVC then
             local cores = multithreadedCoreCount or 0
             if cores > 0 then
@@ -135,6 +146,7 @@ function ProjectTemplate(name, projectType, sourceDir, binDir, dependencies, def
                 buildoptions { "/MP" }
             end
         end
+    end
 end
 
 function CreateDep(name, callback, dependencies)
@@ -168,4 +180,52 @@ end
 
 function AddDefines(list)
     defines { list }
+end
+
+function InitBuildSettings(silentFailOnDuplicateSetting)
+    if BuildSettings == nil then
+        BuildSettings = { }
+
+        BuildSettings.Has = function(settings, name)
+            return settings[name] ~= nil
+        end
+
+        BuildSettings.Add = function(settings, name, value)
+            local silentFail = settings:ShouldSilentFailOnDuplicateSetting()
+
+            if settings:Has(name) then
+                if silentFail then
+                    return
+                end
+
+                error("Tried to call BuildSettings:Add with name '" .. name .. '" but a setting with that name already exists')
+            end
+
+            settings[name] = value
+        end
+
+        BuildSettings.Get = function(settings, name)
+            if not settings:Has(name) then
+                return nil
+            end
+
+            return settings[name]
+        end
+
+        BuildSettings.SetSilentFailOnDuplicateSetting = function(settings, silentFailOnDuplicateSetting)
+            BuildSettings["SilentFailOnDuplicateSetting"] = silentFailOnDuplicateSetting
+        end
+
+        BuildSettings.ShouldSilentFailOnDuplicateSetting = function(settings)
+            local option = BuildSettings["SilentFailOnDuplicateSetting"]
+
+            if option == nil then
+                return false
+            end
+
+            return option
+        end
+    end
+
+    BuildSettings:SetSilentFailOnDuplicateSetting(silentFailOnDuplicateSetting)
 end
