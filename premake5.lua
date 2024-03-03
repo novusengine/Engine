@@ -1,5 +1,8 @@
 Engine = { }
 Engine.name = "Engine"
+Engine.rootDir = ""
+Engine.buildDir = ""
+Engine.binDir = ""
 Engine.isRoot = false
 
 Engine.Init = function(self, rootDir, buildDir, binDir)
@@ -7,13 +10,13 @@ Engine.Init = function(self, rootDir, buildDir, binDir)
 
     self.rootDir = rootDir
     self.buildDir = buildDir
-    self.binDir = binDir
+    self.binDir = binDir .. "/" .. self.name
 
-    local projectUtils = path.getabsolute("ProjectUtil.lua", self.rootDir)
+    local projectUtils = path.getabsolute("Premake/ProjectUtil.lua", self.rootDir)
     include(projectUtils)
 
-    local buildSettings = path.getabsolute("BuildSettings.lua", self.rootDir)
-    local silentFailOnDuplicateSetting = not Engine.isRoot
+    local buildSettings = path.getabsolute("Premake/BuildSettings.lua", self.rootDir)
+    local silentFailOnDuplicateSetting = not self.isRoot
     InitBuildSettings(silentFailOnDuplicateSetting)
     include(buildSettings)
 
@@ -23,8 +26,8 @@ Engine.Init = function(self, rootDir, buildDir, binDir)
     print(" Bin Directory : " .. self.binDir)
     print("--\n")
 
-    if (Engine.isRoot) then
-        workspace "Engine"
+    if self.isRoot then
+        workspace (self.name)
             location (buildDir)
             configurations { "Debug", "RelDebug", "Release" }
 
