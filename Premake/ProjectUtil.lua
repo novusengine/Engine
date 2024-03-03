@@ -85,7 +85,7 @@ function ProjectTemplate(name, projectType, sourceDir, binDir, dependencies, def
         kind (projectType)
         language "C++"
         cppdialect (cppVersion)
-        targetdir (Engine.binDir .. "/%{cfg.buildcfg}")
+        targetdir (binDir .. "/%{cfg.buildcfg}")
         characterset ("ASCII")
         vpaths { ["*"] = name }
 
@@ -164,6 +164,16 @@ function CreateDep(name, callback, dependencies)
 
     _G[internalName].Callback = callback
     _G[internalName].Dependencies = dependencies
+end
+
+function IncludeSubmodule(name, rootDir, binDir)
+    local submoduleRootDir = path.getabsolute("Submodules/".. name .. "/", rootDir)
+    local submoduleBuildDir = path.getabsolute("Build/".. name .. "/", rootDir)
+    local submodulePremakeFile = path.getabsolute("premake5.lua", submoduleRootDir)
+
+    include(submodulePremakeFile)
+
+    _G[name]:Init(submoduleRootDir, submoduleBuildDir, binDir)
 end
 
 function AddFiles(list)
