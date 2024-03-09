@@ -126,7 +126,6 @@ function ProjectTemplate(name, projectType, sourceDir, binDir, dependencies, def
             runtime "Release"
             symbols "Off"
             optimize "Full"
-            flags { "NoBufferSecurityCheck", "NoRuntimeChecks" }
 
         filter "platforms:Win64"
             system "Windows"
