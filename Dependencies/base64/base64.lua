@@ -1,5 +1,5 @@
 local function Include()
-    local includePath = path.getabsolute("base64/", Engine.Engine.dependencyDir);
+    local includePath = path.getabsolute("base64/", Engine.dependencyDir);
     AddIncludeDirs(includePath)
 end
 
