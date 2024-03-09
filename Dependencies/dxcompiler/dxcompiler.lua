@@ -27,3 +27,11 @@ local function Include()
 end
 
 CreateDep("dxcompiler", Include)
+
+if os.istarget("windows") then
+    local libPath = path.getabsolute("dxcompiler/lib/windows/dxcompiler.dll", Engine.dependencyDir)
+    BuildSettings:Add("DXCompiler Dynamic Lib Path", libPath)
+else
+    local libPath = path.getabsolute("dxcompiler/lib/linux/dxcompiler.so", Engine.dependencyDir)
+    BuildSettings:Add("DXCompiler Dynamic Lib Path", libPath)
+end

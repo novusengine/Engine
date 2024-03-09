@@ -7,7 +7,7 @@ local function SetupLib()
 
     ProjectTemplate("EnkiTS", "StaticLib", nil, Engine.binDir, dependencies, defines)
 
-    local sourceDir = path.getabsolute("src/", basePath)
+    local sourceDir = path.getabsolute("enkiTS/", basePath)
     local includeDir = sourceDir
     local files =
     {
@@ -24,7 +24,7 @@ end
 SetupLib()
 
 local function Include()
-    local includeDir = path.getabsolute("enkiTS/src/", Engine.dependencyDir)
+    local includeDir = path.getabsolute("enkiTS/", Engine.dependencyDir)
     AddIncludeDirs(includeDir)
 
     AddLinks("EnkiTS")

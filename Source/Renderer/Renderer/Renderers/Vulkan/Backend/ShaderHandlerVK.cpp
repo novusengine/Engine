@@ -19,7 +19,7 @@ namespace Renderer
 {
     namespace Backend
     {
-        const std::filesystem::path SHADER_CACHE_PATH = "Data/shaders/_shaders.cache";
+        const std::filesystem::path SHADER_CACHE_PATH = "Data/Shaders/_shaders.cache";
 
         void ShaderHandlerVK::Init(RenderDeviceVK* device)
         {
@@ -47,7 +47,7 @@ namespace Renderer
             }
 
             //_shaderCompiler->SetSourceDirPath(SHADER_SOURCE_DIR);
-            _shaderCompiler->SetBinDirPath("Data/shaders");
+            _shaderCompiler->SetBinDirPath("Data/Shaders");
             _shaderCompiler->SetShaderCache(_shaderCache);
             _shaderCompiler->SetShouldForceCompile(true); // ShaderHandler will only request compilation of files we want to compile, this might include force compiling something that is up to date.
         }
@@ -171,7 +171,7 @@ namespace Renderer
         {
             ZoneScoped;
             std::string binShaderPath = shaderPath + ".spv";
-            std::filesystem::path binPath = std::filesystem::path("Data/shaders/") / binShaderPath;
+            std::filesystem::path binPath = std::filesystem::path("Data/Shaders/") / binShaderPath;
             return std::filesystem::absolute(binPath.make_preferred());
         }
 
