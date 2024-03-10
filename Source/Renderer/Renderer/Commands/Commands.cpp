@@ -1,6 +1,7 @@
 #include "Clear.h"
 #include "Draw.h"
 #include "DrawIndirect.h"
+#include "DrawIndirectCount.h"
 #include "DrawIndexed.h"
 #include "DrawIndexedIndirect.h"
 #include "DrawIndexedIndirectCount.h"
@@ -44,6 +45,7 @@ namespace Renderer
         const BackendDispatchFunction ClearDepthImage::DISPATCH_FUNCTION = &BackendDispatch::ClearDepthImage;
         const BackendDispatchFunction Draw::DISPATCH_FUNCTION = &BackendDispatch::Draw;
         const BackendDispatchFunction DrawIndirect::DISPATCH_FUNCTION = &BackendDispatch::DrawIndirect;
+        const BackendDispatchFunction DrawIndirectCount::DISPATCH_FUNCTION = &BackendDispatch::DrawIndirectCount;
         const BackendDispatchFunction DrawIndexed::DISPATCH_FUNCTION = &BackendDispatch::DrawIndexed;
         const BackendDispatchFunction DrawIndexedIndirect::DISPATCH_FUNCTION = &BackendDispatch::DrawIndexedIndirect;
         const BackendDispatchFunction DrawIndexedIndirectCount::DISPATCH_FUNCTION = &BackendDispatch::DrawIndexedIndirectCount;

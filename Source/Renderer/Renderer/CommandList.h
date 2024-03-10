@@ -91,6 +91,10 @@ namespace Renderer
         void Draw(u32 numVertices, u32 numInstances, u32 vertexOffset, u32 instanceOffset);
         void DrawIndirect(BufferResource argumentResource, u32 argumentBufferOffset, u32 drawCount);
         void DrawIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset, u32 drawCount);
+        void DrawIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
+        void DrawIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
+        void DrawIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
+        void DrawIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount);
         void DrawIndexed(u32 numIndices, u32 numInstances, u32 indexOffset, u32 vertexOffset, u32 instanceOffset);
         void DrawIndexedIndirect(BufferResource argumentResource, u32 argumentBufferOffset, u32 drawCount);
         void DrawIndexedIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset, u32 drawCount);

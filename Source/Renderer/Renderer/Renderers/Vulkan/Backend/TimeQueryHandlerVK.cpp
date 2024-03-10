@@ -28,7 +28,7 @@ namespace Renderer
         {
             VkQueryPool queryPool;
 
-            static const u32 NUM_TOTAL_TIMESTAMPS = 100;
+            static const u32 NUM_TOTAL_TIMESTAMPS = 200;
             u32 numTimestamps = 0;
 
             std::vector<TimeQuery> timeQueries;

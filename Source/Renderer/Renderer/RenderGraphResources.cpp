@@ -432,7 +432,7 @@ namespace Renderer
         }
     }
 
-    void _Access(Memory::Allocator* allocator, TrackedBufferBitSets& bufferPermissions, u32 passIndex, BufferID bufferID, AccessType accessType, BufferPassUsage bufferPassUsage)
+    void _Access(Renderer* renderer, Memory::Allocator* allocator, TrackedBufferBitSets& bufferPermissions, u32 passIndex, BufferID bufferID, AccessType accessType, BufferPassUsage bufferPassUsage)
     {
         ZoneScoped;
 
@@ -444,7 +444,8 @@ namespace Renderer
             BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
             if (readBitSet.Has(bufferIndex))
             {
-                DebugHandler::PrintFatal("RenderGraphResources : Pass {} tried to Access BufferID {} twice, you may only .Read or .Write a resource once in the same pass!", passIndex, static_cast<BufferID::type>(bufferID));
+                const std::string& bufferName = renderer->GetBufferName(bufferID);
+                DebugHandler::PrintFatal("RenderGraphResources : Pass {} tried to Access BufferID {} ({}) twice, you may only .Read or .Write a resource once in the same pass!", passIndex, bufferName, static_cast<BufferID::type>(bufferID));
             }
         }
 
@@ -495,7 +496,7 @@ namespace Renderer
         }
 
         TrackedPass& trackedPass = data->trackedPasses[passIndex];
-        _Access(_allocator, trackedPass.bufferPermissions, passIndex, bufferID, accessType, bufferPassUsage);
+        _Access(_renderer, _allocator, trackedPass.bufferPermissions, passIndex, bufferID, accessType, bufferPassUsage);
     }
 
     void RenderGraphResources::Use(u32 passIndex, DescriptorSetResource resource)
