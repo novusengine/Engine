@@ -7,6 +7,7 @@
 #include "Commands/Clear.h"
 #include "Commands/Draw.h"
 #include "Commands/DrawIndirect.h"
+#include "Commands/DrawIndirectCount.h"
 #include "Commands/DrawIndexed.h"
 #include "Commands/DrawIndexedIndirect.h"
 #include "Commands/DrawIndexedIndirectCount.h"
@@ -411,6 +412,94 @@ namespace Renderer
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         Commands::DrawIndirect::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::DrawIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
+    {
+        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        DebugHandler::Assert(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
+        _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
+
+        BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
+        BufferID drawCountBuffer = _resources->GetBuffer(drawCountResource);
+
+        Commands::DrawIndirectCount* command = AddCommand<Commands::DrawIndirectCount>();
+        command->argumentBuffer = argumentBuffer;
+        command->argumentBufferOffset = argumentBufferOffset;
+        command->drawCountBuffer = drawCountBuffer;
+        command->drawCountBufferOffset = drawCountBufferOffset;
+        command->maxDrawCount = maxDrawCount;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DrawIndirectCount::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::DrawIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
+    {
+        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        DebugHandler::Assert(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
+        _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
+
+        BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
+        BufferID drawCountBuffer = _resources->GetBuffer(drawCountResource);
+
+        Commands::DrawIndirectCount* command = AddCommand<Commands::DrawIndirectCount>();
+        command->argumentBuffer = argumentBuffer;
+        command->argumentBufferOffset = argumentBufferOffset;
+        command->drawCountBuffer = drawCountBuffer;
+        command->drawCountBufferOffset = drawCountBufferOffset;
+        command->maxDrawCount = maxDrawCount;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DrawIndirectCount::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::DrawIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
+    {
+        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        DebugHandler::Assert(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
+        _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
+
+        BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
+        BufferID drawCountBuffer = _resources->GetBuffer(drawCountResource);
+
+        Commands::DrawIndirectCount* command = AddCommand<Commands::DrawIndirectCount>();
+        command->argumentBuffer = argumentBuffer;
+        command->argumentBufferOffset = argumentBufferOffset;
+        command->drawCountBuffer = drawCountBuffer;
+        command->drawCountBufferOffset = drawCountBufferOffset;
+        command->maxDrawCount = maxDrawCount;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DrawIndirectCount::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::DrawIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
+    {
+        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        DebugHandler::Assert(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
+        _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
+
+        BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
+        BufferID drawCountBuffer = _resources->GetBuffer(drawCountResource);
+
+        Commands::DrawIndirectCount* command = AddCommand<Commands::DrawIndirectCount>();
+        command->argumentBuffer = argumentBuffer;
+        command->argumentBufferOffset = argumentBufferOffset;
+        command->drawCountBuffer = drawCountBuffer;
+        command->drawCountBufferOffset = drawCountBufferOffset;
+        command->maxDrawCount = maxDrawCount;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DrawIndirectCount::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
 

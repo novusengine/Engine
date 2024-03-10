@@ -4,6 +4,7 @@
 #include "Commands/Clear.h"
 #include "Commands/Draw.h"
 #include "Commands/DrawIndirect.h"
+#include "Commands/DrawIndirectCount.h"
 #include "Commands/DrawIndexed.h"
 #include "Commands/DrawIndexedIndirect.h"
 #include "Commands/DrawIndexedIndirectCount.h"
@@ -79,6 +80,13 @@ namespace Renderer
         ZoneScopedC(tracy::Color::Red3);
         const Commands::DrawIndirect* actualData = static_cast<const Commands::DrawIndirect*>(data);
         renderer->DrawIndirect(commandList, actualData->argumentBuffer, actualData->argumentBufferOffset, actualData->drawCount);
+    }
+
+    void BackendDispatch::DrawIndirectCount(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::DrawIndirectCount* actualData = static_cast<const Commands::DrawIndirectCount*>(data);
+        renderer->DrawIndirectCount(commandList, actualData->argumentBuffer, actualData->argumentBufferOffset, actualData->drawCountBuffer, actualData->drawCountBufferOffset, actualData->maxDrawCount);
     }
 
     void BackendDispatch::DrawIndexed(Renderer* renderer, CommandListID commandList, const void* data)

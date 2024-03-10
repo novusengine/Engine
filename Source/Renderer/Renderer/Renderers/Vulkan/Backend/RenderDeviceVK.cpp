@@ -48,6 +48,7 @@ namespace Renderer
     namespace Backend
     {
         bool RenderDeviceVK::_initialized = false;
+        PFN_vkCmdDrawIndirectCountKHR RenderDeviceVK::fnVkCmdDrawIndirectCountKHR = nullptr;
         PFN_vkCmdDrawIndexedIndirectCountKHR RenderDeviceVK::fnVkCmdDrawIndexedIndirectCountKHR = nullptr;
 
         const std::vector<const char*> validationLayers =
@@ -167,6 +168,7 @@ namespace Renderer
             _descriptorMegaPool = new DescriptorMegaPoolVK();
             _descriptorMegaPool->Init(FRAME_INDEX_COUNT, this);
 
+            fnVkCmdDrawIndirectCountKHR = (PFN_vkCmdDrawIndirectCountKHR)vkGetDeviceProcAddr(_device, "vkCmdDrawIndirectCountKHR");
             fnVkCmdDrawIndexedIndirectCountKHR = (PFN_vkCmdDrawIndexedIndirectCountKHR)vkGetDeviceProcAddr(_device, "vkCmdDrawIndexedIndirectCountKHR");
 
             _initialized = true;
@@ -478,10 +480,7 @@ namespace Renderer
             deviceFeatures.features.geometryShader = VK_TRUE;
             deviceFeatures.features.fillModeNonSolid = VK_TRUE;
             deviceFeatures.features.depthClamp = VK_TRUE;
-
-#if !WIN32
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
-#endif
 
             deviceFeatures.pNext = &atomicInt64Features;
 
@@ -1325,6 +1324,7 @@ namespace Renderer
 #endif
             extensions.push_back("VK_KHR_get_physical_device_properties2");
             extensions.push_back("VK_EXT_debug_report");
+            extensions.push_back("VK_EXT_debug_utils");
 
 #if !WIN32
             extensions.push_back("VK_KHR_xlib_surface");

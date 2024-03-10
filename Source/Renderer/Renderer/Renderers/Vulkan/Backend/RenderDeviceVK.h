@@ -117,6 +117,7 @@ namespace Renderer
 
             ImguiContext* GetImguiContext() { return _imguiContext; }
 
+            static PFN_vkCmdDrawIndirectCountKHR fnVkCmdDrawIndirectCountKHR;
             static PFN_vkCmdDrawIndexedIndirectCountKHR fnVkCmdDrawIndexedIndirectCountKHR;
 
             bool HasExtendedTextureSupport() { return _hasExtendedTextureSupport; }
