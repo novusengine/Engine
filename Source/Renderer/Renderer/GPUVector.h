@@ -50,6 +50,11 @@ namespace Renderer
             SetDirtyRegion(startIndex * sizeof(T), count * sizeof(T));
         }
 
+        void SetDirty()
+        {
+            SetDirtyElements(0, _vector.size());
+        }
+
         // Returns true if we had to resize the buffer
         bool SyncToGPU(Renderer* renderer)
         {
@@ -141,15 +146,21 @@ namespace Renderer
         {
             size_t vectorByteSize = _vector.size() * sizeof(T);
 
-            if (vectorByteSize == 0) // Not sure about this
-                return false;
-
             if (!_initialized)
             {
                 _renderer = renderer;
                 _allocator.Init(0, 0);
                 _initialized = true;
+
+                if (vectorByteSize == 0) // Not sure about this
+                {
+                    ResizeBuffer(renderer, 1, false);
+                    return true;
+                }
             }
+
+            if (vectorByteSize == 0) // Not sure about this
+                return false;
 
             size_t allocatedBytes = _allocator.AllocatedBytes();
             size_t bufferByteSize = _allocator.Size();
