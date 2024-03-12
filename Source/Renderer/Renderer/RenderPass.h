@@ -31,9 +31,9 @@ namespace Renderer
         typedef std::function<bool(PassData&, RenderGraphBuilder&)> SetupFunction;
         typedef std::function<void(PassData&, RenderGraphResources&, CommandList&)> ExecuteFunction;
     
-        RenderPass(std::string& name, SetupFunction onSetup, ExecuteFunction onExecute)
-            : _onSetup(onSetup)
-            , _onExecute(onExecute)
+        RenderPass(std::string& name, SetupFunction& onSetup, ExecuteFunction& onExecute)
+            : _onSetup(std::move(onSetup))
+            , _onExecute(std::move(onExecute))
         {
             if (name.length() >= 32)
             {
