@@ -135,7 +135,7 @@ namespace Adt
 		u32 unused13 = 0;
 		u32 unused14 = 0;
 	};
-	struct MH2O // MH2O provides us with multiple lists related to water information.
+	struct MH2O // MH2O provides us with multiple lists related to liquid information.
 	{
 	public:
 		struct LiquidHeader
@@ -369,7 +369,7 @@ namespace Adt
 		struct Flags
 		{
 			u32 IsUsed : 1;
-			u32 IsWaterOnly : 1;
+			u32 IsLiquidOnly : 1;
 			u32 IsLoaded : 1; // [Runtime Only, Original Client]
 		};
 
