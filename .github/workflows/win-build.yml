@@ -1,0 +1,24 @@
+name: win-build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  win-build:
+    runs-on: [self-hosted, windows, x64]
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: false
+        repository: novusengine/Engine
+
+    - name: Premake
+      run: |
+        premake5 vs2022
+
+    - name: Build
+      run: |
+        msbuild /m /p:Configuration=Debug Engine.sln
