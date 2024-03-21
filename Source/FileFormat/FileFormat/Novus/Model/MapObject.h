@@ -34,14 +34,14 @@ namespace Model
 			u32 HasLights : 1;
 			u32 HasLOD : 1;
 			u32 HasDoodads : 1;
-			u32 HasWater : 1;
+			u32 HasLiquid : 1;
 			u32 IsInterior : 1;
 			u32 : 1;
 			u32 IsMountQueryAllowed : 1;
 			u32 NoPortalCulling : 1;
 			u32 : 1;
 			u32 ShowSkybox : 1;
-			u32 WaterIsOcean : 1;
+			u32 LiquidIsOcean : 1;
 			u32 : 1;
 			u32 IsMountAllowed : 1;
 			u32 : 2;

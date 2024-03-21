@@ -47,7 +47,7 @@ namespace Map
 			}
 		}
 
-		// Water
+		// Liquid
 		{
 			u32 numLiquidHeaders = static_cast<u32>(liquidInfo.headers.size());
 			output.write(reinterpret_cast<char const*>(&numLiquidHeaders), sizeof(u32)); // Write number of liquid headers
@@ -154,7 +154,7 @@ namespace Map
 			}
 		}
 
-		// Read Water
+		// Read Liquid
 		{
 			u32 numLiquidHeaders = 0;
 			if (!buffer->GetU32(numLiquidHeaders))
@@ -370,7 +370,7 @@ namespace Map
 			}
 		}
 
-		// Read Water Data
+		// Read Liquid Data
 		{
 			u32 numHeaders = static_cast<u32>(layout.mh2o.headers.size());
 			u32 numInstances = static_cast<u32>(layout.mh2o.instances.size());
