@@ -6,7 +6,7 @@ on:
 
 jobs:
   win-build:
-    runs-on: [self-hosted, windows, x64]
+    runs-on: self-hosted
     strategy:
       fail-fast: false
     steps:
