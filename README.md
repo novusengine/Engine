@@ -30,6 +30,8 @@ Here we include a honorable mention to all the libraries included directly into 
 * [Cpp-Taskflow](https://github.com/cpp-taskflow/cpp-taskflow)
 
 ## How to build
+>[!TIP]
+> If you plan to use [symlink](https://schinagl.priv.at/nt/hardlinkshellext/linkshellextension.html) to link engine to the [AssetConverter](https://github.com/novusengine/AssetConverter) and [Game](https://github.com/novusengine/Game) projects, you will not build from this folder.
 1. Fork and clone the repositry
 2. Open the project folder and open a terminal within the project's directory.
 3. Use the command `premake5 vs2022`
@@ -40,4 +42,4 @@ Here we include a honorable mention to all the libraries included directly into 
 6. The solution builds to `../Build/Bin/Engine/[BuildConfig]`
 
 ## How to use
-If you build this project, you will probably want to include it in the [AssetConverter](https://github.com/novusengine/AssetConverter) and [Game](https://github.com/novusengine/Game) projects. This is unecessary, but it is recommanded to do so and with the assistance of [symlink](https://schinagl.priv.at/nt/hardlinkshellext/linkshellextension.html). 
+This project is a dependency of the [AssetConverter](https://github.com/novusengine/AssetConverter) and [Game](https://github.com/novusengine/Game) projects. You can either copy/paste or symlink the engine into the `Submodule` folder of the Asset Converter and Game projects. Both actions will override the already cloned engine inside those projects.
