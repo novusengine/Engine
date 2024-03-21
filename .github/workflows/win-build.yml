@@ -21,4 +21,4 @@ jobs:
 
     - name: Build
       run: |
-        msbuild /m /p:Configuration=Debug Engine.sln
+        msbuild /m /p:Configuration=Debug Build/Engine.sln
