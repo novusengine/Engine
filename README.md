@@ -15,8 +15,8 @@ You will find the developers to be active on the discord and always up for answe
 
 ## Dependencies
 * [OpenSSL 1.1.0](https://www.openssl.org/source/)
-* [CMAKE 3.12 or newer](https://cmake.org/download/)
-* [Vulkan](https://vulkan.lunarg.com/)
+* [Premake5](https://premake.github.io/)
+* [Vulkan 1.1 (or higher)](https://vulkan.lunarg.com/)
 
 ## Libraries
 Here we include a honorable mention to all the libraries included directly into the source of NovusCore. You do not need to download these on your own, but we felt it was important to address these as without them, NovusCore would be a lot more time consuming to develop.
