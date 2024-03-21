@@ -40,8 +40,6 @@ Here we include a honorable mention to all the libraries included directly into 
 * [Base64](https://github.com/tobiaslocker/base64)
 
 ## How to build (Microsoft Visual 2022)
->[!TIP]
-> If you plan to use [symlink](https://schinagl.priv.at/nt/hardlinkshellext/linkshellextension.html) to link engine to the [AssetConverter](https://github.com/novusengine/AssetConverter) and [Game](https://github.com/novusengine/Game) projects, you do not need to run premake or build the solution from this folder.
 1. Download the dependencies.
 2. Fork and clone the repositry
 3. Open the project folder and open a terminal within the project's directory.
