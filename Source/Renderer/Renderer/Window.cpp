@@ -40,7 +40,6 @@ namespace Novus
         }
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        //glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // Commenting out to allow resizing
 
 #if NC_Debug
         _window = glfwCreateWindow(width, height, "CNovusCore (DEBUG)", NULL, NULL);
