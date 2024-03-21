@@ -30,6 +30,11 @@ namespace Renderer
 
         void SetDirtyRegion(size_t offset, size_t size)
         {
+            if (size == 0)
+            {
+                DebugHandler::PrintFatal("GPUVector::SetDirtyRegion: Size is 0, this is not allowed!");
+            }
+
             size_t allocatedBytes = _allocator.AllocatedBytes();
             if (offset >= allocatedBytes)
                 return;
