@@ -8,7 +8,7 @@ namespace glm
 {
 	void to_json(nlohmann::json& j, const vec4& P) 
 	{
-		j = { { "x", P.x }, { "y", P.y }, { "z", P.w }, { "w", P.z } };
+		j = { { "x", P.x }, { "y", P.y }, { "z", P.z }, { "w", P.w } };
 	};
 
 	void from_json(const nlohmann::json& j, vec4& P) 
@@ -21,7 +21,7 @@ namespace glm
 
 	void to_json(nlohmann::json& j, const ivec4& P) 
 	{
-		j = { { "x", P.x }, { "y", P.y }, { "z", P.w }, { "w", P.z } };
+		j = { { "x", P.x }, { "y", P.y }, { "z", P.z }, { "w", P.w } };
 	};
 
 	void from_json(const nlohmann::json& j, ivec4& P) 
@@ -564,6 +564,11 @@ namespace JsonUtils
 				}
 
 				config[parameter->name] = object;
+
+				if (object["initial"] == "camera.fogColor")
+				{
+					printf("type: %f\n", object["type"]);
+				}
 			}
 		}
 	}
