@@ -564,11 +564,6 @@ namespace JsonUtils
 				}
 
 				config[parameter->name] = object;
-
-				if (object["initial"] == "camera.fogColor")
-				{
-					printf("type: %f\n", object["type"]);
-				}
 			}
 		}
 	}
