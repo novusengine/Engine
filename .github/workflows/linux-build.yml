@@ -37,7 +37,7 @@ jobs:
 
     - name: Run Premake
       run: |
-        premake5 --help
+        premake5 gmake2
 
     - name: Build
       run: |
