@@ -33,10 +33,10 @@ jobs:
         sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
         sudo apt update
         sudo apt install vulkan-sdk
-        export VULKAN_SDK=/usr/include/vulkan
 
     - name: Run Premake
       run: |
+        export VULKAN_SDK=/usr/include/vulkan
         premake5 gmake2
 
     - name: Build
