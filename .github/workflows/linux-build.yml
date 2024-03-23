@@ -12,21 +12,22 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: abel0b/setup-premake@v2.3
-      with:
-        version: "5.0.0-beta2"
-
     - uses: actions/checkout@v4
       with:
         submodules: false
         repository: novusengine/Engine
 
-    - name: Dependencies
+    - name: Setup premake
+      uses: abel0b/setup-premake@v2
+      with:
+        version: "5.0.0-beta1"
+
+    - name: Install dependencies
       run: |
         sudo apt-get update && sudo apt-get install -yq clang
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100
 
-    - name: Setup
+    - name: Install Vulkan SDK
       run: |
         wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
         sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
@@ -34,9 +35,9 @@ jobs:
         sudo apt install vulkan-sdk
         export VULKAN_SDK=/usr/include/vulkan
 
-    - name: Premake
+    - name: Run Premake
       run: |
-        .premake/premake5 clang
+        premake5 --help
 
     - name: Build
       run: |
