@@ -1,0 +1,44 @@
+name: linux-build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  linux-build:
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: abel0b/setup-premake@v2.3
+      with:
+        version: "5.0.0-beta2"
+
+    - uses: actions/checkout@v4
+      with:
+        submodules: false
+        repository: novusengine/Engine
+
+    - name: Dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -yq clang-10
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-10 100
+
+    - name: Setup
+      run: |
+        wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
+        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+        sudo apt update
+        sudo apt install vulkan-sdk
+        export VULKAN_SDK=/usr/include/vulkan
+
+    - name: Premake
+      run: |
+        premake5 clang
+
+    - name: Build
+      run: |
+        cd build
+        make -j 4 -k
