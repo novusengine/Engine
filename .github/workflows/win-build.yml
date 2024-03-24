@@ -1,8 +1,7 @@
-name: win-build
+name: Windows Build
 
 on:
-  push:
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
   win-build:
