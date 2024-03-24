@@ -4,8 +4,8 @@
 struct ChunkHeader
 {
 public:
-	struct Token
-	{
+    struct Token
+    {
     public:
         constexpr Token(const char* fourCC) noexcept : _value(0)
         {
@@ -17,7 +17,7 @@ public:
 
     private:
         u32 _value;
-	};
+    };
 
 public:
     ChunkHeader(const char* fourCC) : token(fourCC) { }

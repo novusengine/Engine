@@ -2,6 +2,8 @@
 #include <Base/Types.h>
 #include <Base/Memory/Bytebuffer.h>
 
+#include <robinhood/robinhood.h>
+
 namespace Terrain
 {
     constexpr u32 TEXTURE_ID_INVALID = std::numeric_limits<u32>().max();
@@ -148,6 +150,35 @@ inline bool ReadVectorFromBuffer(std::shared_ptr<Bytebuffer>& buffer, std::vecto
     return true;
 }
 
+template <typename KeyType, typename ValueType>
+inline bool ReadUnorderedMapFromBuffer(std::shared_ptr<Bytebuffer>& buffer, robin_hood::unordered_map<KeyType, ValueType>& container)
+{
+    u32 numElements = 0;
+    if (!buffer->GetU32(numElements))
+        return false;
+
+    if (numElements)
+    {
+        container.reserve(numElements);
+
+        KeyType key = { };
+        ValueType value = { };
+
+        for (u32 i = 0; i < numElements; i++)
+        {
+            if (!buffer->Get<KeyType>(key))
+                return false;
+
+            if (!buffer->Get<ValueType>(value))
+                return false;
+
+            container[key] = value;
+        }
+    }
+
+    return true;
+}
+
 inline vec2 OctNormalWrap(vec2 v)
 {
     vec2 wrap;
@@ -245,7 +276,7 @@ namespace CoordinateSpaces
     // Z = UP
     inline vec3 DecorationRotToNovus(const vec3& pos)
     {
-        return vec3(-pos.y,- pos.z, pos.x);
+        return vec3(-pos.y, -pos.z, pos.x);
     }
 
     // Cinematic Camera Coordinate Space
@@ -274,4 +305,3 @@ namespace CoordinateSpaces
         return converted;
     }
 }
-

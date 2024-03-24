@@ -8,13 +8,13 @@
 namespace Map
 {
     bool MapHeader::Save(const std::string& path)
-	{
-		std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
-		if (!output)
-		{
-			DebugHandler::PrintError("Failed to create Map Header file. Check admin permissions {0}", path);
-			return false;
-		}
+    {
+        std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
+        if (!output)
+        {
+            DebugHandler::PrintError("Failed to create Map Header file. Check admin permissions {0}", path);
+            return false;
+        }
 
         output.write(reinterpret_cast<char const*>(&header), sizeof(header));
         output.write(reinterpret_cast<char const*>(&flags), sizeof(flags));

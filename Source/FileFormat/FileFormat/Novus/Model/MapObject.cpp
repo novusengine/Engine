@@ -305,8 +305,8 @@ namespace Model
         return true;
     }
 
-	bool MapObject::FromWMO(Wmo::Layout& layout, MapObject& out)
-	{
+    bool MapObject::FromWMO(Wmo::Layout& layout, MapObject& out)
+    {
         // Convert Materials
         {
             out.materials.resize(layout.momt.data.size());
@@ -567,5 +567,5 @@ namespace Model
         }
 
         return true;
-	}
+    }
 }
