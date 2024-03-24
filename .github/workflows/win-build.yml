@@ -6,8 +6,10 @@ on:
 jobs:
   win-build:
     runs-on: self-hosted
+    
     strategy:
       fail-fast: false
+      
     steps:
     - uses: actions/checkout@v4
       with:
