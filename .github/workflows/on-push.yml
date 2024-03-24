@@ -1,0 +1,12 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  call-windows-build:
+    uses: ./.github/workflows/win-build.yml
+
+  call-linux-build:
+    uses: ./.github/workflows/linux-build.yml
