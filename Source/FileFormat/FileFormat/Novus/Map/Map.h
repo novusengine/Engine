@@ -7,26 +7,26 @@
 
 namespace Map
 {
-	static const std::string HEADER_FILE_EXTENSION = ".map";
+    static const std::string HEADER_FILE_EXTENSION = ".map";
 
-	struct MapHeader
-	{
-	public:
-		static const u32 CURRENT_VERSION = 2;
+    struct MapHeader
+    {
+    public:
+        static const u32 CURRENT_VERSION = 2;
 
-		struct Flags
-		{
-			u32 UseMapObjectAsBase : 1;
-		};
+        struct Flags
+        {
+            u32 UseMapObjectAsBase : 1;
+        };
 
-	public:
-		FileHeader header = FileHeader(FileHeader::Type::MapHeader, CURRENT_VERSION);
+    public:
+        FileHeader header = FileHeader(FileHeader::Type::MapHeader, CURRENT_VERSION);
 
-		Flags flags = { };
-		Terrain::Placement placement = { };
+        Flags flags = { };
+        Terrain::Placement placement = { };
 
-	public:
-		bool Save(const std::string& path);
-		static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapHeader& out);
-	};
+    public:
+        bool Save(const std::string& path);
+        static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapHeader& out);
+    };
 }

@@ -387,10 +387,10 @@ namespace ClientDB
         bool _isDirty = false;
     };
 
-	template <class T>
-	struct Storage
-	{
-	public:
+    template <class T>
+    struct Storage
+    {
+    public:
         static_assert(std::is_base_of<Definitions::Base, T>::value, "ClientDB::Storage Type must derive from Base");
 
         Storage(StorageRaw* storage)
@@ -519,5 +519,5 @@ namespace ClientDB
 
     private:
         StorageRaw* _storage = nullptr;
-	};
+    };
 }

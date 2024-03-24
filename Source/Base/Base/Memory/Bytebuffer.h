@@ -680,6 +680,14 @@ public:
 
             return buffer;
         }
+        else if constexpr (size <= 16777216)
+        {
+            std::shared_ptr<Bytebuffer> buffer = _byteBuffer16777216.acquireOrCreate(nullptr, 16777216);
+            buffer->size = size;
+            buffer->Reset();
+
+            return buffer;
+        }
         else if constexpr (size <= 209715200) // This is used for the Data Extractor, largest observed file in WOTLK is 65MB, however in BFA this has been observed to be 150MB
         {
             std::shared_ptr<Bytebuffer> buffer = _byteBuffer209715200.acquireOrCreate(nullptr, 209715200);
@@ -709,6 +717,7 @@ private:
     static SharedPool<Bytebuffer> _byteBuffer524288;
     static SharedPool<Bytebuffer> _byteBuffer1048576;
     static SharedPool<Bytebuffer> _byteBuffer8388608;
+    static SharedPool<Bytebuffer> _byteBuffer16777216;
     static SharedPool<Bytebuffer> _byteBuffer209715200;
 
     class RuntimePool
