@@ -157,7 +157,6 @@ namespace Map
         {
             u32 numPlacements = out.numComplexModelPlacements;
 
-
             if (numPlacements)
             {
                 out.complexModelPlacements.resize(numPlacements);
