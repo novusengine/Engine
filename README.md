@@ -14,7 +14,7 @@ The project has an official [Discord](https://discord.gg/gz6FMZa).
 You will find the developers to be active on the discord and always up for answering any questions you might have regarding the project. Despite Novus not currently being ready for production level use, we are always welcoming any users that want to try using it.
 
 ## Dependencies
-* [OpenSSL 1.1.0](https://www.openssl.org/source/)
+* [OpenSSL 3.3.0](https://www.openssl.org/source/)
 * [Premake5](https://premake.github.io/)
 * [Vulkan 1.1 (or higher)](https://vulkan.lunarg.com/)
 
