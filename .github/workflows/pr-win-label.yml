@@ -1,4 +1,4 @@
-name: PR build-win label
+name: PR Windows Build
 
 on:
   workflow_dispatch:
