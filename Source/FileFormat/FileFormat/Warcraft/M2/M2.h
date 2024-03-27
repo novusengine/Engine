@@ -539,7 +539,7 @@ namespace M2
         M2Array<char> uniqueName = { };
         Flags flags = { };
 
-        M2Array<u32> loopingSequenceTimestamps = { };
+        M2Array<u32> globalLoops = { };
         M2Array<M2Sequence> sequences = { };
         M2Array<u16> sequenceIDToAnimationID = { };
         M2Array<M2CompBone> bones = { };

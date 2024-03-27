@@ -24,7 +24,7 @@ namespace Model
     struct ComplexModel
     {
     public:
-        static const u32 CURRENT_VERSION = 8;
+        static const u32 CURRENT_VERSION = 9;
 
         struct Flags
         {
@@ -54,7 +54,6 @@ namespace Model
         struct AnimationTrack
         {
         public:
-            u32 sequenceID = 0;
             std::vector<u32> timestamps = { };
             std::vector<T> values = { };
 
@@ -87,11 +86,9 @@ namespace Model
                     }
                 }
             }
-            AnimationTrack(AnimationTrack<T>&& other) : sequenceID(other.sequenceID), timestamps(std::move(other.timestamps)), values(std::move(other.values)) { }
+            AnimationTrack(AnimationTrack<T>&& other) : timestamps(std::move(other.timestamps)), values(std::move(other.values)) { }
             AnimationTrack<T>& operator=(const AnimationTrack<T>& other)
             {
-                sequenceID = other.sequenceID;
-
                 size_t numTimestamps = other.timestamps.size();
                 if (numTimestamps)
                 {
@@ -134,7 +131,7 @@ namespace Model
         {
         public:
             AnimationInterpolationType interpolationType = AnimationInterpolationType::NONE;
-            bool isGlobalSequence = false;
+            i16 globalLoopIndex = -1;
 
             std::vector<AnimationTrack<T>> tracks;
 
@@ -154,11 +151,11 @@ namespace Model
                     tracks[i] = other.tracks[i];
                 }
             }
-            AnimationData(AnimationData<T>&& other) : interpolationType(other.interpolationType), isGlobalSequence(other.isGlobalSequence), tracks(std::move(other.tracks)) { }
+            AnimationData(AnimationData<T>&& other) : interpolationType(other.interpolationType), globalLoopIndex(other.globalLoopIndex), tracks(std::move(other.tracks)) { }
             AnimationData<T>& operator=(const AnimationData<T>& other)
             {
                 interpolationType = other.interpolationType;
-                isGlobalSequence = other.isGlobalSequence;
+                globalLoopIndex = other.globalLoopIndex;
 
                 size_t numTracks = other.tracks.size();
                 tracks.resize(numTracks);
@@ -174,7 +171,7 @@ namespace Model
             void Serialize(std::ofstream& stream) const
             {
                 stream.write(reinterpret_cast<char const*>(&interpolationType), sizeof(AnimationInterpolationType));
-                stream.write(reinterpret_cast<char const*>(&isGlobalSequence), sizeof(bool));
+                stream.write(reinterpret_cast<char const*>(&globalLoopIndex), sizeof(i16));
 
                 u32 numTracks = static_cast<u32>(tracks.size());
                 {
@@ -183,8 +180,6 @@ namespace Model
                     for (u32 i = 0; i < numTracks; i++)
                     {
                         const AnimationTrack<T>& track = tracks[i];
-
-                        stream.write(reinterpret_cast<char const*>(&track.sequenceID), sizeof(u32));
 
                         u32 numTimestamps = static_cast<u32>(track.timestamps.size());
                         {
@@ -205,7 +200,7 @@ namespace Model
                 if (!buffer->Get(interpolationType))
                     return false;
 
-                if (!buffer->Get(isGlobalSequence))
+                if (!buffer->Get(globalLoopIndex))
                     return false;
 
                 u32 numTracks = 0;
@@ -217,9 +212,6 @@ namespace Model
                 for (u32 i = 0; i < numTracks; i++)
                 {
                     AnimationTrack<T>& track = tracks[i];
-
-                    if (!buffer->GetU32(track.sequenceID))
-                        return false;
 
                     u32 numTimestamps = 0;
                     if (!buffer->GetU32(numTimestamps))
@@ -418,7 +410,6 @@ namespace Model
         public:
             struct Flags
             {
-                u32 isAlwaysPlaying : 1;
                 u32 isAlias : 1;
                 u32 blendTransition : 1; // (This applies if set on either side of the transition) If set we lerp between the end -> start states, but only if end != start (Compare Bone Values)
                 u32 blendTransitionIfActive : 1;
@@ -557,6 +548,7 @@ namespace Model
 
         Flags flags = { };
 
+        std::vector<u32> globalLoops;
         std::vector<AnimationSequence> sequences;
         std::vector<Bone> bones;
         robin_hood::unordered_map<u16, i16> keyBoneIDToBoneIndex;

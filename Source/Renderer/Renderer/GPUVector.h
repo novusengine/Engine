@@ -122,7 +122,7 @@ namespace Renderer
                 BufferRangeFrame bufferRangeFrame;
                 if (!_allocator.Allocate(bytesToAllocate, bufferRangeFrame))
                 {
-                    DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector %s", _debugName.c_str());
+                    DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
                 }
                 
                 _wantsValidation = _validateTransfers;
@@ -188,7 +188,7 @@ namespace Renderer
                 BufferRangeFrame bufferRangeFrame;
                 if (!_allocator.Allocate(bytesToAllocate, bufferRangeFrame))
                 {
-                    DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector %s", _debugName.c_str());
+                    DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
                 }
 
                 _wantsValidation = _validateTransfers;
