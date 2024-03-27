@@ -68,6 +68,17 @@ namespace Model
             output.write(reinterpret_cast<const char*>(&flags), sizeof(ComplexModel::Flags));
         }
 
+        // Write Global Loops
+        {
+            u32 numElements = static_cast<u32>(globalLoops.size());
+            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+
+            if (numElements > 0)
+            {
+                output.write(reinterpret_cast<const char*>(&globalLoops[0]), numElements * sizeof(u32));
+            }
+        }
+
         // Write Sequences
         {
             u32 numElements = modelHeader.numSequences;
@@ -433,6 +444,12 @@ namespace Model
                 return false;
         }
 
+        // Read Global Loops
+        {
+            if (!ReadVectorFromBuffer(buffer, out.globalLoops))
+                return false;
+        }
+
         // Read Sequences
         {
             if (!buffer->GetVector(out.sequences, out.modelHeader.numSequences))
@@ -764,23 +781,29 @@ namespace Model
     template <typename T>
     void GetAnimationTrack(std::shared_ptr<Bytebuffer>& rootBuffer, const Layout& file, ComplexModel::AnimationData<T>& animationData, M2Track<T>& m2Track)
     {
+        i16 globalLoopIndex = m2Track.globalSequence;
         u32 numTracks = m2Track.values.size;
 
         animationData.interpolationType = static_cast<ComplexModel::AnimationInterpolationType>(m2Track.interpolationType);
-        animationData.isGlobalSequence = m2Track.globalSequence != -1;
+        animationData.globalLoopIndex = globalLoopIndex;
         animationData.tracks.reserve(numTracks);
 
-        // Handle Global Sequence
-        if (animationData.isGlobalSequence)
+        if (globalLoopIndex != -1)
         {
-            u32 sequenceID = file.md21.sequences.size + m2Track.globalSequence;
-
-            if (sequenceID < file.md21.sequences.size)
+            if (globalLoopIndex < static_cast<i32>(file.md21.sequences.size))
             {
-                M2Sequence* m2Sequence = file.md21.sequences.GetElement(rootBuffer, sequenceID);
+                M2Sequence* m2Sequence = file.md21.sequences.GetElement(rootBuffer, globalLoopIndex);
+
+                while (m2Sequence->flags.IsAlias)
+                {
+                    if (m2Sequence->nextAliasID >= file.md21.sequences.size)
+                        break;
+
+                    m2Sequence = file.md21.sequences.GetElement(rootBuffer, m2Sequence->nextAliasID);
+                }
 
                 bool hasExternalAnimationData = !m2Sequence->flags.HasEmbeddedAnimationData;
-                if (hasExternalAnimationData || m2Sequence->flags.IsAlias)
+                if (hasExternalAnimationData && !m2Sequence->flags.IsAlias)
                 {
                     // TODO : Animation is stored externally
                     return;
@@ -794,8 +817,6 @@ namespace Model
             {
                 ComplexModel::AnimationTrack<T>& track = animationData.tracks.emplace_back();
 
-                track.sequenceID = sequenceID;
-
                 track.timestamps.resize(m2Timestamps->size);
                 memcpy(track.timestamps.data(), m2Timestamps->Get(rootBuffer), sizeof(u32) * m2Timestamps->size);
 
@@ -803,7 +824,6 @@ namespace Model
                 memcpy(track.values.data(), m2Values->Get(rootBuffer), sizeof(T) * m2Values->size);
             }
         }
-        // Read All Sequence Tracks
         else
         {
             for (u32 i = 0; i < numTracks; i++)
@@ -812,23 +832,29 @@ namespace Model
                 {
                     M2Sequence* m2Sequence = file.md21.sequences.GetElement(rootBuffer, i);
 
+                    while (m2Sequence->flags.IsAlias)
+                    {
+                        if (m2Sequence->nextAliasID >= file.md21.sequences.size)
+                            break;
+
+                        m2Sequence = file.md21.sequences.GetElement(rootBuffer, m2Sequence->nextAliasID);
+                    }
+
                     bool hasExternalAnimationData = !m2Sequence->flags.HasEmbeddedAnimationData;
-                    if (hasExternalAnimationData || m2Sequence->flags.IsAlias)
+                    if (hasExternalAnimationData && !m2Sequence->flags.IsAlias)
                     {
                         // TODO : Animation is stored externally
                         continue;
                     }
                 }
 
+                ComplexModel::AnimationTrack<T>& track = animationData.tracks.emplace_back();
+
                 M2Array<u32>* m2Timestamps = m2Track.timestamps.GetElement(rootBuffer, i);
                 M2Array<T>* m2Values = m2Track.values.GetElement(rootBuffer, i);
 
                 if (m2Timestamps->size > 0 && m2Values->size > 0)
                 {
-                    ComplexModel::AnimationTrack<T>& track = animationData.tracks.emplace_back();
-
-                    track.sequenceID = i;
-
                     track.timestamps.resize(m2Timestamps->size);
                     memcpy(track.timestamps.data(), m2Timestamps->Get(rootBuffer), sizeof(u32) * m2Timestamps->size);
 
@@ -843,15 +869,13 @@ namespace Model
         u32 numTracks = static_cast<u32>(src.tracks.size());
 
         dest.interpolationType = src.interpolationType;
-        dest.isGlobalSequence = src.isGlobalSequence;
+        dest.globalLoopIndex = src.globalLoopIndex;
         dest.tracks.resize(numTracks);
 
         for (u32 i = 0; i < numTracks; i++)
         {
             ComplexModel::AnimationTrack<M2CompressedQuaternion>& srcTrack = src.tracks[i];
             ComplexModel::AnimationTrack<quat>& destTrack = dest.tracks[i];
-
-            destTrack.sequenceID = srcTrack.sequenceID;
 
             // Copy Timestamps
             {
@@ -880,12 +904,22 @@ namespace Model
         out.flags = *reinterpret_cast<ComplexModel::Flags*>(&layout.md21.flags);
         out.flags.IsConvertedMapObject = false;
 
-        u32 numGlobalSequences = layout.md21.loopingSequenceTimestamps.size;
         u32 numSequences = layout.md21.sequences.size;
+
+        // Read Global Loops
+        {
+            out.globalLoops.resize(layout.md21.globalLoops.size);
+
+            for (u32 i = 0; i < layout.md21.globalLoops.size; i++)
+            {
+                u32* m2GlobalLoop = layout.md21.globalLoops.GetElement(rootBuffer, i);
+                out.globalLoops[i] = *m2GlobalLoop;
+            }
+        }
 
         // Read Sequences
         {
-            out.sequences.resize(numSequences + numGlobalSequences);
+            out.sequences.resize(numSequences);
 
             for (u32 i = 0; i < layout.md21.sequences.size; i++)
             {
@@ -898,7 +932,6 @@ namespace Model
                 sequence.duration = m2Sequence->duration;
                 sequence.moveSpeed = m2Sequence->moveSpeed;
 
-                sequence.flags.isAlwaysPlaying = false;
                 sequence.flags.isAlias = m2Sequence->flags.IsAlias;
                 sequence.flags.blendTransition = m2Sequence->flags.BlendTransition;
                 sequence.flags.blendTransitionIfActive = m2Sequence->flags.SetBlendTransitionOnLoad;
@@ -917,38 +950,6 @@ namespace Model
 
                 sequence.nextVariationID = m2Sequence->nextVariationID;
                 sequence.nextAliasID = m2Sequence->nextAliasID;
-            }
-        }
-
-        // Add Global Sequences (Important GlobalSequences are added at the end, otherwise we have to patch nextVariationId && nextAliasId
-        {
-            for (u32 i = 0; i < numGlobalSequences; i++)
-            {
-                ComplexModel::AnimationSequence& sequence = out.sequences[numSequences + i];
-                sequence.id = -1;
-                sequence.subID = -1;
-
-                sequence.duration = *layout.md21.loopingSequenceTimestamps.GetElement(rootBuffer, i);
-                sequence.moveSpeed = 0;
-
-                sequence.flags.isAlwaysPlaying = true;
-                sequence.flags.isAlias = false;
-                sequence.flags.blendTransition = false;
-
-                sequence.frequency = 0;
-                sequence.repetitionRange = uvec2(0, 0);
-                sequence.blendTimeStart = 0;
-                sequence.blendTimeEnd = 0;
-
-                vec3 aabbMin = CoordinateSpaces::ModelPosToNovus(layout.md21.cullingAABBBounds.aabb.min);
-                vec3 aabbMax = CoordinateSpaces::ModelPosToNovus(layout.md21.cullingAABBBounds.aabb.max);
-
-                sequence.aabbCenter = (aabbMin + aabbMax) * 0.5f;
-                sequence.aabbExtents = aabbMax - sequence.aabbCenter;
-                sequence.radius = 0;
-
-                sequence.nextVariationID = -1;
-                sequence.nextAliasID = -1;
             }
         }
 
@@ -1086,7 +1087,32 @@ namespace Model
             memcpy(out.materials.data(), &rootBuffer->GetDataPointer()[materialsOffset], numMaterials * sizeof(ComplexModel::Material));
         }
 
-        // TODO : Texture Transforms
+        // Read Texture Transforms
+        {
+            u32 numTextureTransforms = layout.md21.textureTransforms.size;
+
+            out.textureTransforms.resize(numTextureTransforms);
+            for (u32 i = 0; i < numTextureTransforms; i++)
+            {
+                ComplexModel::TextureTransform& textureTransform = out.textureTransforms[i];
+                M2TextureTransform* m2TextureTransform = layout.md21.textureTransforms.GetElement(rootBuffer, i);
+
+                // Read Translation Track
+                {
+                    GetAnimationTrack(rootBuffer, layout, textureTransform.translation, m2TextureTransform->translation);
+                }
+
+                // Read Rotation Track
+                {
+                    GetAnimationTrack(rootBuffer, layout, textureTransform.rotation, m2TextureTransform->rotation);
+                }
+
+                // Read Scale Track
+                {
+                    GetAnimationTrack(rootBuffer, layout, textureTransform.scale, m2TextureTransform->scale);
+                }
+            }
+        }
 
         // Read Texture Lookup Tables
         {

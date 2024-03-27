@@ -117,9 +117,12 @@ static void InitAnimationArray(std::shared_ptr<Bytebuffer>& buffer, M2Track<T>& 
     for (u32 j = 0; j < track.timestamps.size; j++)
     {
         M2Array<u32>* timestamps = track.timestamps.GetElement(buffer, j);
-        M2Array<T>* values = track.values.GetElement(buffer, j);
-
         timestamps->Init(md21Offset);
+    }
+
+    for (u32 j = 0; j < track.values.size; j++)
+    {
+        M2Array<T>* values = track.values.GetElement(buffer, j);
         values->Init(md21Offset);
     }
 }
@@ -144,7 +147,7 @@ bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>
     // Make offsets absolute
     {
         layout.md21.uniqueName.Init(md21Offset);
-        layout.md21.loopingSequenceTimestamps.Init(md21Offset);
+        layout.md21.globalLoops.Init(md21Offset);
         layout.md21.sequences.Init(md21Offset);
         layout.md21.sequenceIDToAnimationID.Init(md21Offset);
         layout.md21.bones.Init(md21Offset);
@@ -181,6 +184,15 @@ bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>
             InitAnimationArray(buffer, bone->translation, md21Offset);
             InitAnimationArray(buffer, bone->rotation, md21Offset);
             InitAnimationArray(buffer, bone->scale, md21Offset);
+        }
+
+        for (u32 i = 0; i < layout.md21.textureTransforms.size; i++)
+        {
+            M2TextureTransform* textureTransform = layout.md21.textureTransforms.GetElement(buffer, i);
+
+            InitAnimationArray(buffer, textureTransform->translation, md21Offset);
+            InitAnimationArray(buffer, textureTransform->rotation, md21Offset);
+            InitAnimationArray(buffer, textureTransform->scale, md21Offset);
         }
 
         for (u32 i = 0; i < layout.md21.cameras.size; i++)
