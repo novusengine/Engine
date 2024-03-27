@@ -1,8 +1,7 @@
-name: linux-build
+name: Linux Build
 
 on:
-  push:
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
   linux-build:
@@ -18,7 +17,7 @@ jobs:
         repository: novusengine/Engine
 
     - name: Setup premake
-      uses: abel0b/setup-premake@v2
+      uses: abel0b/setup-premake@v2.3
       with:
         version: "5.0.0-beta1"
 
