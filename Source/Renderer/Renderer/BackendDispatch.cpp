@@ -146,7 +146,7 @@ namespace Renderer
 
     void BackendDispatch::PopMarker(Renderer* renderer, CommandListID commandList, const void* /*data*/)
     {
-        ZoneScopedC(tracy::Color::Red3)
+        ZoneScopedC(tracy::Color::Red3);
         renderer->PopMarker(commandList);
     }
 
