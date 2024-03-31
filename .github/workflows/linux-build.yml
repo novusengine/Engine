@@ -17,7 +17,7 @@ jobs:
         repository: novusengine/Engine
 
     - name: Setup premake
-      uses: abel0b/setup-premake@v2.3
+      uses: abel0b/setup-premake@v2.4
       with:
         version: "5.0.0-beta1"
 
