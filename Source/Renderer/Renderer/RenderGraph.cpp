@@ -9,7 +9,7 @@
 
 namespace Renderer
 {
-    AutoCVar_Int CVAR_RenderGraphPrintNumBarriers("renderGraph.printNumBarriers", "Print number of barriers automatically placed by the Rendergraph", 0, CVarFlags::EditCheckbox);
+    AutoCVar_Int CVAR_RenderGraphPrintNumBarriers(CVarCategory::Client | CVarCategory::Rendering, "renderGraphPrintNumBarriers", "Print number of barriers automatically placed by the Rendergraph", 0, CVarFlags::EditCheckbox);
 
     struct RenderGraphData : IRenderGraphData
     {
