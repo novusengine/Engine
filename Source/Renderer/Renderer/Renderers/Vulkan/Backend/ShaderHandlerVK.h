@@ -6,6 +6,7 @@
 
 #include <Base/Types.h>
 #include <Base/Util/DebugHandler.h>
+#include <Base/Util/StringUtils.h>
 
 #include <vulkan/vulkan_core.h>
 

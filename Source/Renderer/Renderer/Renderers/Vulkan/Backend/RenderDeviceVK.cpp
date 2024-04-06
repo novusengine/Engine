@@ -1436,7 +1436,7 @@ namespace Renderer
                 }
                 else
                 {
-                    DebugHandler::PrintFatal("Tried to use a format that wasn't uncompressed or used BC compression, what is this? id: {}", format);
+                    DebugHandler::PrintFatal("Tried to use a format that wasn't uncompressed or used BC compression, what is this? id: {}", static_cast<std::underlying_type<VkFormat>::type>(format));
                 }
 
                 curWidth = Math::Max(1, curWidth / 2);

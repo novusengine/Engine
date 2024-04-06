@@ -810,7 +810,7 @@ namespace Renderer
                 {
                     if (set != bindInfo.set)
                     {
-                        DebugHandler::PrintError("While creating DescriptorSet, we found BindInfo with matching name ({}) and type ({}), but it didn't match the location ({} != {})", bindInfo.name, bindInfo.descriptorType, bindInfo.set, set);
+                        DebugHandler::PrintError("While creating DescriptorSet, we found BindInfo with matching name ({}) and type ({}), but it didn't match the location ({} != {})", bindInfo.name, static_cast<std::underlying_type<DescriptorType>::type>(bindInfo.descriptorType), bindInfo.set, set);
                     }
                 }
                 else

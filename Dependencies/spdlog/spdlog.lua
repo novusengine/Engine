@@ -1,7 +1,7 @@
 local function SetupLib()
     local basePath = path.getabsolute("spdlog/", Engine.dependencyDir)
     local dependencies = { }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "SPDLOG_COMPILED_LIB" }
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "SPDLOG_COMPILED_LIB", "SPDLOG_USE_STD_FORMAT" }
 
     ProjectTemplate("Spdlog", "StaticLib", nil, Engine.binDir, dependencies, defines)
 

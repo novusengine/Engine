@@ -59,7 +59,7 @@ namespace Model
 
         public:
             AnimationTrack() { }
-            AnimationTrack(AnimationTrack<T>& other) : sequenceID(sequenceID)
+            AnimationTrack(AnimationTrack<T>& other)
             {
                 size_t numTimestamps = other.timestamps.size();
                 if (numTimestamps)
@@ -86,7 +86,7 @@ namespace Model
                     }
                 }
             }
-            AnimationTrack(AnimationTrack<T>&& other) : timestamps(std::move(other.timestamps)), values(std::move(other.values)) { }
+            AnimationTrack(AnimationTrack<T>&& other) noexcept : timestamps(std::move(other.timestamps)), values(std::move(other.values)) { }
             AnimationTrack<T>& operator=(const AnimationTrack<T>& other)
             {
                 size_t numTimestamps = other.timestamps.size();
@@ -141,7 +141,7 @@ namespace Model
             AnimationData(AnimationData<T>& other)
             {
                 interpolationType = other.interpolationType;
-                isGlobalSequence = other.isGlobalSequence;
+                globalLoopIndex = other.globalLoopIndex;
 
                 size_t numTracks = other.tracks.size();
                 tracks.resize(numTracks);
@@ -151,7 +151,7 @@ namespace Model
                     tracks[i] = other.tracks[i];
                 }
             }
-            AnimationData(AnimationData<T>&& other) : interpolationType(other.interpolationType), globalLoopIndex(other.globalLoopIndex), tracks(std::move(other.tracks)) { }
+            AnimationData(AnimationData<T>&& other) noexcept : interpolationType(other.interpolationType), globalLoopIndex(other.globalLoopIndex), tracks(std::move(other.tracks)) { }
             AnimationData<T>& operator=(const AnimationData<T>& other)
             {
                 interpolationType = other.interpolationType;
