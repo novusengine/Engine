@@ -1,4 +1,5 @@
 #pragma once
+#include <Base/Types.h>
 #include <json/json.hpp>
 
 #include <filesystem>
@@ -14,9 +15,11 @@ namespace JsonUtils
 	bool LoadFromPathOrCreate(nlohmann::ordered_json& json, const nlohmann::ordered_json& fallback, const std::filesystem::path& path);
 	bool SaveToPath(const nlohmann::ordered_json& json, const std::filesystem::path& path);
 
-	void LoadCVarsIntoJson(nlohmann::json& json);
-	void LoadJsonIntoCVars(nlohmann::json& json);
+	constexpr u32 CVAR_VERSION = 1u;
+	void VerifyCVarsOrFallback(nlohmann::json& json, const nlohmann::json& fallback);
+	void SaveCVarsToJson(nlohmann::json& json);
+	void LoadCVarsFromJson(nlohmann::json& json);
 
-	void LoadCVarsIntoJson(nlohmann::ordered_json& json);
-	void LoadJsonIntoCVars(nlohmann::ordered_json& json);
+	void SaveCVarsToJson(nlohmann::ordered_json& json);
+	void LoadCVarsFromJson(nlohmann::ordered_json& json);
 }

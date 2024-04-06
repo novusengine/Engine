@@ -4,14 +4,19 @@
 
 #include <algorithm>
 
-u32 Hash(const char* str)
-{
-    return StringUtils::fnv1a_32(str, strlen(str));
-}
-
 f64* CVarSystemImpl::GetFloatCVar(StringUtils::StringHash hash)
 {
     return GetCVarCurrent<f64>(hash);
+}
+
+f64* CVarSystemImpl::GetFloatCVar(CVarCategory category, StringUtils::StringHash hash)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return nullptr;
+    }
+    return GetFloatCVar(qualifiedNameHash);
 }
 
 i32* CVarSystemImpl::GetIntCVar(StringUtils::StringHash hash)
@@ -19,9 +24,29 @@ i32* CVarSystemImpl::GetIntCVar(StringUtils::StringHash hash)
     return GetCVarCurrent<i32>(hash);
 }
 
+i32* CVarSystemImpl::GetIntCVar(CVarCategory category, StringUtils::StringHash hash)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return nullptr;
+    }
+    return GetIntCVar(qualifiedNameHash);
+}
+
 const char* CVarSystemImpl::GetStringCVar(StringUtils::StringHash hash)
 {
     return GetCVarCurrent<std::string>(hash)->c_str();
+}
+
+const char* CVarSystemImpl::GetStringCVar(CVarCategory category, StringUtils::StringHash hash)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return nullptr;
+    }
+    return GetStringCVar(qualifiedNameHash);
 }
 
 vec4* CVarSystemImpl::GetVecFloatCVar(StringUtils::StringHash hash)
@@ -29,9 +54,29 @@ vec4* CVarSystemImpl::GetVecFloatCVar(StringUtils::StringHash hash)
     return GetCVarCurrent<vec4>(hash);
 }
 
+vec4* CVarSystemImpl::GetVecFloatCVar(CVarCategory category, StringUtils::StringHash hash)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return nullptr;
+    }
+    return GetVecFloatCVar(qualifiedNameHash);
+}
+
 ivec4* CVarSystemImpl::GetVecIntCVar(StringUtils::StringHash hash)
 {
     return GetCVarCurrent<ivec4>(hash);
+}
+
+ivec4* CVarSystemImpl::GetVecIntCVar(CVarCategory category, StringUtils::StringHash hash)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return nullptr;
+    }
+    return GetVecIntCVar(qualifiedNameHash);
 }
 
 ShowFlag* CVarSystemImpl::GetShowFlagCVar(StringUtils::StringHash hash)
@@ -39,10 +84,40 @@ ShowFlag* CVarSystemImpl::GetShowFlagCVar(StringUtils::StringHash hash)
     return GetCVarCurrent<ShowFlag>(hash);
 }
 
+ShowFlag* CVarSystemImpl::GetShowFlagCVar(CVarCategory category, StringUtils::StringHash hash)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return nullptr;
+    }
+    return GetShowFlagCVar(qualifiedNameHash);
+}
+
 CVarSystem* CVarSystem::Get()
 {
     static CVarSystemImpl cvarSys{};
     return &cvarSys;
+}
+
+std::string CVarSystem::GetQualifiedName(CVarCategory category, const char* name)
+{
+    // Construct the qualified name
+    std::string qualifiedName;
+
+    // Add all prefixes
+    for (u32 i = 0; i < static_cast<u32>(CVarCategory::COUNT); i++)
+    {
+        u32 mask = 1 << i;
+        if (static_cast<u32>(category) & mask)
+        {
+            qualifiedName += CVarCategoryToPrefix[i];
+        }
+    }
+
+    qualifiedName += name;
+
+    return qualifiedName;
 }
 
 CVarParameter* CVarSystemImpl::GetCVar(StringUtils::StringHash hash)
@@ -58,9 +133,31 @@ CVarParameter* CVarSystemImpl::GetCVar(StringUtils::StringHash hash)
     return nullptr;
 }
 
+CVarParameter* CVarSystemImpl::GetCVar(CVarCategory category, StringUtils::StringHash hash)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return nullptr;
+    }
+
+    return GetCVar(qualifiedNameHash);
+}
+
 void CVarSystemImpl::SetFloatCVar(StringUtils::StringHash hash, f64 value)
 {
     SetCVarCurrent<f64>(hash, value);
+}
+
+void CVarSystemImpl::SetFloatCVar(CVarCategory category, StringUtils::StringHash hash, f64 value)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    SetFloatCVar(qualifiedNameHash, value);
 }
 
 void CVarSystemImpl::SetIntCVar(StringUtils::StringHash hash, i32 value)
@@ -68,9 +165,31 @@ void CVarSystemImpl::SetIntCVar(StringUtils::StringHash hash, i32 value)
     SetCVarCurrent<i32>(hash, value);
 }
 
+void CVarSystemImpl::SetIntCVar(CVarCategory category, StringUtils::StringHash hash, i32 value)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    SetIntCVar(qualifiedNameHash, value);
+}
+
 void CVarSystemImpl::SetStringCVar(StringUtils::StringHash hash, const char* value)
 {
     SetCVarCurrent<std::string>(hash, value);
+}
+
+void CVarSystemImpl::SetStringCVar(CVarCategory category, StringUtils::StringHash hash, const char* value)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    SetStringCVar(qualifiedNameHash, value);
 }
 
 void CVarSystemImpl::SetVecFloatCVar(StringUtils::StringHash hash, const vec4& value)
@@ -78,9 +197,31 @@ void CVarSystemImpl::SetVecFloatCVar(StringUtils::StringHash hash, const vec4& v
     SetCVarCurrent<vec4>(hash, value);
 }
 
+void CVarSystemImpl::SetVecFloatCVar(CVarCategory category, StringUtils::StringHash hash, const vec4& value)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    SetVecFloatCVar(qualifiedNameHash, value);
+}
+
 void CVarSystemImpl::SetVecIntCVar(StringUtils::StringHash hash, const ivec4& value)
 {
     SetCVarCurrent<ivec4>(hash, value);
+}
+
+void CVarSystemImpl::SetVecIntCVar(CVarCategory category, StringUtils::StringHash hash, const ivec4& value)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    SetVecIntCVar(qualifiedNameHash, value);
 }
 
 void CVarSystemImpl::SetShowFlagCVar(StringUtils::StringHash hash, const ShowFlag& value)
@@ -88,103 +229,200 @@ void CVarSystemImpl::SetShowFlagCVar(StringUtils::StringHash hash, const ShowFla
     SetCVarCurrent<ShowFlag>(hash, value);
 }
 
-CVarParameter* CVarSystemImpl::CreateFloatCVar(const char* name, const char* description, f64 defaultValue, f64 currentValue)
+void CVarSystemImpl::SetShowFlagCVar(CVarCategory category, StringUtils::StringHash hash, const ShowFlag& value)
 {
-    CVarParameter* param = InitCVar(name, description);
-    if (!param) return nullptr;
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    SetShowFlagCVar(qualifiedNameHash, value);
+}
+
+CVarParameter* CVarSystemImpl::CreateFloatCVar(CVarCategory category, const char* name, const char* description, f64 defaultValue, f64 currentValue, CVarFlags flags)
+{
+    CVarParameter* param = nullptr;
+    bool wasCreated = InitCVar(category, name, description, param);
+    bool typeChanged = param->type != CVarType::FLOAT;
 
     std::unique_lock lock(mutex_);
     param->type = CVarType::FLOAT;
+    param->flags = flags;
 
-    GetCVarArray<f64>()->Add(defaultValue, currentValue, param);
+    CVarArray<f64>* cvarArray = GetCVarArray<f64>();
+    if (wasCreated || typeChanged)
+    {
+        cvarArray->Add(defaultValue, currentValue, param);
+    }
 
     return param;
 }
 
-CVarParameter* CVarSystemImpl::CreateIntCVar(const char* name, const char* description, i32 defaultValue, i32 currentValue)
+CVarParameter* CVarSystemImpl::CreateIntCVar(CVarCategory category, const char* name, const char* description, i32 defaultValue, i32 currentValue, CVarFlags flags)
 {
-    CVarParameter* param = InitCVar(name, description);
-    if (!param) return nullptr;
+    CVarParameter* param = nullptr;
+    bool wasCreated = InitCVar(category, name, description, param);
+    bool typeChanged = param->type != CVarType::INT;
+
     std::unique_lock lock(mutex_);
     param->type = CVarType::INT;
+    param->flags = flags;
 
-    GetCVarArray<i32>()->Add(defaultValue, currentValue, param);
+    CVarArray<i32>* cvarArray = GetCVarArray<i32>();
+    if (wasCreated || typeChanged)
+    {
+        cvarArray->Add(defaultValue, currentValue, param);
+    }
 
     return param;
 }
 
-CVarParameter* CVarSystemImpl::CreateStringCVar(const char* name, const char* description, const char* defaultValue, const char* currentValue)
+CVarParameter* CVarSystemImpl::CreateStringCVar(CVarCategory category, const char* name, const char* description, const char* defaultValue, const char* currentValue, CVarFlags flags)
 {
-    CVarParameter* param = InitCVar(name, description);
-    if (!param) return nullptr;
+    CVarParameter* param = nullptr;
+    bool wasCreated = InitCVar(category, name, description, param);
+    bool typeChanged = param->type != CVarType::STRING;
 
     std::unique_lock lock(mutex_);
     param->type = CVarType::STRING;
+    param->flags = flags;
 
-    GetCVarArray<std::string>()->Add(defaultValue, currentValue, param);
+    CVarArray<std::string>* cvarArray = GetCVarArray<std::string>();
+    if (wasCreated || typeChanged)
+    {
+        cvarArray->Add(defaultValue, currentValue, param);
+    }
 
     return param;
 }
 
-CVarParameter* CVarSystemImpl::CreateVecFloatCVar(const char* name, const char* description, const vec4& defaultValue, const vec4& currentValue)
+CVarParameter* CVarSystemImpl::CreateVecFloatCVar(CVarCategory category, const char* name, const char* description, const vec4& defaultValue, const vec4& currentValue, CVarFlags flags)
 {
-    CVarParameter* param = InitCVar(name, description);
-    if (!param) return nullptr;
+    CVarParameter* param = nullptr;
+    bool wasCreated = InitCVar(category, name, description, param);
+    bool typeChanged = param->type != CVarType::FLOATVEC;
 
     std::unique_lock lock(mutex_);
     param->type = CVarType::FLOATVEC;
+    param->flags = flags;
 
-    GetCVarArray<vec4>()->Add(defaultValue, currentValue, param);
+    CVarArray<vec4>* cvarArray = GetCVarArray<vec4>();
+    if (wasCreated || typeChanged)
+    {
+        cvarArray->Add(defaultValue, currentValue, param);
+    }
 
     return param;
 }
 
-CVarParameter* CVarSystemImpl::CreateVecIntCVar(const char* name, const char* description, const ivec4& defaultValue, const ivec4& currentValue)
+CVarParameter* CVarSystemImpl::CreateVecIntCVar(CVarCategory category, const char* name, const char* description, const ivec4& defaultValue, const ivec4& currentValue, CVarFlags flags)
 {
-    CVarParameter* param = InitCVar(name, description);
-    if (!param) return nullptr;
+    CVarParameter* param = nullptr;
+    bool wasCreated = InitCVar(category, name, description, param);
+    bool typeChanged = param->type != CVarType::INTVEC;
 
     std::unique_lock lock(mutex_);
     param->type = CVarType::INTVEC;
+    param->flags = flags;
 
-    GetCVarArray<ivec4>()->Add(defaultValue, currentValue, param);
+    CVarArray<ivec4>* cvarArray = GetCVarArray<ivec4>();
+    if (wasCreated || typeChanged)
+    {
+        cvarArray->Add(defaultValue, currentValue, param);
+    }
 
     return param;
 }
 
-CVarParameter* CVarSystemImpl::CreateShowFlagCVar(const char* name, const char* description, const ShowFlag& defaultValue, const ShowFlag& currentValue)
+CVarParameter* CVarSystemImpl::CreateShowFlagCVar(CVarCategory category, const char* name, const char* description, const ShowFlag& defaultValue, const ShowFlag& currentValue, CVarFlags flags)
 {
-    CVarParameter* param = InitCVar(name, description);
-    if (!param) return nullptr;
+    CVarParameter* param = nullptr;
+    bool wasCreated = InitCVar(category, name, description, param);
+    bool typeChanged = param->type != CVarType::SHOWFLAG;
 
     std::unique_lock lock(mutex_);
     param->type = CVarType::SHOWFLAG;
+    param->flags = flags;
 
-    GetCVarArray<ShowFlag>()->Add(defaultValue, currentValue, param);
+    CVarArray<ShowFlag>* cvarArray = GetCVarArray<ShowFlag>();
+    if (wasCreated || typeChanged)
+    {
+        cvarArray->Add(defaultValue, currentValue, param);
+    }
 
     return param;
 }
 
-CVarParameter* CVarSystemImpl::InitCVar(const char* name, const char* description)
+bool CVarSystemImpl::InitCVar(CVarCategory category, const char* name, const char* description, CVarParameter*& outParam)
 {
-    if (GetCVar(name)) return nullptr; //return null if the cvar already exists
-
+    std::string qualifiedName = GetQualifiedName(category, name);
+    u32 qualifiedNameHash = StringUtils::StringHash{ qualifiedName };
+    u32 nameHash = StringUtils::StringHash{ name };
+    
+    outParam = GetCVar(qualifiedName.c_str());
     std::unique_lock lock(mutex_);
-    u32 namehash = StringUtils::StringHash{ name };
-    savedCVars[namehash] = CVarParameter{};
+    if (outParam)
+    {
+        CVarCategory existingCategory = outParam->category;
+        if (category != existingCategory)
+        {
+            // Remove old category lookup
+            cvarCategoryLookupTable[existingCategory].erase(nameHash);
 
-    CVarParameter& newParam = savedCVars[namehash];
+            // Add new category lookup
+            if (!cvarCategoryLookupTable.contains(category))
+            {
+                cvarCategoryLookupTable[category] = CVarLookupTable();
+            }
 
+            cvarCategoryLookupTable[category][nameHash] = qualifiedNameHash;
+        }
+
+        outParam->category = category;
+        outParam->description = description;
+        return false;
+    }
+
+    savedCVars[qualifiedNameHash] = CVarParameter{};
+
+    CVarParameter& newParam = savedCVars[qualifiedNameHash];
+    newParam.category = category;
     newParam.name = name;
     newParam.description = description;
 
-    return &newParam;
+    if (!cvarCategoryLookupTable.contains(category))
+    {
+        cvarCategoryLookupTable[category] = CVarLookupTable();
+    }
+
+    cvarCategoryLookupTable[category][nameHash] = qualifiedNameHash;
+
+    outParam = &newParam;
+    return true;
 }
 
-AutoCVar_Float::AutoCVar_Float(const char* name, const char* description, f64 defaultValue, CVarFlags flags)
+bool CVarSystemImpl::LookupCVar(CVarCategory category, StringUtils::StringHash nameHash, u32& outHash)
 {
-    CVarParameter* cvar = CVarSystem::Get()->CreateFloatCVar(name, description, defaultValue, defaultValue);
-    cvar->flags = flags;
+    outHash = 0;
+    if (!cvarCategoryLookupTable.contains(category))
+    {
+        return false;
+    }
+
+    CVarLookupTable& table = cvarCategoryLookupTable[category];
+    if (!table.contains(nameHash))
+    {
+        return false;
+    }
+
+    outHash = table[nameHash];
+    return true;
+}
+
+AutoCVar_Float::AutoCVar_Float(CVarCategory category, const char* name, const char* description, f64 defaultValue, CVarFlags flags)
+{
+    CVarParameter* cvar = CVarSystem::Get()->CreateFloatCVar(category, name, description, defaultValue, defaultValue, flags);
     index = cvar->arrayIndex;
 }
 
@@ -214,10 +452,9 @@ void AutoCVar_Float::Set(f64 f)
     CVarSystemImpl::Get()->GetCVarArray<f64>()->SetCurrent(f, index);
 }
 
-AutoCVar_Int::AutoCVar_Int(const char* name, const char* description, i32 defaultValue, CVarFlags flags)
+AutoCVar_Int::AutoCVar_Int(CVarCategory category, const char* name, const char* description, i32 defaultValue, CVarFlags flags)
 {
-    CVarParameter* cvar = CVarSystem::Get()->CreateIntCVar(name, description, defaultValue, defaultValue);
-    cvar->flags = flags;
+    CVarParameter* cvar = CVarSystem::Get()->CreateIntCVar(category, name, description, defaultValue, defaultValue, flags);
     index = cvar->arrayIndex;
 }
 
@@ -243,10 +480,9 @@ void AutoCVar_Int::Toggle()
     Set(enabled ? 0 : 1);
 }
 
-AutoCVar_String::AutoCVar_String(const char* name, const char* description, const char* defaultValue, CVarFlags flags)
+AutoCVar_String::AutoCVar_String(CVarCategory category, const char* name, const char* description, const char* defaultValue, CVarFlags flags)
 {
-    CVarParameter* cvar = CVarSystem::Get()->CreateStringCVar(name, description, defaultValue, defaultValue);
-    cvar->flags = flags;
+    CVarParameter* cvar = CVarSystem::Get()->CreateStringCVar(category, name, description, defaultValue, defaultValue, flags);
     index = cvar->arrayIndex;
 }
 
@@ -260,10 +496,9 @@ void AutoCVar_String::Set(std::string&& val)
     CVarSystemImpl::Get()->GetCVarArray<std::string>()->SetCurrent(val, index);
 }
 
-AutoCVar_VecFloat::AutoCVar_VecFloat(const char* name, const char* description, const vec4& defaultValue, CVarFlags flags /*= CVarFlags::None*/)
+AutoCVar_VecFloat::AutoCVar_VecFloat(CVarCategory category, const char* name, const char* description, const vec4& defaultValue, CVarFlags flags /*= CVarFlags::None*/)
 {
-    CVarParameter* cvar = CVarSystem::Get()->CreateVecFloatCVar(name, description, defaultValue, defaultValue);
-    cvar->flags = flags;
+    CVarParameter* cvar = CVarSystem::Get()->CreateVecFloatCVar(category, name, description, defaultValue, defaultValue, flags);
     index = cvar->arrayIndex;
 }
 
@@ -277,10 +512,9 @@ void AutoCVar_VecFloat::Set(const vec4& val)
     CVarSystemImpl::Get()->GetCVarArray<vec4>()->SetCurrent(val, index);
 }
 
-AutoCVar_VecInt::AutoCVar_VecInt(const char* name, const char* description, const ivec4& defaultValue, CVarFlags flags)
+AutoCVar_VecInt::AutoCVar_VecInt(CVarCategory category, const char* name, const char* description, const ivec4& defaultValue, CVarFlags flags)
 {
-    CVarParameter* cvar = CVarSystem::Get()->CreateVecIntCVar(name, description, defaultValue, defaultValue);
-    cvar->flags = flags;
+    CVarParameter* cvar = CVarSystem::Get()->CreateVecIntCVar(category, name, description, defaultValue, defaultValue, flags);
     index = cvar->arrayIndex;
 }
 
@@ -294,9 +528,9 @@ void AutoCVar_VecInt::Set(const ivec4& val)
     CVarSystemImpl::Get()->GetCVarArray<ivec4>()->SetCurrent(val, index);
 }
 
-AutoCVar_ShowFlag::AutoCVar_ShowFlag(const char* name, const char* description, const ShowFlag& defaultValue)
+AutoCVar_ShowFlag::AutoCVar_ShowFlag(CVarCategory category, const char* name, const char* description, const ShowFlag& defaultValue, CVarFlags flags)
 {
-    CVarParameter* cvar = CVarSystem::Get()->CreateShowFlagCVar(name, description, defaultValue, defaultValue);
+    CVarParameter* cvar = CVarSystem::Get()->CreateShowFlagCVar(category, name, description, defaultValue, defaultValue, flags);
     index = cvar->arrayIndex;
 }
 
