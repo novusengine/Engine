@@ -9,7 +9,7 @@ if ProjectTemplate == nil then
         _G[internalName] = { }
 
         if cppVersion == nil or cppVersion == "" then
-            cppVersion = "C++17"
+            cppVersion = "C++20"
         else
             local version = tonumber(cppVersion)
 
@@ -32,7 +32,7 @@ if ProjectTemplate == nil then
             end
 
             if not cppVersion:find("^C++") then
-                cppVersion = "C++17"
+                cppVersion = "C++20"
             end
         end
 

@@ -35,7 +35,7 @@ enum class CVarCategory : u8
 };
 DECLARE_GENERIC_BITWISE_OPERATORS(CVarCategory);
 
-constexpr char* CVarCategoryToString[u8(CVarCategory::COUNT)] =
+static const char* CVarCategoryToString[u8(CVarCategory::COUNT)] =
 {
     "Server",
     "Client",
@@ -44,7 +44,7 @@ constexpr char* CVarCategoryToString[u8(CVarCategory::COUNT)] =
     "Network",
 };
 
-constexpr char* CVarCategoryToPrefix[u8(CVarCategory::COUNT)] =
+static const char* CVarCategoryToPrefix[u8(CVarCategory::COUNT)] =
 {
     "sv_",
     "cl_",
