@@ -26,6 +26,7 @@ local dependencies =
     "typesafe/typesafe.lua",
     "utfcpp/utfcpp.lua",
     "luau/luau.lua",
+    "FidelityFX-SDK/FidelityFX.lua",
 }
 
 for k,v in pairs(dependencies) do

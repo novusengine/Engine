@@ -128,6 +128,7 @@ struct AutoCVar_Int : AutoCVar
 public:
     AutoCVar_Int(CVarCategory category, const char* name, const char* description, i32 defaultValue, CVarFlags flags = CVarFlags::None);
     i32 Get();
+    u32 GetU32();
     i32* GetPtr();
     void Set(i32 val);
 

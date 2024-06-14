@@ -32,6 +32,7 @@
 #include "DrawImgui.h"
 #include "PushConstant.h"
 #include "TimeQuery.h"
+#include "FidelityFXCommands.h"
 
 #include "Renderer/BackendDispatch.h"
 
@@ -81,5 +82,8 @@ namespace Renderer
         const BackendDispatchFunction BufferBarrier::DISPATCH_FUNCTION = &BackendDispatch::BufferBarrier;
         const BackendDispatchFunction DrawImgui::DISPATCH_FUNCTION = &BackendDispatch::DrawImgui;
         const BackendDispatchFunction PushConstant::DISPATCH_FUNCTION = &BackendDispatch::PushConstant;
+
+        // FidelityFX
+        const BackendDispatchFunction DispatchCacao::DISPATCH_FUNCTION = &BackendDispatch::DispatchCacao;
     }
 }

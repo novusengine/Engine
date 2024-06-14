@@ -468,6 +468,11 @@ namespace Renderer
             atomicInt64Features.shaderBufferInt64Atomics = VK_TRUE;
             atomicInt64Features.pNext = &descriptorIndexingFeatures;
 
+            VkPhysicalDeviceFloat16Int8FeaturesKHR float16Int8Features = {};
+            float16Int8Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR;
+            float16Int8Features.shaderFloat16 = VK_TRUE;
+            float16Int8Features.pNext = &atomicInt64Features;
+
             VkPhysicalDeviceFeatures2 deviceFeatures = {};
             deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             deviceFeatures.features.samplerAnisotropy = VK_TRUE;
@@ -481,8 +486,9 @@ namespace Renderer
             deviceFeatures.features.fillModeNonSolid = VK_TRUE;
             deviceFeatures.features.depthClamp = VK_TRUE;
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
+            deviceFeatures.features.shaderImageGatherExtended = VK_TRUE;
 
-            deviceFeatures.pNext = &atomicInt64Features;
+            deviceFeatures.pNext = &float16Int8Features;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
 

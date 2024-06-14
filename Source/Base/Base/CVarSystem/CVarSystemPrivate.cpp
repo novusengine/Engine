@@ -463,6 +463,11 @@ i32 AutoCVar_Int::Get()
     return CVarSystemImpl::Get()->GetCVarArray<i32>()->GetCurrent(index);
 }
 
+u32 AutoCVar_Int::GetU32()
+{
+    return static_cast<u32>(CVarSystemImpl::Get()->GetCVarArray<i32>()->GetCurrent(index));
+}
+
 i32* AutoCVar_Int::GetPtr()
 {
     return CVarSystemImpl::Get()->GetCVarArray<i32>()->GetCurrentPtr(index);

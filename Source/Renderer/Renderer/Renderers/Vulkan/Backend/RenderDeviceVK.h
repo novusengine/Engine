@@ -171,6 +171,7 @@ namespace Renderer
             friend struct DescriptorAllocatorHandleVK;
             friend class DescriptorAllocatorPoolVKImpl;
             friend class DescriptorSetBuilderVK;
+            friend class FidelityFXHandlerVK;
         };
     }
 }
