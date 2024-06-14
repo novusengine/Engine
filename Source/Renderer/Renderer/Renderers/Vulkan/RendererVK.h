@@ -27,6 +27,7 @@ namespace Renderer
         class DescriptorSetBuilderVK;
         struct SwapChainVK;
         class DescriptorSetBuilderVK;
+        class FidelityFXHandlerVK;
     }
     
     class RendererVK : public Renderer
@@ -141,6 +142,9 @@ namespace Renderer
         void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) override;
         void UpdateBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, void* data) override;
 
+        // FidelityFX Commands
+        void DispatchCacao(CommandListID commandListID, FfxCacaoContext* context, DepthImageID depthImage, ImageID normalImage, ImageID outputImage, mat4x4* proj, mat4x4* normalsToView, f32 normalUnpackMul, f32 normalUnpackAdd) override;
+
         // Present functions
         void Present(Novus::Window* window, ImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) override;
         void Present(Novus::Window* window, DepthImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) override;
@@ -163,7 +167,14 @@ namespace Renderer
         [[nodiscard]] const std::string& GetTimeQueryName(TimeQueryID id) override;
         [[nodiscard]] f32 GetLastTimeQueryDuration(TimeQueryID id) override;
 
+        // FidelityFX
+        i32 ffxGetInterface(FfxInterface* backendInterface, void* scratchBuffer, size_t scratchBufferSize, size_t maxContexts) override;
+        size_t ffxGetScratchMemorySize(size_t maxContexts) override;
+
         // Utils
+        // Flush will wait until any in-flight frames are done
+        void FlushGPU() override;
+
         f32 FlipFrame(u32 frameIndex) override;
         void ResetTimeQueries(u32 frameIndex) override;
 
@@ -215,6 +226,7 @@ namespace Renderer
         Backend::SemaphoreHandlerVK* _semaphoreHandler = nullptr;
         Backend::UploadBufferHandlerVK* _uploadBufferHandler = nullptr;
         Backend::TimeQueryHandlerVK* _timeQueryHandler = nullptr;
+        Backend::FidelityFXHandlerVK* _fidelityFXHandler = nullptr;
 
         Memory::StackAllocator _frameAllocator;
 

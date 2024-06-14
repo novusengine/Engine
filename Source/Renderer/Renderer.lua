@@ -1,4 +1,4 @@
-local dependencies = { "base", "shadercooker", "tracy", "imgui", "gli", "typesafe" }
+local dependencies = { "base", "shadercooker", "tracy", "imgui", "gli", "typesafe", "fidelityfx" }
 local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "NOMINMAX", "NOMINMAX" }
 ProjectTemplate("Renderer", "StaticLib", ".", Engine.binDir, dependencies, defines)
 

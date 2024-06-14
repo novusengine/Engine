@@ -429,7 +429,7 @@ namespace Renderer
         R32G32_SINT,
         R10G10B10A2_UNORM,
         R10G10B10A2_UINT,
-        R11G11B10_FLOAT,
+        R11G11B10_UFLOAT,
         R8G8B8A8_UNORM,
         R8G8B8A8_UNORM_SRGB,
         R8G8B8A8_UINT,
@@ -546,7 +546,7 @@ namespace Renderer
             case ImageFormat::R32G32B32_FLOAT:
             case ImageFormat::R16G16B16A16_FLOAT:
             case ImageFormat::R32G32_FLOAT:
-            case ImageFormat::R11G11B10_FLOAT:
+            case ImageFormat::R11G11B10_UFLOAT:
             case ImageFormat::R16G16_FLOAT:
             case ImageFormat::R32_FLOAT:
             case ImageFormat::R16_FLOAT:
@@ -662,7 +662,7 @@ namespace Renderer
             case ImageFormat::R32G32B32_FLOAT:
             case ImageFormat::R32G32B32_UINT:
             case ImageFormat::R32G32B32_SINT:
-            case ImageFormat::R11G11B10_FLOAT:
+            case ImageFormat::R11G11B10_UFLOAT:
                 return 3;
         
             // 2 components

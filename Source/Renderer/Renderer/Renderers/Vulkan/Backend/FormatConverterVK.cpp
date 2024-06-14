@@ -27,7 +27,7 @@ namespace Renderer
                 case ImageFormat::R32G32_SINT:              return VK_FORMAT_R32G32_SINT;
                 case ImageFormat::R10G10B10A2_UNORM:        return VK_FORMAT_A2R10G10B10_UNORM_PACK32; // RGB10A2, 32 bits per pixel
                 case ImageFormat::R10G10B10A2_UINT:         return VK_FORMAT_A2R10G10B10_UINT_PACK32;
-                case ImageFormat::R11G11B10_FLOAT:          return VK_FORMAT_B10G11R11_UFLOAT_PACK32; //RG11B10, 32 bits per pixel
+                case ImageFormat::R11G11B10_UFLOAT:         return VK_FORMAT_B10G11R11_UFLOAT_PACK32; //RG11B10, 32 bits per pixel
                 case ImageFormat::R8G8B8A8_UNORM:           return VK_FORMAT_R8G8B8A8_UNORM; //RGBA8, 32 bits per pixel
                 case ImageFormat::R8G8B8A8_UNORM_SRGB:      return VK_FORMAT_R8G8B8A8_SRGB;
                 case ImageFormat::R8G8B8A8_UINT:            return VK_FORMAT_R8G8B8A8_UINT;

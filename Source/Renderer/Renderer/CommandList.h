@@ -32,6 +32,8 @@ namespace tracy
 #define GPU_SCOPED_PROFILER_ZONE(commandList, name) ((void)0)
 #endif
 
+struct FfxCacaoContext;
+
 namespace Renderer
 {
     inline u32 GetDispatchCount(u32 num, u32 threadGroupSize)
@@ -128,6 +130,9 @@ namespace Renderer
         void DrawImgui();
 
         void PushConstant(void* data, u32 offset, u32 size);
+
+        // FidelityFX
+        void DispatchCacao(FfxCacaoContext* context, DepthImageResource depthResource, ImageResource normalResource, ImageMutableResource outputResource, mat4x4* proj, mat4x4* normalsToView, f32 normalUnpackMul, f32 normalUnpackAdd);
 
     private:
         // Execute gets friend-called from RenderGraph
