@@ -144,7 +144,7 @@ namespace Renderer
                 VkResult result = vmaMapMemory(_device->_allocator, _bufferHandler->GetBufferAllocation(stagingBuffer.buffer), &mappedStagingMemory);
                 if (result != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("UploadBufferHandlerVK : vmaMapMemory failed!\n");
+                    NC_LOG_CRITICAL("UploadBufferHandlerVK : vmaMapMemory failed!\n");
                 }
                 stagingBuffer.mappedMemory = mappedStagingMemory;
 
@@ -258,17 +258,17 @@ namespace Renderer
         {
             if (targetBuffer == BufferID::Invalid())
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Tried to create an upload buffer pointing at an invalid buffer");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Tried to create an upload buffer pointing at an invalid buffer");
             }
 
             if (size > Settings::STAGING_BUFFER_SIZE)
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Requested bigger staging memory than our staging buffer size!");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Requested bigger staging memory than our staging buffer size!");
             }
 
             if (size == 0)
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Tried to upload 0 bytes of data!");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Tried to upload 0 bytes of data!");
             }
 
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
@@ -287,7 +287,7 @@ namespace Renderer
             size_t targetBufferSize = _bufferHandler->GetBufferSize(targetBuffer);
             if (targetOffset + size > targetBufferSize)
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Upload Overflowed Target Buffer");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Upload Overflowed Target Buffer");
             }
 
             StagingBuffer& stagingBuffer = data->stagingBuffers.Get(static_cast<StagingBufferID::type>(stagingBufferID));
@@ -307,7 +307,7 @@ namespace Renderer
                     {
                         std::scoped_lock lock(stagingBuffer.handleMutex);
 
-                        DebugHandler::Assert(stagingBuffer.bufferStatus == BufferStatus::READY || stagingBuffer.bufferStatus == BufferStatus::CLOSED, "UploadBufferHandlerVK : It seems like the staging buffer got executed while we had an active handle");
+                        NC_ASSERT(stagingBuffer.bufferStatus == BufferStatus::READY || stagingBuffer.bufferStatus == BufferStatus::CLOSED, "UploadBufferHandlerVK : It seems like the staging buffer got executed while we had an active handle");
 
                         // Decrement the number of active handles into this staging buffer
                         stagingBuffer.activeHandles--;
@@ -326,12 +326,12 @@ namespace Renderer
         {
             if (targetTexture == TextureID::Invalid())
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Tried to create an upload buffer pointing at an invalid texture");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Tried to create an upload buffer pointing at an invalid texture");
             }
 
             if (size > Settings::STAGING_BUFFER_SIZE)
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Requested bigger staging memory than our staging buffer size!");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Requested bigger staging memory than our staging buffer size!");
             }
 
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
@@ -349,13 +349,13 @@ namespace Renderer
             size_t targetTextureTotalSize = _textureHandler->GetTextureTotalSize(targetTexture);
             if (targetOffset + size > targetTextureTotalSize)
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Upload Overflowed Target Buffer");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Upload Overflowed Target Buffer");
             }
 
             size_t targetTextureUploadSize = _textureHandler->GetTextureUploadSize(targetTexture);
             if (numMipsToGenerate > 0 && (targetTextureUploadSize == targetTextureTotalSize))
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : We are trying to generate mips without creating extra room for the mips");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : We are trying to generate mips without creating extra room for the mips");
             }
 
             StagingBuffer& stagingBuffer = data->stagingBuffers.Get(static_cast<StagingBufferID::type>(stagingBufferID));
@@ -375,7 +375,7 @@ namespace Renderer
                     {
                         std::scoped_lock lock(stagingBuffer.handleMutex);
 
-                        DebugHandler::Assert(stagingBuffer.bufferStatus == BufferStatus::READY || stagingBuffer.bufferStatus == BufferStatus::CLOSED, "UploadBufferHandlerVK : It seems like the staging buffer got executed while we had an active handle");
+                        NC_ASSERT(stagingBuffer.bufferStatus == BufferStatus::READY || stagingBuffer.bufferStatus == BufferStatus::CLOSED, "UploadBufferHandlerVK : It seems like the staging buffer got executed while we had an active handle");
 
                         // Decrement the number of active handles into this staging buffer
                         stagingBuffer.activeHandles--;
@@ -394,12 +394,12 @@ namespace Renderer
         {
             if (targetBuffer == BufferID::Invalid())
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Tried to create a CopyBufferToBuffer where the target buffer was invalid");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Tried to create a CopyBufferToBuffer where the target buffer was invalid");
             }
 
             if (sourceBuffer == BufferID::Invalid())
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Tried to create a CopyBufferToBuffer where the source buffer was invalid");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Tried to create a CopyBufferToBuffer where the source buffer was invalid");
             }
 
             CopyBufferToBufferTask* task = new CopyBufferToBufferTask();
@@ -412,7 +412,7 @@ namespace Renderer
             size_t targetBufferSize = _bufferHandler->GetBufferSize(targetBuffer);
             if (targetOffset + size > targetBufferSize)
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Upload Overflowed Target Buffer");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Upload Overflowed Target Buffer");
             }
 
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
@@ -429,7 +429,7 @@ namespace Renderer
         {
             if (buffer == BufferID::Invalid())
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Tried to create a CopyBufferToBuffer where the target buffer was invalid");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Tried to create a CopyBufferToBuffer where the target buffer was invalid");
             }
 
             QueueDestroyBufferTask* task = new QueueDestroyBufferTask();
@@ -518,7 +518,7 @@ namespace Renderer
                 return offset;
             }
             
-            DebugHandler::PrintFatal("UploadBufferHandlerVK : Could not allocate in staging buffer after 5 tries and waiting");
+            NC_LOG_CRITICAL("UploadBufferHandlerVK : Could not allocate in staging buffer after 5 tries and waiting");
             return offset;
         }
 
@@ -534,7 +534,7 @@ namespace Renderer
 
                     if (uploadType == UploadTaskType::Invalid)
                     {
-                        DebugHandler::PrintFatal("UploadBufferHandlerVK : UploadTask supplied 'UploadTaskType::Invalid'");
+                        NC_LOG_CRITICAL("UploadBufferHandlerVK : UploadTask supplied 'UploadTaskType::Invalid'");
                     }
                     else if (uploadType == UploadTaskType::UploadToBuffer)
                     {
@@ -595,7 +595,7 @@ namespace Renderer
 
             if (result == VK_TIMEOUT)
             {
-                DebugHandler::PrintFatal("UploadBufferHandlerVK : Waiting for staging buffer fence took longer than 5 seconds, something is wrong!");
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Waiting for staging buffer fence took longer than 5 seconds, something is wrong!");
             }
 
             vkResetFences(_device->_device, 1, &stagingBuffer.fence);
@@ -627,11 +627,11 @@ namespace Renderer
 
             if (copyRegion.srcOffset + copyRegion.size > srcBufferSize)
             {
-                DebugHandler::PrintFatal("[UploadBufferHandlerVK::HandleUploadToBufferTask] Source Buffer out of bounds!");
+                NC_LOG_CRITICAL("[UploadBufferHandlerVK::HandleUploadToBufferTask] Source Buffer out of bounds!");
             }
             if (copyRegion.dstOffset + copyRegion.size > dstBufferSize)
             {
-                DebugHandler::PrintFatal("[UploadBufferHandlerVK::HandleUploadToBufferTask] Destination Buffer out of bounds!");
+                NC_LOG_CRITICAL("[UploadBufferHandlerVK::HandleUploadToBufferTask] Destination Buffer out of bounds!");
             }
 
             vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
@@ -646,7 +646,7 @@ namespace Renderer
 
             if (uploadToTextureTask->stagingBufferOffset + textureSize > srcBufferSize)
             {
-                DebugHandler::PrintFatal("[UploadBufferHandlerVK::HandleUploadToTextureTask] Source Buffer out of bounds!");
+                NC_LOG_CRITICAL("[UploadBufferHandlerVK::HandleUploadToTextureTask] Source Buffer out of bounds!");
             }
 
             _textureHandler->CopyBufferToImage(commandBuffer, srcBuffer, uploadToTextureTask->stagingBufferOffset, uploadToTextureTask->targetTexture);
@@ -754,11 +754,11 @@ namespace Renderer
 
             if (copyRegion.srcOffset + copyRegion.size > srcBufferSize)
             {
-                DebugHandler::PrintFatal("[UploadBufferHandlerVK::HandleCopyBufferToBufferTask] Source Buffer out of bounds!");
+                NC_LOG_CRITICAL("[UploadBufferHandlerVK::HandleCopyBufferToBufferTask] Source Buffer out of bounds!");
             }
             if (copyRegion.dstOffset + copyRegion.size > dstBufferSize)
             {
-                DebugHandler::PrintFatal("[UploadBufferHandlerVK::HandleCopyBufferToBufferTask] Destination Buffer out of bounds!");
+                NC_LOG_CRITICAL("[UploadBufferHandlerVK::HandleCopyBufferToBufferTask] Destination Buffer out of bounds!");
             }
 
             vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);

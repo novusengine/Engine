@@ -78,7 +78,7 @@ namespace Renderer
                                 else
                                 {
                                     // Else somethings is really bad, lets fatal log
-                                    DebugHandler::PrintFatal("Vertex Shader and Pixel Shader tries to use the same descriptor set and binding, but they don't seem to match");
+                                    NC_LOG_CRITICAL("Vertex Shader and Pixel Shader tries to use the same descriptor set and binding, but they don't seem to match");
                                 }
                                 found = true;
                                 break;
@@ -147,7 +147,7 @@ namespace Renderer
         {
             ZoneScoped;
 
-            DebugHandler::Assert(imageInfo.sampler != nullptr, "DescriptorSetBuilderVK : BindSampler was passed an imageInfo with a nullptr sampler");
+            NC_ASSERT(imageInfo.sampler != nullptr, "DescriptorSetBuilderVK : BindSampler was passed an imageInfo with a nullptr sampler");
 
             if (!_hashedNameToBindInfoIndex.contains(nameHash))
                 return;
@@ -621,7 +621,7 @@ namespace Renderer
             const BitSet& readPermissions = _bufferPermissions->GetReadBitSet();
             if (!_bufferReadAccesses->IsSubsetOf(readPermissions))
             {
-                DebugHandler::Print("\n\n--- READS ---");
+                NC_LOG_INFO("\n\n--- READS ---");
 
                 BitSet* subtracted = _bufferReadAccesses->NewBitwiseUnset(readPermissions);
 
@@ -635,7 +635,7 @@ namespace Renderer
                     u32 bindInfoIndex = _bufferIndexToBindInfoIndex[bufferIndex];
                     BindInfo& bindInfo = _bindInfos[bindInfoIndex];
                     
-                    DebugHandler::PrintError("DescriptorSetBuilderVK : Tried to read from BufferID {} (Buffer Name: {}, Binding Name: {}), but RenderPass does not have READ access for that", bufferIndex, bufferName, bindInfo.name);
+                    NC_LOG_ERROR("DescriptorSetBuilderVK : Tried to read from BufferID {} (Buffer Name: {}, Binding Name: {}), but RenderPass does not have READ access for that", bufferIndex, bufferName, bindInfo.name);
                     didError = true;
                 });
             }
@@ -643,7 +643,7 @@ namespace Renderer
             const BitSet& writePermissions = _bufferPermissions->GetWriteBitSet();
             if (!_bufferWriteAccesses->IsSubsetOf(writePermissions))
             {
-                DebugHandler::Print("\n\n--- WRITES ---");
+                NC_LOG_INFO("\n\n--- WRITES ---");
 
                 BitSet* subtracted = _bufferWriteAccesses->NewBitwiseUnset(writePermissions);
 
@@ -657,7 +657,7 @@ namespace Renderer
                     u32 bindInfoIndex = _bufferIndexToBindInfoIndex[bufferIndex];
                     BindInfo& bindInfo = _bindInfos[bindInfoIndex];
 
-                    DebugHandler::PrintError("DescriptorSetBuilderVK : Tried to write to BufferID {} (Buffer Name: {}, Binding Name: {}), but RenderPass does not have WRITE access for that", bufferIndex, bufferName, bindInfo.name);
+                    NC_LOG_ERROR("DescriptorSetBuilderVK : Tried to write to BufferID {} (Buffer Name: {}, Binding Name: {}), but RenderPass does not have WRITE access for that", bufferIndex, bufferName, bindInfo.name);
                     didError = true;
                 });
             }
@@ -667,7 +667,7 @@ namespace Renderer
             if (!_bufferAccesses->IsSubsetOf(shaderStagePermissions))
             {
                 std::string stageName = (isGraphics) ? "GRAPHICS" : "COMPUTE";
-                DebugHandler::Print("\n\n--- {} ---", stageName);
+                NC_LOG_INFO("\n\n--- {} ---", stageName);
 
                 BitSet* subtracted = _bufferAccesses->NewBitwiseUnset(shaderStagePermissions);
 
@@ -681,14 +681,14 @@ namespace Renderer
                     u32 bindInfoIndex = _bufferIndexToBindInfoIndex[bufferIndex];
                     BindInfo& bindInfo = _bindInfos[bindInfoIndex];
 
-                    DebugHandler::PrintError("DescriptorSetBuilderVK : Tried to use BufferID {} (Buffer Name: {}, Binding Name: {}) in a {} pipeline, but RenderPass does not have access for that", bufferIndex, bufferName, bindInfo.name, stageName);
+                    NC_LOG_ERROR("DescriptorSetBuilderVK : Tried to use BufferID {} (Buffer Name: {}, Binding Name: {}) in a {} pipeline, but RenderPass does not have access for that", bufferIndex, bufferName, bindInfo.name, stageName);
                     didError = true;
                 });
             }
 
             if (didError)
             {
-                DebugHandler::PrintFatal("DescriptorSetBuilderVK : ValidateAccesses failed to validate the RenderPass");
+                NC_LOG_CRITICAL("DescriptorSetBuilderVK : ValidateAccesses failed to validate the RenderPass");
             }
         }
 

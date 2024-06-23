@@ -1,206 +1,213 @@
 local warningsAsErrors = BuildSettings:Get("Luau Warnings as Errors")
-
-local basePath = path.getabsolute("luau/Luau", Engine.dependencyDir)
+local basePath = path.getabsolute("luau/Luau", Solution.Projects.Current.DependencyDir)
 
 local Luau = { }
 Luau.SetupCommon = function()
-    local callback = function()
-        local includeDir = path.getabsolute("Common/include", basePath)
-        AddIncludeDirs(includeDir)
-    end
-    CreateDep("luau-common", callback)
+    local dep = Solution.Util.CreateDepTable("luau-common", {})
+
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(basePath .. "/Common/include")
+    end)
 end
 Luau.SetupAst = function()
-    local dependencies = { "luau-common" }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local dep = Solution.Util.CreateDepTable("Luau-Ast", { "luau-common" })
+    local sourceDir = basePath .. "/Ast/src"
+    local includeDir = basePath .. "/Ast/include"
 
-    ProjectTemplate("Luau-Ast", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("Ast/src", basePath)
-    local includeDir = path.getabsolute("Ast/include", basePath)
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(20)
 
-    local files =
-    {
-        includeDir .. "/**.h",
-        sourceDir .. "/**.c",
-        sourceDir .. "/**.cpp"
-    }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
+        local files =
+        {
+            includeDir .. "/**.h",
+            sourceDir .. "/**.c",
+            sourceDir .. "/**.cpp"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetDefines(defines)
+    end)
 
-    local callback = function()
-        AddIncludeDirs(includeDir)
-
-        AddLinks("Luau-Ast")
-    end
-
-    CreateDep("luau-ast", callback, dependencies)
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
 end
 Luau.SetupCompiler = function()
-    local dependencies = { "luau-ast" }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local dep = Solution.Util.CreateDepTable("Luau-Compiler", { "luau-ast" })
+    local sourceDir = basePath .. "/Compiler/src"
+    local includeDir = basePath .. "/Compiler/include"
 
-    ProjectTemplate("Luau-Compiler", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("Compiler/src", basePath)
-    local includeDir = path.getabsolute("Compiler/include", basePath)
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(20)
 
-    local files =
-    {
-        includeDir .. "/**.h",
-        sourceDir .. "/**.c",
-        sourceDir .. "/**.cpp"
-    }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
+        local files =
+        {
+            includeDir .. "/**.h",
+            sourceDir .. "/**.c",
+            sourceDir .. "/**.cpp"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetDefines(defines)
+    end)
 
-    local callback = function()
-        AddIncludeDirs(includeDir)
-
-        AddLinks("Luau-Compiler")
-    end
-
-    CreateDep("luau-compiler", callback, dependencies)
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
 end
 Luau.SetupConfig = function()
-    local dependencies = { "luau-ast" }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local dep = Solution.Util.CreateDepTable("Luau-Config", { "luau-ast" })
+    local sourceDir = basePath .. "/Config/src"
+    local includeDir = basePath .. "/Config/include"
 
-    ProjectTemplate("Luau-Config", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("Config/src", basePath)
-    local includeDir = path.getabsolute("Config/include", basePath)
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(20)
 
-    local files =
-    {
-        includeDir .. "/**.h",
-        sourceDir .. "/**.c",
-        sourceDir .. "/**.cpp"
-    }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
+        local files =
+        {
+            includeDir .. "/**.h",
+            sourceDir .. "/**.c",
+            sourceDir .. "/**.cpp"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetDefines(defines)
+    end)
 
-    local callback = function()
-        AddIncludeDirs(includeDir)
-
-        AddLinks("Luau-Config")
-    end
-
-    CreateDep("luau-config", callback, dependencies)
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
 end
 Luau.SetupAnalysis = function()
-    local dependencies = { "luau-ast", "luau-config" }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local dep = Solution.Util.CreateDepTable("Luau-Analysis", { "luau-ast", "luau-config" })
+    local sourceDir = basePath .. "/Analysis/src"
+    local includeDir = basePath .. "/Analysis/include"
 
-    ProjectTemplate("Luau-Analysis", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("Analysis/src", basePath)
-    local includeDir = path.getabsolute("Analysis/include", basePath)
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(20)
 
-    local files =
-    {
-        includeDir .. "/**.h",
-        sourceDir .. "/**.c",
-        sourceDir .. "/**.cpp"
-    }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
+        local files =
+        {
+            includeDir .. "/**.h",
+            sourceDir .. "/**.c",
+            sourceDir .. "/**.cpp"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetDefines(defines)
 
-    filter "platforms:Win64"
-        AddDefines("_CRT_SECURE_NO_WARNINGS")
+        Solution.Util.SetFilter("platforms:Win64", function()
+            Solution.Util.SetDefines({ "_CRT_SECURE_NO_WARNINGS" })
+        end)
+    end)
 
-    local callback = function()
-        AddIncludeDirs(includeDir)
-
-        AddLinks("Luau-Analysis")
-    end
-
-    CreateDep("luau-analysis", callback, dependencies)
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
 end
 Luau.SetupVM = function()
-    local dependencies = { "luau-common" }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local dep = Solution.Util.CreateDepTable("Luau-VM", { "luau-common" })
+    local sourceDir = basePath .. "/VM/src"
+    local includeDir = basePath .. "/VM/include"
 
-    ProjectTemplate("Luau-VM", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("VM/src", basePath)
-    local includeDir = path.getabsolute("VM/include", basePath)
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(20)
 
-    local files =
-    {
-        includeDir .. "/**.h",
-        sourceDir .. "/**.c",
-        sourceDir .. "/**.cpp"
-    }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
+        local files =
+        {
+            includeDir .. "/**.h",
+            sourceDir .. "/**.c",
+            sourceDir .. "/**.cpp"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetDefines(defines)
 
-    filter "platforms:Win64"
-        AddDefines("_CRT_SECURE_NO_WARNINGS")
+        Solution.Util.SetFilter("platforms:Win64", function()
+            Solution.Util.SetDefines({ "_CRT_SECURE_NO_WARNINGS" })
+        end)
+    end)
 
-    local callback = function()
-        AddIncludeDirs(includeDir)
-
-        AddLinks("Luau-VM")
-    end
-
-    CreateDep("luau-vm", callback, dependencies)
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
 end
 Luau.SetupCodeGen = function()
-    local dependencies = { "luau-common", "luau-vm" }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local dep = Solution.Util.CreateDepTable("Luau-CodeGen", { "luau-common", "luau-vm" })
+    local sourceDir = basePath .. "/CodeGen/src"
+    local includeDir = basePath .. "/CodeGen/include"
+    local vmSourceDir = basePath .. "/VM/src"
 
-    ProjectTemplate("Luau-CodeGen", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("CodeGen/src", basePath)
-    local includeDir = path.getabsolute("CodeGen/include", basePath)
-    local vmSourceDir = path.getabsolute("VM/src", basePath)
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(20)
 
-    local files =
-    {
-        includeDir .. "/**.h",
-        sourceDir .. "/**.c",
-        sourceDir .. "/**.cpp"
-    }
-    AddFiles(files)
-    AddIncludeDirs({ includeDir, vmSourceDir })
+        local files =
+        {
+            includeDir .. "/**.h",
+            sourceDir .. "/**.c",
+            sourceDir .. "/**.cpp"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes({ includeDir, vmSourceDir })
+        Solution.Util.SetDefines(defines)
+    end)
 
-    local callback = function()
-        AddIncludeDirs(includeDir)
-
-        AddLinks("Luau-CodeGen")
-    end
-
-    CreateDep("luau-codegen", callback, dependencies)
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
 end
 Luau.SetupIsocline = function()
-    local dependencies = { }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local dep = Solution.Util.CreateDepTable("Luau-Isocline", { "luau-common" })
+    local sourceDir = basePath .. "/extern/isocline/src"
+    local includeDir = basePath .. "/extern/isocline/include"
 
-    ProjectTemplate("Luau-Isocline", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("extern/isocline/src", basePath)
-    local includeDir = path.getabsolute("extern/isocline/include", basePath)
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(20)
 
-    local files =
-    {
-        includeDir .. "/isocline.h",
-        sourceDir .. "/isocline.c",
-    }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
+        local files =
+        {
+            includeDir .. "/isocline.h",
+            sourceDir .. "/isocline.c"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetDefines(defines)
+    end)
 
-    local callback = function()
-        AddIncludeDirs(includeDir)
-
-        AddLinks("Luau-Isocline")
-    end
-
-    CreateDep("luau-isocline", callback, dependencies)
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
 end
 
-local luauDependencyGroup = Engine.dependencyGroup .. "/Luau"
-group (luauDependencyGroup)
+Solution.Util.SetGroup(Solution.DependencyGroup .. "/Luau")
 Luau.SetupCommon()
 Luau.SetupAst()
 Luau.SetupCompiler()
@@ -209,4 +216,4 @@ Luau.SetupAnalysis()
 Luau.SetupVM()
 Luau.SetupCodeGen()
 Luau.SetupIsocline()
-group (Engine.dependencyGroup)
+Solution.Util.SetGroup(Solution.DependencyGroup)

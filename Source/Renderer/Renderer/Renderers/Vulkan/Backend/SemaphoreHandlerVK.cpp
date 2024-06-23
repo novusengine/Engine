@@ -40,7 +40,7 @@ namespace Renderer
 
             if (vkCreateSemaphore(_device->_device, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create sampler!");
+                NC_LOG_CRITICAL("Failed to create sampler!");
             }
 
             return SemaphoreID(static_cast<SemaphoreID::type>(nextID));

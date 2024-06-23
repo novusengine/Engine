@@ -384,7 +384,7 @@ namespace Renderer
 
     void CommandList::DrawIndirect(BufferResource argumentResource, u32 argumentBufferOffset, u32 drawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirect got invalid argumentResource");
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirect got invalid argumentResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
 
         BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
@@ -401,7 +401,7 @@ namespace Renderer
 
     void CommandList::DrawIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset, u32 drawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirect got invalid argumentResource");
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirect got invalid argumentResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
 
         BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
@@ -418,8 +418,8 @@ namespace Renderer
 
     void CommandList::DrawIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -440,8 +440,8 @@ namespace Renderer
 
     void CommandList::DrawIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -462,8 +462,8 @@ namespace Renderer
 
     void CommandList::DrawIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -484,8 +484,8 @@ namespace Renderer
 
     void CommandList::DrawIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -520,7 +520,7 @@ namespace Renderer
 
     void CommandList::DrawIndexedIndirect(BufferResource argumentResource, u32 argumentBufferOffset, u32 drawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirect got invalid argumentResource");
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirect got invalid argumentResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
 
         BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
@@ -537,7 +537,7 @@ namespace Renderer
 
     void CommandList::DrawIndexedIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset, u32 drawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirect got invalid argumentResource");
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirect got invalid argumentResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
 
         BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
@@ -554,8 +554,8 @@ namespace Renderer
 
     void CommandList::DrawIndexedIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -576,8 +576,8 @@ namespace Renderer
 
     void CommandList::DrawIndexedIndirectCount(BufferResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -598,8 +598,8 @@ namespace Renderer
 
     void CommandList::DrawIndexedIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -620,8 +620,8 @@ namespace Renderer
 
     void CommandList::DrawIndexedIndirectCount(BufferMutableResource argumentResource, u32 argumentBufferOffset, BufferMutableResource drawCountResource, u32 drawCountBufferOffset, u32 maxDrawCount)
     {
-        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
-        DebugHandler::Assert(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid argumentResource");
+        NC_ASSERT(drawCountResource != BufferMutableResource::Invalid(), "CommandList : DrawIndexedIndirectCount got invalid drawCountResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
         _resources->EnforceHasAccess(_currentPassIndex, drawCountResource, BufferPassUsage::GRAPHICS);
 
@@ -657,7 +657,7 @@ namespace Renderer
 
     void CommandList::DispatchIndirect(BufferResource argumentResource, u32 argumentBufferOffset)
     {
-        DebugHandler::Assert(argumentResource != BufferResource::Invalid(), "CommandList : DispatchIndirect got invalid argumentResource");
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DispatchIndirect got invalid argumentResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::COMPUTE);
 
         BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
@@ -673,7 +673,7 @@ namespace Renderer
 
     void CommandList::DispatchIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset)
     {
-        DebugHandler::Assert(argumentResource != BufferMutableResource::Invalid(), "CommandList : DispatchIndirect got invalid argumentResource");
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DispatchIndirect got invalid argumentResource");
         _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::COMPUTE);
 
         BufferID argumentBuffer = _resources->GetBuffer(argumentResource);
@@ -743,8 +743,8 @@ namespace Renderer
 
     void CommandList::CopyBuffer(BufferMutableResource dstResource, u64 dstBufferOffset, BufferResource srcResource, u64 srcBufferOffset, u64 region)
     {
-        DebugHandler::Assert(dstResource != BufferMutableResource::Invalid(), "CommandList : CopyBuffer got invalid dstResource");
-        DebugHandler::Assert(srcResource != BufferResource::Invalid(), "CommandList : CopyBuffer got invalid srcResource");
+        NC_ASSERT(dstResource != BufferMutableResource::Invalid(), "CommandList : CopyBuffer got invalid dstResource");
+        NC_ASSERT(srcResource != BufferResource::Invalid(), "CommandList : CopyBuffer got invalid srcResource");
         _resources->EnforceHasAccess(_currentPassIndex, dstResource, BufferPassUsage::TRANSFER);
         _resources->EnforceHasAccess(_currentPassIndex, srcResource, BufferPassUsage::TRANSFER);
 
@@ -765,8 +765,8 @@ namespace Renderer
 
     void CommandList::CopyBuffer(BufferMutableResource dstResource, u64 dstBufferOffset, BufferMutableResource srcResource, u64 srcBufferOffset, u64 region)
     {
-        DebugHandler::Assert(dstResource != BufferMutableResource::Invalid(), "CommandList : CopyBuffer got invalid dstResource");
-        DebugHandler::Assert(srcResource != BufferMutableResource::Invalid(), "CommandList : CopyBuffer got invalid srcResource");
+        NC_ASSERT(dstResource != BufferMutableResource::Invalid(), "CommandList : CopyBuffer got invalid dstResource");
+        NC_ASSERT(srcResource != BufferMutableResource::Invalid(), "CommandList : CopyBuffer got invalid srcResource");
         _resources->EnforceHasAccess(_currentPassIndex, dstResource, BufferPassUsage::TRANSFER);
         _resources->EnforceHasAccess(_currentPassIndex, srcResource, BufferPassUsage::TRANSFER);
 
@@ -787,7 +787,7 @@ namespace Renderer
 
     void CommandList::FillBuffer(BufferMutableResource dstResource, u64 dstBufferOffset, u64 size, u32 data)
     {
-        DebugHandler::Assert(dstResource != BufferMutableResource::Invalid(), "CommandList : FillBuffer got invalid dstResource");
+        NC_ASSERT(dstResource != BufferMutableResource::Invalid(), "CommandList : FillBuffer got invalid dstResource");
         _resources->EnforceHasAccess(_currentPassIndex, dstResource, BufferPassUsage::TRANSFER);
 
         BufferID dstBuffer = _resources->GetBuffer(dstResource);
@@ -805,7 +805,7 @@ namespace Renderer
 
     void CommandList::UpdateBuffer(BufferMutableResource dstResource, u64 dstBufferOffset, u64 size, void* data)
     {
-        DebugHandler::Assert(dstResource != BufferMutableResource::Invalid(), "CommandList : UpdateBuffer got invalid dstResource");
+        NC_ASSERT(dstResource != BufferMutableResource::Invalid(), "CommandList : UpdateBuffer got invalid dstResource");
         _resources->EnforceHasAccess(_currentPassIndex, dstResource, BufferPassUsage::TRANSFER);
 
         BufferID dstBuffer = _resources->GetBuffer(dstResource);

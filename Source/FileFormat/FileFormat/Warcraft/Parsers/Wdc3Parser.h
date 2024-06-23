@@ -146,12 +146,12 @@ namespace DB2::WDC3
                     case Layout::FieldStorageInfo::CompressionType::Bitpacked:
                     case Layout::FieldStorageInfo::CompressionType::BitpackedSigned:
                     {
-                        DebugHandler::PrintFatal("GetFieldPtr: Bitpacked and BitpackedSigned is not supported for GetFieldPtr");
+                        NC_LOG_CRITICAL("GetFieldPtr: Bitpacked and BitpackedSigned is not supported for GetFieldPtr");
                     }
 
                     case Layout::FieldStorageInfo::CompressionType::CommonData:
                     {
-                        DebugHandler::PrintFatal("GetFieldPtr: CommonData is not supported for GetFieldPtr");
+                        NC_LOG_CRITICAL("GetFieldPtr: CommonData is not supported for GetFieldPtr");
                     }
 
                     case Layout::FieldStorageInfo::CompressionType::BitpackedIndexed:

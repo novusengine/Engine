@@ -1,40 +1,33 @@
-local isEnabled = BuildSettings:Get("Enable Tracy")
+local dep = Solution.Util.CreateDepTable("TracyProfiler", {})
 
-local function SetupLib()
-    local basePath = path.getabsolute("tracyprofiler/", Engine.dependencyDir)
-    local dependencies = { }
+Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
     local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    ProjectTemplate("Tracy", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.SetLanguage("C++")
+    Solution.Util.SetCppDialect(20)
 
-    local sourceDir = path.getabsolute("tracy/", basePath)
-    local includeDir = { basePath }
-
+    local sourceDir = dep.Path .. "/tracy/"
+    
     local files =
     {
         path.getabsolute("tracy/Tracy.hpp", sourceDir),
         path.getabsolute("tracy/TracyVulkan.hpp", sourceDir),
         path.getabsolute("TracyClient.cpp", sourceDir)
     }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
 
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetDefines(defines)
+    
+    local isEnabled = BuildSettings:Get("Enable Tracy")
     if isEnabled then
-        AddDefines("TRACY_ENABLE")
+        Solution.Util.SetDefines({ "TRACY_ENABLE" })
     end
-end
-SetupLib()
+end)
 
-local function Include()
-    local basePath = path.getabsolute("tracyprofiler/", Engine.dependencyDir)
-    local sourcePath = path.getabsolute("tracy/", basePath)
-    local includeDir = { basePath, sourcePath }
-    AddIncludeDirs(includeDir)
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    local sourceDir = dep.Path .. "/tracy/"
 
-    if isEnabled then
-        AddDefines("TRACY_ENABLE")
-    end
-
-    AddLinks("Tracy")
-end
-CreateDep("tracy", Include)
+    Solution.Util.SetIncludes({ dep.Path, sourceDir })
+    Solution.Util.SetLinks(dep.Name)
+end)

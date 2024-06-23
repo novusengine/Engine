@@ -49,7 +49,7 @@ namespace Memory
         {
             if (allocator->_onlyOffset)
             {
-                DebugHandler::PrintFatal("Tried to Allocator::New with an allocator that is set to onlyOffset and thus has no backing memory");
+                //NC_LOG_CRITICAL("Tried to Allocator::New with an allocator that is set to onlyOffset and thus has no backing memory");
             }
 
             void* memory = allocator->Allocate(sizeof(T), 8);
@@ -63,7 +63,7 @@ namespace Memory
         {
             if (allocator->_onlyOffset)
             {
-                DebugHandler::PrintFatal("Tried to Allocator::NewArray with an allocator that is set to onlyOffset and thus has no backing memory");
+                //NC_LOG_CRITICAL("Tried to Allocator::NewArray with an allocator that is set to onlyOffset and thus has no backing memory");
             }
 
             void* memory = allocator->Allocate(sizeof(T) * count, 8);

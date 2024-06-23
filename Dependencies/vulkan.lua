@@ -2,18 +2,13 @@ local osEnvName = "VULKAN_SDK"
 local vulkanSDK = os.getenv(osEnvName)
 
 if not vulkanSDK then
-    error("Failed to find System Environment Variable '" .. osEnvName .. ". Please ensure Vulkan is installed and properly configured")
+    Solution.Util.PrintError("Failed to find System Environment Variable '" .. osEnvName .. ". Please ensure Vulkan is installed and configured properly")
 end
 
-local function Include()
-    local includeDir = vulkanSDK .. "/include"
-    AddIncludeDirs(includeDir)
+local dep = Solution.Util.CreateDepTable("vulkan", {})
 
-    local link = vulkanSDK .. "/lib/vulkan-1.lib"
-    AddLinks(link)
-
-    local define = { "_CRT_SECURE_NO_WARNINGS" }
-    AddDefines(define)
-end
-
-CreateDep("vulkan", Include)
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
+    Solution.Util.SetIncludes(vulkanSDK .. "/include")
+    Solution.Util.SetLinks(vulkanSDK .. "/lib/vulkan-1.lib")
+    Solution.Util.SetDefines({ "_CRT_SECURE_NO_WARNINGS" })
+end)

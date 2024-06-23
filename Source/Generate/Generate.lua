@@ -1,10 +1,11 @@
+local currentProject = Solution.Projects.Current
+
 local dependencies = { }
-local defines = { }
-ProjectTemplate("Generate", "StaticLib", ".", Engine.binDir, dependencies, defines)
+Solution.Util.CreateProject("Generate", "StaticLib", currentProject.BinDir, dependencies)
 
 local solutionType = BuildSettings:Get("Solution Type")
 postbuildcommands
 {
-    "cd " .. Engine.rootDir,
+    "cd " .. currentProject.RootDir,
     "premake5 " .. solutionType
 }

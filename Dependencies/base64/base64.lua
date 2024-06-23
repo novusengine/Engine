@@ -1,6 +1,5 @@
-local function Include()
-    local includePath = path.getabsolute("base64/", Engine.dependencyDir);
-    AddIncludeDirs(includePath)
-end
+local dep = Solution.Util.CreateDepTable("base64", {})
 
-CreateDep("base64", Include)
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+end)

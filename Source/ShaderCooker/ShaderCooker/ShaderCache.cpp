@@ -73,7 +73,7 @@ namespace ShaderCooker
         std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
         if (!output)
         {
-            DebugHandler::PrintError("Failed to create shader cache. Check admin permissions");
+            NC_LOG_ERROR("Failed to create shader cache. Check admin permissions");
             return;
         }
 

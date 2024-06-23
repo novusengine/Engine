@@ -1,44 +1,14 @@
-local function Win64Include(srcFolder)
-    local files =
-    {
-        -- Windows Only
-        srcFolder .. "/win32_platform.h",
-        srcFolder .. "/win32_joystick.h",
-        srcFolder .. "/wgl_context.h",
-        srcFolder .. "/egl_context.h",
-        srcFolder .. "/osmesa_context.h",
+local dep = Solution.Util.CreateDepTable("Glfw", {})
 
-        srcFolder .. "/win32_init.c",
-        srcFolder .. "/win32_joystick.c",
-        srcFolder .. "/win32_monitor.c",
-        srcFolder .. "/win32_time.c",
-        srcFolder .. "/win32_thread.c",
-        srcFolder .. "/win32_window.c",
-        srcFolder .. "/wgl_context.c",
-        srcFolder .. "/egl_context.c",
-        srcFolder .. "/osmesa_context.c"
-    }
-
-    AddFiles(files)
-
-    local defines =
-    {
-        "_GLFW_WIN32",
-        "_CRT_SECURE_NO_WARNINGS"
-    }
-
-    AddDefines(defines)
-end
-
-local function SetupLib()
-    local basePath = path.getabsolute("glfw/", Engine.dependencyDir)
-    local dependencies = { }
+Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
     local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    ProjectTemplate("Glfw", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.SetLanguage("C++")
+    Solution.Util.SetCppDialect(20)
 
-    local sourceDir = path.getabsolute("src/", basePath)
-    local includeDir = path.getabsolute("include/", basePath)
+    local sourceDir = dep.Path .. "/src"
+    local includeDir = dep.Path .. "/include"
+
     local files =
     {
         includeDir .. "/GLFW/glfw3.h",
@@ -51,24 +21,44 @@ local function SetupLib()
         sourceDir .. "/vulkan.c",
         sourceDir .. "/window.c"
     }
-    AddFiles(files)
-    AddIncludeDirs(includeDir)
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetDefines(defines)
 
-    filter "platforms:Win64"
-        Win64Include(sourceDir)
+    Solution.Util.SetFilter("platforms:Win64", function()
+        local files =
+        {
+            sourceDir .. "/win32_platform.h",
+            sourceDir .. "/win32_joystick.h",
+            sourceDir .. "/wgl_context.h",
+            sourceDir .. "/egl_context.h",
+            sourceDir .. "/osmesa_context.h",
 
-    filter "platforms:Linux"
-        AddLinks("pthread")
-end
-SetupLib()
+            sourceDir .. "/win32_init.c",
+            sourceDir .. "/win32_joystick.c",
+            sourceDir .. "/win32_monitor.c",
+            sourceDir .. "/win32_time.c",
+            sourceDir .. "/win32_thread.c",
+            sourceDir .. "/win32_window.c",
+            sourceDir .. "/wgl_context.c",
+            sourceDir .. "/egl_context.c",
+            sourceDir .. "/osmesa_context.c"
+        }
+        
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetDefines({ "_GLFW_WIN32", "_CRT_SECURE_NO_WARNINGS" })
+    end)
+    
+    Solution.Util.SetFilter("platforms:Linux", function()
+        Solution.Util.SetLinks({ "pthread" })
+    end)
+end)
 
-local function Include()
-    local includeDir = path.getabsolute("glfw/include/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-
-    filter "platforms:Win64"
-        AddDefines({ "_GLFW_WIN32", "_CRT_SECURE_NO_WARNINGS" })
-
-    AddLinks("Glfw")
-end
-CreateDep("glfw", Include)
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path .. "/include")
+    Solution.Util.SetLinks(dep.Name)
+    
+    Solution.Util.SetFilter("platforms:Win64", function()
+        Solution.Util.SetDefines({ "_GLFW_WIN32", "_CRT_SECURE_NO_WARNINGS" })
+    end)
+end)

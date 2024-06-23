@@ -1,5 +1,5 @@
-local function Include()
-    local includeDir = path.getabsolute("utfcpp/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-end
-CreateDep("utfcpp", Include)
+local dep = Solution.Util.CreateDepTable("utfcpp", {})
+
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+end)

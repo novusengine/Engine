@@ -123,7 +123,7 @@ namespace Renderer
 
                 if (vkBeginCommandBuffer(commandList.commandBuffer, &beginInfo) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to begin recording command buffer!");
+                    NC_LOG_CRITICAL("Failed to begin recording command buffer!");
                 }
             }
             else
@@ -156,20 +156,20 @@ namespace Renderer
                     queue = _device->_transferQueue;
                     break;
                 default:
-                    DebugHandler::PrintFatal("Tried to EndCommandList with unknown QueueType, did we add a QueueType without updating this function?");
+                    NC_LOG_CRITICAL("Tried to EndCommandList with unknown QueueType, did we add a QueueType without updating this function?");
                     break;
                 }
 
                 // Validate command list
                 if (commandList.renderPassOpenCount != 0)
                 {
-                    DebugHandler::PrintFatal("We found unmatched calls to BeginPipeline in your commandlist, for every BeginPipeline you need to also EndPipeline!");
+                    NC_LOG_CRITICAL("We found unmatched calls to BeginPipeline in your commandlist, for every BeginPipeline you need to also EndPipeline!");
                 }
 
                 // Close command list
                 if (vkEndCommandBuffer(commandList.commandBuffer) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to record command buffer!");
+                    NC_LOG_CRITICAL("Failed to record command buffer!");
                 }
 
                 // Execute command list
@@ -343,7 +343,7 @@ namespace Renderer
                     break;
 
                 default:
-                    DebugHandler::PrintFatal("Tried to create a CommandList with an unknown QueueType, did we add a QueueType without updating this function?");
+                    NC_LOG_CRITICAL("Tried to create a CommandList with an unknown QueueType, did we add a QueueType without updating this function?");
                     break;
             }
 
@@ -354,7 +354,7 @@ namespace Renderer
 
             if (vkCreateCommandPool(_device->_device, &poolInfo, nullptr, &commandList.commandPool) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create command pool!");
+                NC_LOG_CRITICAL("Failed to create command pool!");
             }
 
             // Create commandlist
@@ -366,7 +366,7 @@ namespace Renderer
 
             if (vkAllocateCommandBuffers(_device->_device, &allocInfo, &commandList.commandBuffer) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to allocate command buffers!");
+                NC_LOG_CRITICAL("Failed to allocate command buffers!");
             }
 
             // Open commandlist
@@ -377,7 +377,7 @@ namespace Renderer
 
             if (vkBeginCommandBuffer(commandList.commandBuffer, &beginInfo) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to begin recording command buffer!");
+                NC_LOG_CRITICAL("Failed to begin recording command buffer!");
             }
 
             {

@@ -1,34 +1,31 @@
-local taskPriorities = BuildSettings:Get("EnkiTS Num Task Priorities")
+local dep = Solution.Util.CreateDepTable("EnkiTS", {})
 
-local function SetupLib()
-    local basePath = path.getabsolute("enkiTS/", Engine.dependencyDir)
-    local dependencies = { }
+Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
     local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    ProjectTemplate("EnkiTS", "StaticLib", nil, Engine.binDir, dependencies, defines)
+    Solution.Util.SetLanguage("C++")
+    Solution.Util.SetCppDialect(20)
 
-    local sourceDir = path.getabsolute("enkiTS/", basePath)
-    local includeDir = sourceDir
+    local sourceDir = dep.Path .. "/enkiTS"
     local files =
     {
         sourceDir .. "/LockLessMultiReadPipe.h",
         sourceDir .. "/TaskScheduler.h",
         sourceDir .. "/TaskScheduler.cpp"
     }
-    AddFiles(files)
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetDefines(defines)
 
-    AddIncludeDirs(includeDir)
+    local taskPriorities = BuildSettings:Get("EnkiTS Num Task Priorities")
+    Solution.Util.SetDefines({ "ENKITS_TASK_PRIORITIES_NUM=" .. tostring(taskPriorities) })
+end)
 
-    AddDefines("ENKITS_TASK_PRIORITIES_NUM=" .. tostring(taskPriorities))
-end
-SetupLib()
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetLinks(dep.Name)
 
-local function Include()
-    local includeDir = path.getabsolute("enkiTS/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-
-    AddLinks("EnkiTS")
-    filter "platforms:Linux"
-        AddLinks("pthread")
-end
-CreateDep("enkiTS", Include)
+    Solution.Util.SetFilter("platforms:Linux", function()
+        Solution.Util.SetLinks("pthread")
+    end)
+end)

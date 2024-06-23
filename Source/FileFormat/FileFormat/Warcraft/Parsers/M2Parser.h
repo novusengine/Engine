@@ -33,6 +33,7 @@ namespace M2
         static bool ReadAFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, M2::Layout& layout);
         static bool ReadBFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, M2::Layout& layout);
         static bool ReadTXID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, M2::Layout& layout);
+        static bool ReadTVFS(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, M2::Layout& layout);
 
     private:
         static robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::shared_ptr<Bytebuffer>&, M2::Layout&)>> _m2FileChunkToFunction;

@@ -19,7 +19,7 @@ namespace Model
         std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
         if (!output)
         {
-            DebugHandler::PrintError("Failed to create CModel file. Check admin permissions");
+            NC_LOG_ERROR("Failed to create CModel file. Check admin permissions");
             return false;
         }
 
@@ -880,20 +880,26 @@ namespace Model
             // Copy Timestamps
             {
                 u32 numTimestamps = static_cast<u32>(srcTrack.values.size());
-                destTrack.timestamps.resize(numTimestamps);
 
-                memcpy(&destTrack.timestamps[0], &srcTrack.timestamps[0], sizeof(u32) * numTimestamps);
+                if (numTimestamps)
+                {
+                    destTrack.timestamps.resize(numTimestamps);
+                    memcpy(&destTrack.timestamps[0], &srcTrack.timestamps[0], sizeof(u32) * numTimestamps);
+                }
             }
 
             // Copy Values
             {
                 u32 numValues = static_cast<u32>(srcTrack.values.size());
-                destTrack.values.resize(numValues);
-
-                for (u32 j = 0; j < numValues; j++)
+                if (numValues)
                 {
-                    quat rotQuat = srcTrack.values[j].ToQuat();
-                    destTrack.values[j] = CoordinateSpaces::ModelRotToNovus(rotQuat);
+                    destTrack.values.resize(numValues);
+
+                    for (u32 j = 0; j < numValues; j++)
+                    {
+                        quat rotQuat = srcTrack.values[j].ToQuat();
+                        destTrack.values[j] = CoordinateSpaces::ModelRotToNovus(rotQuat);
+                    }
                 }
             }
         }

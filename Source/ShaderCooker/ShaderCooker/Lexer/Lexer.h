@@ -40,7 +40,7 @@ namespace ShaderCooker
         template<typename... Args>
         static void ReportError(int errorCode, std::string str, Args... args)
         {
-            DebugHandler::PrintError("Lexer Error {0} : {1}", errorCode, str.c_str(), args...);
+            NC_LOG_ERROR("Lexer Error {0} : {1}", errorCode, str.c_str(), args...);
         }
 
         static robin_hood::unordered_map<std::string_view, Token::Type> _keywordStringToType;

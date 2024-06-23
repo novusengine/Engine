@@ -1,25 +1,26 @@
-local dependencies = { }
-local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
-ProjectTemplate("Catch2", "StaticLib", path.getabsolute("catch2/", Engine.dependencyDir), Engine.binDir, dependencies, defines)
+local dep = Solution.Util.CreateDepTable("Catch2", {})
 
-local function IncludeCatch2()
-    local includePath = path.getabsolute("catch2/", Engine.dependencyDir);
-    AddIncludeDirs(includePath)
-    AddLinks("Catch2")
-end
-CreateDep("catch2", IncludeCatch2, dependencies)
+Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-local function IncludeCatch2WithMain()
-    local files =
-    {
-        path.getabsolute("catch2/**.h", Engine.dependencyDir),
-        path.getabsolute("catch2/**.cpp", Engine.dependencyDir)
-    }
-    AddFiles(files)
+    Solution.Util.SetLanguage("C++")
+    Solution.Util.SetCppDialect(20)
 
-    local includePath = path.getabsolute("catch2/", Engine.dependencyDir);
-    AddIncludeDirs(includePath)
+    local files = Solution.Util.GetFilesForCpp(dep.Path)
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetDefines(defines)
+end)
 
-    AddDefines("DO_NOT_USE_WMAIN")
-end
-CreateDep("catch2-withmain", IncludeCatch2WithMain)
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetLinks(dep.Name)
+end)
+
+Solution.Util.CreateDep(dep.NameLow .. "-withmain", dep.Dependencies, function()
+    local files = Solution.Util.GetFilesForCpp(dep.Path)
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetLinks(dep.Name)
+    Solution.Util.SetDefines({ "DO_NOT_USE_WMAIN" })
+end)

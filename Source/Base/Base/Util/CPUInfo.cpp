@@ -53,19 +53,19 @@ void CPUInfo::Print(i32 detailLevel)
 {
     if (detailLevel > 0)
     {
-        DebugHandler::Print("[CPUInfo]: {0}", _prettyName);
+        //NC_LOG_INFO("[CPUInfo]: {0}", _prettyName);
     }
 
     if (detailLevel > 1)
     {
-        DebugHandler::Print("[CPUInfo]: Supports Hyperthreading: {0}", features.isHTT ? "yes" : "no");
-        DebugHandler::Print("[CPUInfo]: Supports SSE: {0}", features.isSSE ? "yes" : "no");
-        DebugHandler::Print("[CPUInfo]: Supports SSE2: {0}", features.isSSE2 ? "yes" : "no");
-        DebugHandler::Print("[CPUInfo]: Supports SSE3: {0}", features.isSSE3 ? "yes" : "no");
-        DebugHandler::Print("[CPUInfo]: Supports SSE4.1: {0}", features.isSSE41 ? "yes" : "no");
-        DebugHandler::Print("[CPUInfo]: Supports SSE4.2: {0}", features.isSSE42 ? "yes" : "no");
-        DebugHandler::Print("[CPUInfo]: Supports AVX: {0}", features.isAVX ? "yes" : "no");
-        DebugHandler::Print("[CPUInfo]: Supports AVX2: {0}", features.isAVX2 ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports Hyperthreading: {0}", features.isHTT ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports SSE: {0}", features.isSSE ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports SSE2: {0}", features.isSSE2 ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports SSE3: {0}", features.isSSE3 ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports SSE4.1: {0}", features.isSSE41 ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports SSE4.2: {0}", features.isSSE42 ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports AVX: {0}", features.isAVX ? "yes" : "no");
+        //NC_LOG_INFO("[CPUInfo]: Supports AVX2: {0}", features.isAVX2 ? "yes" : "no");
     }
 }
 
@@ -177,7 +177,7 @@ CPUInfo::CPUInfo()
     }
     else
     {
-        DebugHandler::PrintFatal("Unexpected vendor id ({0})", upVId.c_str());
+        //NC_LOG_CRITICAL("Unexpected vendor id ({0})", upVId.c_str());
     }
 
     // Get processor brand string

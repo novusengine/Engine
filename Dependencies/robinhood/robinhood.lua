@@ -1,5 +1,5 @@
-local function Include()
-    local includeDir = path.getabsolute("robinhood/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-end
-CreateDep("robinhood", Include)
+local dep = Solution.Util.CreateDepTable("robinhood", {})
+
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+end)

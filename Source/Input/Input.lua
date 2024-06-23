@@ -1,10 +1,18 @@
-local dependencies = { "base", "imgui" }
-local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
-ProjectTemplate("Input", "StaticLib", ".", Engine.binDir, dependencies, defines)
+local mod = Solution.Util.CreateModuleTable("Input", { "base", "imgui" })
 
-local function Include()
-    local includeDir = path.getabsolute("Input/", Engine.projectsDir)
-    AddIncludeDirs(includeDir)
-    AddLinks("Input")
-end
-CreateDep("input", Include, dependencies)
+Solution.Util.CreateStaticLib(mod.Name, Solution.Projects.Current.BinDir, mod.Dependencies, function()
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+
+    Solution.Util.SetLanguage("C++")
+    Solution.Util.SetCppDialect(20)
+
+    local files = Solution.Util.GetFilesForCpp(mod.Path)
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(mod.Path)
+    Solution.Util.SetDefines(defines)
+end)
+
+Solution.Util.CreateDep(mod.NameLow, mod.Dependencies, function()
+    Solution.Util.SetIncludes(mod.Path)
+    Solution.Util.SetLinks(mod.Name)
+end)

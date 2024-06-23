@@ -1,37 +1,18 @@
-local function Win64Link()
-    local links =
-    {
-        path.getabsolute("dxcompiler/lib/windows/dxcompiler.lib", Engine.dependencyDir)
-    }
+local mod = Solution.Util.CreateDepTable("dxcompiler", {})
 
-    AddLinks(links)
-end
-local function LinuxLink()
-    local links =
-    {
-        path.getabsolute("dxcompiler/lib/linux/dxcompiler.so", Engine.dependencyDir)
-    }
+Solution.Util.CreateDep(mod.Name, mod.Dependencies, function()
+    Solution.Util.SetIncludes(mod.Path .. "/include")
 
-    AddLinks(links)
-end
+    Solution.Util.SetFilter("platforms:Win64", function()
+        local link = mod.Path .. "/lib/windows/dxcompiler.lib"
+        Solution.Util.SetLinks(link)
+    end)
+    
+    Solution.Util.SetFilter("platforms:Linux", function()
+        local link = mod.Path .. "/lib/linux/dxcompiler.so"
+        Solution.Util.SetLinks(link)
+    end)
+end)
 
-local function Include()
-    local includeDir = path.getabsolute("dxcompiler/include", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-
-    filter "platforms:Win64"
-        Win64Link()
-
-    filter "platforms:Linux"
-        LinuxLink()
-end
-
-CreateDep("dxcompiler", Include)
-
-if os.istarget("windows") then
-    local libPath = path.getabsolute("dxcompiler/lib/windows/dxcompiler.dll", Engine.dependencyDir)
-    BuildSettings:Add("DXCompiler Dynamic Lib Path", libPath)
-else
-    local libPath = path.getabsolute("dxcompiler/lib/linux/dxcompiler.so", Engine.dependencyDir)
-    BuildSettings:Add("DXCompiler Dynamic Lib Path", libPath)
-end
+local libPath = iif(os.istarget("windows"), mod.Path .. "/lib/windows/dxcompiler.dll", mod.Path .. "/lib/linux/dxcompiler.so")
+BuildSettings:Add("DXCompiler Dynamic Lib Path", libPath)

@@ -50,7 +50,7 @@ namespace Network
     {
         if (_isStopped)
         {
-            DebugHandler::PrintError("[Networking] Attempted to call Stop on an already closed Server");
+            NC_LOG_ERROR("[Networking] Attempted to call Stop on an already closed Server");
             return Socket::Result::ERROR_SERVER_ALREADY_STOPPED;
         }
 
@@ -102,7 +102,7 @@ namespace Network
     {
         if (_isInitialized == false)
         {
-            DebugHandler::PrintError("[Networking] Attempted to call Accept on uninitialized Server");
+            NC_LOG_ERROR("[Networking] Attempted to call Accept on uninitialized Server");
             return Socket::Result::ERROR_SERVER_UNINITIALIZED;
         }
 
@@ -243,7 +243,7 @@ namespace Network
                         if (header->opcode == Opcode::INVALID || header->opcode > Opcode::MAX_COUNT)
                         {
 #ifdef NC_Debug
-                            DebugHandler::PrintError("Network : Received Invalid Opcode ({0}) from (SocketId : {1}, \"{2}:{3}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
+                            NC_LOG_ERROR("Network : Received Invalid Opcode ({0}) from (SocketId : {1}, \"{2}:{3}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
 #endif // NC_Debug
                             CloseSocketID(connection.id);
                             break;
@@ -252,7 +252,7 @@ namespace Network
                         if (header->size > DEFAULT_BUFFER_SIZE)
                         {
 #ifdef NC_Debug
-                            DebugHandler::PrintError("Network : Received Invalid Opcode Size ({0} : {1}) from (SocketId : {2}, \"{3}:{4}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), header->size, static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
+                            NC_LOG_ERROR("Network : Received Invalid Opcode Size ({0} : {1}) from (SocketId : {2}, \"{3}:{4}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), header->size, static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
 #endif // NC_Debug
                             CloseSocketID(connection.id);
                             break;

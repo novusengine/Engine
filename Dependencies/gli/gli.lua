@@ -1,6 +1,5 @@
-local function Include()
-    local includeDir = path.getabsolute("gli/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-end
+local dep = Solution.Util.CreateDepTable("gli", {})
 
-CreateDep("gli", Include)
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+end)

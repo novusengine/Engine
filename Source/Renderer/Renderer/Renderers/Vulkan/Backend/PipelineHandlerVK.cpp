@@ -148,7 +148,7 @@ namespace Renderer
                     desc.MutableResourceToImageID == nullptr ||
                     desc.MutableResourceToDepthImageID == nullptr)
                 {
-                    DebugHandler::PrintFatal("Tried to create a pipeline with uninitialized pipelineDesc, try using RenderGraphResources::InitializePipelineDesc!");
+                    NC_LOG_CRITICAL("Tried to create a pipeline with uninitialized pipelineDesc, try using RenderGraphResources::InitializePipelineDesc!");
                 }
             }
             
@@ -279,7 +279,7 @@ namespace Renderer
 
             if (vkCreateRenderPass(_device->_device, &renderPassInfo, nullptr, &pipeline.renderPass) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create render pass!");
+                NC_LOG_CRITICAL("Failed to create render pass!");
             }
 
             // -- Create Framebuffer --
@@ -320,7 +320,7 @@ namespace Renderer
                             else
                             {
                                 // Else somethings is really bad, lets fatal log
-                                DebugHandler::PrintFatal("Vertex Shader and Pixel Shader tries to use the same descriptor set and binding, but they don't seem to match");
+                                NC_LOG_CRITICAL("Vertex Shader and Pixel Shader tries to use the same descriptor set and binding, but they don't seem to match");
                             }
                             found = true;
                             break;
@@ -362,7 +362,7 @@ namespace Renderer
 
                 if (vkCreateDescriptorSetLayout(_device->_device, &pipeline.descriptorSetLayoutDatas[i].createInfo, nullptr, &pipeline.descriptorSetLayouts[i]) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to create descriptor set layout!");
+                    NC_LOG_CRITICAL("Failed to create descriptor set layout!");
                 }
             }
 
@@ -588,7 +588,7 @@ namespace Renderer
 
             if (vkCreatePipelineLayout(_device->_device, &pipelineLayoutInfo, nullptr, &pipeline.pipelineLayout) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create pipeline layout!");
+                NC_LOG_CRITICAL("Failed to create pipeline layout!");
             }
 
             // Set up dynamic viewport and scissor
@@ -624,7 +624,7 @@ namespace Renderer
 
             if (vkCreateGraphicsPipelines(_device->_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline.pipeline) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create graphics pipeline!");
+                NC_LOG_CRITICAL("Failed to create graphics pipeline!");
             }
 
             
@@ -694,7 +694,7 @@ namespace Renderer
 
                 if (vkCreateDescriptorSetLayout(_device->_device, &pipeline.descriptorSetLayoutDatas[i].createInfo, nullptr, &pipeline.descriptorSetLayouts[i]) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to create descriptor set layout!");
+                    NC_LOG_CRITICAL("Failed to create descriptor set layout!");
                 }
             }
 
@@ -707,7 +707,7 @@ namespace Renderer
 
             if (vkCreatePipelineLayout(_device->_device, &pipelineLayoutInfo, nullptr, &pipeline.pipelineLayout) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create pipeline layout!");
+                NC_LOG_CRITICAL("Failed to create pipeline layout!");
             }
 
             VkPipelineShaderStageCreateInfo shaderStage = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
@@ -721,7 +721,7 @@ namespace Renderer
 
             if (vkCreateComputePipelines(_device->_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline.pipeline) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create compute pipeline!");
+                NC_LOG_CRITICAL("Failed to create compute pipeline!");
             }
 
             ComputePipelineID pipelineID = ComputePipelineID(static_cast<cIDType>(nextID));
@@ -991,7 +991,7 @@ namespace Renderer
 
             if (vkCreateFramebuffer(_device->_device, &framebufferInfo, nullptr, &pipeline.framebuffer) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create framebuffer!");
+                NC_LOG_CRITICAL("Failed to create framebuffer!");
             }
         }
     }

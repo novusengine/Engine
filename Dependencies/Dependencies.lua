@@ -1,10 +1,7 @@
 -- Dependencies
-Engine.dependencyDir = path.getabsolute("Dependencies/", Engine.rootDir)
-
-print("-- Creating Dependencies --")
-
-Engine.dependencyGroup = (Engine.name .. "/Dependencies")
-group (Engine.dependencyGroup)
+Solution.Util.Print("-- Creating Dependencies --")
+Solution.Util.ClearFilter()
+Solution.Util.SetGroup(Solution.DependencyGroup)
 
 local dependencies =
 {
@@ -21,20 +18,18 @@ local dependencies =
     "json/json.lua",
     "refl-cpp/refl-cpp.lua",
     "robinhood/robinhood.lua",
-    "spdlog/spdlog.lua",
     "tracyprofiler/tracy.lua",
     "typesafe/typesafe.lua",
     "utfcpp/utfcpp.lua",
     "luau/luau.lua",
-    "FidelityFX-SDK/FidelityFX.lua",
+    "quill/quill.lua",
+    "fidelityfx/fidelityfx.lua",
 }
 
 for k,v in pairs(dependencies) do
-    filter { }
     include(v)
+    Solution.Util.ClearFilter()
 end
 
-filter { }
-group (Engine.name)
-
-print("-- Finished with Dependencies --\n")
+Solution.Util.SetGroup("")
+Solution.Util.Print("-- Finished with Dependencies --\n")

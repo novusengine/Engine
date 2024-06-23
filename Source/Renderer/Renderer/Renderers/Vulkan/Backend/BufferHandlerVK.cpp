@@ -67,10 +67,10 @@ namespace Renderer
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBuffer tried to access Invalid BufferID");
+            NC_ASSERT(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBuffer tried to access Invalid BufferID");
 
             BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
-            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBuffer tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+            NC_ASSERT(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBuffer tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
 
             return data.buffers[bufferIndex].buffer;
         }
@@ -79,10 +79,10 @@ namespace Renderer
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferSize tried to access Invalid BufferID");
+            NC_ASSERT(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferSize tried to access Invalid BufferID");
 
             BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
-            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferSize tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+            NC_ASSERT(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferSize tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
 
             return data.buffers[bufferIndex].size;
         }
@@ -91,10 +91,10 @@ namespace Renderer
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferAllocation tried to access Invalid BufferID");
+            NC_ASSERT(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferAllocation tried to access Invalid BufferID");
 
             BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
-            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferAllocation tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+            NC_ASSERT(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferAllocation tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
 
             return data.buffers[bufferIndex].allocation;
         }
@@ -103,10 +103,10 @@ namespace Renderer
         {
             BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
 
-            DebugHandler::Assert(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferName tried to access Invalid BufferID");
+            NC_ASSERT(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferName tried to access Invalid BufferID");
 
             BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
-            DebugHandler::Assert(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferName tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+            NC_ASSERT(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferName tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
 
             return data.buffers[bufferIndex].name;
         }
@@ -177,7 +177,7 @@ namespace Renderer
 
             if (bufferID == BufferID::Invalid())
             {
-                DebugHandler::PrintFatal("BufferHandlerVK: Acquired new buffer ID that was BufferID::Invalid, are we overflowing?");
+                NC_LOG_CRITICAL("BufferHandlerVK: Acquired new buffer ID that was BufferID::Invalid, are we overflowing?");
             }
 
             bool failed = false;
@@ -187,7 +187,7 @@ namespace Renderer
 
             if (vmaCreateBuffer(_device->_allocator, &bufferInfo, &allocInfo, &buffer.buffer, &buffer.allocation, nullptr) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create buffer!");
+                NC_LOG_CRITICAL("Failed to create buffer!");
                 return BufferID::Invalid();
             }
 

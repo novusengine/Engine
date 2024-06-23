@@ -1,9 +1,8 @@
-local function Include()
-    local includeDir = path.getabsolute("glm/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
+local dep = Solution.Util.CreateDepTable("glm", {})
 
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
     local defines = { "GLM_FORCE_LEFT_HANDED", "GLM_FORCE_DEPTH_ZERO_TO_ONE" }
-    AddDefines(defines)
-end
 
-CreateDep("glm", Include)
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetDefines(defines)
+end)

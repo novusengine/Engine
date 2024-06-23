@@ -772,12 +772,15 @@ namespace Renderer
 
                 FfxResourceStates& curState = backendContext->pResources[resource->internalIndex].currentState;
 
-                VkImageSubresourceRange range;
-                range.aspectMask = ffxResource.resourceDescription.usage & FFX_RESOURCE_USAGE_DEPTHTARGET ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-                range.baseMipLevel = 0;
-                range.levelCount = VK_REMAINING_MIP_LEVELS;
-                range.baseArrayLayer = 0;
-                range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+                VkImageAspectFlags aspectMask = ffxResource.resourceDescription.usage & FFX_RESOURCE_USAGE_DEPTHTARGET ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+                VkImageSubresourceRange range =
+                {
+                    .aspectMask = aspectMask,
+                    .baseMipLevel = 0,
+                    .levelCount = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount = VK_REMAINING_ARRAY_LAYERS
+                };
 
                 barrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
                 barrier->pNext = nullptr;
@@ -838,7 +841,7 @@ namespace Renderer
             uint32_t resourceArraySize = FFX_ALIGN_UP(maxContexts * FFX_MAX_RESOURCE_COUNT * sizeof(BackendContext_VK::Resource), sizeof(uint32_t));
             uint32_t contextArraySize = FFX_ALIGN_UP(maxContexts * sizeof(BackendContext_VK::EffectContext), sizeof(uint32_t));
 
-            _maxEffectContexts = maxContexts;
+            _maxEffectContexts = static_cast<u32>(maxContexts);
 
             return FFX_ALIGN_UP(sizeof(BackendContext_VK) + extensionPropArraySize + gpuJobDescArraySize + resourceArraySize + ringBufferArraySize +
                 pipelineArraySize + resourceArraySize + contextArraySize, sizeof(uint64_t));
@@ -937,7 +940,7 @@ namespace Renderer
                 pMem += resourceArraySize;
 
                 // Clear out all resource mappings
-                for (int i = 0; i < _maxEffectContexts * FFX_MAX_RESOURCE_COUNT; ++i) 
+                for (u32 i = 0; i < _maxEffectContexts * FFX_MAX_RESOURCE_COUNT; ++i) 
                 {
                     backendContext->pResources[i].uavViewIndex = backendContext->pResources[i].srvViewIndex = -1;
                 }
@@ -1061,7 +1064,7 @@ namespace Renderer
 
                     VkMemoryAllocateInfo allocInfo{};
                     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-                    allocInfo.allocationSize = _maxEffectContexts * FFX_RING_BUFFER_MEM_BLOCK_SIZE;
+                    allocInfo.allocationSize = static_cast<VkDeviceSize>(_maxEffectContexts) * FFX_RING_BUFFER_MEM_BLOCK_SIZE;
                     allocInfo.memoryTypeIndex = findMemoryTypeIndex(backendContext->physicalDevice, memRequirements, requiredMemoryProperties, backendContext->ringBufferMemoryProperties);
 
                     if (allocInfo.memoryTypeIndex == UINT32_MAX) 
@@ -1092,7 +1095,7 @@ namespace Renderer
                     // map the memory block
                     uint8_t* pData = nullptr;
 
-                    if (backendContext->vkFunctionTable.vkMapMemory(backendContext->device, backendContext->ringBufferMemory, 0, _maxEffectContexts * FFX_RING_BUFFER_MEM_BLOCK_SIZE, 0, reinterpret_cast<void**>(&pData)) != VK_SUCCESS) 
+                    if (backendContext->vkFunctionTable.vkMapMemory(backendContext->device, backendContext->ringBufferMemory, 0, static_cast<VkDeviceSize>(_maxEffectContexts) * FFX_RING_BUFFER_MEM_BLOCK_SIZE, 0, reinterpret_cast<void**>(&pData)) != VK_SUCCESS)
                     {
                         return FFX_ERROR_BACKEND_API_ERROR;
                     }
@@ -1120,11 +1123,11 @@ namespace Renderer
             ++_backendRefCount;
 
             // Get an available context id
-            for (size_t i = 0; i < _maxEffectContexts; ++i) 
+            for (u32 i = 0; i < _maxEffectContexts; ++i) 
             {
                 if (!backendContext->pEffectContexts[i].active) 
                 {
-                    *effectContextId = i;
+                    *effectContextId = static_cast<FfxUInt32>(i);
 
                     // Reset everything accordingly
                     BackendContext_VK::EffectContext& effectContext = backendContext->pEffectContexts[i];
@@ -1213,7 +1216,7 @@ namespace Renderer
 
             // Delete any resources allocated by this context
             BackendContext_VK::EffectContext& effectContext = backendContext->pEffectContexts[effectContextId];
-            for (int32_t currentStaticResourceIndex = effectContextId * FFX_MAX_RESOURCE_COUNT; currentStaticResourceIndex < effectContext.nextStaticResource; ++currentStaticResourceIndex) 
+            for (int32_t currentStaticResourceIndex = effectContextId * FFX_MAX_RESOURCE_COUNT; currentStaticResourceIndex < static_cast<int32_t>(effectContext.nextStaticResource); ++currentStaticResourceIndex)
             {
                 if (backendContext->pResources[currentStaticResourceIndex].imageResource != VK_NULL_HANDLE) 
                 {
@@ -1838,8 +1841,10 @@ namespace Renderer
             const uint32_t dynamicResourceIndexStart = getDynamicResourcesStartIndex(effectContextId);
             for (uint32_t resourceIndex = ++effectContext.nextDynamicResource; resourceIndex <= dynamicResourceIndexStart; ++resourceIndex)
             {
-                FfxResourceInternal internalResource;
-                internalResource.internalIndex = resourceIndex;
+                FfxResourceInternal internalResource =
+                {
+                    .internalIndex = static_cast<int32_t>(resourceIndex)
+                };
 
                 BackendContext_VK::Resource* backendResource = &backendContext->pResources[resourceIndex];
 
@@ -2341,7 +2346,7 @@ namespace Renderer
                 writeDescriptorSets[descriptorWriteIndex].dstBinding = currentSrvResourceIndex;
                 writeDescriptorSets[descriptorWriteIndex].dstArrayElement = 0;
 
-                for (int i = 0; i < job->computeJobDescriptor.pipeline.srvTextureBindings[currentPipelineSrvIndex].bindCount; ++i, ++imageDescriptorIndex)
+                for (u32 i = 0; i < job->computeJobDescriptor.pipeline.srvTextureBindings[currentPipelineSrvIndex].bindCount; ++i, ++imageDescriptorIndex)
                 {
                     addBarrier(backendContext, &job->computeJobDescriptor.srvTextures[currentPipelineSrvIndex + i], FFX_RESOURCE_STATE_COMPUTE_READ);
 
@@ -2607,12 +2612,14 @@ namespace Renderer
                 clearColorValue.float32[2] = job->clearJobDescriptor.color[2];
                 clearColorValue.float32[3] = job->clearJobDescriptor.color[3];
 
-                VkImageSubresourceRange range;
-                range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                range.baseMipLevel = 0;
-                range.levelCount = ffxResource.resourceDescription.mipCount;
-                range.baseArrayLayer = 0;
-                range.layerCount = ffxResource.resourceDescription.depth;
+                VkImageSubresourceRange range =
+                {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = ffxResource.resourceDescription.mipCount,
+                    .baseArrayLayer = 0,
+                    .layerCount = ffxResource.resourceDescription.depth
+                };
 
                 backendContext->vkFunctionTable.vkCmdClearColorImage(vkCommandBuffer, vkResource, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColorValue, 1, &range);
             }

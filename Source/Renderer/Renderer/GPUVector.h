@@ -32,7 +32,7 @@ namespace Renderer
         {
             if (size == 0)
             {
-                DebugHandler::PrintFatal("GPUVector::SetDirtyRegion: Size is 0, this is not allowed!");
+                NC_LOG_CRITICAL("GPUVector::SetDirtyRegion: Size is 0, this is not allowed!");
             }
 
             size_t allocatedBytes = _allocator.AllocatedBytes();
@@ -57,7 +57,11 @@ namespace Renderer
 
         void SetDirty()
         {
-            SetDirtyElements(0, _vector.size());
+            size_t size = _vector.size();
+            if (size == 0)
+                return;
+
+            SetDirtyElements(0, size);
         }
 
         // Returns true if we had to resize the buffer
@@ -122,7 +126,7 @@ namespace Renderer
                 BufferRangeFrame bufferRangeFrame;
                 if (!_allocator.Allocate(bytesToAllocate, bufferRangeFrame))
                 {
-                    DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
+                    NC_LOG_CRITICAL("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
                 }
                 
                 _wantsValidation = _validateTransfers;
@@ -133,7 +137,7 @@ namespace Renderer
             {
                 if (_dirtyRegions[i].offset >= allocatedBytes)
                 {
-                    DebugHandler::PrintFatal("[GPUVector] : UploadToBuffer will attempt to update a region in the buffer that ALSO exists in UpdateDirtyRegions, this will cause data corruption.");
+                    NC_LOG_CRITICAL("[GPUVector] : UploadToBuffer will attempt to update a region in the buffer that ALSO exists in UpdateDirtyRegions, this will cause data corruption.");
                 }
             }
 #endif
@@ -188,7 +192,7 @@ namespace Renderer
                 BufferRangeFrame bufferRangeFrame;
                 if (!_allocator.Allocate(bytesToAllocate, bufferRangeFrame))
                 {
-                    DebugHandler::PrintFatal("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
+                    NC_LOG_CRITICAL("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
                 }
 
                 _wantsValidation = _validateTransfers;
@@ -365,7 +369,7 @@ namespace Renderer
             validationDesc.cpuAccess = BufferCPUAccess::ReadOnly;
             _validationBuffer = _renderer->CreateBuffer(_validationBuffer, validationDesc);
 
-            DebugHandler::PrintWarning("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
+            NC_LOG_WARNING("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
 
             // Immediately copy from the GPU buffer to the validation buffer
             _renderer->CopyBufferImmediate(_validationBuffer, 0, _buffer, 0, validationDesc.size);
@@ -376,7 +380,7 @@ namespace Renderer
             int result = memcmp(_vector.data(), validationData, validationDesc.size);
             if (result != 0)
             {
-                DebugHandler::PrintFatal("Validation failed for buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
+                NC_LOG_CRITICAL("Validation failed for buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
             }
             _renderer->UnmapBuffer(_validationBuffer);
         }

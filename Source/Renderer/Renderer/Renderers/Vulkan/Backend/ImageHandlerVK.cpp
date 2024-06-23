@@ -238,12 +238,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetImageDesc with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImageDesc with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetImageDesc with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImageDesc with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].desc;
@@ -256,12 +256,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == DepthImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDepthImageDesc with invalid DepthImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthImageDesc with invalid DepthImageID");
             }
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDepthImageDesc with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthImageDesc with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
             }
 
             return data.depthImages[static_cast<DepthImageID::type>(id)].desc;
@@ -274,12 +274,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDimension with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDimension with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
             const ImageDesc& desc = GetImageDesc(id);
@@ -349,12 +349,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == DepthImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDimension with invalid DepthImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with invalid DepthImageID");
             }
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDimension with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
             }
 
             const DepthImageDesc& desc = GetImageDesc(id);
@@ -419,12 +419,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetImage with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetImage with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].image;
@@ -437,12 +437,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].colorView;
@@ -455,18 +455,18 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
             ImageID::type tid = static_cast<ImageID::type>(id);
             if (mipLevel >= data.images[tid].mipViews.size())
             {
-                DebugHandler::PrintFatal("ImageHandlerVK: GetColorView tried to get a mipLevel that doesn't exist");
+                NC_LOG_CRITICAL("ImageHandlerVK: GetColorView tried to get a mipLevel that doesn't exist");
             }
 
             if (mipLevel == 0)
@@ -484,18 +484,18 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
             
             ImageID::type tid = static_cast<ImageID::type>(id);
             if (mipLevel >= data.images[tid].mipArrayViews.size())
             {
-                DebugHandler::PrintFatal("ImageHandlerVK: GetColorArrayView tried to get a mipLevel that doesn't exist");
+                NC_LOG_CRITICAL("ImageHandlerVK: GetColorArrayView tried to get a mipLevel that doesn't exist");
             }
 
             return data.images[tid].mipArrayViews[mipLevel];
@@ -508,12 +508,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == DepthImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetImage with invalid DepthImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with invalid DepthImageID");
             }
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetImage with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
             }
 
             return data.depthImages[static_cast<DepthImageID::type>(id)].image;
@@ -526,12 +526,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == DepthImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDepthView with invalid DepthImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthView with invalid DepthImageID");
             }
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetDepthView with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthView with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
             }
 
             return data.depthImages[static_cast<DepthImageID::type>(id)].depthView;
@@ -544,12 +544,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].imguiTextureHandle;
@@ -562,12 +562,12 @@ namespace Renderer
             // Lets make sure this id exists
             if (id == ImageID::Invalid())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with invalid ImageID");
             }
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                DebugHandler::PrintFatal("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].isSwapchain;
@@ -603,7 +603,7 @@ namespace Renderer
             }
             else
             {
-                DebugHandler::PrintFatal("Non-3d images is currently unsupported");
+                NC_LOG_CRITICAL("Non-3d images is currently unsupported");
             }
 
             f32 width = image.desc.dimensions.x;
@@ -689,7 +689,7 @@ namespace Renderer
 
             if (vmaCreateImage(_device->_allocator, &imageInfo, &allocInfo, &image.image, &image.allocation, nullptr) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create image!");
+                NC_LOG_CRITICAL("Failed to create image!");
             }
         }
 
@@ -743,7 +743,7 @@ namespace Renderer
 
             if (vmaCreateImage(_device->_allocator, &imageInfo, &allocInfo, &image.image, &image.allocation, nullptr) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create image!");
+                NC_LOG_CRITICAL("Failed to create image!");
             }
 
             // Create Depth View
@@ -765,7 +765,7 @@ namespace Renderer
 
             if (vkCreateImageView(_device->_device, &depthViewInfo, nullptr, &image.depthView) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create depth image view!");
+                NC_LOG_CRITICAL("Failed to create depth image view!");
             }
 
             DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.depthView, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT, image.desc.debugName.c_str());
@@ -788,7 +788,7 @@ namespace Renderer
             }
             else
             {
-                DebugHandler::PrintFatal("Non-2d images is currently unsupported");
+                NC_LOG_CRITICAL("Non-2d images is currently unsupported");
             }
 
             colorViewInfo.format = format;
@@ -811,13 +811,13 @@ namespace Renderer
 
                 if (vkCreateImageView(_device->_device, &pyramidLevelInfo, nullptr, &image.mipViews[i]) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to create color image view!");
+                    NC_LOG_CRITICAL("Failed to create color image view!");
                 }
             }
 
             if (vkCreateImageView(_device->_device, &colorViewInfo, nullptr, &image.colorView) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create color image view!");
+                NC_LOG_CRITICAL("Failed to create color image view!");
             }
 
             // Also create mipViews that are arrays of the specific view, down to the last mip
@@ -831,7 +831,7 @@ namespace Renderer
 
                 if (vkCreateImageView(_device->_device, &pyramidLevelInfo, nullptr, &image.mipArrayViews[i]) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to create color image view!");
+                    NC_LOG_CRITICAL("Failed to create color image view!");
                 }
             }
 

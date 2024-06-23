@@ -34,16 +34,16 @@ namespace Renderer
             {
                 if (_shaderCache->Load(SHADER_CACHE_PATH))
                 {
-                    DebugHandler::Print("Loaded shadercache from: {}", SHADER_CACHE_PATH.string().c_str());
+                    NC_LOG_INFO("Loaded shadercache from: {}", SHADER_CACHE_PATH.string().c_str());
                 }
                 else
                 {
-                    DebugHandler::Print("Creating shadercache at: {}", SHADER_CACHE_PATH.string().c_str());
+                    NC_LOG_INFO("Creating shadercache at: {}", SHADER_CACHE_PATH.string().c_str());
                 }
             }
             else
             {
-                DebugHandler::Print("Skipped loading shadercache due to debugSkipCache being true");
+                NC_LOG_INFO("Skipped loading shadercache due to debugSkipCache being true");
             }
 
             //_shaderCompiler->SetSourceDirPath(SHADER_SOURCE_DIR);
@@ -93,7 +93,7 @@ namespace Renderer
 
             if (!file.is_open())
             {
-                DebugHandler::PrintFatal("Failed to open file!");
+                NC_LOG_CRITICAL("Failed to open file!");
             }
 
             size_t fileSize = (size_t)file.tellg();
@@ -115,13 +115,13 @@ namespace Renderer
 
             if (createInfo.codeSize == 0)
             {
-                DebugHandler::PrintFatal("ShaderHandlerVK::CreateShaderModule Tried to load shader with size 0, did you forget Permutation Fields?");
+                NC_LOG_CRITICAL("ShaderHandlerVK::CreateShaderModule Tried to load shader with size 0, did you forget Permutation Fields?");
             }
 
             VkShaderModule shaderModule;
             if (vkCreateShaderModule(_device->_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create shader module!");
+                NC_LOG_CRITICAL("Failed to create shader module!");
             }
 
             DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)shaderModule, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT, debugName.c_str());
@@ -189,7 +189,7 @@ namespace Renderer
 
             if (!std::filesystem::exists(sourcePath))
             {
-                DebugHandler::PrintFatal("Tried to load a shader (%s) which does not exist at expected location (%s)", shaderPath.c_str(), sourcePath.string().c_str());
+                NC_LOG_CRITICAL("Tried to load a shader (%s) which does not exist at expected location (%s)", shaderPath.c_str(), sourcePath.string().c_str());
             }
 
             if (_forceRecompileAll)

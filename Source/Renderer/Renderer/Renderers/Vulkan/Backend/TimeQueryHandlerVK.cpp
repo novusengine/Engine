@@ -52,7 +52,7 @@ namespace Renderer
             createInfo.queryCount = TimeQueryHandlerVKData::NUM_TOTAL_TIMESTAMPS;
 
             VkResult result = vkCreateQueryPool(_device->_device, &createInfo, nullptr, &data.queryPool);
-            DebugHandler::Assert(result == VK_SUCCESS, "TimeQueryHandlerVK : Init failed to create time query pool!");
+            NC_ASSERT(result == VK_SUCCESS, "TimeQueryHandlerVK : Init failed to create time query pool!");
 
             fnVkResetQueryPoolEXT = (PFN_vkResetQueryPoolEXT)vkGetDeviceProcAddr(_device->_device, "vkResetQueryPoolEXT");
 
@@ -86,7 +86,7 @@ namespace Renderer
                 }
                 else
                 {
-                    DebugHandler::PrintFatal("TimeQueryHandlerVK : FlipFrame failed to receive query results!");
+                    NC_LOG_CRITICAL("TimeQueryHandlerVK : FlipFrame failed to receive query results!");
                 }
 
                 // Queries must be reset after each individual use.
@@ -117,7 +117,7 @@ namespace Renderer
 
             const u32 queryCount = TimeQuery::NUM_TIMESTAMPS_PER_FRAME * NUM_FRAMES_IN_FLIGHT;
 
-            DebugHandler::Assert(data.numTimestamps + queryCount < data.NUM_TOTAL_TIMESTAMPS, "TimeQueryHandlerVK : CreateTimeQuery overflowed NUM_TOTAL_QUERIES, maybe increase it?");
+            NC_ASSERT(data.numTimestamps + queryCount < data.NUM_TOTAL_TIMESTAMPS, "TimeQueryHandlerVK : CreateTimeQuery overflowed NUM_TOTAL_QUERIES, maybe increase it?");
 
             timeQuery.timestampOffset = data.numTimestamps;
             timeQuery.timestampCount = queryCount;
@@ -131,7 +131,7 @@ namespace Renderer
             TimeQueryHandlerVKData& data = static_cast<TimeQueryHandlerVKData&>(*_data);
 
             TimeQueryID::type typedID = static_cast<TimeQueryID::type>(id);
-            DebugHandler::Assert(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : Begin tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
+            NC_ASSERT(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : Begin tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
 
             TimeQuery& timeQuery = data.timeQueries[typedID];
             u32 timestampOffset = timeQuery.timestampOffset + (data.currentFrameIndex * TimeQuery::NUM_TIMESTAMPS_PER_FRAME);
@@ -144,7 +144,7 @@ namespace Renderer
             TimeQueryHandlerVKData& data = static_cast<TimeQueryHandlerVKData&>(*_data);
 
             TimeQueryID::type typedID = static_cast<TimeQueryID::type>(id);
-            DebugHandler::Assert(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : End tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
+            NC_ASSERT(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : End tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
 
             TimeQuery& timeQuery = data.timeQueries[typedID];
             u32 timestampOffset = timeQuery.timestampOffset + (data.currentFrameIndex * TimeQuery::NUM_TIMESTAMPS_PER_FRAME) + 1;
@@ -157,7 +157,7 @@ namespace Renderer
             TimeQueryHandlerVKData& data = static_cast<TimeQueryHandlerVKData&>(*_data);
 
             TimeQueryID::type typedID = static_cast<TimeQueryID::type>(id);
-            DebugHandler::Assert(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : GetLastTime tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
+            NC_ASSERT(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : GetLastTime tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
 
             TimeQuery& timeQuery = data.timeQueries[typedID];
             return timeQuery.name;
@@ -168,7 +168,7 @@ namespace Renderer
             TimeQueryHandlerVKData& data = static_cast<TimeQueryHandlerVKData&>(*_data);
 
             TimeQueryID::type typedID = static_cast<TimeQueryID::type>(id);
-            DebugHandler::Assert(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : GetLastTime tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
+            NC_ASSERT(typedID < data.timeQueries.size(), "TimeQueryHandlerVK : GetLastTime tried to get TimeQuery ({}) that doesn't exist (Num: {})", typedID, data.timeQueries.size());
 
             TimeQuery& timeQuery = data.timeQueries[typedID];
             u64 timeStampDiff = timeQuery.lastTimestamps[1] - timeQuery.lastTimestamps[0];

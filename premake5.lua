@@ -1,60 +1,79 @@
-Engine = { }
-Engine.name = "Engine"
-Engine.rootDir = ""
-Engine.buildDir = ""
-Engine.binDir = ""
-Engine.isRoot = false
+Solution = Solution or
+{
+    NumProjects = 0,
+    Projects = {},
 
-Engine.Init = function(self, rootDir, buildDir, binDir)
-    print("-- Configuring (" .. self.name .. ") --\n")
+    ActiveGroup = "",
+    BuildSystemGroup = "0. [Build System]",
+    ModuleGroup = "0. [Modules]",
+    TestGroup = "1. [Tests]",
+    DependencyGroup = "2. [Dependencies]"
+}
 
-    self.rootDir = rootDir
-    self.buildDir = buildDir
-    self.binDir = binDir .. "/" .. self.name
+local projectUtils = "Premake/ProjectUtil.lua"
+include(projectUtils)
 
-    local projectUtils = path.getabsolute("Premake/ProjectUtil.lua", self.rootDir)
-    include(projectUtils)
+local projectName = "Engine"
+local projectIsRoot = Solution.NumProjects == 0
+local project = Solution.Util.Create(projectName, projectIsRoot)
+local submodules = { }
 
-    local buildSettings = path.getabsolute("Premake/BuildSettings.lua", self.rootDir)
-    local silentFailOnDuplicateSetting = not self.isRoot
+project.Init = function(self, rootDir, buildDir, binDir)
+    Solution.Util.Print("-- Initializing (" .. self.Name .. ") --\n")
+
+    self.RootDir = rootDir
+    self.BuildDir = buildDir
+    self.BinDir = binDir .. "/" .. self.Name
+
+    self.DependencyDir = path.getabsolute("Dependencies/", self.RootDir)
+    self.ModulesDir = path.getabsolute("Source/", self.RootDir)
+    
+    local buildSettings = path.getabsolute("Premake/BuildSettings.lua", self.RootDir)
+    local silentFailOnDuplicateSetting = not self.IsRoot
     InitBuildSettings(silentFailOnDuplicateSetting)
     include(buildSettings)
 
-    print("\n-- Directory Info (" .. self.name .. ") --")
-    print(" Root Directory : " .. self.rootDir)
-    print(" Build Directory : " .. self.buildDir)
-    print(" Bin Directory : " .. self.binDir)
-    print("--\n")
-
-    if self.isRoot then
-        workspace (self.name)
-            location (buildDir)
+    if self.IsRoot then
+        workspace (self.Name)
+            location (self.BuildDir)
             configurations { "Debug", "RelDebug", "Release" }
 
-            filter "system:Windows"
+            Solution.Util.SetFilter("system:Windows", function()
                 system "windows"
                 platforms "Win64"
+            end)
 
-            filter "system:Unix"
+            Solution.Util.SetFilter("system:Unix", function()
                 system "linux"
                 platforms "Linux"
+            end)
     end
 
-    local deps = path.getabsolute("Dependencies/Dependencies.lua", self.rootDir)
-    local projects = path.getabsolute("Source/Projects.lua", self.rootDir)
+    for _, v in pairs(submodules) do
+        Solution.Util.Print("-- Initializing Submodule : " .. v)
+        Solution.Util.IncludeSubmodule(v, self.RootDir, self.BinDir)
+    end
+
+    Solution.Util.Print("\n-- Directory Info (" .. self.Name .. ") --")
+    Solution.Util.Print(" Root Directory : " .. self.RootDir)
+    Solution.Util.Print(" Build Directory : " .. self.BuildDir)
+    Solution.Util.Print(" Bin Directory : " .. self.BinDir)
+    Solution.Util.Print("--\n")
+
+    Solution.Projects.Current = project
+
+    local deps = path.getabsolute("Dependencies/Dependencies.lua", self.RootDir)
+    local projects = path.getabsolute("Source/Modules.lua", self.RootDir)
     include(deps)
     include(projects)
 
-    print("-- Done (" .. self.name .. ") --")
+    Solution.Util.Print("-- Done (" .. self.Name .. ") --")
 end
 
-if HasRoot == nil then
-    HasRoot = true
-
+if projectIsRoot then
     local rootDir = path.getabsolute(".")
     local buildDir = path.getabsolute("Build/", rootDir)
     local binDir = path.getabsolute("Bin/", buildDir)
 
-    Engine.isRoot = true
-    Engine:Init(rootDir, buildDir, binDir)
+    project:Init(rootDir, buildDir, binDir)
 end

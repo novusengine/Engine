@@ -1,5 +1,5 @@
-local function Include()
-    local includeDir = path.getabsolute("json/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-end
-CreateDep("json", Include)
+local dep = Solution.Util.CreateDepTable("json", {})
+
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+end)

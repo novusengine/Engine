@@ -136,7 +136,7 @@ namespace Renderer
                 case InputFormat::R8_UINT:              return VK_FORMAT_R8_UINT;
                 case InputFormat::R8_SINT:              return VK_FORMAT_R8_SINT;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more input formats?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more input formats?");
             }
 
             return VK_FORMAT_UNDEFINED;
@@ -149,7 +149,7 @@ namespace Renderer
                 case FillMode::SOLID:     return VK_POLYGON_MODE_FILL;
                 case FillMode::WIREFRAME: return VK_POLYGON_MODE_LINE;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more fillmodes?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more fillmodes?");
             }
 
             return VK_POLYGON_MODE_FILL;
@@ -163,7 +163,7 @@ namespace Renderer
                 case CullMode::FRONT: return VK_CULL_MODE_FRONT_BIT;
                 case CullMode::BACK: return VK_CULL_MODE_BACK_BIT;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more cullmodes?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more cullmodes?");
             }
 
             return VK_CULL_MODE_NONE;
@@ -176,7 +176,7 @@ namespace Renderer
                 case FrontFaceState::CLOCKWISE:        return VK_FRONT_FACE_CLOCKWISE;
                 case FrontFaceState::COUNTERCLOCKWISE: return VK_FRONT_FACE_COUNTER_CLOCKWISE;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more frontface states?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more frontface states?");
             }
 
             return VK_FRONT_FACE_CLOCKWISE;
@@ -204,7 +204,7 @@ namespace Renderer
                 case BlendMode::SRC1_ALPHA:          return VK_BLEND_FACTOR_SRC1_ALPHA;
                 case BlendMode::INV_SRC1_ALPHA:      return VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more blend modes?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more blend modes?");
             }
 
             return VK_BLEND_FACTOR_ZERO;
@@ -220,7 +220,7 @@ namespace Renderer
                 case BlendOp::MIN:             return VK_BLEND_OP_MIN;
                 case BlendOp::MAX:             return VK_BLEND_OP_MAX;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more blend ops?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more blend ops?");
             }
 
             return VK_BLEND_OP_ADD;
@@ -263,7 +263,7 @@ namespace Renderer
                 case LogicOp::OR_REVERSE:      return VK_LOGIC_OP_OR_REVERSE;
                 case LogicOp::OR_INVERTED:     return VK_LOGIC_OP_OR_INVERTED;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more logic ops?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more logic ops?");
             }
 
             return VK_LOGIC_OP_CLEAR;
@@ -282,7 +282,7 @@ namespace Renderer
                 case ComparisonFunc::GREATER_EQUAL: return VK_COMPARE_OP_GREATER_OR_EQUAL;
                 case ComparisonFunc::ALWAYS:        return VK_COMPARE_OP_ALWAYS;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more comparison ops?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more comparison ops?");
             }
 
             return VK_COMPARE_OP_NEVER;
@@ -301,7 +301,7 @@ namespace Renderer
                 case StencilOp::INCR: return VK_STENCIL_OP_INCREMENT_AND_WRAP;
                 case StencilOp::DECR: return VK_STENCIL_OP_DECREMENT_AND_WRAP;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more stencil ops?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more stencil ops?");
             }
 
             return VK_STENCIL_OP_KEEP;
@@ -348,7 +348,7 @@ namespace Renderer
                 case SamplerFilter::MAXIMUM_MIN_MAG_MIP_LINEAR:                  return VK_FILTER_LINEAR;
                 case SamplerFilter::MAXIMUM_ANISOTROPIC:                         return VK_FILTER_LINEAR;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more filters?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more filters?");
             }
 
             return VK_FILTER_NEAREST;
@@ -395,7 +395,7 @@ namespace Renderer
                 case SamplerFilter::MAXIMUM_MIN_MAG_MIP_LINEAR:                  return VK_FILTER_LINEAR;
                 case SamplerFilter::MAXIMUM_ANISOTROPIC:                         return VK_FILTER_LINEAR;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more filters?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more filters?");
             }
 
             return VK_FILTER_NEAREST;
@@ -411,7 +411,7 @@ namespace Renderer
                 case TextureAddressMode::BORDER:       return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
                 case TextureAddressMode::MIRROR_ONCE:  return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more modes?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more modes?");
             }
 
             return VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -425,7 +425,7 @@ namespace Renderer
                 case StaticBorderColor::OPAQUE_BLACK:       return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
                 case StaticBorderColor::OPAQUE_WHITE:       return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more colors?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more colors?");
             }
 
             return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
@@ -438,7 +438,7 @@ namespace Renderer
                 case IndexFormat::UInt16:   return VK_INDEX_TYPE_UINT16;
                 case IndexFormat::UInt32:   return VK_INDEX_TYPE_UINT32;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more colors?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more colors?");
             }
             return VK_INDEX_TYPE_UINT16;
         }
@@ -453,7 +453,7 @@ namespace Renderer
                 case PrimitiveTopology::TriangleStrip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more colors?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more colors?");
             }
             return VkPrimitiveTopology::VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         }
@@ -508,7 +508,7 @@ namespace Renderer
                 case InputFormat::R8_UINT:              return 1;
                 case InputFormat::R8_SINT:              return 1;
                 default:
-                    DebugHandler::PrintFatal("This should never hit, did we forget to update this function after adding more input formats?");
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more input formats?");
             }
 
             return 1;

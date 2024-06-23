@@ -35,6 +35,7 @@ robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::s
     { FileChunkToken("NERF", true), nullptr},
     { FileChunkToken("DETL", true), nullptr},
     { FileChunkToken("DBOC", true), nullptr}
+
 };
 
 bool Parser::TryParse(const ParseType parseType, std::shared_ptr<Bytebuffer>& buffer, Layout& out)
@@ -80,7 +81,7 @@ bool Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, La
 
             std::string_view sv(bytes, 4);
 
-            DebugHandler::PrintError("M2Parser : Encountered unexpected Chunk {0}", sv);
+            NC_LOG_ERROR("M2Parser : Encountered unexpected Chunk {0}", sv);
 
             return false;
         }
@@ -94,7 +95,6 @@ bool Parser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer, La
         {
             buffer->SkipRead(header.size);
         }
-
     } while (buffer->GetActiveSize());
 
     return true;
@@ -249,6 +249,13 @@ bool Parser::ReadBFID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>
     return true;
 }
 bool Parser::ReadTXID(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+{
+    if (!LoadArrayOfStructs(buffer, header.size, layout.txid.textureFileIDs))
+        return false;
+
+    return true;
+}
+bool Parser::ReadTVFS(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
 {
     if (!LoadArrayOfStructs(buffer, header.size, layout.txid.textureFileIDs))
         return false;

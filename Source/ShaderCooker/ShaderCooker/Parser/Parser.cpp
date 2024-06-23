@@ -65,7 +65,7 @@ namespace ShaderCooker
 
         if (errorCount > 0)
         {
-            DebugHandler::PrintError("Shader ({0}) failed to pass syntax check", shader.name.c_str());
+            NC_LOG_ERROR("Shader ({0}) failed to pass syntax check", shader.name.c_str());
         }
 
         return errorCount == 0;
@@ -103,7 +103,7 @@ namespace ShaderCooker
                 }
                 else
                 {
-                    DebugHandler::PrintError("Shader ({0}) includes ({1}) the include could not be resolved", shader.name.c_str(), include.name.c_str());
+                    NC_LOG_ERROR("Shader ({0}) includes ({1}) the include could not be resolved", shader.name.c_str(), include.name.c_str());
                 }
             }
         }

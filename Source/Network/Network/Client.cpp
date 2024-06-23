@@ -58,13 +58,13 @@ namespace Network
     {
         if (_isInitialized == false)
         {
-            DebugHandler::PrintError("[Networking] Attempted to call Connect on uninitialized Client");
+            NC_LOG_ERROR("[Networking] Attempted to call Connect on uninitialized Client");
             return Socket::Result::ERROR_CLIENT_UNINITIALIZED;
         }
 
         if (_isConnected == true)
         {
-            DebugHandler::PrintError("[Networking] Attempted to call Connect on connected Client");
+            NC_LOG_ERROR("[Networking] Attempted to call Connect on connected Client");
             return Socket::Result::ERROR_CLIENT_ALREADY_CONNECTED;
         }
 

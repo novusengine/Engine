@@ -178,7 +178,7 @@ namespace Renderer
 #if _DEBUG
         if (!_isExecutingCommandlist)
         {
-            DebugHandler::PrintFatal("Please only create pipelines from inside a Commandlist");
+            NC_LOG_CRITICAL("Please only create pipelines from inside a Commandlist");
         }
 #endif // _DEBUG
 
@@ -190,7 +190,7 @@ namespace Renderer
 #if _DEBUG
         if (!_isExecutingCommandlist)
         {
-            DebugHandler::PrintFatal("Please only create pipelines from inside a Commandlist");
+            NC_LOG_CRITICAL("Please only create pipelines from inside a Commandlist");
         }
 #endif // _DEBUG
 
@@ -289,7 +289,7 @@ namespace Renderer
 
             if (result == VK_TIMEOUT)
             {
-                DebugHandler::PrintFatal("Waiting for frame fence took longer than 5 seconds, something is wrong!");
+                NC_LOG_CRITICAL("Waiting for frame fence took longer than 5 seconds, something is wrong!");
             }
 
             vkResetFences(_device->_device, 1, &frameFence);
@@ -506,7 +506,7 @@ namespace Renderer
 
         if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
         {
-            DebugHandler::PrintFatal("You tried to draw without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
 
         vkCmdDraw(commandBuffer, numVertices, numInstances, vertexOffset, instanceOffset);
@@ -518,7 +518,7 @@ namespace Renderer
 
         if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
         {
-            DebugHandler::PrintFatal("You tried to draw without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
@@ -532,7 +532,7 @@ namespace Renderer
 
         if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
         {
-            DebugHandler::PrintFatal("You tried to draw without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
@@ -547,7 +547,7 @@ namespace Renderer
 
         if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
         {
-            DebugHandler::PrintFatal("You tried to draw without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
 
         vkCmdDrawIndexed(commandBuffer, numIndices, numInstances, indexOffset, vertexOffset, instanceOffset);
@@ -559,7 +559,7 @@ namespace Renderer
 
         if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
         {
-            DebugHandler::PrintFatal("You tried to draw without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
@@ -573,7 +573,7 @@ namespace Renderer
 
         if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
         {
-            DebugHandler::PrintFatal("You tried to draw without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
@@ -621,7 +621,7 @@ namespace Renderer
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
         if (renderPassOpenCount != 0)
         {
-            DebugHandler::PrintFatal("You need to match your BeginPipeline calls with a EndPipeline call before beginning another pipeline!");
+            NC_LOG_CRITICAL("You need to match your BeginPipeline calls with a EndPipeline call before beginning another pipeline!");
         }
         renderPassOpenCount++;
         _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
@@ -665,7 +665,7 @@ namespace Renderer
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
         if (renderPassOpenCount <= 0)
         {
-            DebugHandler::PrintFatal("You tried to call EndPipeline without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to call EndPipeline without first calling BeginPipeline!");
         }
         renderPassOpenCount--;
         _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
@@ -697,7 +697,7 @@ namespace Renderer
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
         if (renderPassOpenCount != 0)
         {
-            DebugHandler::PrintFatal("You need to match your BeginPipeline calls with a EndPipeline call before beginning another pipeline!");
+            NC_LOG_CRITICAL("You need to match your BeginPipeline calls with a EndPipeline call before beginning another pipeline!");
         }
         renderPassOpenCount++;
         _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
@@ -714,7 +714,7 @@ namespace Renderer
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
         if (renderPassOpenCount <= 0)
         {
-            DebugHandler::PrintFatal("You tried to call EndPipeline without first calling BeginPipeline!");
+            NC_LOG_CRITICAL("You tried to call EndPipeline without first calling BeginPipeline!");
         }
         renderPassOpenCount--;
         _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
@@ -821,7 +821,7 @@ namespace Renderer
                 {
                     if (set != bindInfo.set)
                     {
-                        DebugHandler::PrintError("While creating DescriptorSet, we found BindInfo with matching name ({}) and type ({}), but it didn't match the location ({} != {})", bindInfo.name, static_cast<std::underlying_type<DescriptorType>::type>(bindInfo.descriptorType), bindInfo.set, set);
+                        NC_LOG_ERROR("While creating DescriptorSet, we found BindInfo with matching name ({}) and type ({}), but it didn't match the location ({} != {})", bindInfo.name, static_cast<std::underlying_type<DescriptorType>::type>(bindInfo.descriptorType), bindInfo.set, set);
                     }
                 }
                 else
@@ -842,7 +842,7 @@ namespace Renderer
             }
         }
 
-        DebugHandler::PrintError("While creating DescriptorSet we encountered binding (%s) of type (%u) which did not have a matching BindInfo in the bound shaders", name.c_str(), type);
+        NC_LOG_ERROR("While creating DescriptorSet we encountered binding (%s) of type (%u) which did not have a matching BindInfo in the bound shaders", name.c_str(), type);
         return false;
     }
 
@@ -1153,7 +1153,7 @@ namespace Renderer
 
         if (tracyScope != nullptr)
         {
-            DebugHandler::PrintFatal("Tried to begin GPU trace on a commandlist that already had a begun GPU trace");
+            NC_LOG_CRITICAL("Tried to begin GPU trace on a commandlist that already had a begun GPU trace");
         }
 
         tracyScope = new tracy::VkCtxManualScope(_device->_tracyContext, sourceLocation, true);
@@ -1172,7 +1172,7 @@ namespace Renderer
 
         if (tracyScope == nullptr)
         {
-            DebugHandler::PrintFatal("Tried to end GPU trace on a commandlist that didn't have a running trace");
+            NC_LOG_CRITICAL("Tried to end GPU trace on a commandlist that didn't have a running trace");
         }
 
         tracyScope->End();
@@ -1272,11 +1272,11 @@ namespace Renderer
 
         if (srcOffset + range > srcBufferSize)
         {
-            DebugHandler::PrintFatal("[RendererVK::CopyBuffer] Source Buffer out of bounds!");
+            NC_LOG_CRITICAL("[RendererVK::CopyBuffer] Source Buffer out of bounds!");
         }
         if (dstOffset + range > dstBufferSize)
         {
-            DebugHandler::PrintFatal("[RendererVK::CopyBuffer] Destination Buffer out of bounds!");
+            NC_LOG_CRITICAL("[RendererVK::CopyBuffer] Destination Buffer out of bounds!");
         }
 
         vkCmdCopyBuffer(commandBuffer, vkSrcBuffer, vkDstBuffer, 1, &copyRegion);
@@ -1305,9 +1305,9 @@ namespace Renderer
 
     void RendererVK::BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from)
     {
-        DebugHandler::Assert(commandListID != CommandListID::Invalid(), "RendererVK : BufferBarrier got invalid commandListID");
-        DebugHandler::Assert(bufferID != BufferID::Invalid(), "RendererVK : BufferBarrier got invalid bufferID");
-        DebugHandler::Assert(from != BufferPassUsage::NONE, "RendererVK : BufferBarrier from BufferPassUsage was NONE");
+        NC_ASSERT(commandListID != CommandListID::Invalid(), "RendererVK : BufferBarrier got invalid commandListID");
+        NC_ASSERT(bufferID != BufferID::Invalid(), "RendererVK : BufferBarrier got invalid bufferID");
+        NC_ASSERT(from != BufferPassUsage::NONE, "RendererVK : BufferBarrier from BufferPassUsage was NONE");
 
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
 
@@ -1375,7 +1375,7 @@ namespace Renderer
 
             if (shaderStageFlags == 0)
             {
-                DebugHandler::PrintFatal("RendererVK::PushConstant : shaderStageFlags was 0, did we try to push a constant that doesn't exist?");
+                NC_LOG_CRITICAL("RendererVK::PushConstant : shaderStageFlags was 0, did we try to push a constant that doesn't exist?");
             }
 
             VkPipelineLayout layout = _pipelineHandler->GetPipelineLayout(graphicsPipelineID);
@@ -1403,7 +1403,7 @@ namespace Renderer
             ZoneScopedNC("Present::TracyScope", tracy::Color::Red);
             if (tracyScope != nullptr)
             {
-                DebugHandler::PrintFatal("Tried to begin GPU trace on a commandlist that already had a begun GPU trace");
+                NC_LOG_CRITICAL("Tried to begin GPU trace on a commandlist that already had a begun GPU trace");
             }
 
 #if TRACY_ENABLE
@@ -1434,7 +1434,7 @@ namespace Renderer
             }
             else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
             {
-                DebugHandler::PrintFatal("Failed to acquire swap chain image!");
+                NC_LOG_CRITICAL("Failed to acquire swap chain image!");
             }
         }
         
@@ -1618,7 +1618,7 @@ namespace Renderer
             }
             else if (result != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to present swap chain image!");
+                NC_LOG_CRITICAL("Failed to present swap chain image!");
             }
         }
 
@@ -1668,7 +1668,7 @@ namespace Renderer
     {
         std::string dstName = _bufferHandler->GetBufferName(dstBuffer);
         std::string srcName = _bufferHandler->GetBufferName(srcBuffer);
-        DebugHandler::PrintWarning("Immediately copying buffer {} into buffer {}, this is bad for performance and should only be used for debugging", srcName, dstName);
+        NC_LOG_WARNING("Immediately copying buffer {} into buffer {}, this is bad for performance and should only be used for debugging", srcName, dstName);
 
         VkCommandBuffer commandList = _device->BeginSingleTimeCommands();
         
@@ -1723,7 +1723,7 @@ namespace Renderer
         FfxErrorCode errorCode = ffxCacaoContextDispatch(context, &dispatchDescription);
         if (errorCode != FfxErrorCodes::FFX_OK)
         {
-            DebugHandler::PrintFatal("Failed to dispatch CACAO");
+            NC_LOG_CRITICAL("Failed to dispatch CACAO");
             return;
         }
 
@@ -1740,7 +1740,7 @@ namespace Renderer
         VkResult result = vmaMapMemory(_device->_allocator, _bufferHandler->GetBufferAllocation(buffer), &mappedMemory);
         if (result != VK_SUCCESS)
         {
-            DebugHandler::PrintError("vmaMapMemory failed!\n");
+            NC_LOG_ERROR("vmaMapMemory failed!\n");
             return nullptr;
         }
         return mappedMemory;

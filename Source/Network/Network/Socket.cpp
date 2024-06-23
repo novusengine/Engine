@@ -38,7 +38,7 @@ namespace Network
             i32 code = WSAStartup(MAKEWORD(2, 2), &data);
             if (code != 0)
             {
-                DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
+                NC_LOG_CRITICAL("[Network] Failed to initialize WinSock");
             }
         }
 #endif
@@ -72,7 +72,7 @@ namespace Network
             i32 code = WSAStartup(MAKEWORD(2, 2), &data);
             if (code != 0)
             {
-                DebugHandler::PrintFatal("[Network] Failed to initialize WinSock");
+                NC_LOG_CRITICAL("[Network] Failed to initialize WinSock");
             }
         }
 #endif
@@ -493,7 +493,7 @@ namespace Network
 
         if (result == Result::ERROR_GENERIC)
         {
-            DebugHandler::PrintWarning("[Networking] Error Code %u is unhandled", error);
+            NC_LOG_WARNING("[Networking] Error Code %u is unhandled", error);
         }
 
         return result;

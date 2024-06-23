@@ -43,7 +43,7 @@ namespace Renderer
 
         if (desc.allocator == nullptr)
         {
-            DebugHandler::PrintFatal("You need to set an allocator!");
+            NC_LOG_CRITICAL("You need to set an allocator!");
         }
 
         return true;
@@ -162,7 +162,7 @@ namespace Renderer
         {
             u32 numPlacedImageBarriers = _renderGraphBuilder->GetNumPlacedImageBarriers();
             u32 numPlacedBufferBarriers = _renderGraphBuilder->GetNumPlacedBufferBarriers();
-            DebugHandler::Print("Image Barriers: {}, Buffer Barriers: {}", numPlacedImageBarriers, numPlacedBufferBarriers);
+            NC_LOG_INFO("Image Barriers: {}, Buffer Barriers: {}", numPlacedImageBarriers, numPlacedBufferBarriers);
         }
         
         {

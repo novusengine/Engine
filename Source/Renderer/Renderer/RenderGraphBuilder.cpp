@@ -82,7 +82,7 @@ namespace Renderer
                 }
                 else
                 {
-                    DebugHandler::PrintFatal("Please implement more of these");
+                    NC_LOG_CRITICAL("Please implement more of these");
                 }
 
                 _resources.SetLastBarrier(imageID, currentPassIndex);
@@ -333,7 +333,7 @@ namespace Renderer
     ImageResource RenderGraphBuilder::Read(ImageID id, PipelineType pipelineType)
     {
         ZoneScoped;
-        DebugHandler::Assert(id != ImageID::Invalid(), "RenderGraphBuilder : Read got invalid ImageID");
+        NC_ASSERT(id != ImageID::Invalid(), "RenderGraphBuilder : Read got invalid ImageID");
 
         ImageResource resource = _resources.GetResource(id);
 
@@ -345,7 +345,7 @@ namespace Renderer
     DepthImageResource RenderGraphBuilder::Read(DepthImageID id, PipelineType pipelineType)
     {
         ZoneScoped;
-        DebugHandler::Assert(id != DepthImageID::Invalid(), "RenderGraphBuilder : Read got invalid DepthImageID");
+        NC_ASSERT(id != DepthImageID::Invalid(), "RenderGraphBuilder : Read got invalid DepthImageID");
 
         DepthImageResource resource = _resources.GetResource(id);
 
@@ -357,7 +357,7 @@ namespace Renderer
     BufferResource RenderGraphBuilder::Read(BufferID id, BufferPassUsage bufferPassUsage)
     {
         ZoneScoped;
-        DebugHandler::Assert(id != BufferID::Invalid(), "RenderGraphBuilder : Read got invalid BufferID");
+        NC_ASSERT(id != BufferID::Invalid(), "RenderGraphBuilder : Read got invalid BufferID");
 
         BufferResource resource = _resources.GetResource(id);
 
@@ -369,7 +369,7 @@ namespace Renderer
     ImageMutableResource RenderGraphBuilder::Write(ImageID id, PipelineType pipelineType, LoadMode loadMode)
     {
         ZoneScoped;
-        DebugHandler::Assert(id != ImageID::Invalid(), "RenderGraphBuilder : Write got invalid ImageID");
+        NC_ASSERT(id != ImageID::Invalid(), "RenderGraphBuilder : Write got invalid ImageID");
 
         ImageMutableResource resource = _resources.GetMutableResource(id);
 
@@ -386,7 +386,7 @@ namespace Renderer
     DepthImageMutableResource RenderGraphBuilder::Write(DepthImageID id, PipelineType pipelineType, LoadMode loadMode)
     {
         ZoneScoped;
-        DebugHandler::Assert(id != DepthImageID::Invalid(), "RenderGraphBuilder : Write got invalid DepthImageID");
+        NC_ASSERT(id != DepthImageID::Invalid(), "RenderGraphBuilder : Write got invalid DepthImageID");
 
         DepthImageMutableResource resource = _resources.GetMutableResource(id);
 
@@ -403,7 +403,7 @@ namespace Renderer
     BufferMutableResource RenderGraphBuilder::Write(BufferID id, BufferPassUsage bufferPassUsage)
     {
         ZoneScoped;
-        DebugHandler::Assert(id != BufferID::Invalid(), "RenderGraphBuilder : Write got invalid BufferID");
+        NC_ASSERT(id != BufferID::Invalid(), "RenderGraphBuilder : Write got invalid BufferID");
 
         BufferMutableResource resource = _resources.GetMutableResource(id);
 

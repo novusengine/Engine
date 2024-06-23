@@ -93,7 +93,7 @@ namespace Renderer
         {
             if (!_initialized)
             {
-                DebugHandler::PrintFatal("You need to intialize the render device before intializing a window");
+                NC_LOG_CRITICAL("You need to intialize the render device before intializing a window");
             }
 
             GLFWwindow* glfwWindow = window->GetWindow();
@@ -133,11 +133,11 @@ namespace Renderer
         {
             if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
             {
-                DebugHandler::PrintError("Validation layer: {0}", pCallbackData->pMessage);
+                NC_LOG_ERROR("Validation layer: {0}", pCallbackData->pMessage);
             }
             else if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
             {
-                DebugHandler::PrintWarning("Validation layer: {0}", pCallbackData->pMessage);
+                NC_LOG_WARNING("Validation layer: {0}", pCallbackData->pMessage);
             }
 
             return VK_FALSE;
@@ -346,7 +346,7 @@ namespace Renderer
 
             if (vkCreateInstance(&createInfo, nullptr, &_instance) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create Vulkan instance!");
+                NC_LOG_CRITICAL("Failed to create Vulkan instance!");
             }
         }
 
@@ -380,7 +380,7 @@ namespace Renderer
 
             if (CreateDebugUtilsMessengerEXT(_instance, &createInfo, nullptr, &_debugMessenger) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to set up Vulkan debug messenger!");
+                NC_LOG_CRITICAL("Failed to set up Vulkan debug messenger!");
             }
 #endif
         }
@@ -392,7 +392,7 @@ namespace Renderer
 
             if (deviceCount == 0)
             {
-                DebugHandler::PrintFatal("Failed to find GPUs with Vulkan support!");
+                NC_LOG_CRITICAL("Failed to find GPUs with Vulkan support!");
             }
 
             std::vector<VkPhysicalDevice> devices(deviceCount);
@@ -424,7 +424,7 @@ namespace Renderer
             }
             else
             {
-                DebugHandler::PrintFatal("Failed to find a suitable Vulkan GPU!");
+                NC_LOG_CRITICAL("Failed to find a suitable Vulkan GPU!");
             }
         }
 
@@ -526,7 +526,7 @@ namespace Renderer
 
             if (vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create logical device!");
+                NC_LOG_CRITICAL("Failed to create logical device!");
             }
 
             DebugMarkerUtilVK::InitializeFunctions(_device);
@@ -559,7 +559,7 @@ namespace Renderer
 
                 if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_graphicsCommandPool) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to create command pool!");
+                    NC_LOG_CRITICAL("Failed to create command pool!");
                 }
             }
 
@@ -572,7 +572,7 @@ namespace Renderer
 
                 if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_transferCommandPool) != VK_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("Failed to create command pool!");
+                    NC_LOG_CRITICAL("Failed to create command pool!");
                 }
             }
         }
@@ -598,7 +598,7 @@ namespace Renderer
         {
             if (glfwCreateWindowSurface(_instance, window, nullptr, &swapChain->surface) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create window surface!");
+                NC_LOG_CRITICAL("Failed to create window surface!");
             }
         }
 
@@ -608,7 +608,7 @@ namespace Renderer
 
             if (SwapChainVK::FRAME_BUFFER_COUNT < swapChainSupport.capabilities.minImageCount || SwapChainVK::FRAME_BUFFER_COUNT > swapChainSupport.capabilities.maxImageCount)
             {
-                DebugHandler::PrintFatal("Physical device does not support the requested number of swapchain images, you requested {0}, and it supports between {1} and {2}", SwapChainVK::FRAME_BUFFER_COUNT, swapChainSupport.capabilities.minImageCount, swapChainSupport.capabilities.maxImageCount);
+                NC_LOG_CRITICAL("Physical device does not support the requested number of swapchain images, you requested {0}, and it supports between {1} and {2}", SwapChainVK::FRAME_BUFFER_COUNT, swapChainSupport.capabilities.minImageCount, swapChainSupport.capabilities.maxImageCount);
             }
 
             VkSurfaceFormatKHR surfaceFormat = swapChain->ChooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -636,7 +636,7 @@ namespace Renderer
 
             if (!presentSupport)
             {
-                DebugHandler::PrintFatal("Selected physical device does not support presenting!");
+                NC_LOG_CRITICAL("Selected physical device does not support presenting!");
             }
 
             if (indices.graphicsFamily != indices.presentFamily)
@@ -662,7 +662,7 @@ namespace Renderer
 
             if (vkCreateSwapchainKHR(_device, &createInfo, nullptr, &swapChain->swapChain) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create swap chain!");
+                NC_LOG_CRITICAL("Failed to create swap chain!");
             }
         }
 
@@ -751,20 +751,20 @@ namespace Renderer
 
             if (deviceProperties.limits.maxPerStageDescriptorSampledImages < Renderer::Settings::MAX_TEXTURES_NORMAL)
             {
-                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support enough sampled images", deviceProperties.deviceName, 0);
+                NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1} because it doesn't support enough sampled images", deviceProperties.deviceName, 0);
                 return 0;
             }
 
             if (!deviceFeatures.samplerAnisotropy)
             {
-                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support sampler anisotropy", deviceProperties.deviceName, 0);
+                NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1} because it doesn't support sampler anisotropy", deviceProperties.deviceName, 0);
                 return 0;
             }
 
             // Application can't function without geometry shaders
             if (!deviceFeatures.geometryShader)
             {
-                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support geometry shaders", deviceProperties.deviceName, 0);
+                NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1} because it doesn't support geometry shaders", deviceProperties.deviceName, 0);
                 return 0;
             }
 
@@ -772,7 +772,7 @@ namespace Renderer
             QueueFamilyIndices indices = FindQueueFamilies(device);
             if (!indices.IsComplete())
             {
-                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support VK_QUEUE_GRAPHICS_BIT", deviceProperties.deviceName, 0);
+                NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1} because it doesn't support VK_QUEUE_GRAPHICS_BIT", deviceProperties.deviceName, 0);
                 return 0;
             }
 
@@ -780,11 +780,11 @@ namespace Renderer
             bool extensionsSupported = CheckDeviceExtensionSupport(device);
             if (!extensionsSupported)
             {
-                DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1} because it doesn't support the required extensions", deviceProperties.deviceName, 0);
+                NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1} because it doesn't support the required extensions", deviceProperties.deviceName, 0);
                 return 0;
             }
 
-            DebugHandler::Print("[Renderer]: GPU Detected {0} with score {1}", deviceProperties.deviceName, score);
+            NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1}", deviceProperties.deviceName, score);
             return score;
         }
 
@@ -1279,10 +1279,10 @@ namespace Renderer
             {
                 for (const std::string& errorMessage : errorMessages)
                 {
-                    DebugHandler::PrintError(errorMessage);
+                    NC_LOG_ERROR("{0}", errorMessage);
                 }
 
-                DebugHandler::PrintFatal("The graphics card did not support all requested features!");
+                NC_LOG_CRITICAL("The graphics card did not support all requested features!");
                 return false;
             }
 
@@ -1312,7 +1312,7 @@ namespace Renderer
 
                 if (!layerFound)
                 {
-                    DebugHandler::PrintFatal("We do not support a validation layer that we need to support: {0}", layerName);
+                    NC_LOG_CRITICAL("We do not support a validation layer that we need to support: {0}", layerName);
                 }
             }
         }
@@ -1442,7 +1442,7 @@ namespace Renderer
                 }
                 else
                 {
-                    DebugHandler::PrintFatal("Tried to use a format that wasn't uncompressed or used BC compression, what is this? id: {}", static_cast<std::underlying_type<VkFormat>::type>(format));
+                    NC_LOG_CRITICAL("Tried to use a format that wasn't uncompressed or used BC compression, what is this? id: {}", static_cast<std::underlying_type<VkFormat>::type>(format));
                 }
 
                 curWidth = Math::Max(1, curWidth / 2);

@@ -17,7 +17,7 @@ namespace Model
         std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
         if (!output)
         {
-            DebugHandler::PrintError("Failed to create Map Object file. Check admin permissions");
+            NC_LOG_ERROR("Failed to create Map Object file. Check admin permissions");
             return false;
         }
 

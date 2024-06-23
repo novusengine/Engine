@@ -68,7 +68,7 @@ namespace Renderer
             case TERRAIN: return "TERRAIN";
             case MODEL: return "MODEL";
             default:
-                DebugHandler::PrintFatal("Unknown DescriptorSet, did we forget to extend the DescriptorSetToName function after adding new DescriptorSetSlots?");
+                NC_LOG_CRITICAL("Unknown DescriptorSet, did we forget to extend the DescriptorSetToName function after adding new DescriptorSetSlots?");
         }
         return "";
     }

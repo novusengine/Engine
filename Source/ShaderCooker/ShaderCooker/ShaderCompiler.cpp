@@ -198,7 +198,7 @@ namespace ShaderCooker
                                 if (shader.source.length() == 0)
                                 {
                                     _shaders.pop_back();
-                                    DebugHandler::PrintError("Compiler failed to read script ({0})", itr->string().c_str());
+                                    NC_LOG_ERROR("Compiler failed to read script ({0})", itr->string().c_str());
                                     itr = _stageInfo.paths.erase(itr);
                                     _numFailedShaders++;
                                     continue;
@@ -222,7 +222,7 @@ namespace ShaderCooker
                         continue;
                     }
 
-                    DebugHandler::PrintError("Compiler failed to find path ({0})", path.c_str());
+                    NC_LOG_ERROR("Compiler failed to find path ({0})", path.c_str());
                     _numFailedShaders++;
                 }
 
@@ -300,7 +300,6 @@ namespace ShaderCooker
                         for (u32 j = 0; j < numPermutationGroups; j++)
                         {
                             u32 index = indices[j];
-                            //DebugHandler::Print("%s = %.*s", shader.permutationGroups[j].name.c_str(), shader.permutationGroups[j].types[index].stringview.length(), shader.permutationGroups[j].types[index].stringview.data());
 
                             std::wstring name = StringUtils::StringToWString(shader.permutationGroups[j].name);
                             std::wstring value = StringUtils::StringToWString({ shader.permutationGroups[j].types[index].stringview.data(), shader.permutationGroups[j].types[index].stringview.length() });
@@ -364,7 +363,7 @@ namespace ShaderCooker
 
                     if (numPermutations > 1)
                     {
-                        DebugHandler::Print(">> Generated {0} permutations from {1}", numPermutations, shader.name.c_str());
+                        NC_LOG_INFO(">> Generating {0} permutations from {1}", numPermutations, shader.name.c_str());
                     }
 
                     bool didFail = false;
@@ -383,7 +382,7 @@ namespace ShaderCooker
                         size_t size;
                         if (!dxcBridge.Compile(shader.path, shader.source, blob, size, _sourceDirPath))
                         {
-                            DebugHandler::PrintError("Failed to compile");
+                            NC_LOG_ERROR("Failed to compile");
                             didFail = true;
                             break;
                         }
@@ -408,7 +407,7 @@ namespace ShaderCooker
 
                     if (numPermutations > 1)
                     {
-                        DebugHandler::Print("");
+                        NC_LOG_INFO("");
                     }
                     _shaderCache->Touch(shader.path);
 
@@ -462,7 +461,7 @@ namespace ShaderCooker
 
         filename += extension;
 
-        DebugHandler::Print("Compiling: {0}", filename.c_str());
+        NC_LOG_INFO("Compiling: {0}", filename.c_str());
     }
 
 }

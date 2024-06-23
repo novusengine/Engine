@@ -16,261 +16,197 @@
 #include <string>
 #include <vector>
 
+#include <filesystem>
+
 namespace ClientDB
 {
     static const std::string FILE_EXTENSION = ".cdb";
 
-    struct StorageRaw
+    template <class T>
+    struct Storage
     {
     public:
-        static const u32 CURRENT_VERSION = 1;
+        static_assert(std::is_same<Definitions::Base, T>::value || std::is_base_of<Definitions::Base, T>::value, "ClientDB::Storage Type must derive from Base");
+        static const u32 CURRENT_VERSION = 2;
 
         struct Flags
         {
             u32 unused : 32;
         };
 
-        StorageRaw(const std::string& name)
+        Storage(const std::string& name) : _name(name) { }
+        ~Storage()
         {
-            _name = name;
-        }
-
-    public:
-        const std::string& GetName() { return _name; }
-
-        u32 GetSizeOfElement()
-        {
-            return _sizeOfElement;
-        }
-        bool IsInitialized()
-        {
-            return GetSizeOfElement() != std::numeric_limits<u32>().max();
-        }
-        bool Init(size_t sizeOfElement)
-        {
-            if (IsInitialized())
-                return false;
-
-            if (sizeOfElement == 0)
-                return false;
-
-            u32 elementSize = static_cast<u32>(sizeOfElement);
-            _sizeOfElement = elementSize;
-
-            u32 numBytes = static_cast<u32>(_data.size());
-            if (numBytes > 0)
+            for (void* row : _rows)
             {
-                u32 numElements = numBytes / elementSize;
-                f32 remainder = glm::mod(static_cast<f32>(numBytes), static_cast<f32>(numElements));
+                if (row)
+				    delete row;
+			}
+		}
 
-                if (remainder != 0.0f)
-                    return false;
+        void Each(std::function<void(const Storage<T>* storage, const T*)> func)
+        {
+            for (T* row : _rows)
+            {
+                if (!row)
+                    continue;
 
-                _idToIndexMap.clear();
-                for (u32 i = 0; i < numElements; i++)
+                func(this, row);
+            }
+        }
+
+        void EachAfterID(u32 id, std::function<void(const Storage<T>* storage, const T*)> func)
+        {
+            u32 storageMaxID = _minID + Count();
+            if (id < _minID || id > storageMaxID)
+                return;
+
+            u32 count = storageMaxID - id;
+            for (u32 i = 0; i < count; i++)
+            {
+                T* row = _rows[i - _minID];
+                if (!row)
+                    continue;
+
+                func(this, row);
+            }
+        }
+        void EachInRange(u32 min, u32 max, std::function<void(const Storage<T>* storage, const T*)> func)
+        {
+            u32 count = 0;
+
+            for (T* row : _rows)
+            {
+                if (!row)
+                    continue;
+
+                u32 currentCount = count++;
+                if (currentCount < min)
+                    continue;
+
+                if (currentCount > max)
+                    break;
+
+                func(this, row);
+            }
+        }
+
+        T* GetRow(u32 id)
+        {
+            u32 maxID = _minID + Count();
+            if (id < _minID || id > maxID)
+				return nullptr;
+
+			return _rows[id - _minID];
+		}
+        bool HasRow(u32 id)
+        {
+            u32 maxID = _minID + Count();
+            if (id < _minID || id > maxID)
+                return false;
+
+            const T* row = _rows[id - _minID];
+            return row != nullptr;
+        }
+
+        void AddRow(T& row)
+        {
+            u32 originalSize = Count();
+            u32 originalMinID = _minID;
+            u32 originalMaxID = originalSize == 0 ? 0 : (originalSize + originalMinID) - 1;
+
+            // auto assign id if id is u32 max
+            if (row.id == std::numeric_limits<u32>().max())
+            {
+                row.id = originalMaxID + 1;
+            }
+
+            bool hasNewMin = row.id < originalMinID;
+            bool hasNewMax = row.id > originalMaxID || originalSize == 0;
+            if (hasNewMin || hasNewMax)
+            {
+                u32 newMinID = glm::min(originalMinID, row.id);
+                u32 newMaxID = glm::max(originalMaxID, row.id);
+
+                u32 newSize = row.id - newMinID + 1;
+                _rows.resize(newSize);
+
+                if (hasNewMin)
                 {
-                    u32 id = *reinterpret_cast<u32*>(&_data[i * elementSize]);
+                    u32 numNewRows = originalMinID - newMinID;
 
-                    _idToIndexMap[id] = i;
-                    _maxID = glm::max(_maxID, id);
+                    memcpy(_rows.data() + numNewRows, _rows.data(), sizeof(T*) * originalSize);
+                    memset(_rows.data(), 0, sizeof(T*) * numNewRows);
+
+                    _minID = newMinID;
+				}
+			}
+
+            bool hasRowAtID = _rows[row.id - _minID] != nullptr;
+            _numRows += 1 * !hasRowAtID;
+            _rows[row.id - _minID] = new T(row);
+        }
+        bool CopyRow(u32 rowToCopyID, u32 newRowID)
+        {
+            if (!HasRow(rowToCopyID))
+                return false;
+
+            T newRow = *_rows[rowToCopyID - _minID];
+            newRow.id = newRowID;
+
+            AddRow(newRow);
+            return true;
+        }
+
+        void RemoveRow(u32 id)
+        {
+            u32 numRows = Count();
+            u32 maxID = _minID + numRows;
+            if (id < _minID || id > maxID)
+                return;
+            
+            T* row = _rows[id - _minID];
+            if (row)
+            {
+                delete row;
+
+                _numRows -= 1;
+                _rows[id - _minID] = nullptr;
+
+                bool wasLastRow = id == maxID - 1;
+                if (wasLastRow)
+                {
+                    _rows.resize(numRows - 1);
                 }
             }
-
-            return true;
-        }
-
-        template <typename T>
-        T& GetByIndex(u32 index)
-        {
-            u32 sizeOfElement = GetSizeOfElement();
-            assert(sizeOfElement == sizeof(T));
-
-            u32 offset = index * sizeOfElement;
-            assert(offset < GetDataBytes());
-
-            return *reinterpret_cast<T*>(&_data[offset]);
-        }
-
-        template <typename T>
-        T& GetByID(u32 id)
-        {
-            assert(GetSizeOfElement() == sizeof(T));
-            assert(_idToIndexMap.contains(id));
-
-            u32 index = _idToIndexMap[id];
-
-            return GetByIndex<T>(index);
-        }
-
-        template <typename T>
-        bool Add(T& element)
-        {
-            u32 sizeOfElement = GetSizeOfElement();
-            assert(sizeOfElement == sizeof(T));
-
-            u32 newID = ++_maxID;
-            element._id = newID;
-
-            u32 sizeBeforeAdd = GetDataBytes();
-            _data.resize(sizeBeforeAdd + sizeOfElement);
-            memcpy(&_data[sizeBeforeAdd], &element, sizeOfElement);
-
-            u32 index = sizeBeforeAdd / sizeOfElement;
-            _idToIndexMap[newID] = index;
-
-            MarkDirty();
-            return true;
-        }
-
-        template <typename T>
-        void Replace(u32 id, T& element)
-        {
-            u32 sizeOfElement = GetSizeOfElement();
-            assert(sizeOfElement == sizeof(T));
-
-            element._id = id;
-
-            if (_idToIndexMap.contains(id))
-            {
-                u32 index = _idToIndexMap[id];
-                u32 offset = index * sizeOfElement;
-                assert(offset < GetDataBytes());
-
-                *reinterpret_cast<T*>(&_data[offset]) = element;
-            }
-            else
-            {
-                u32 sizeBeforeAdd = GetDataBytes();
-                _data.resize(sizeBeforeAdd + sizeOfElement);
-                memcpy(&_data[sizeBeforeAdd], &element, sizeOfElement);
-
-                u32 index = sizeBeforeAdd / sizeOfElement;
-                _idToIndexMap[id] = index;
-            }
-
-            MarkDirty();
-        }
-        template <typename T>
-        bool Copy(u32 idToCopy, u32 idForCopy)
-        {
-            u32 sizeOfElement = GetSizeOfElement();
-            assert(sizeOfElement == sizeof(T));
-
-            if (!_idToIndexMap.contains(idToCopy))
-                return false;
-
-            u32 indexToCopy = _idToIndexMap[idToCopy];
-            T* elementToCopy = reinterpret_cast<T*>(&_data[indexToCopy * sizeOfElement]);
-
-            T copyElement = *elementToCopy;
-            Replace(idForCopy, copyElement);
-
-            return true;
-        }
-
-        template <typename T>
-        bool Remove(u32 id)
-        {
-            u32 sizeOfElement = GetSizeOfElement();
-            assert(sizeOfElement == sizeof(T));
-
-            if (!_idToIndexMap.contains(id))
-                return false;
-
-            u32 index = _idToIndexMap[id];
-            _idToIndexMap.erase(id);
-
-            u32 offset = index * sizeOfElement;
-            assert(offset < GetDataBytes());
-            *reinterpret_cast<u32*>(&_data[offset]) = std::numeric_limits<u32>().max();
-
-            MarkDirty();
-            return true;
-        }
-
-        bool HasString(u32 index)
-        {
-            return index < _stringTable.GetNumStrings();
-        }
-        const std::string& GetString(u32 index)
-        {
-            return _stringTable.GetString(index);
-        }
-        u32 AddString(const std::string& string)
-        {
-            u32 numStrings = static_cast<u32>(_stringTable.GetNumStrings());
-
-            u32 stringIndex = _stringTable.AddString(string);
-            if (stringIndex == numStrings)
-                MarkDirty();
-
-            return stringIndex;
         }
 
         u32 Count()
         {
-            u32 numEntries = static_cast<u32>(_idToIndexMap.size());
-            return numEntries;
+            u32 numRows = static_cast<u32>(_rows.size());
+            return numRows;
         }
-        u32 GetDataBytes() { return static_cast<u32>(_data.size()); }
-        bool Contains(u32 id)
+        u32 GetNumRows()
         {
-            return _idToIndexMap.contains(id);
+            return _numRows;
         }
-
-        bool IsDirty() { return _isDirty; }
-        void MarkDirty() { _isDirty = true; }
-        void ClearDirty() { _isDirty = false; }
-
-        void Clear()
+        void Reserve(u32 count)
         {
-            flags = { };
-
-            _data.clear();
-            _idToIndexMap.clear();
-            _stringTable.Clear();
-        }
-        void Reserve(size_t numElements, size_t numStringsPerElement = 0)
-        {
-            u32 sizeOfElement = GetSizeOfElement();
-
-            _data.reserve(numElements * sizeOfElement);
-            _idToIndexMap.reserve(numElements);
-
-            _stringTable.Reserve(numElements * numStringsPerElement);
-        }
-        u32 GetMaxID() { return _maxID; }
-        void SetMaxID(u32 maxID)
-        {
-            _maxID = maxID;
+            _rows.reserve(count);
         }
 
-    public: // Save/Read/Write Helper Functions
-        size_t GetSerializedSize()
+        size_t GetSerializedSize(const Novus::Container::StringTableUnsafe& stringTable)
         {
             size_t result = 0;
 
             result += sizeof(FileHeader);
             result += sizeof(Flags);
-            result += sizeof(u32) + GetDataBytes();
-            result += sizeof(u32) + _stringTable.GetNumBytes();
+            result += sizeof(u32); // numRows
+            result += sizeof(u32); // minID
+            result += sizeof(u32) + stringTable.GetNumBytes();
+            result += sizeof(T) * Count(); // Rows
 
             return result;
-        }
-        bool Save(const std::string& path)
-        {
-            size_t size = GetSerializedSize();
-            std::shared_ptr<Bytebuffer> resultBuffer = Bytebuffer::BorrowRuntime(size);
-
-            if (!Write(resultBuffer))
-                return false;
-
-            FileWriter fileWriter(path, resultBuffer);
-            if (!fileWriter.Write())
-                return false;
-
-            ClearDirty();
-            return true;
         }
         bool Read(std::shared_ptr<Bytebuffer>& buffer)
         {
@@ -280,244 +216,145 @@ namespace ClientDB
             if (!buffer->Get(flags))
                 return false;
 
-            // Read Elements
+            if (header.type != FileHeader::Type::ClientDB)
             {
-                _data.clear();
-                _idToIndexMap.clear();
-
-                u32 numBytes = 0;
-                if (!buffer->GetU32(numBytes))
-                    return false;
-
-                if (numBytes)
-                {
-                    _data.resize(numBytes);
-
-                    if (!buffer->GetBytes(&_data[0], numBytes))
-                        return false;
-
-                    _maxID = std::numeric_limits<u32>().max();
-                }
+                NC_LOG_ERROR("ClientDB::Storage::Read('{0}') - Type mismatch. Got: {1}, Expected: {2}", _name, (i32)FileHeader::Type::ClientDB, (i32)header.type);
+                return false;
             }
 
-            // Read Stringtable
+            if (header.version != CURRENT_VERSION)
             {
-                _stringTable.Clear();
+                NC_LOG_ERROR("ClientDB::Storage::Read('{0}') - Version mismatch. Got: {1}, Expected: {2}", _name, header.version, CURRENT_VERSION);
+				return false;
+			}
 
-                if (!_stringTable.Deserialize(buffer.get()))
-                    return false;
-            }
+            u32 maxID = 0;
 
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer)
-        {
-            u32 sizeOfElement = GetSizeOfElement();
+			if (!buffer->GetU32(_minID))
+				return false;
 
-            // Require Init to have been called before writing
-            if (sizeOfElement == std::numeric_limits<u32>().max())
+			if (!buffer->GetU32(maxID))
+				return false;
+
+            u32 numRows = maxID - _minID + 1;
+            _rows.resize(numRows);
+
+            Novus::Container::StringTableUnsafe stringTable;
+            if (!stringTable.Deserialize(buffer.get()))
                 return false;
 
+            while (buffer->GetActiveSize() > 0)
+            {
+				T* row = new T();
+                if (!row->Read(buffer, stringTable))
+                {
+					delete row;
+					return false;
+				}
+
+                if (row->id < _minID || row->id > maxID)
+                {
+					NC_LOG_ERROR("ClientDB::Storage::Read('{0}') - Row ID out of bounds. Got: {1} (Min: {2}, Max: {3})", _name, row->id, _minID, maxID);
+
+                    delete row;
+                    continue;
+                }
+
+                bool hasRowAtID = _rows[row->id - _minID] != nullptr;
+                _numRows += 1 * !hasRowAtID;
+
+                _rows[row->id - _minID] = row;
+			}
+
+			return true;
+		}
+
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable)
+        {
             if (!buffer->Put(header))
                 return false;
 
             if (!buffer->Put(flags))
                 return false;
 
-            // Write Elements
+            u32 minID = std::numeric_limits<u32>().max();
+            u32 maxID = 0;
+
+            for (T* row : _rows)
             {
-                u32 numBytes = Count() * sizeOfElement;
-                if (!buffer->PutU32(numBytes))
-                    return false;
+                if (!row)
+                    continue;
 
-                if (numBytes)
-                {
-                    struct IdIndexPair
-                    {
-                    public:
-                        u32 id;
-                        u32 index;
-                    };
-
-                    std::vector<IdIndexPair> pairs;
-                    pairs.reserve(Count());
-
-                    for (const auto& pair : _idToIndexMap)
-                    {
-                        IdIndexPair& idIndexPair = pairs.emplace_back();
-                        idIndexPair.id = pair.first;
-                        idIndexPair.index = pair.second;
-                    }
-
-                    std::sort(pairs.begin(), pairs.end(), [&](const IdIndexPair& a, const IdIndexPair& b) { return a.id < b.id; });
-
-                    for (const IdIndexPair& pair : pairs)
-                    {
-                        u32 offset = pair.index * sizeOfElement;
-                        assert(offset < GetDataBytes());
-
-                        if (!buffer->PutBytes(&_data[offset], sizeOfElement))
-                            return false;
-                    }
-                }
+                minID = glm::min(minID, row->id);
+                maxID = glm::max(maxID, row->id);
             }
 
-            if (!_stringTable.Serialize(buffer.get()))
+            if (minID == std::numeric_limits<u32>().max())
+                minID = 0;
+
+            if (!buffer->PutU32(minID))
                 return false;
+
+            if (!buffer->PutU32(maxID))
+                return false;
+
+            stringTable.Serialize(buffer.get());
+
+            for (T* row : _rows)
+            {
+                if (!row)
+                    continue;
+
+				if (!row->Write(buffer, stringTable))
+					return false;
+			}
 
             return true;
         }
+
+        bool Save(const std::filesystem::path& path)
+        {
+            Novus::Container::StringTableUnsafe stringTable;
+
+            for (T* row : _rows)
+            {
+                if (!row)
+                    continue;
+
+                if (!row->WriteStringTable(stringTable))
+                    return false;
+            }
+
+            size_t size = GetSerializedSize(stringTable);
+            std::shared_ptr<Bytebuffer> resultBuffer = Bytebuffer::BorrowRuntime(size);
+
+            if (!Write(resultBuffer, stringTable))
+                return false;
+
+            FileWriter fileWriter(path, resultBuffer);
+            if (!fileWriter.Write())
+                return false;
+
+            ClearDirty();
+            return true;
+        }
+
+        const std::string& GetName() { return _name; }
+        bool IsDirty() { return _isDirty; }
+        void SetDirty() { _isDirty = true; }
+        void ClearDirty() { _isDirty = false; }
 
     public:
         FileHeader header = FileHeader(FileHeader::Type::ClientDB, CURRENT_VERSION);
         Flags flags = { };
 
     private:
-        template <class T>
-        friend struct Storage;
-
         std::string _name;
 
-        u32 _sizeOfElement = std::numeric_limits<u32>().max();
-        std::vector<u8> _data;
-        robin_hood::unordered_map<u32, u32> _idToIndexMap;
-        Novus::Container::StringTable _stringTable = { };
+        u32 _minID = 0;
+        u32 _numRows = 0;
+        std::vector<T*> _rows;
 
-        u32 _maxID = 0;
         bool _isDirty = false;
-    };
-
-    template <class T>
-    struct Storage
-    {
-    public:
-        static_assert(std::is_base_of<Definitions::Base, T>::value, "ClientDB::Storage Type must derive from Base");
-
-        Storage(StorageRaw* storage)
-        {
-            _storage = storage;
-        }
-
-        // Helper Functions
-    public:
-        const std::string& GetName() { return _storage->GetName(); }
-
-        bool Contains(u32 id)
-        {
-            return _storage->Contains(id);
-        }
-
-        T& GetByIndex(u32 index)
-        {
-            return _storage->GetByIndex<T>(index);
-        }
-        T& GetByID(u32 id)
-        {
-            return _storage->GetByID<T>(id);
-        }
-
-        bool Add(T& element)
-        {
-            return _storage->Add<T>(element);
-        }
-        void Replace(u32 id, T& element)
-        {
-            _storage->Replace<T>(id, element);
-        }
-        bool Copy(u32 idToCopy, u32 idForCopy)
-        {
-            return _storage->Copy<T>(idToCopy, idForCopy);
-        }
-        bool Remove(u32 id)
-        {
-            return _storage->Remove<T>(id);
-        }
-        void Clear()
-        {
-            _storage->Clear();
-        }
-        void Reserve(u32 numElements, u32 numStringsPerElement = 0)
-        {
-            _storage->Reserve(numElements, numStringsPerElement);
-        }
-
-        bool HasString(u32 index)
-        {
-            return _storage->HasString(index);
-        }
-        const std::string& GetString(u32 index)
-        {
-            return _storage->GetString(index);
-        }
-        u32 AddString(const std::string& string)
-        {
-            return _storage->AddString(string);
-        }
-
-        u32 Count() { return _storage->Count(); }
-        u32 Size() { return Count(); }
-
-        bool IsValid(const T& element)
-        {
-            u32 elementID = element.GetID();
-            return elementID != std::numeric_limits<u32>().max() && elementID < _storage->_maxID;
-        }
-
-        bool IsDirty() { return _storage->IsDirty(); }
-        void MarkDirty() { _storage->MarkDirty(); }
-        void ClearDirty() { _storage->ClearDirty(); }
-
-    public:
-        struct Iterator
-        {
-        public:
-            using iterator_category = std::forward_iterator_tag;
-            using difference_type = std::ptrdiff_t;
-            using value_type = T;
-            using pointer = T*;
-            using reference = T&;
-
-            Iterator(pointer ptr) : _ptr(ptr) {}
-
-        public:
-            reference operator*() const { return *_ptr; }
-            pointer operator->() { return _ptr; }
-
-            // Prefix increment
-            Iterator& operator++() { _ptr++; return *this; }
-
-            // Postfix increment
-            Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
-
-            friend bool operator== (const Iterator& a, const Iterator& b) { return a._ptr == b._ptr; };
-            friend bool operator!= (const Iterator& a, const Iterator& b) { return a._ptr != b._ptr; };
-
-        private:
-            pointer _ptr;
-        };
-
-        auto begin() { return Iterator(reinterpret_cast<T*>(_storage->_data.data())); }
-        auto end() { return Iterator(reinterpret_cast<T*>(_storage->_data.data() + _storage->_data.size())); }
-
-    public:
-        size_t GetSerializedSize()
-        {
-            return _storage->GetSerializedSize();
-        }
-        bool Save(std::string& path)
-        {
-            return _storage->Save(path);
-        }
-        bool Read(std::shared_ptr<Bytebuffer>& buffer)
-        {
-            return _storage->Read(buffer);
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer)
-        {
-            return _storage->Write(buffer);
-        }
-
-    private:
-        StorageRaw* _storage = nullptr;
     };
 }

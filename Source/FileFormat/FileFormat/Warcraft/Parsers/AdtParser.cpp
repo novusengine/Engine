@@ -99,7 +99,7 @@ bool Parser::ParseBufferOrderIndependent(Context& context, ParseType parseType, 
 
             std::string_view sv(bytes, 4);
 
-            DebugHandler::PrintError("AdtParser : Encountered unexpected Chunk {0}", sv);
+            NC_LOG_ERROR("AdtParser : Encountered unexpected Chunk {0}", sv);
 
             return false;
         }
@@ -268,22 +268,22 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
                     i16 liquidTypeID = -1;
                     i32 materialID = -1;
 
-                    if (context.liquidObjects->Contains(liquidVertexFormat))
+                    if (ClientDB::Definitions::LiquidObject* liquidObject = context.liquidObjects->GetRow(liquidVertexFormat))
                     {
-                        liquidTypeID = context.liquidObjects->GetByID(liquidVertexFormat).liquidTypeID;
+                        liquidTypeID = liquidObject->liquidTypeID;
                     }
                     else
                     {
                         liquidTypeID = liquidInstance.liquidType;
                     }
 
-                    if (context.liquidTypes->Contains(liquidTypeID))
+                    if (ClientDB::Definitions::LiquidType* liquidType = context.liquidTypes->GetRow(liquidTypeID))
                     {
-                        materialID = context.liquidTypes->GetByID(liquidTypeID).materialID;
+                        materialID = liquidType->materialID;
 
-                        if (context.liquidMaterials->Contains(materialID))
+                        if (ClientDB::Definitions::LiquidMaterial* liquidMaterial = context.liquidMaterials->GetRow(materialID))
                         {
-                            liquidVertexFormat = context.liquidMaterials->GetByID(materialID).liquidVertexFormat;
+                            liquidVertexFormat = liquidMaterial->liquidVertexFormat;
                         }
                     }
                 }

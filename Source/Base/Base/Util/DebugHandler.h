@@ -2,86 +2,26 @@
 #include "Base/Types.h"
 #include "Base/Platform.h"
 
-#include <spdlog/spdlog.h>
-#include <spdlog/fmt/fmt.h>
-#include <spdlog/fmt/bundled/color.h>
-
-#include <format>
-#include <string>
-#include <source_location>
+#include "quill/Backend.h"
+#include "quill/Frontend.h"
+#include "quill/LogMacros.h"
+#include "quill/Logger.h"
+#include "quill/sinks/ConsoleSink.h"
 
 PRAGMA_CLANG_DIAGNOSTIC_PUSH;
 PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wformat-security);
 PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wnon-pod-varargs);
 
-namespace Logging
-{
-    using source_location = std::source_location;
-    [[nodiscard]] constexpr auto get_log_source_location(const source_location& location)
-    {
-        return spdlog::source_loc { location.file_name(), static_cast<std::int32_t>(location.line()), location.function_name() };
-    }
+#define NC_GET_LOGGER() quill::Frontend::get_logger("root")
+#define NC_LOG_TRACE_L3(fmt, ...) LOG_TRACE_L3(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_LOG_TRACE_L2(fmt, ...) LOG_TRACE_L2(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_LOG_TRACE_L1(fmt, ...) LOG_TRACE_L1(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_LOG_DEBUG(fmt, ...) LOG_DEBUG(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_LOG_INFO(fmt, ...) LOG_INFO(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_LOG_WARNING(fmt, ...) LOG_WARNING(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_LOG_ERROR(fmt, ...) LOG_ERROR(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_LOG_CRITICAL(fmt, ...) LOG_CRITICAL(NC_GET_LOGGER(), fmt, ##__VA_ARGS__); ReleaseModeBreakpoint();
+#define NC_LOG_BACKTRACE(fmt, ...) LOG_BACKTRACE(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
+#define NC_ASSERT(assertion, fmt, ...) if (!(assertion)) { NC_LOG_CRITICAL(fmt, ##__VA_ARGS__); }
 
-    struct format_with_location
-    {
-        std::string_view value;
-        spdlog::source_loc loc;
-
-        template <typename String>
-        format_with_location(const String& s, const source_location& location = source_location::current()) : value{ s }, loc{ get_log_source_location(location) } {}
-    };
-}
-
-class DebugHandler
-{
-public:
-    template <typename... Args>
-    inline static void Print(const std::string_view fmt, Args... args)
-    {
-        spdlog::default_logger_raw()->log(spdlog::level::info, std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...)));
-    }
-
-    template <typename... Args>
-    inline static void PrintTrace(const Logging::format_with_location& fmt, Args... args)
-    {
-        spdlog::default_logger_raw()->log(fmt.loc, spdlog::level::trace, std::vformat(fmt.value, std::make_format_args(std::forward<Args>(args)...)));
-    }
-
-    template <typename... Args>
-    inline static void PrintDebug(const Logging::format_with_location& fmt, Args... args)
-    {
-        spdlog::default_logger_raw()->log(fmt.loc, spdlog::level::debug, std::vformat(fmt.value, std::make_format_args(std::forward<Args>(args)...)));
-    }
-
-    template <typename... Args>
-    inline static void PrintWarning(const Logging::format_with_location& fmt, Args... args)
-    {
-        spdlog::default_logger_raw()->log(fmt.loc, spdlog::level::warn, std::vformat(fmt.value, std::make_format_args(std::forward<Args>(args)...)));
-    }
-
-    template <typename... Args>
-    inline static void PrintError(const Logging::format_with_location& fmt, Args... args)
-    {
-        spdlog::default_logger_raw()->log(fmt.loc, spdlog::level::err, std::vformat(fmt.value, std::make_format_args(std::forward<Args>(args)...)));
-    }
-
-    template <typename... Args>
-    inline static void PrintFatal(const Logging::format_with_location& fmt, Args... args)
-    {
-        spdlog::default_logger_raw()->log(fmt.loc, spdlog::level::critical, std::vformat(fmt.value, std::make_format_args(std::forward<Args>(args)...)));
-
-        ReleaseModeBreakpoint();
-    }
-
-    template <typename... Args>
-    inline static void Assert(bool assertion, const Logging::format_with_location& fmt, Args... args)
-    {
-        if (!assertion)
-        {
-            PrintFatal(fmt, std::forward<Args>(args)...);
-        }
-    }
-
-private:
-};
 PRAGMA_CLANG_DIAGNOSTIC_POP;

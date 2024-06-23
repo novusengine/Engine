@@ -98,7 +98,7 @@ namespace Renderer
 
             if (vkCreateSampler(_device->_device, &samplerInfo, nullptr, &sampler.sampler) != VK_SUCCESS)
             {
-                DebugHandler::PrintFatal("Failed to create sampler!");
+                NC_LOG_CRITICAL("Failed to create sampler!");
             }
 
             data.samplers.push_back(sampler);

@@ -1,5 +1,5 @@
-local function Include()
-    local includeDir = path.getabsolute("refl-cpp/", Engine.dependencyDir)
-    AddIncludeDirs(includeDir)
-end
-CreateDep("refl-cpp", Include)
+local dep = Solution.Util.CreateDepTable("refl-cpp", {})
+
+Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+end)

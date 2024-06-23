@@ -12,7 +12,7 @@ namespace Map
         std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
         if (!output)
         {
-            DebugHandler::PrintError("Failed to create Map Header file. Check admin permissions {0}", path);
+            NC_LOG_ERROR("Failed to create Map Header file. Check admin permissions {0}", path);
             return false;
         }
 

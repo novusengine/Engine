@@ -117,7 +117,7 @@ bool Parser::ParseBufferOrderIndependent(ParseType parseType, std::shared_ptr<By
 
             std::string_view sv(bytes, 4);
 
-            DebugHandler::PrintError("WmoParser : Encountered unexpected Chunk {0}", sv);
+            NC_LOG_ERROR("WmoParser : Encountered unexpected Chunk {0}", sv);
 
             return false;
         }

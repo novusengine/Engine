@@ -92,7 +92,7 @@ void KeybindGroup::AddKeyboardInputValidator(const std::string& keybindName, std
 {
     if (_keyboardInputValidator)
     {
-        DebugHandler::PrintFatal("KeybindGroup : Attempted to install KeyboardInputValidator \"{0}\" for KeybindGroup \"{1}\" but KeyboardInputValidator\"{2}\" is already installed", keybindName, _debugName, _keyboardInputValidator->keybindName);
+        NC_LOG_CRITICAL("KeybindGroup : Attempted to install KeyboardInputValidator \"{0}\" for KeybindGroup \"{1}\" but KeyboardInputValidator\"{2}\" is already installed", keybindName, _debugName, _keyboardInputValidator->keybindName);
     }
 
     _keyboardInputValidator = new Keybind();
@@ -135,7 +135,7 @@ void KeybindGroup::AddMouseInputValidator(const std::string& keybindName, std::f
 {
     if (_mouseInputValidator)
     {
-        DebugHandler::PrintFatal("KeybindGroup : Attempted to install MouseInputValidator \"{0}\" for KeybindGroup \"{1}\" but MouseInputValidator\"{2}\" is already installed", keybindName, _debugName, _mouseInputValidator->keybindName);
+        NC_LOG_CRITICAL("KeybindGroup : Attempted to install MouseInputValidator \"{0}\" for KeybindGroup \"{1}\" but MouseInputValidator\"{2}\" is already installed", keybindName, _debugName, _mouseInputValidator->keybindName);
     }
 
     _mouseInputValidator = new Keybind();
@@ -153,7 +153,7 @@ void KeybindGroup::AddMousePositionValidator(std::function<MousePositionUpdateFu
 {
     if (_mousePositionValidator && callback != nullptr)
     {
-        DebugHandler::PrintFatal("KeybindGroup : Attempted to install a MousePositionValidator for KeybindGroup \"{0}\" but a MousePositionValidator is already installed", _debugName);
+        NC_LOG_CRITICAL("KeybindGroup : Attempted to install a MousePositionValidator for KeybindGroup \"{0}\" but a MousePositionValidator is already installed", _debugName);
     }
 
     _mousePositionValidator = callback;
@@ -162,7 +162,7 @@ void KeybindGroup::AddMouseScrollValidator(std::function<MouseScrollUpdateFunc> 
 {
     if (_mouseScrollValidator && callback != nullptr)
     {
-        DebugHandler::PrintFatal("KeybindGroup : Attempted to install a MouseScrollValidator for KeybindGroup \"{0}\" but a MouseScrollValidator is already installed", _debugName);
+        NC_LOG_CRITICAL("KeybindGroup : Attempted to install a MouseScrollValidator for KeybindGroup \"{0}\" but a MouseScrollValidator is already installed", _debugName);
     }
 
     _mouseScrollValidator = callback;

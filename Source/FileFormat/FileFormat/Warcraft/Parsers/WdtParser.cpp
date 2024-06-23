@@ -54,7 +54,7 @@ bool WdtParser::ParseBufferOrderIndependent(std::shared_ptr<Bytebuffer>& buffer,
 
             std::string_view sv(bytes, 4);
 
-            DebugHandler::PrintError("WdtParser : Encountered unexpected Chunk {0}", sv);
+            NC_LOG_ERROR("WdtParser : Encountered unexpected Chunk {0}", sv);
 
             return false;
         }

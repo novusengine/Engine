@@ -45,7 +45,7 @@ namespace Renderer
         SAMPLE_COUNT_8
     };
 
-    constexpr int SampleCountToInt(SampleCount sampleCount)
+    constexpr i32 SampleCountToInt(SampleCount sampleCount)
     {
         switch (sampleCount)
         {
@@ -54,7 +54,9 @@ namespace Renderer
             case SampleCount::SAMPLE_COUNT_4: return 4;
             case SampleCount::SAMPLE_COUNT_8: return 8;
             default:
-                DebugHandler::PrintFatal("Invalid sample count, did we just add to the enum?");
+            {
+                static_assert("Invalid sample count, did we just add to the enum?");
+            }
         }
         return 0;
     }
@@ -602,10 +604,10 @@ namespace Renderer
                 return ImageComponentType::SNORM;
 
             case ImageFormat::UNKNOWN:
-                DebugHandler::PrintFatal("This should never hit, we should catch unknowns earlier!");
+                NC_LOG_CRITICAL("This should never hit, we should catch unknowns earlier!");
                 break;
         }
-        DebugHandler::PrintFatal("This should never hit, did we forget to add more cases after updating ImageFormat?");
+        NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating ImageFormat?");
         return ImageComponentType::FLOAT;
     }
 
@@ -624,10 +626,10 @@ namespace Renderer
                 return ImageComponentType::UNORM;
 
             case DepthImageFormat::UNKNOWN:
-                DebugHandler::PrintFatal("This should never hit, we should catch unknowns earlier!");
+                NC_LOG_CRITICAL("This should never hit, we should catch unknowns earlier!");
                 break;
         }
-        DebugHandler::PrintFatal("This should never hit, did we forget to add more cases after updating DepthImageFormat?");
+        NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating DepthImageFormat?");
         return ImageComponentType::FLOAT;
     }
 
@@ -697,11 +699,11 @@ namespace Renderer
                 return 1;
 
             case ImageFormat::UNKNOWN:
-                DebugHandler::PrintFatal("This should never hit, we should catch unknowns earlier!");
+                NC_LOG_CRITICAL("This should never hit, we should catch unknowns earlier!");
                 break;
         }
 
-        DebugHandler::PrintFatal("This should never hit, did we forget to add more cases after updating ImageFormat?");
+        NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating ImageFormat?");
         return 1;
     }
 
@@ -720,10 +722,10 @@ namespace Renderer
                 return 1;
 
             case DepthImageFormat::UNKNOWN:
-                DebugHandler::PrintFatal("This should never hit, we should catch unknowns earlier!");
+                NC_LOG_CRITICAL("This should never hit, we should catch unknowns earlier!");
                 break;
         }
-        DebugHandler::PrintFatal("This should never hit, did we forget to add more cases after updating DepthImageFormat?");
+        NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating DepthImageFormat?");
         return 1;
     }
     PRAGMA_NO_PADDING_END;

@@ -24,7 +24,7 @@ namespace Renderer
             FontChar fontChar;
             if (!InitChar(character, fontChar))
             {
-                DebugHandler::PrintFatal("The font does not support this character");
+                NC_LOG_CRITICAL("The font does not support this character");
             }
 
             _chars[character] = fontChar;
@@ -62,13 +62,13 @@ namespace Renderer
             FileReader file(fontPathStr);
             if (!file.Open())
             {
-                DebugHandler::PrintWarning("Could not open Font file %s. Using fallback font", fontPath.c_str());
+                NC_LOG_WARNING("Could not open Font file %s. Using fallback font", fontPath.c_str());
 
                 path = std::filesystem::absolute(FALLBACK_FONT_PATH);
                 file.SetPath(path.string());
                 if (!file.Open())
                 {
-                    DebugHandler::PrintFatal("Could not open Fallback Font file %s.", FALLBACK_FONT_PATH);
+                    NC_LOG_CRITICAL("Could not open Fallback Font file %s.", FALLBACK_FONT_PATH);
                 }
             }
 

@@ -120,10 +120,10 @@ namespace Renderer
                 // Check if we need to compile it before loading
                 if (NeedsCompile(shaderPath))
                 {
-                    //DebugHandler::Print("[ShaderCooker]: Compiling {0}", shaderPath);
+                    //NC_LOG_INFO("[ShaderCooker]: Compiling {0}", shaderPath);
                     if (!CompileShader(shaderPath))
                     {
-                        DebugHandler::PrintWarning("[ShaderCooker]: Compiling {0} failed, using old version", shaderPath);
+                        NC_LOG_WARNING("[ShaderCooker]: Compiling {0} failed, using old version", shaderPath);
                     }
                 }
 
@@ -145,7 +145,7 @@ namespace Renderer
 
                 if (result != SPV_REFLECT_RESULT_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("We failed to reflect the spirv of {0}", shaderPath);
+                    NC_LOG_CRITICAL("We failed to reflect the spirv of {0}", shaderPath);
                 }
 
                 uint32_t descriptorSetCount = 0;
@@ -153,7 +153,7 @@ namespace Renderer
 
                 if (result != SPV_REFLECT_RESULT_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("We failed to reflect the spirv descriptor set count of {0}", shaderPath);
+                    NC_LOG_CRITICAL("We failed to reflect the spirv descriptor set count of {0}", shaderPath);
                 }
 
                 if (descriptorSetCount > 0)
@@ -164,7 +164,7 @@ namespace Renderer
 
                     if (result != SPV_REFLECT_RESULT_SUCCESS)
                     {
-                        DebugHandler::PrintFatal("We failed to reflect the spirv descriptor sets of {0}", shaderPath);
+                        NC_LOG_CRITICAL("We failed to reflect the spirv descriptor sets of {0}", shaderPath);
                     }
 
                     for (auto* descriptorSet : descriptorSets)
@@ -198,7 +198,7 @@ namespace Renderer
 
                 if (result != SPV_REFLECT_RESULT_SUCCESS)
                 {
-                    DebugHandler::PrintFatal("We failed to reflect the spirv push constant count of {0}", shaderPath);
+                    NC_LOG_CRITICAL("We failed to reflect the spirv push constant count of {0}", shaderPath);
                 }
 
                 if (pushConstantCount > 0)

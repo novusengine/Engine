@@ -23,7 +23,7 @@ namespace ShaderCooker
         template<typename... Args>
         static void ReportError(int errorCode, std::string str, Args... args)
         {
-            DebugHandler::PrintError("Parser Error {0} : {1}", errorCode, str.c_str(), args...);
+            NC_LOG_ERROR("Parser Error {0} : {1}", errorCode, str.c_str(), args...);
         }
     };
 }

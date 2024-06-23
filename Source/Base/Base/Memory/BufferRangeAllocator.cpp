@@ -122,7 +122,7 @@ bool BufferRangeAllocator::Allocate(size_t size, size_t alignment, BufferRangeFr
 
         if (frame.offset % alignment != 0)
         {
-            DebugHandler::PrintFatal("Did not allocate aligned");
+            //NC_LOG_CRITICAL("Did not allocate aligned");
         }
 
         _allocatedBytes += size;

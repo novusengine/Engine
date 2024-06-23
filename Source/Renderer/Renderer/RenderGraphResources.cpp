@@ -158,28 +158,28 @@ namespace Renderer
 
     ImageID RenderGraphResources::GetImage(ImageResource resource)
     {
-        DebugHandler::Assert(resource != ImageResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid ImageResource");
+        NC_ASSERT(resource != ImageResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid ImageResource");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedImages[static_cast<ImageResource::type> (resource)];
     }
     ImageID RenderGraphResources::GetImage(ImageMutableResource resource)
     {
-        DebugHandler::Assert(resource != ImageMutableResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid ImageMutableResource");
+        NC_ASSERT(resource != ImageMutableResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid ImageMutableResource");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedImages[static_cast<ImageMutableResource::type>(resource)];
     }
     DepthImageID RenderGraphResources::GetImage(DepthImageResource resource)
     {
-        DebugHandler::Assert(resource != DepthImageResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid DepthImageResource");
+        NC_ASSERT(resource != DepthImageResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid DepthImageResource");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedDepthImages[static_cast<DepthImageResource::type>(resource)];
     }
     DepthImageID RenderGraphResources::GetImage(DepthImageMutableResource resource)
     {
-        DebugHandler::Assert(resource != DepthImageMutableResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid DepthImageMutableResource");
+        NC_ASSERT(resource != DepthImageMutableResource::Invalid(), "RenderGraphResources : GetImage tried to get image of invalid DepthImageMutableResource");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedDepthImages[static_cast<DepthImageMutableResource::type>(resource)];
@@ -187,14 +187,14 @@ namespace Renderer
 
     BufferID RenderGraphResources::GetBuffer(BufferResource resource)
     {
-        DebugHandler::Assert(resource != BufferResource::Invalid(), "RenderGraphResources : GetBuffer tried to get buffer of invalid BufferResource");
+        NC_ASSERT(resource != BufferResource::Invalid(), "RenderGraphResources : GetBuffer tried to get buffer of invalid BufferResource");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedBuffers[static_cast<DepthImageMutableResource::type>(resource)];
     }
     BufferID RenderGraphResources::GetBuffer(BufferMutableResource resource)
     {
-        DebugHandler::Assert(resource != BufferMutableResource::Invalid(), "RenderGraphResources : GetBuffer tried to get buffer of invalid BufferMutableResource");
+        NC_ASSERT(resource != BufferMutableResource::Invalid(), "RenderGraphResources : GetBuffer tried to get buffer of invalid BufferMutableResource");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedBuffers[static_cast<DepthImageMutableResource::type>(resource)];
@@ -202,7 +202,7 @@ namespace Renderer
 
     DescriptorSet* RenderGraphResources::GetDescriptorSet(DescriptorSetID descriptorSetID)
     {
-        DebugHandler::Assert(descriptorSetID != DescriptorSetID::Invalid(), "RenderGraphResources : GetDescriptorSet tried to get image of invalid DescriptorSetResourceID");
+        NC_ASSERT(descriptorSetID != DescriptorSetID::Invalid(), "RenderGraphResources : GetDescriptorSet tried to get image of invalid DescriptorSetResourceID");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedDescriptorSets[static_cast<DepthImageMutableResource::type>(descriptorSetID)];
@@ -339,7 +339,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to Clear color image of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to Clear color image of pass that hasn't been tracked yet");
         }
 
         data->trackedPasses[passIndex].colorClears.Insert(resource);
@@ -351,7 +351,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to Clear depth image of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to Clear depth image of pass that hasn't been tracked yet");
         }
 
         data->trackedPasses[passIndex].depthClears.Insert(resource);
@@ -445,7 +445,7 @@ namespace Renderer
             if (readBitSet.Has(bufferIndex))
             {
                 const std::string& bufferName = renderer->GetBufferName(bufferID);
-                DebugHandler::PrintFatal("RenderGraphResources : Pass {} tried to Access BufferID {} ({}) twice, you may only .Read or .Write a resource once in the same pass!", passIndex, bufferName, static_cast<BufferID::type>(bufferID));
+                NC_LOG_CRITICAL("RenderGraphResources : Pass {} tried to Access BufferID {} ({}) twice, you may only .Read or .Write a resource once in the same pass!", passIndex, bufferName, static_cast<BufferID::type>(bufferID));
             }
         }
 
@@ -464,7 +464,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to Access pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to Access pass that hasn't been tracked yet");
         }
 
         _Access(_allocator, data->trackedPasses[passIndex].imageAccesses, data->trackedImageAccesses, data->trackedImageLastBarrier, passIndex, imageID, accessType, pipelineType);
@@ -478,7 +478,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to Access pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to Access pass that hasn't been tracked yet");
         }
 
         _Access(_allocator, data->trackedPasses[passIndex].depthImageAccesses, data->trackedDepthImageAccesses, data->trackedDepthImageLastBarrier, passIndex, imageID, accessType, pipelineType);
@@ -492,7 +492,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to Access pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to Access pass that hasn't been tracked yet");
         }
 
         TrackedPass& trackedPass = data->trackedPasses[passIndex];
@@ -505,7 +505,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to Use DescriptorSetResource in pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to Use DescriptorSetResource in pass that hasn't been tracked yet");
         }
 
         data->trackedPasses[passIndex].descriptorSetIDs.Insert(resource.GetID());
@@ -517,7 +517,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to EnforceHasAccess in pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to EnforceHasAccess in pass that hasn't been tracked yet");
         }
 
         BufferID bufferID = GetBuffer(resource);
@@ -528,7 +528,7 @@ namespace Renderer
         if (!permissions.Has(bufferID, bufferPassUsage))
         {
             const std::string& bufferName = _renderer->GetBufferName(bufferID);
-            DebugHandler::PrintFatal("RenderGraphResources : EnforceHasAccess tried to enforce {} access on BufferID {} ({}) in RenderPass {}, but it did not have access", GetBufferPassUsageName(bufferPassUsage), bufferIDTyped, bufferName, passIndex);
+            NC_LOG_CRITICAL("RenderGraphResources : EnforceHasAccess tried to enforce {} access on BufferID {} ({}) in RenderPass {}, but it did not have access", GetBufferPassUsageName(bufferPassUsage), bufferIDTyped, bufferName, passIndex);
         }
     }
 
@@ -538,7 +538,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to EnforceHasAccess in pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to EnforceHasAccess in pass that hasn't been tracked yet");
         }
 
         BufferID bufferID = GetBuffer(resource);
@@ -549,7 +549,7 @@ namespace Renderer
         if (!permissions.Has(bufferID, bufferPassUsage))
         {
             const std::string& bufferName = _renderer->GetBufferName(bufferID);
-            DebugHandler::PrintFatal("RenderGraphResources : EnforceHasAccess tried to enforce {} access on BufferID {} ({}) in RenderPass {}, but it did not have access", GetBufferPassUsageName(bufferPassUsage), bufferIDTyped, bufferName, passIndex);
+            NC_LOG_CRITICAL("RenderGraphResources : EnforceHasAccess tried to enforce {} access on BufferID {} ({}) in RenderPass {}, but it did not have access", GetBufferPassUsageName(bufferPassUsage), bufferIDTyped, bufferName, passIndex);
         }
     }
 
@@ -559,7 +559,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access colorClears of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access colorClears of pass that hasn't been tracked yet");
         }
 
         return data->trackedPasses[passIndex].colorClears;
@@ -571,7 +571,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access depthClears of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access depthClears of pass that hasn't been tracked yet");
         }
 
         return data->trackedPasses[passIndex].depthClears;
@@ -583,7 +583,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access imageAccesses of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access imageAccesses of pass that hasn't been tracked yet");
         }
 
         return data->trackedPasses[passIndex].imageAccesses;
@@ -594,7 +594,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access depthImageAccesses of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access depthImageAccesses of pass that hasn't been tracked yet");
         }
 
         return data->trackedPasses[passIndex].depthImageAccesses;
@@ -606,7 +606,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access bufferAccesses of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access bufferAccesses of pass that hasn't been tracked yet");
         }
 
         return data->trackedPasses[passIndex].bufferPermissions;
@@ -618,7 +618,7 @@ namespace Renderer
 
         if (passIndex >= data->trackedPasses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access used descriptor sets of pass that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access used descriptor sets of pass that hasn't been tracked yet");
         }
 
         return data->trackedPasses[passIndex].descriptorSetIDs;
@@ -631,7 +631,7 @@ namespace Renderer
         ImageID::type index = static_cast<ImageID::type>(imageID);
         if (index >= data->trackedImageAccesses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access trackedImageAccesses of ImageID that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access trackedImageAccesses of ImageID that hasn't been tracked yet");
         }
 
         return data->trackedImageAccesses[index];
@@ -644,7 +644,7 @@ namespace Renderer
         DepthImageID::type index = static_cast<DepthImageID::type>(imageID);
         if (index >= data->trackedDepthImageAccesses.Count())
         {
-            DebugHandler::PrintFatal("Tried to access trackedDepthImageAccesses of DepthImageID that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to access trackedDepthImageAccesses of DepthImageID that hasn't been tracked yet");
         }
 
         return data->trackedDepthImageAccesses[index];
@@ -657,7 +657,7 @@ namespace Renderer
         ImageID::type index = static_cast<ImageID::type>(imageID);
         if (index >= data->trackedImageLastBarrier.Count())
         {
-            DebugHandler::PrintFatal("Tried to get trackedImageLastBarrier of ImageID that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to get trackedImageLastBarrier of ImageID that hasn't been tracked yet");
         }
 
         return data->trackedImageLastBarrier[index];
@@ -670,7 +670,7 @@ namespace Renderer
         DepthImageID::type index = static_cast<DepthImageID::type>(imageID);
         if (index >= data->trackedDepthImageLastBarrier.Count())
         {
-            DebugHandler::PrintFatal("Tried to get trackedDepthImageLastBarrier of DepthImageID that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to get trackedDepthImageLastBarrier of DepthImageID that hasn't been tracked yet");
         }
 
         return data->trackedDepthImageLastBarrier[index];
@@ -683,7 +683,7 @@ namespace Renderer
         ImageID::type index = static_cast<ImageID::type>(imageID);
         if (index >= data->trackedImageLastBarrier.Count())
         {
-            DebugHandler::PrintFatal("Tried to set trackedImageLastBarrier of ImageID that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to set trackedImageLastBarrier of ImageID that hasn't been tracked yet");
         }
 
         data->trackedImageLastBarrier[index] = passID;
@@ -696,7 +696,7 @@ namespace Renderer
         DepthImageID::type index = static_cast<DepthImageID::type>(imageID);
         if (index >= data->trackedDepthImageLastBarrier.Count())
         {
-            DebugHandler::PrintFatal("Tried to set trackedDepthImageLastBarrier of DepthImageID that hasn't been tracked yet");
+            NC_LOG_CRITICAL("Tried to set trackedDepthImageLastBarrier of DepthImageID that hasn't been tracked yet");
         }
 
         data->trackedDepthImageLastBarrier[index] = passID;

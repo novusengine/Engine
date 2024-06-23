@@ -20,6 +20,9 @@ namespace DB2::WDC3
             };
 
             u32 token = 0;
+            u32 version = 0;
+
+            char schemaString[128];
 
             u32 recordCount = 0;
             u32 fieldCount = 0;

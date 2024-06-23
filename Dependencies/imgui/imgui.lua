@@ -1,12 +1,13 @@
-local function SetupLib()
-    local basePath = path.getabsolute("imgui/", Engine.dependencyDir)
-    local dependencies = { "vulkan", "glfw", "glm" }
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "SPDLOG_COMPILED_LIB" }
+local dep = Solution.Util.CreateDepTable("Imgui", { "vulkan", "glfw", "glm"})
 
-    ProjectTemplate("Imgui", "StaticLib", nil, Engine.binDir, dependencies, defines)
+Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
-    local sourceDir = path.getabsolute("imgui/", basePath)
-    local includeDir = { basePath, sourceDir }
+    Solution.Util.SetLanguage("C++")
+    Solution.Util.SetCppDialect(20)
+
+    local sourceDir = dep.Path .. "/imgui"
+    local includeDirs = { dep.Path, sourceDir }
     local files =
     {
         sourceDir .. "/imgui.h",
@@ -40,19 +41,12 @@ local function SetupLib()
         sourceDir .. "/imnodes.h",
         sourceDir .. "/imnodes.cpp"
     }
-    AddFiles(files)
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(includeDirs)
+    Solution.Util.SetDefines(defines)
+end)
 
-    AddIncludeDirs(includeDir)
-end
-SetupLib()
-
-local dependencies = { "vulkan", "glfw", "glm" }
-local function Include()
-    local imguiFolder = path.getabsolute("imgui/", Engine.dependencyDir)
-
-    local includeDirs = { imguiFolder }
-    AddIncludeDirs(includeDirs)
-
-    AddLinks("Imgui")
-end
-CreateDep("imgui", Include, dependencies)
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    Solution.Util.SetIncludes(dep.Path)
+    Solution.Util.SetLinks(dep.Name)
+end)
