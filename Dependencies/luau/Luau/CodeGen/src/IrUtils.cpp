@@ -12,6 +12,8 @@
 #include <limits.h>
 #include <math.h>
 
+LUAU_FASTFLAG(LuauCodegenInstG)
+
 namespace Luau
 {
 namespace CodeGen
@@ -31,6 +33,8 @@ IrValueKind getCmdValueKind(IrCmd cmd)
         return IrValueKind::Double;
     case IrCmd::LOAD_INT:
         return IrValueKind::Int;
+    case IrCmd::LOAD_FLOAT:
+        return IrValueKind::Double;
     case IrCmd::LOAD_TVALUE:
         return IrValueKind::Tvalue;
     case IrCmd::LOAD_ENV:
@@ -40,6 +44,7 @@ IrValueKind getCmdValueKind(IrCmd cmd)
     case IrCmd::GET_CLOSURE_UPVAL_ADDR:
         return IrValueKind::Pointer;
     case IrCmd::STORE_TAG:
+    case IrCmd::STORE_EXTRA:
     case IrCmd::STORE_POINTER:
     case IrCmd::STORE_DOUBLE:
     case IrCmd::STORE_INT:
@@ -65,6 +70,12 @@ IrValueKind getCmdValueKind(IrCmd cmd)
     case IrCmd::SQRT_NUM:
     case IrCmd::ABS_NUM:
         return IrValueKind::Double;
+    case IrCmd::ADD_VEC:
+    case IrCmd::SUB_VEC:
+    case IrCmd::MUL_VEC:
+    case IrCmd::DIV_VEC:
+    case IrCmd::UNM_VEC:
+        return IrValueKind::Tvalue;
     case IrCmd::NOT_ANY:
     case IrCmd::CMP_ANY:
         return IrValueKind::Int;
@@ -90,6 +101,7 @@ IrValueKind getCmdValueKind(IrCmd cmd)
     case IrCmd::TRY_NUM_TO_INDEX:
         return IrValueKind::Int;
     case IrCmd::TRY_CALL_FASTGETTM:
+    case IrCmd::NEW_USERDATA:
         return IrValueKind::Pointer;
     case IrCmd::INT_TO_NUM:
     case IrCmd::UINT_TO_NUM:
@@ -97,6 +109,9 @@ IrValueKind getCmdValueKind(IrCmd cmd)
     case IrCmd::NUM_TO_INT:
     case IrCmd::NUM_TO_UINT:
         return IrValueKind::Int;
+    case IrCmd::NUM_TO_VEC:
+    case IrCmd::TAG_VECTOR:
+        return IrValueKind::Tvalue;
     case IrCmd::ADJUST_STACK_TO_REG:
     case IrCmd::ADJUST_STACK_TO_TOP:
         return IrValueKind::None;
@@ -123,6 +138,7 @@ IrValueKind getCmdValueKind(IrCmd cmd)
     case IrCmd::CHECK_NODE_NO_NEXT:
     case IrCmd::CHECK_NODE_VALUE:
     case IrCmd::CHECK_BUFFER_LEN:
+    case IrCmd::CHECK_USERDATA_TAG:
     case IrCmd::INTERRUPT:
     case IrCmd::CHECK_GC:
     case IrCmd::BARRIER_OBJ:
@@ -197,7 +213,7 @@ static void removeInstUse(IrFunction& function, uint32_t instIdx)
 {
     IrInst& inst = function.instructions[instIdx];
 
-    LUAU_ASSERT(inst.useCount);
+    CODEGEN_ASSERT(inst.useCount);
     inst.useCount--;
 
     if (inst.useCount == 0)
@@ -208,7 +224,7 @@ static void removeBlockUse(IrFunction& function, uint32_t blockIdx)
 {
     IrBlock& block = function.blocks[blockIdx];
 
-    LUAU_ASSERT(block.useCount);
+    CODEGEN_ASSERT(block.useCount);
     block.useCount--;
 
     // Entry block is never removed because is has an implicit use
@@ -234,15 +250,63 @@ void removeUse(IrFunction& function, IrOp op)
 
 bool isGCO(uint8_t tag)
 {
-    LUAU_ASSERT(tag < LUA_T_COUNT);
+    CODEGEN_ASSERT(tag < LUA_T_COUNT);
 
     // mirrors iscollectable(o) from VM/lobject.h
     return tag >= LUA_TSTRING;
 }
 
+bool isUserdataBytecodeType(uint8_t ty)
+{
+    return ty == LBC_TYPE_USERDATA || isCustomUserdataBytecodeType(ty);
+}
+
+bool isCustomUserdataBytecodeType(uint8_t ty)
+{
+    return ty >= LBC_TYPE_TAGGED_USERDATA_BASE && ty < LBC_TYPE_TAGGED_USERDATA_END;
+}
+
+HostMetamethod tmToHostMetamethod(int tm)
+{
+    switch (TMS(tm))
+    {
+    case TM_ADD:
+        return HostMetamethod::Add;
+    case TM_SUB:
+        return HostMetamethod::Sub;
+    case TM_MUL:
+        return HostMetamethod::Mul;
+    case TM_DIV:
+        return HostMetamethod::Div;
+    case TM_IDIV:
+        return HostMetamethod::Idiv;
+    case TM_MOD:
+        return HostMetamethod::Mod;
+    case TM_POW:
+        return HostMetamethod::Pow;
+    case TM_UNM:
+        return HostMetamethod::Minus;
+    case TM_EQ:
+        return HostMetamethod::Equal;
+    case TM_LT:
+        return HostMetamethod::LessThan;
+    case TM_LE:
+        return HostMetamethod::LessEqual;
+    case TM_LEN:
+        return HostMetamethod::Length;
+    case TM_CONCAT:
+        return HostMetamethod::Concat;
+    default:
+        CODEGEN_ASSERT(!"invalid tag method for host");
+        break;
+    }
+
+    return HostMetamethod::Add;
+}
+
 void kill(IrFunction& function, IrInst& inst)
 {
-    LUAU_ASSERT(inst.useCount == 0);
+    CODEGEN_ASSERT(inst.useCount == 0);
 
     inst.cmd = IrCmd::NOP;
 
@@ -253,12 +317,18 @@ void kill(IrFunction& function, IrInst& inst)
     removeUse(function, inst.e);
     removeUse(function, inst.f);
 
+    if (FFlag::LuauCodegenInstG)
+        removeUse(function, inst.g);
+
     inst.a = {};
     inst.b = {};
     inst.c = {};
     inst.d = {};
     inst.e = {};
     inst.f = {};
+
+    if (FFlag::LuauCodegenInstG)
+        inst.g = {};
 }
 
 void kill(IrFunction& function, uint32_t start, uint32_t end)
@@ -266,7 +336,7 @@ void kill(IrFunction& function, uint32_t start, uint32_t end)
     // Kill instructions in reverse order to avoid killing instructions that are still marked as used
     for (int i = int(end); i >= int(start); i--)
     {
-        LUAU_ASSERT(unsigned(i) < function.instructions.size());
+        CODEGEN_ASSERT(unsigned(i) < function.instructions.size());
         IrInst& curr = function.instructions[i];
 
         if (curr.cmd == IrCmd::NOP)
@@ -278,7 +348,7 @@ void kill(IrFunction& function, uint32_t start, uint32_t end)
 
 void kill(IrFunction& function, IrBlock& block)
 {
-    LUAU_ASSERT(block.useCount == 0);
+    CODEGEN_ASSERT(block.useCount == 0);
 
     block.kind = IrBlockKind::Dead;
 
@@ -308,6 +378,9 @@ void replace(IrFunction& function, IrBlock& block, uint32_t instIdx, IrInst repl
     addUse(function, replacement.e);
     addUse(function, replacement.f);
 
+    if (FFlag::LuauCodegenInstG)
+        addUse(function, replacement.g);
+
     // An extra reference is added so block will not remove itself
     block.useCount++;
 
@@ -315,8 +388,8 @@ void replace(IrFunction& function, IrBlock& block, uint32_t instIdx, IrInst repl
     if (!isBlockTerminator(inst.cmd) && isBlockTerminator(replacement.cmd))
     {
         // Block has has to be fully constructed before replacement is performed
-        LUAU_ASSERT(block.finish != ~0u);
-        LUAU_ASSERT(instIdx + 1 <= block.finish);
+        CODEGEN_ASSERT(block.finish != ~0u);
+        CODEGEN_ASSERT(instIdx + 1 <= block.finish);
 
         kill(function, instIdx + 1, block.finish);
 
@@ -330,6 +403,9 @@ void replace(IrFunction& function, IrBlock& block, uint32_t instIdx, IrInst repl
     removeUse(function, inst.e);
     removeUse(function, inst.f);
 
+    if (FFlag::LuauCodegenInstG)
+        removeUse(function, inst.g);
+
     // Inherit existing use count (last use is skipped as it will be defined later)
     replacement.useCount = inst.useCount;
 
@@ -342,7 +418,7 @@ void replace(IrFunction& function, IrBlock& block, uint32_t instIdx, IrInst repl
 
 void substitute(IrFunction& function, IrInst& inst, IrOp replacement)
 {
-    LUAU_ASSERT(!isBlockTerminator(inst.cmd));
+    CODEGEN_ASSERT(!isBlockTerminator(inst.cmd));
 
     inst.cmd = IrCmd::SUBSTITUTE;
 
@@ -355,12 +431,18 @@ void substitute(IrFunction& function, IrInst& inst, IrOp replacement)
     removeUse(function, inst.e);
     removeUse(function, inst.f);
 
+    if (FFlag::LuauCodegenInstG)
+        removeUse(function, inst.g);
+
     inst.a = replacement;
     inst.b = {};
     inst.c = {};
     inst.d = {};
     inst.e = {};
     inst.f = {};
+
+    if (FFlag::LuauCodegenInstG)
+        inst.g = {};
 }
 
 void applySubstitutions(IrFunction& function, IrOp& op)
@@ -378,12 +460,12 @@ void applySubstitutions(IrFunction& function, IrOp& op)
             if (op.kind == IrOpKind::Inst)
             {
                 IrInst& dst = function.instructions[op.index];
-                LUAU_ASSERT(dst.cmd != IrCmd::SUBSTITUTE && "chained substitutions are not allowed");
+                CODEGEN_ASSERT(dst.cmd != IrCmd::SUBSTITUTE && "chained substitutions are not allowed");
 
                 dst.useCount++;
             }
 
-            LUAU_ASSERT(src.useCount > 0);
+            CODEGEN_ASSERT(src.useCount > 0);
             src.useCount--;
 
             if (src.useCount == 0)
@@ -404,6 +486,9 @@ void applySubstitutions(IrFunction& function, IrInst& inst)
     applySubstitutions(function, inst.d);
     applySubstitutions(function, inst.e);
     applySubstitutions(function, inst.f);
+
+    if (FFlag::LuauCodegenInstG)
+        applySubstitutions(function, inst.g);
 }
 
 bool compare(double a, double b, IrCondition cond)
@@ -432,7 +517,7 @@ bool compare(double a, double b, IrCondition cond)
     case IrCondition::NotGreaterEqual:
         return !bool(a >= b);
     default:
-        LUAU_ASSERT(!"Unsupported condition");
+        CODEGEN_ASSERT(!"Unsupported condition");
     }
 
     return false;
@@ -471,7 +556,7 @@ bool compare(int a, int b, IrCondition cond)
     case IrCondition::UnsignedGreaterEqual:
         return unsigned(a) >= unsigned(b);
     default:
-        LUAU_ASSERT(!"Unsupported condition");
+        CODEGEN_ASSERT(!"Unsupported condition");
     }
 
     return false;
@@ -860,7 +945,7 @@ uint32_t getNativeContextOffset(int bfid)
     case LBF_MATH_LDEXP:
         return offsetof(NativeContext, libm_ldexp);
     default:
-        LUAU_ASSERT(!"Unsupported bfid");
+        CODEGEN_ASSERT(!"Unsupported bfid");
     }
 
     return 0;

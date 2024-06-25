@@ -13,8 +13,6 @@
 #include <stdint.h>
 #include <string.h>
 
-LUAU_FASTFLAG(LuauKeepVmapLinear2)
-
 struct Proto;
 
 namespace Luau
@@ -33,7 +31,7 @@ enum
 // * Rn - VM stack register slot, n in 0..254
 // * Kn - VM proto constant slot, n in 0..2^23-1
 // * UPn - VM function upvalue slot, n in 0..199
-// * A, B, C, D, E are instruction arguments
+// * A, B, C, D, E, F, G are instruction arguments
 enum class IrCmd : uint8_t
 {
     NOP,
@@ -54,9 +52,15 @@ enum class IrCmd : uint8_t
     // A: Rn
     LOAD_INT,
 
+    // Load a float field from vector as a double number
+    // A: Rn or Kn
+    // B: int (offset from the start of TValue)
+    LOAD_FLOAT,
+
     // Load a TValue from memory
     // A: Rn or Kn or pointer (TValue)
-    // B: int (optional 'A' pointer offset)
+    // B: int/none (optional 'A' pointer offset)
+    // C: tag/none (tag of the value being loaded)
     LOAD_TVALUE,
 
     // Load current environment table
@@ -88,6 +92,11 @@ enum class IrCmd : uint8_t
     // A: Rn
     // B: tag
     STORE_TAG,
+
+    // Store an integer into the extra field of the TValue
+    // A: Rn
+    // B: int
+    STORE_EXTRA,
 
     // Store a pointer (*) into TValue
     // A: Rn
@@ -129,7 +138,7 @@ enum class IrCmd : uint8_t
     ADD_INT,
     SUB_INT,
 
-    // Add/Sub/Mul/Div/Mod two double numbers
+    // Add/Sub/Mul/Div/Idiv/Mod two double numbers
     // A, B: double
     // In final x64 lowering, B can also be Rn or Kn
     ADD_NUM,
@@ -169,6 +178,17 @@ enum class IrCmd : uint8_t
     // Get absolute value of the argument (math.abs)
     // A: double
     ABS_NUM,
+
+    // Add/Sub/Mul/Div/Idiv two vectors
+    // A, B: TValue
+    ADD_VEC,
+    SUB_VEC,
+    MUL_VEC,
+    DIV_VEC,
+
+    // Negate a vector
+    // A: TValue
+    UNM_VEC,
 
     // Compute Luau 'not' operation on destructured TValue
     // A: tag
@@ -270,6 +290,11 @@ enum class IrCmd : uint8_t
     // C: block
     TRY_CALL_FASTGETTM,
 
+    // Create new tagged userdata
+    // A: int (size)
+    // B: int (tag)
+    NEW_USERDATA,
+
     // Convert integer into a double number
     // A: int
     INT_TO_NUM,
@@ -283,6 +308,14 @@ enum class IrCmd : uint8_t
     // A: double
     NUM_TO_UINT,
 
+    // Converts a double number to a vector with the value in X/Y/Z
+    // A: double
+    NUM_TO_VEC,
+
+    // Adds VECTOR type tag to a vector, preserving X/Y/Z components
+    // A: TValue
+    TAG_VECTOR,
+
     // Adjust stack top (L->top) to point at 'B' TValues *after* the specified register
     // This is used to return multiple values
     // A: Rn
@@ -293,22 +326,22 @@ enum class IrCmd : uint8_t
     // This is used to recover after calling a variadic function
     ADJUST_STACK_TO_TOP,
 
-    // Execute fastcall builtin function in-place
-    // A: builtin
+    // Execute fastcall builtin function with 1 argument in-place
+    // This is used for a few builtins that can have more than 1 result and cannot be represented as a regular instruction
+    // A: unsigned int (builtin id)
     // B: Rn (result start)
-    // C: Rn (argument start)
-    // D: Rn or Kn or undef (optional second argument)
-    // E: int (argument count)
-    // F: int (result count)
+    // C: Rn (first argument)
+    // D: int (result count)
     FASTCALL,
 
     // Call the fastcall builtin function
-    // A: builtin
+    // A: unsigned int (builtin id)
     // B: Rn (result start)
     // C: Rn (argument start)
     // D: Rn or Kn or undef (optional second argument)
-    // E: int (argument count or -1 to use all arguments up to stack top)
-    // F: int (result count or -1 to preserve all results and adjust stack top)
+    // E: Rn or Kn or undef (optional third argument)
+    // F: int (argument count or -1 to use all arguments up to stack top)
+    // G: int (result count or -1 to preserve all results and adjust stack top)
     INVOKE_FASTCALL,
 
     // Check that fastcall builtin function invocation was successful (negative result count jumps to fallback)
@@ -371,6 +404,7 @@ enum class IrCmd : uint8_t
     // A, B: tag
     // C: block/vmexit/undef
     // In final x64 lowering, A can also be Rn
+    // When DebugLuauAbortingChecks flag is enabled, A can also be Rn
     // When undef is specified instead of a block, execution is aborted on check failure
     CHECK_TAG,
 
@@ -430,6 +464,13 @@ enum class IrCmd : uint8_t
     // D: block/vmexit/undef
     // When undef is specified instead of a block, execution is aborted on check failure
     CHECK_BUFFER_LEN,
+
+    // Guard against userdata tag mismatch
+    // A: pointer (userdata)
+    // B: int (tag)
+    // C: block/vmexit/undef
+    // When undef is specified instead of a block, execution is aborted on check failure
+    CHECK_USERDATA_TAG,
 
     // Special operations
 
@@ -828,6 +869,7 @@ struct IrInst
     IrOp d;
     IrOp e;
     IrOp f;
+    IrOp g;
 
     uint32_t lastUse = 0;
     uint16_t useCount = 0;
@@ -882,6 +924,7 @@ struct IrInstHash
         h = mix(h, key.d);
         h = mix(h, key.e);
         h = mix(h, key.f);
+        h = mix(h, key.g);
 
         // MurmurHash2 tail
         h ^= h >> 13;
@@ -896,7 +939,7 @@ struct IrInstEq
 {
     bool operator()(const IrInst& a, const IrInst& b) const
     {
-        return a.cmd == b.cmd && a.a == b.a && a.b == b.b && a.c == b.c && a.d == b.d && a.e == b.e && a.f == b.f;
+        return a.cmd == b.cmd && a.a == b.a && a.b == b.b && a.c == b.c && a.d == b.d && a.e == b.e && a.f == b.f && a.g == b.g;
     }
 };
 
@@ -948,6 +991,25 @@ struct BytecodeTypes
     uint8_t c = LBC_TYPE_ANY;
 };
 
+struct BytecodeRegTypeInfo
+{
+    uint8_t type = LBC_TYPE_ANY;
+    uint8_t reg = 0; // Register slot where variable is stored
+    int startpc = 0; // First point where variable is alive (could be before variable has been assigned a value)
+    int endpc = 0;   // First point where variable is dead
+};
+
+struct BytecodeTypeInfo
+{
+    std::vector<uint8_t> argumentTypes;
+    std::vector<BytecodeRegTypeInfo> regTypes;
+    std::vector<uint8_t> upvalueTypes;
+
+    // Offsets into regTypes for each individual register
+    // One extra element at the end contains the vector size for easier arr[Rn], arr[Rn + 1] range access
+    std::vector<uint32_t> regTypeOffsets;
+};
+
 struct IrFunction
 {
     std::vector<IrBlock> blocks;
@@ -964,7 +1026,8 @@ struct IrFunction
     // For each instruction, an operand that can be used to recompute the value
     std::vector<IrOp> valueRestoreOps;
     std::vector<uint32_t> validRestoreOpBlocks;
-    uint32_t validRestoreOpBlockIdx = 0;
+
+    BytecodeTypeInfo bcTypeInfo;
 
     Proto* proto = nullptr;
     bool variadic = false;
@@ -973,13 +1036,13 @@ struct IrFunction
 
     IrBlock& blockOp(IrOp op)
     {
-        LUAU_ASSERT(op.kind == IrOpKind::Block);
+        CODEGEN_ASSERT(op.kind == IrOpKind::Block);
         return blocks[op.index];
     }
 
     IrInst& instOp(IrOp op)
     {
-        LUAU_ASSERT(op.kind == IrOpKind::Inst);
+        CODEGEN_ASSERT(op.kind == IrOpKind::Inst);
         return instructions[op.index];
     }
 
@@ -993,7 +1056,7 @@ struct IrFunction
 
     IrConst& constOp(IrOp op)
     {
-        LUAU_ASSERT(op.kind == IrOpKind::Constant);
+        CODEGEN_ASSERT(op.kind == IrOpKind::Constant);
         return constants[op.index];
     }
 
@@ -1001,7 +1064,7 @@ struct IrFunction
     {
         IrConst& value = constOp(op);
 
-        LUAU_ASSERT(value.kind == IrConstKind::Tag);
+        CODEGEN_ASSERT(value.kind == IrConstKind::Tag);
         return value.valueTag;
     }
 
@@ -1022,7 +1085,7 @@ struct IrFunction
     {
         IrConst& value = constOp(op);
 
-        LUAU_ASSERT(value.kind == IrConstKind::Int);
+        CODEGEN_ASSERT(value.kind == IrConstKind::Int);
         return value.valueInt;
     }
 
@@ -1043,7 +1106,7 @@ struct IrFunction
     {
         IrConst& value = constOp(op);
 
-        LUAU_ASSERT(value.kind == IrConstKind::Uint);
+        CODEGEN_ASSERT(value.kind == IrConstKind::Uint);
         return value.valueUint;
     }
 
@@ -1064,7 +1127,7 @@ struct IrFunction
     {
         IrConst& value = constOp(op);
 
-        LUAU_ASSERT(value.kind == IrConstKind::Double);
+        CODEGEN_ASSERT(value.kind == IrConstKind::Double);
         return value.valueDouble;
     }
 
@@ -1084,14 +1147,14 @@ struct IrFunction
     uint32_t getBlockIndex(const IrBlock& block) const
     {
         // Can only be called with blocks from our vector
-        LUAU_ASSERT(&block >= blocks.data() && &block <= blocks.data() + blocks.size());
+        CODEGEN_ASSERT(&block >= blocks.data() && &block <= blocks.data() + blocks.size());
         return uint32_t(&block - blocks.data());
     }
 
     uint32_t getInstIndex(const IrInst& inst) const
     {
         // Can only be called with instructions from our vector
-        LUAU_ASSERT(&inst >= instructions.data() && &inst <= instructions.data() + instructions.size());
+        CODEGEN_ASSERT(&inst >= instructions.data() && &inst <= instructions.data() + instructions.size());
         return uint32_t(&inst - instructions.data());
     }
 
@@ -1108,37 +1171,21 @@ struct IrFunction
         if (instIdx >= valueRestoreOps.size())
             return {};
 
-        if (FFlag::LuauKeepVmapLinear2)
+        // When spilled, values can only reference restore operands in the current block chain
+        if (limitToCurrentBlock)
         {
-            // When spilled, values can only reference restore operands in the current block chain
-            if (limitToCurrentBlock)
+            for (uint32_t blockIdx : validRestoreOpBlocks)
             {
-                for (uint32_t blockIdx : validRestoreOpBlocks)
-                {
-                    const IrBlock& block = blocks[blockIdx];
+                const IrBlock& block = blocks[blockIdx];
 
-                    if (instIdx >= block.start && instIdx <= block.finish)
-                        return valueRestoreOps[instIdx];
-                }
-
-                return {};
+                if (instIdx >= block.start && instIdx <= block.finish)
+                    return valueRestoreOps[instIdx];
             }
 
-            return valueRestoreOps[instIdx];
+            return {};
         }
-        else
-        {
-            const IrBlock& block = blocks[validRestoreOpBlockIdx];
 
-            // When spilled, values can only reference restore operands in the current block
-            if (limitToCurrentBlock)
-            {
-                if (instIdx < block.start || instIdx > block.finish)
-                    return {};
-            }
-
-            return valueRestoreOps[instIdx];
-        }
+        return valueRestoreOps[instIdx];
     }
 
     IrOp findRestoreOp(const IrInst& inst, bool limitToCurrentBlock) const
@@ -1148,7 +1195,7 @@ struct IrFunction
 
     BytecodeTypes getBytecodeTypesAt(int pcpos) const
     {
-        LUAU_ASSERT(pcpos >= 0);
+        CODEGEN_ASSERT(pcpos >= 0);
 
         if (size_t(pcpos) < bcTypes.size())
             return bcTypes[pcpos];
@@ -1159,31 +1206,31 @@ struct IrFunction
 
 inline IrCondition conditionOp(IrOp op)
 {
-    LUAU_ASSERT(op.kind == IrOpKind::Condition);
+    CODEGEN_ASSERT(op.kind == IrOpKind::Condition);
     return IrCondition(op.index);
 }
 
 inline int vmRegOp(IrOp op)
 {
-    LUAU_ASSERT(op.kind == IrOpKind::VmReg);
+    CODEGEN_ASSERT(op.kind == IrOpKind::VmReg);
     return op.index;
 }
 
 inline int vmConstOp(IrOp op)
 {
-    LUAU_ASSERT(op.kind == IrOpKind::VmConst);
+    CODEGEN_ASSERT(op.kind == IrOpKind::VmConst);
     return op.index;
 }
 
 inline int vmUpvalueOp(IrOp op)
 {
-    LUAU_ASSERT(op.kind == IrOpKind::VmUpvalue);
+    CODEGEN_ASSERT(op.kind == IrOpKind::VmUpvalue);
     return op.index;
 }
 
 inline uint32_t vmExitOp(IrOp op)
 {
-    LUAU_ASSERT(op.kind == IrOpKind::VmExit);
+    CODEGEN_ASSERT(op.kind == IrOpKind::VmExit);
     return op.index;
 }
 

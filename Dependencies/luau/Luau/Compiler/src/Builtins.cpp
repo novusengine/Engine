@@ -4,10 +4,6 @@
 #include "Luau/Bytecode.h"
 #include "Luau/Compiler.h"
 
-LUAU_FASTFLAGVARIABLE(LuauBit32ByteswapBuiltin, false)
-
-LUAU_FASTFLAGVARIABLE(LuauBufferBuiltins, false)
-
 namespace Luau
 {
 namespace Compile
@@ -170,7 +166,7 @@ static int getBuiltinFunctionId(const Builtin& builtin, const CompileOptions& op
             return LBF_BIT32_COUNTLZ;
         if (builtin.method == "countrz")
             return LBF_BIT32_COUNTRZ;
-        if (FFlag::LuauBit32ByteswapBuiltin && builtin.method == "byteswap")
+        if (builtin.method == "byteswap")
             return LBF_BIT32_BYTESWAP;
     }
 
@@ -194,7 +190,7 @@ static int getBuiltinFunctionId(const Builtin& builtin, const CompileOptions& op
             return LBF_TABLE_UNPACK;
     }
 
-    if (FFlag::LuauBufferBuiltins && builtin.object == "buffer")
+    if (builtin.object == "buffer")
     {
         if (builtin.method == "readi8")
             return LBF_BUFFER_READI8;
@@ -458,7 +454,7 @@ BuiltinInfo getBuiltinInfo(int bfid)
     case LBF_BUFFER_WRITEF32:
     case LBF_BUFFER_WRITEF64:
         return {3, 0, BuiltinInfo::Flag_NoneSafe};
-    };
+    }
 
     LUAU_UNREACHABLE();
 }

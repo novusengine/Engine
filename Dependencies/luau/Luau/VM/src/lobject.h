@@ -240,6 +240,7 @@ typedef struct TString
     // 1 byte padding
 
     int16_t atom;
+
     // 2 byte padding
 
     TString* next; // next string in the hash table bucket
@@ -249,6 +250,7 @@ typedef struct TString
 
     char data[1]; // string data is allocated right after the header
 } TString;
+
 
 #define getstr(ts) (ts)->data
 #define svalue(o) getstr(tsvalue(o))
@@ -333,6 +335,7 @@ typedef struct Proto
     int linegaplog2;
     int linedefined;
     int bytecodeid;
+    int sizetypeinfo;
 } Proto;
 // clang-format on
 
@@ -498,5 +501,3 @@ LUAI_FUNC int luaO_str2d(const char* s, double* result);
 LUAI_FUNC const char* luaO_pushvfstring(lua_State* L, const char* fmt, va_list argp);
 LUAI_FUNC const char* luaO_pushfstring(lua_State* L, const char* fmt, ...);
 LUAI_FUNC const char* luaO_chunkid(char* buf, size_t buflen, const char* source, size_t srclen);
-
-LUAU_FASTFLAG(TaggedLuData)

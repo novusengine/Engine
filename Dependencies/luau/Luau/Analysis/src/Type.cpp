@@ -9,8 +9,10 @@
 #include "Luau/RecursionCounter.h"
 #include "Luau/StringUtils.h"
 #include "Luau/ToString.h"
+#include "Luau/TypeFamily.h"
 #include "Luau/TypeInfer.h"
 #include "Luau/TypePack.h"
+#include "Luau/VecDeque.h"
 #include "Luau/VisitType.h"
 
 #include <algorithm>
@@ -25,9 +27,6 @@ LUAU_FASTINTVARIABLE(LuauTypeMaximumStringifierLength, 500)
 LUAU_FASTINTVARIABLE(LuauTableTypeMaximumStringifierLength, 0)
 LUAU_FASTINT(LuauTypeInferRecursionLimit)
 LUAU_FASTFLAG(LuauInstantiateInSubtyping)
-LUAU_FASTFLAG(DebugLuauReadWriteProperties)
-LUAU_FASTFLAGVARIABLE(LuauInitializeStringMetatableInGlobalTypes, false)
-LUAU_FASTFLAG(LuauBufferTypeck)
 
 namespace Luau
 {
@@ -129,7 +128,7 @@ std::vector<TypeId> flattenIntersection(TypeId ty)
         return {ty};
 
     std::unordered_set<TypeId> seen;
-    std::deque<TypeId> queue{ty};
+    VecDeque<TypeId> queue{ty};
 
     std::vector<TypeId> result;
 
@@ -217,8 +216,6 @@ bool isThread(TypeId ty)
 
 bool isBuffer(TypeId ty)
 {
-    LUAU_ASSERT(FFlag::LuauBufferTypeck);
-
     return isPrim(ty, PrimitiveType::Buffer);
 }
 
@@ -246,6 +243,15 @@ bool isTableIntersection(TypeId ty)
 
     std::vector<TypeId> parts = flattenIntersection(ty);
     return std::all_of(parts.begin(), parts.end(), getTableType);
+}
+
+bool isTableUnion(TypeId ty)
+{
+    const UnionType* ut = get<UnionType>(follow(ty));
+    if (!ut)
+        return false;
+
+    return std::all_of(begin(ut), end(ut), getTableType);
 }
 
 bool isOverloadedFunction(TypeId ty)
@@ -413,6 +419,13 @@ bool maybeSingleton(TypeId ty)
         for (TypeId option : utv)
             if (get<SingletonType>(follow(option)))
                 return true;
+    if (const IntersectionType* itv = get<IntersectionType>(ty))
+        for (TypeId part : itv)
+            if (maybeSingleton(part)) // will i regret this?
+                return true;
+    if (const TypeFamilyInstanceType* tfit = get<TypeFamilyInstanceType>(ty))
+        if (tfit->family->name == "keyof" || tfit->family->name == "rawkeyof")
+            return true;
     return false;
 }
 
@@ -533,6 +546,26 @@ BlockedType::BlockedType()
 {
 }
 
+Constraint* BlockedType::getOwner() const
+{
+    return owner;
+}
+
+void BlockedType::setOwner(Constraint* newOwner)
+{
+    LUAU_ASSERT(owner == nullptr);
+
+    if (owner != nullptr)
+        return;
+
+    owner = newOwner;
+}
+
+void BlockedType::replaceOwner(Constraint* newOwner)
+{
+    owner = newOwner;
+}
+
 PendingExpansionType::PendingExpansionType(
     std::optional<AstName> prefix, AstName name, std::vector<TypeId> typeArguments, std::vector<TypePackId> packArguments)
     : prefix(prefix)
@@ -622,13 +655,10 @@ Property::Property(TypeId readTy, bool deprecated, const std::string& deprecated
     , readTy(readTy)
     , writeTy(readTy)
 {
-    LUAU_ASSERT(!FFlag::DebugLuauReadWriteProperties);
 }
 
 Property Property::readonly(TypeId ty)
 {
-    LUAU_ASSERT(FFlag::DebugLuauReadWriteProperties);
-
     Property p;
     p.readTy = ty;
     return p;
@@ -636,8 +666,6 @@ Property Property::readonly(TypeId ty)
 
 Property Property::writeonly(TypeId ty)
 {
-    LUAU_ASSERT(FFlag::DebugLuauReadWriteProperties);
-
     Property p;
     p.writeTy = ty;
     return p;
@@ -650,8 +678,6 @@ Property Property::rw(TypeId ty)
 
 Property Property::rw(TypeId read, TypeId write)
 {
-    LUAU_ASSERT(FFlag::DebugLuauReadWriteProperties);
-
     Property p;
     p.readTy = read;
     p.writeTy = write;
@@ -673,34 +699,41 @@ Property Property::create(std::optional<TypeId> read, std::optional<TypeId> writ
 
 TypeId Property::type() const
 {
-    LUAU_ASSERT(!FFlag::DebugLuauReadWriteProperties);
     LUAU_ASSERT(readTy);
     return *readTy;
 }
 
 void Property::setType(TypeId ty)
 {
-    LUAU_ASSERT(!FFlag::DebugLuauReadWriteProperties);
     readTy = ty;
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        writeTy = ty;
 }
 
-std::optional<TypeId> Property::readType() const
+void Property::makeShared()
 {
-    LUAU_ASSERT(FFlag::DebugLuauReadWriteProperties);
-    LUAU_ASSERT(!(bool(readTy) && bool(writeTy)));
-    return readTy;
-}
-
-std::optional<TypeId> Property::writeType() const
-{
-    LUAU_ASSERT(FFlag::DebugLuauReadWriteProperties);
-    LUAU_ASSERT(!(bool(readTy) && bool(writeTy)));
-    return writeTy;
+    if (writeTy)
+        writeTy = readTy;
 }
 
 bool Property::isShared() const
 {
     return readTy && writeTy && readTy == writeTy;
+}
+
+bool Property::isReadOnly() const
+{
+    return readTy && !writeTy;
+}
+
+bool Property::isWriteOnly() const
+{
+    return !readTy && writeTy;
+}
+
+bool Property::isReadWrite() const
+{
+    return readTy && writeTy;
 }
 
 TableType::TableType(TableState state, TypeLevel level, Scope* scope)
@@ -951,17 +984,11 @@ BuiltinTypes::BuiltinTypes()
     , optionalStringType(arena->addType(Type{UnionType{{stringType, nilType}}, /*persistent*/ true}))
     , emptyTypePack(arena->addTypePack(TypePackVar{TypePack{{}}, /*persistent*/ true}))
     , anyTypePack(arena->addTypePack(TypePackVar{VariadicTypePack{anyType}, /*persistent*/ true}))
+    , unknownTypePack(arena->addTypePack(TypePackVar{VariadicTypePack{unknownType}, /*persistent*/ true}))
     , neverTypePack(arena->addTypePack(TypePackVar{VariadicTypePack{neverType}, /*persistent*/ true}))
     , uninhabitableTypePack(arena->addTypePack(TypePackVar{TypePack{{neverType}, neverTypePack}, /*persistent*/ true}))
     , errorTypePack(arena->addTypePack(TypePackVar{Unifiable::Error{}, /*persistent*/ true}))
 {
-    if (!FFlag::LuauInitializeStringMetatableInGlobalTypes)
-    {
-        TypeId stringMetatable = makeStringMetatable(NotNull{this});
-        asMutable(stringType)->ty = PrimitiveType{PrimitiveType::String, stringMetatable};
-        persist(stringMetatable);
-    }
-
     freeze(*arena);
 }
 
@@ -999,7 +1026,7 @@ TypePackId BuiltinTypes::errorRecoveryTypePack(TypePackId guess) const
 
 void persist(TypeId ty)
 {
-    std::deque<TypeId> queue{ty};
+    VecDeque<TypeId> queue{ty};
 
     while (!queue.empty())
     {
@@ -1300,6 +1327,13 @@ bool GenericTypeDefinition::operator==(const GenericTypeDefinition& rhs) const
 bool GenericTypePackDefinition::operator==(const GenericTypePackDefinition& rhs) const
 {
     return tp == rhs.tp && defaultValue == rhs.defaultValue;
+}
+
+template<>
+LUAU_NOINLINE Unifiable::Bound<TypeId>* emplaceType<BoundType>(Type* ty, TypeId& tyArg)
+{
+    LUAU_ASSERT(ty != follow(tyArg));
+    return &ty->ty.emplace<BoundType>(tyArg);
 }
 
 } // namespace Luau

@@ -26,7 +26,6 @@ namespace CodeGen
 {
 
 enum class IrCondition : uint8_t;
-struct NativeState;
 struct IrOp;
 
 namespace X64
@@ -73,7 +72,7 @@ inline unsigned getNonVolXmmStorageSize(ABIX64 abi, uint8_t xmmRegCount)
     if (xmmRegCount <= kWindowsFirstNonVolXmmReg)
         return 0;
 
-    LUAU_ASSERT(xmmRegCount <= 16);
+    CODEGEN_ASSERT(xmmRegCount <= 16);
     return (xmmRegCount - kWindowsFirstNonVolXmmReg) * 16;
 }
 
@@ -110,6 +109,11 @@ inline OperandX64 luauRegValue(int ri)
 inline OperandX64 luauRegTag(int ri)
 {
     return dword[rBase + ri * sizeof(TValue) + offsetof(TValue, tt)];
+}
+
+inline OperandX64 luauRegExtra(int ri)
+{
+    return dword[rBase + ri * sizeof(TValue) + offsetof(TValue, extra)];
 }
 
 inline OperandX64 luauRegValueInt(int ri)
@@ -155,7 +159,7 @@ inline OperandX64 luauNodeKeyTag(RegisterX64 node)
 
 inline void setLuauReg(AssemblyBuilderX64& build, RegisterX64 tmp, int ri, OperandX64 op)
 {
-    LUAU_ASSERT(op.cat == CategoryX64::mem);
+    CODEGEN_ASSERT(op.cat == CategoryX64::mem);
 
     build.vmovups(tmp, op);
     build.vmovups(luauReg(ri), tmp);

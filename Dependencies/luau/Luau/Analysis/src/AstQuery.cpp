@@ -11,7 +11,8 @@
 
 #include <algorithm>
 
-LUAU_FASTFLAG(DebugLuauReadWriteProperties)
+LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
+LUAU_FASTFLAGVARIABLE(LuauFixBindingForGlobalPos, false);
 
 namespace Luau
 {
@@ -332,6 +333,11 @@ std::optional<TypeId> findExpectedTypeAtPosition(const Module& module, const Sou
 
 static std::optional<AstStatLocal*> findBindingLocalStatement(const SourceModule& source, const Binding& binding)
 {
+    // Bindings coming from global sources (e.g., definition files) have a zero position.
+    // They cannot be defined from a local statement
+    if (FFlag::LuauFixBindingForGlobalPos && binding.location == Location{{0, 0}, {0, 0}})
+        return std::nullopt;
+
     std::vector<AstNode*> nodes = findAstAncestryOfPosition(source, binding.location.begin);
     auto iter = std::find_if(nodes.rbegin(), nodes.rend(), [](AstNode* node) {
         return node->is<AstStatLocal>();
@@ -524,9 +530,9 @@ std::optional<DocumentationSymbol> getDocumentationSymbolAtPosition(const Source
                 {
                     if (auto propIt = ttv->props.find(indexName->index.value); propIt != ttv->props.end())
                     {
-                        if (FFlag::DebugLuauReadWriteProperties)
+                        if (FFlag::DebugLuauDeferredConstraintResolution)
                         {
-                            if (auto ty = propIt->second.readType())
+                            if (auto ty = propIt->second.readTy)
                                 return checkOverloadedDocumentationSymbol(module, *ty, parentExpr, propIt->second.documentationSymbol);
                         }
                         else
@@ -537,9 +543,9 @@ std::optional<DocumentationSymbol> getDocumentationSymbolAtPosition(const Source
                 {
                     if (auto propIt = ctv->props.find(indexName->index.value); propIt != ctv->props.end())
                     {
-                        if (FFlag::DebugLuauReadWriteProperties)
+                        if (FFlag::DebugLuauDeferredConstraintResolution)
                         {
-                            if (auto ty = propIt->second.readType())
+                            if (auto ty = propIt->second.readTy)
                                 return checkOverloadedDocumentationSymbol(module, *ty, parentExpr, propIt->second.documentationSymbol);
                         }
                         else

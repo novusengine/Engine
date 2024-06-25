@@ -1380,7 +1380,7 @@ namespace Model
                             vertex.boneWeights[j] = 0;
                         }
 
-                        out.modelData.vertexLookupIDs[i] = i;
+                        out.modelData.vertexLookupIDs[vertexOffset + i] = vertexOffset + i;
                     }
                 }
 

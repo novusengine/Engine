@@ -3,12 +3,10 @@
 
 #include "Luau/ApplyTypeFunction.h"
 #include "Luau/Cancellation.h"
-#include "Luau/Clone.h"
 #include "Luau/Common.h"
 #include "Luau/Instantiation.h"
 #include "Luau/ModuleResolver.h"
 #include "Luau/Normalize.h"
-#include "Luau/Parser.h"
 #include "Luau/Quantify.h"
 #include "Luau/RecursionCounter.h"
 #include "Luau/Scope.h"
@@ -36,10 +34,10 @@ LUAU_FASTFLAGVARIABLE(DebugLuauFreezeDuringUnification, false)
 LUAU_FASTFLAGVARIABLE(DebugLuauSharedSelf, false)
 LUAU_FASTFLAG(LuauInstantiateInSubtyping)
 LUAU_FASTFLAGVARIABLE(LuauTinyControlFlowAnalysis, false)
-LUAU_FASTFLAGVARIABLE(LuauLoopControlFlowAnalysis, false)
 LUAU_FASTFLAGVARIABLE(LuauAlwaysCommitInferencesOfFunctionCalls, false)
-LUAU_FASTFLAG(LuauBufferTypeck)
 LUAU_FASTFLAGVARIABLE(LuauRemoveBadRelationalOperatorWarning, false)
+LUAU_FASTFLAGVARIABLE(LuauOkWithIteratingOverTableProperties, false)
+LUAU_FASTFLAGVARIABLE(LuauReusableSubstitutions, false)
 
 namespace Luau
 {
@@ -216,6 +214,7 @@ TypeChecker::TypeChecker(const ScopePtr& globalScope, ModuleResolver* resolver, 
     , iceHandler(iceHandler)
     , unifierState(iceHandler)
     , normalizer(nullptr, builtinTypes, NotNull{&unifierState})
+    , reusableInstantiation(TxnLog::empty(), nullptr, builtinTypes, {}, nullptr)
     , nilType(builtinTypes->nilType)
     , numberType(builtinTypes->numberType)
     , stringType(builtinTypes->stringType)
@@ -350,9 +349,9 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStat& program)
     else if (auto repeat = program.as<AstStatRepeat>())
         return check(scope, *repeat);
     else if (program.is<AstStatBreak>())
-        return FFlag::LuauLoopControlFlowAnalysis ? ControlFlow::Breaks : ControlFlow::None;
+        return FFlag::LuauTinyControlFlowAnalysis ? ControlFlow::Breaks : ControlFlow::None;
     else if (program.is<AstStatContinue>())
-        return FFlag::LuauLoopControlFlowAnalysis ? ControlFlow::Continues : ControlFlow::None;
+        return FFlag::LuauTinyControlFlowAnalysis ? ControlFlow::Continues : ControlFlow::None;
     else if (auto return_ = program.as<AstStatReturn>())
         return check(scope, *return_);
     else if (auto expr = program.as<AstStatExpr>())
@@ -668,7 +667,7 @@ LUAU_NOINLINE void TypeChecker::checkBlockTypeAliases(const ScopePtr& scope, std
     {
         if (const auto& typealias = stat->as<AstStatTypeAlias>())
         {
-            if (typealias->name == kParseNameError)
+            if (typealias->name == kParseNameError || typealias->name == "typeof")
                 continue;
 
             auto& bindings = typealias->exported ? scope->exportedTypeBindings : scope->privateTypeBindings;
@@ -755,7 +754,7 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatIf& statement
         else if (thencf == ControlFlow::None && elsecf != ControlFlow::None)
             scope->inheritRefinements(thenScope);
 
-        if (FFlag::LuauLoopControlFlowAnalysis && thencf == elsecf)
+        if (FFlag::LuauTinyControlFlowAnalysis && thencf == elsecf)
             return thencf;
         else if (matches(thencf, ControlFlow::Returns | ControlFlow::Throws) && matches(elsecf, ControlFlow::Returns | ControlFlow::Throws))
             return ControlFlow::Returns;
@@ -1335,10 +1334,10 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatForIn& forin)
             for (size_t i = 2; i < varTypes.size(); ++i)
                 unify(nilType, varTypes[i], scope, forin.location);
         }
-        else if (isNonstrictMode())
+        else if (isNonstrictMode() || FFlag::LuauOkWithIteratingOverTableProperties)
         {
             for (TypeId var : varTypes)
-                unify(anyType, var, scope, forin.location);
+                unify(unknownType, var, scope, forin.location);
         }
         else
         {
@@ -1536,6 +1535,12 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatTypeAlias& ty
     if (name == kParseNameError)
         return ControlFlow::None;
 
+    if (name == "typeof")
+    {
+        reportError(typealias.location, GenericError{"Type aliases cannot be named typeof"});
+        return ControlFlow::None;
+    }
+
     std::optional<TypeFun> binding;
     if (auto it = scope->exportedTypeBindings.find(name); it != scope->exportedTypeBindings.end())
         binding = it->second;
@@ -1649,7 +1654,9 @@ void TypeChecker::prototype(const ScopePtr& scope, const AstStatTypeAlias& typea
     Name name = typealias.name.value;
 
     // If the alias is missing a name, we can't do anything with it.  Ignore it.
-    if (name == kParseNameError)
+    // Also, typeof is not a valid type alias name.  We will report an error for
+    // this in check()
+    if (name == kParseNameError || name == "typeof")
         return;
 
     std::optional<TypeFun> binding;
@@ -2639,12 +2646,27 @@ static std::optional<bool> areEqComparable(NotNull<TypeArena> arena, NotNull<Nor
     if (isExempt(a) || isExempt(b))
         return true;
 
+    NormalizationResult nr;
+
     TypeId c = arena->addType(IntersectionType{{a, b}});
-    const NormalizedType* n = normalizer->normalize(c);
+    std::shared_ptr<const NormalizedType> n = normalizer->normalize(c);
     if (!n)
         return std::nullopt;
 
-    return normalizer->isInhabited(n);
+    nr = normalizer->isInhabited(n.get());
+
+    switch (nr)
+    {
+    case NormalizationResult::HitLimits:
+        return std::nullopt;
+    case NormalizationResult::False:
+        return false;
+    case NormalizationResult::True:
+        return true;
+    }
+
+    // n.b. msvc can never figure this stuff out.
+    LUAU_UNREACHABLE();
 }
 
 TypeId TypeChecker::checkRelationalOperation(
@@ -4844,12 +4866,27 @@ TypeId TypeChecker::instantiate(const ScopePtr& scope, TypeId ty, Location locat
     if (ftv && ftv->hasNoFreeOrGenericTypes)
         return ty;
 
-    Instantiation instantiation{log, &currentModule->internalTypes, builtinTypes, scope->level, /*scope*/ nullptr};
+    std::optional<TypeId> instantiated;
 
-    if (instantiationChildLimit)
-        instantiation.childLimit = *instantiationChildLimit;
+    if (FFlag::LuauReusableSubstitutions)
+    {
+        reusableInstantiation.resetState(log, &currentModule->internalTypes, builtinTypes, scope->level, /*scope*/ nullptr);
 
-    std::optional<TypeId> instantiated = instantiation.substitute(ty);
+        if (instantiationChildLimit)
+            reusableInstantiation.childLimit = *instantiationChildLimit;
+
+        instantiated = reusableInstantiation.substitute(ty);
+    }
+    else
+    {
+        Instantiation instantiation{log, &currentModule->internalTypes, builtinTypes, scope->level, /*scope*/ nullptr};
+
+        if (instantiationChildLimit)
+            instantiation.childLimit = *instantiationChildLimit;
+
+        instantiated = instantiation.substitute(ty);
+    }
+
     if (instantiated.has_value())
         return *instantiated;
     else
@@ -5400,10 +5437,28 @@ TypeId TypeChecker::resolveTypeWorker(const ScopePtr& scope, const AstType& anno
         std::optional<TableIndexer> tableIndexer;
 
         for (const auto& prop : table->props)
-            props[prop.name.value] = {resolveType(scope, *prop.type), /* deprecated: */ false, {}, std::nullopt, {}, std::nullopt, prop.location};
+        {
+            if (prop.access == AstTableAccess::Read)
+                reportError(prop.accessLocation.value_or(Location{}), GenericError{"read keyword is illegal here"});
+            else if (prop.access == AstTableAccess::Write)
+                reportError(prop.accessLocation.value_or(Location{}), GenericError{"write keyword is illegal here"});
+            else if (prop.access == AstTableAccess::ReadWrite)
+                props[prop.name.value] = {resolveType(scope, *prop.type), /* deprecated: */ false, {}, std::nullopt, {}, std::nullopt, prop.location};
+            else
+                ice("Unexpected property access " + std::to_string(int(prop.access)));
+        }
 
         if (const auto& indexer = table->indexer)
-            tableIndexer = TableIndexer(resolveType(scope, *indexer->indexType), resolveType(scope, *indexer->resultType));
+        {
+            if (indexer->access == AstTableAccess::Read)
+                reportError(indexer->accessLocation.value_or(Location{}), GenericError{"read keyword is illegal here"});
+            else if (indexer->access == AstTableAccess::Write)
+                reportError(indexer->accessLocation.value_or(Location{}), GenericError{"write keyword is illegal here"});
+            else if (indexer->access == AstTableAccess::ReadWrite)
+                tableIndexer = TableIndexer(resolveType(scope, *indexer->indexType), resolveType(scope, *indexer->resultType));
+            else
+                ice("Unexpected property access " + std::to_string(int(indexer->access)));
+        }
 
         TableType ttv{props, tableIndexer, scope->level, TableState::Sealed};
         ttv.definitionModuleName = currentModule->name;
@@ -5580,7 +5635,8 @@ TypeId TypeChecker::instantiateTypeFun(const ScopePtr& scope, const TypeFun& tf,
     TypeId instantiated = *maybeInstantiated;
 
     TypeId target = follow(instantiated);
-    bool needsClone = follow(tf.type) == target;
+    const TableType* tfTable = getTableType(tf.type);
+    bool needsClone = follow(tf.type) == target || (tfTable != nullptr && tfTable == getTableType(target));
     bool shouldMutate = getTableType(tf.type);
     TableType* ttv = getMutableTableType(target);
 
@@ -6022,7 +6078,7 @@ void TypeChecker::resolve(const TypeGuardPredicate& typeguardP, RefinementMap& r
         return refine(isBoolean, booleanType);
     else if (typeguardP.kind == "thread")
         return refine(isThread, threadType);
-    else if (FFlag::LuauBufferTypeck && typeguardP.kind == "buffer")
+    else if (typeguardP.kind == "buffer")
         return refine(isBuffer, bufferType);
     else if (typeguardP.kind == "table")
     {

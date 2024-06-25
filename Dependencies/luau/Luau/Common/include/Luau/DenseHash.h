@@ -3,7 +3,7 @@
 
 #include "Luau/Common.h"
 
-#include <cstddef>
+#include <stddef.h>
 #include <functional>
 #include <utility>
 #include <type_traits>
@@ -120,12 +120,12 @@ public:
         return *this;
     }
 
-    void clear()
+    void clear(size_t thresholdToDestroy = 32)
     {
         if (count == 0)
             return;
 
-        if (capacity > 32)
+        if (capacity > thresholdToDestroy)
         {
             destroy();
         }
@@ -583,9 +583,9 @@ public:
     {
     }
 
-    void clear()
+    void clear(size_t thresholdToDestroy = 32)
     {
-        impl.clear();
+        impl.clear(thresholdToDestroy);
     }
 
     // Note: this reference is invalidated by any insert operation (i.e. operator[])

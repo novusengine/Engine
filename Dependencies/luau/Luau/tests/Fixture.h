@@ -22,8 +22,6 @@
 #include <unordered_map>
 #include <optional>
 
-LUAU_FASTFLAG(LuauBufferTypeck);
-
 namespace Luau
 {
 
@@ -100,8 +98,6 @@ struct Fixture
     TypeId requireExportedType(const ModuleName& moduleName, const std::string& name);
 
     ScopedFastFlag sff_DebugLuauFreezeArena;
-
-    ScopedFastFlag luauBufferTypeck{FFlag::LuauBufferTypeck, true};
 
     TestFileResolver fileResolver;
     TestConfigResolver configResolver;
@@ -245,3 +241,21 @@ using DifferFixtureWithBuiltins = DifferFixtureGeneric<BuiltinsFixture>;
     } while (false)
 
 #define LUAU_REQUIRE_NO_ERRORS(result) LUAU_REQUIRE_ERROR_COUNT(0, result)
+
+#define LUAU_CHECK_ERRORS(result) \
+    do \
+    { \
+        auto&& r = (result); \
+        validateErrors(r.errors); \
+        CHECK(!r.errors.empty()); \
+    } while (false)
+
+#define LUAU_CHECK_ERROR_COUNT(count, result) \
+    do \
+    { \
+        auto&& r = (result); \
+        validateErrors(r.errors); \
+        CHECK_MESSAGE(count == r.errors.size(), getErrors(r)); \
+    } while (false)
+
+#define LUAU_CHECK_NO_ERRORS(result) LUAU_CHECK_ERROR_COUNT(0, result)

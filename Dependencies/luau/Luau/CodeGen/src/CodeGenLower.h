@@ -8,6 +8,7 @@
 #include "Luau/IrDump.h"
 #include "Luau/IrUtils.h"
 #include "Luau/OptimizeConstProp.h"
+#include "Luau/OptimizeDeadStore.h"
 #include "Luau/OptimizeFinalX64.h"
 
 #include "EmitCommon.h"
@@ -26,14 +27,15 @@ LUAU_FASTFLAG(DebugCodegenSkipNumbering)
 LUAU_FASTINT(CodegenHeuristicsInstructionLimit)
 LUAU_FASTINT(CodegenHeuristicsBlockLimit)
 LUAU_FASTINT(CodegenHeuristicsBlockInstructionLimit)
-LUAU_FASTFLAG(LuauKeepVmapLinear2)
+LUAU_FASTFLAG(LuauLoadUserdataInfo)
+LUAU_FASTFLAG(LuauNativeAttribute)
 
 namespace Luau
 {
 namespace CodeGen
 {
 
-inline void gatherFunctions(std::vector<Proto*>& results, Proto* proto, unsigned int flags)
+inline void gatherFunctions_DEPRECATED(std::vector<Proto*>& results, Proto* proto, unsigned int flags)
 {
     if (results.size() <= size_t(proto->bytecodeid))
         results.resize(proto->bytecodeid + 1);
@@ -48,7 +50,36 @@ inline void gatherFunctions(std::vector<Proto*>& results, Proto* proto, unsigned
 
     // Recursively traverse child protos even if we aren't compiling this one
     for (int i = 0; i < proto->sizep; i++)
-        gatherFunctions(results, proto->p[i], flags);
+        gatherFunctions_DEPRECATED(results, proto->p[i], flags);
+}
+
+inline void gatherFunctionsHelper(
+    std::vector<Proto*>& results, Proto* proto, const unsigned int flags, const bool hasNativeFunctions, const bool root)
+{
+    if (results.size() <= size_t(proto->bytecodeid))
+        results.resize(proto->bytecodeid + 1);
+
+    // Skip protos that we've already compiled in this run: this happens because at -O2, inlined functions get their protos reused
+    if (results[proto->bytecodeid])
+        return;
+
+    // if native module, compile cold functions if requested
+    // if not native module, compile function if it has native attribute and is not root
+    bool shouldGather = hasNativeFunctions ? (!root && (proto->flags & LPF_NATIVE_FUNCTION) != 0)
+                                           : ((proto->flags & LPF_NATIVE_COLD) == 0 || (flags & CodeGen_ColdFunctions) != 0);
+
+    if (shouldGather)
+        results[proto->bytecodeid] = proto;
+
+    // Recursively traverse child protos even if we aren't compiling this one
+    for (int i = 0; i < proto->sizep; i++)
+        gatherFunctionsHelper(results, proto->p[i], flags, hasNativeFunctions, false);
+}
+
+inline void gatherFunctions(std::vector<Proto*>& results, Proto* root, const unsigned int flags, const bool hasNativeFunctions = false)
+{
+    LUAU_ASSERT(FFlag::LuauNativeAttribute);
+    gatherFunctionsHelper(results, root, flags, hasNativeFunctions, true);
 }
 
 inline unsigned getInstructionCount(const std::vector<IrInst>& instructions, IrCmd cmd)
@@ -86,7 +117,7 @@ inline bool lowerImpl(AssemblyBuilder& build, IrLowering& lowering, IrFunction& 
     dummy.start = ~0u;
 
     // Make sure entry block is first
-    LUAU_ASSERT(sortedBlocks[0] == 0);
+    CODEGEN_ASSERT(sortedBlocks[0] == 0);
 
     for (size_t i = 0; i < sortedBlocks.size(); ++i)
     {
@@ -96,8 +127,8 @@ inline bool lowerImpl(AssemblyBuilder& build, IrLowering& lowering, IrFunction& 
         if (block.kind == IrBlockKind::Dead)
             continue;
 
-        LUAU_ASSERT(block.start != ~0u);
-        LUAU_ASSERT(block.finish != ~0u);
+        CODEGEN_ASSERT(block.start != ~0u);
+        CODEGEN_ASSERT(block.finish != ~0u);
 
         // If we want to skip fallback code IR/asm, we'll record when those blocks start once we see them
         if (block.kind == IrBlockKind::Fallback && !seenFallback)
@@ -109,20 +140,14 @@ inline bool lowerImpl(AssemblyBuilder& build, IrLowering& lowering, IrFunction& 
 
         if (options.includeIr)
         {
-            build.logAppend("# ");
-            toStringDetailed(ctx, block, blockIndex, /* includeUseInfo */ true);
+            if (options.includeIrPrefix == IncludeIrPrefix::Yes)
+                build.logAppend("# ");
+
+            toStringDetailed(ctx, block, blockIndex, options.includeUseInfo, options.includeCfgInfo, options.includeRegFlowInfo);
         }
 
-        if (FFlag::LuauKeepVmapLinear2)
-        {
-            // Values can only reference restore operands in the current block chain
-            function.validRestoreOpBlocks.push_back(blockIndex);
-        }
-        else
-        {
-            // Values can only reference restore operands in the current block
-            function.validRestoreOpBlockIdx = blockIndex;
-        }
+        // Values can only reference restore operands in the current block chain
+        function.validRestoreOpBlocks.push_back(blockIndex);
 
         build.setLabel(block.label);
 
@@ -136,11 +161,11 @@ inline bool lowerImpl(AssemblyBuilder& build, IrLowering& lowering, IrFunction& 
         // Optimizations often propagate information between blocks
         // To make sure the register and spill state is correct when blocks are lowered, we check that sorted block order matches the expected one
         if (block.expectedNextBlock != ~0u)
-            LUAU_ASSERT(function.getBlockIndex(nextBlock) == block.expectedNextBlock);
+            CODEGEN_ASSERT(function.getBlockIndex(nextBlock) == block.expectedNextBlock);
 
         for (uint32_t index = block.start; index <= block.finish; index++)
         {
-            LUAU_ASSERT(index < function.instructions.size());
+            CODEGEN_ASSERT(index < function.instructions.size());
 
             uint32_t bcLocation = bcLocations[index];
 
@@ -154,7 +179,11 @@ inline bool lowerImpl(AssemblyBuilder& build, IrLowering& lowering, IrFunction& 
 
                 if (bcTypes.result != LBC_TYPE_ANY || bcTypes.a != LBC_TYPE_ANY || bcTypes.b != LBC_TYPE_ANY || bcTypes.c != LBC_TYPE_ANY)
                 {
-                    toString(ctx.result, bcTypes);
+                    if (FFlag::LuauLoadUserdataInfo)
+                        toString(ctx.result, bcTypes, options.compilationOptions.userdataTypes);
+                    else
+                        toString_DEPRECATED(ctx.result, bcTypes);
+
                     build.logAppend("\n");
                 }
             }
@@ -172,17 +201,19 @@ inline bool lowerImpl(AssemblyBuilder& build, IrLowering& lowering, IrFunction& 
             // This also prevents them from getting into text output when that's enabled
             if (isPseudo(inst.cmd))
             {
-                LUAU_ASSERT(inst.useCount == 0);
+                CODEGEN_ASSERT(inst.useCount == 0);
                 continue;
             }
 
             // Either instruction result value is not referenced or the use count is not zero
-            LUAU_ASSERT(inst.lastUse == 0 || inst.useCount != 0);
+            CODEGEN_ASSERT(inst.lastUse == 0 || inst.useCount != 0);
 
             if (options.includeIr)
             {
-                build.logAppend("# ");
-                toStringDetailed(ctx, block, blockIndex, inst, index, /* includeUseInfo */ true);
+                if (options.includeIrPrefix == IncludeIrPrefix::Yes)
+                    build.logAppend("# ");
+
+                toStringDetailed(ctx, block, blockIndex, inst, index, options.includeUseInfo);
             }
 
             lowering.lowerInst(inst, index, nextBlock);
@@ -206,10 +237,10 @@ inline bool lowerImpl(AssemblyBuilder& build, IrLowering& lowering, IrFunction& 
 
         lowering.finishBlock(block, nextBlock);
 
-        if (options.includeIr)
+        if (options.includeIr && options.includeIrPrefix == IncludeIrPrefix::Yes)
             build.logAppend("#\n");
 
-        if (FFlag::LuauKeepVmapLinear2 && block.expectedNextBlock == ~0u)
+        if (block.expectedNextBlock == ~0u)
             function.validRestoreOpBlocks.clear();
     }
 
@@ -251,7 +282,8 @@ inline bool lowerIr(A64::AssemblyBuilderA64& build, IrBuilder& ir, const std::ve
 }
 
 template<typename AssemblyBuilder>
-inline bool lowerFunction(IrBuilder& ir, AssemblyBuilder& build, ModuleHelpers& helpers, Proto* proto, AssemblyOptions options, LoweringStats* stats)
+inline bool lowerFunction(IrBuilder& ir, AssemblyBuilder& build, ModuleHelpers& helpers, Proto* proto, AssemblyOptions options, LoweringStats* stats,
+    CodeGenCompilationResult& codeGenCompilationResult)
 {
     killUnusedBlocks(ir.function);
 
@@ -274,10 +306,16 @@ inline bool lowerFunction(IrBuilder& ir, AssemblyBuilder& build, ModuleHelpers& 
     }
 
     if (preOptBlockCount >= unsigned(FInt::CodegenHeuristicsBlockLimit.value))
+    {
+        codeGenCompilationResult = CodeGenCompilationResult::CodeGenOverflowBlockLimit;
         return false;
+    }
 
     if (maxBlockInstructions >= unsigned(FInt::CodegenHeuristicsBlockInstructionLimit.value))
+    {
+        codeGenCompilationResult = CodeGenCompilationResult::CodeGenOverflowBlockInstructionLimit;
         return false;
+    }
 
     computeCfgInfo(ir.function);
 
@@ -307,6 +345,8 @@ inline bool lowerFunction(IrBuilder& ir, AssemblyBuilder& build, ModuleHelpers& 
                 stats->blockLinearizationStats.constPropInstructionCount += constPropInstructionCount;
             }
         }
+
+        markDeadStoresInBlockChains(ir);
     }
 
     std::vector<uint32_t> sortedBlocks = getSortedBlockOrder(ir.function);
@@ -323,7 +363,12 @@ inline bool lowerFunction(IrBuilder& ir, AssemblyBuilder& build, ModuleHelpers& 
         }
     }
 
-    return lowerIr(build, ir, sortedBlocks, helpers, proto, options, stats);
+    bool result = lowerIr(build, ir, sortedBlocks, helpers, proto, options, stats);
+
+    if (!result)
+        codeGenCompilationResult = CodeGenCompilationResult::CodeGenLoweringFailure;
+
+    return result;
 }
 
 } // namespace CodeGen
