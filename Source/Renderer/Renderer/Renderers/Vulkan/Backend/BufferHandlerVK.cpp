@@ -192,7 +192,7 @@ namespace Renderer
             }
 
             buffer.name = desc.name;
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)buffer.buffer, VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT, buffer.name.c_str());
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)buffer.buffer, VK_OBJECT_TYPE_BUFFER, buffer.name.c_str());
 
             return bufferID;
         }

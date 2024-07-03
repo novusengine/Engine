@@ -17,98 +17,106 @@ namespace Renderer
             
             static bool GetDebugMarkersEnabled() 
             {
-                return _debugMarkersEnabled; 
+                return _debugUtilsEnabled; 
             }
 
-            static void SetObjectName(VkDevice device, uint64_t object, VkDebugReportObjectTypeEXT objectType, const char* name)
+            static void SetObjectName(VkDevice device, uint64_t object, VkObjectType objectType, const char* name)
             {
-                if (_debugMarkersAvailable && _debugMarkersEnabled)
+                if (_debugUtilsAvailable && _debugUtilsEnabled)
                 {
-                    VkDebugMarkerObjectNameInfoEXT nameInfo = {};
-                    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
-                    nameInfo.objectType = objectType;
-                    nameInfo.object = object;
-                    nameInfo.pObjectName = name;
-                    fnDebugMarkerSetObjectName(device, &nameInfo);
+                    const VkDebugUtilsObjectNameInfoEXT nameInfo =
+                    {
+                        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                        .pNext = NULL,
+                        .objectType = objectType,
+                        .objectHandle = object,
+                        .pObjectName = name,
+                    };
+                    fnSetDebugUtilsObjectName(device, &nameInfo);
                 }
             }
 
             static void PushMarker(VkCommandBuffer commandBuffer, Color color, std::string name)
             {
-                if (_debugMarkersAvailable && _debugMarkersEnabled)
+                if (_debugUtilsAvailable && _debugUtilsEnabled)
                 {
-                    VkDebugMarkerMarkerInfoEXT markerInfo = {};
-                    markerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+                    VkDebugUtilsLabelEXT label =
+                    {
+                        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+                        .pNext = NULL,
+                        .pLabelName = NULL,
+                        .color = { 0.0f, 0.0f, 0.0f, 0.0f },
+                    };
 
-                    markerInfo.color[0] = color.r;
-                    markerInfo.color[1] = color.g;
-                    markerInfo.color[2] = color.b;
-                    markerInfo.color[3] = color.a;
+                    label.color[0] = color.r;
+                    label.color[1] = color.g;
+                    label.color[2] = color.b;
+                    label.color[3] = color.a;
 
-                    markerInfo.pMarkerName = name.c_str();
-                    fnCmdDebugMarkerBegin(commandBuffer, &markerInfo);
+                    label.pLabelName = name.c_str();
+                    fnCmdBeginDebugUtilsLabel(commandBuffer, &label);
                 }
             }
 
             static void PopMarker(VkCommandBuffer commandBuffer)
             {
-                if (_debugMarkersAvailable && _debugMarkersEnabled)
+                if (_debugUtilsAvailable && _debugUtilsEnabled)
                 {
-                    fnCmdDebugMarkerEnd(commandBuffer);
+                    fnCmdEndDebugUtilsLabel(commandBuffer);
                 }
             }
 
         private:
-            static void InitializeFunctions(VkDevice device)
+            static void InitializeFunctions(VkInstance instance)
             {
                 assert(!_initialized);
                 _initialized = true;
 
-                if (_debugMarkersAvailable && _debugMarkersEnabled)
+                if (_debugUtilsAvailable && _debugUtilsEnabled)
                 {
-                    fnDebugMarkerSetObjectTag = (PFN_vkDebugMarkerSetObjectTagEXT)vkGetDeviceProcAddr(device, "vkDebugMarkerSetObjectTagEXT");
-                    fnDebugMarkerSetObjectName = (PFN_vkDebugMarkerSetObjectNameEXT)vkGetDeviceProcAddr(device, "vkDebugMarkerSetObjectNameEXT");
-                    fnCmdDebugMarkerBegin = (PFN_vkCmdDebugMarkerBeginEXT)vkGetDeviceProcAddr(device, "vkCmdDebugMarkerBeginEXT");
-                    fnCmdDebugMarkerEnd = (PFN_vkCmdDebugMarkerEndEXT)vkGetDeviceProcAddr(device, "vkCmdDebugMarkerEndEXT");
-                    fnCmdDebugMarkerInsert = (PFN_vkCmdDebugMarkerInsertEXT)vkGetDeviceProcAddr(device, "vkCmdDebugMarkerInsertEXT");
+                    fnSetDebugUtilsObjectTag = (PFN_vkSetDebugUtilsObjectTagEXT)vkGetInstanceProcAddr(instance, "vkSetDebugUtilsObjectTagEXT");
+                    fnSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(instance, "vkSetDebugUtilsObjectNameEXT");
+                    fnCmdBeginDebugUtilsLabel = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(instance, "vkCmdBeginDebugUtilsLabelEXT");
+                    fnCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(instance, "vkCmdEndDebugUtilsLabelEXT");
+                    fnCmdInsertDebugUtilsLabel = (PFN_vkCmdInsertDebugUtilsLabelEXT)vkGetInstanceProcAddr(instance, "vkCmdInsertDebugUtilsLabelEXT");
                 }
             }
 
             static void CheckExtension(const VkExtensionProperties& extension)
             {
-                if (_debugMarkersEnabled)
+                if (_debugUtilsEnabled)
                 {
-                    if (!strcmp(extension.extensionName, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+                    if (!strcmp(extension.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME))
                     {
-                        _debugMarkersAvailable = true;
+                        _debugUtilsAvailable = true;
                     }
                 }
             }
 
             static void AddValidationLayer(std::vector<const char*>& layers) 
             {
-                if (_debugMarkersAvailable && _debugMarkersEnabled)
-                    layers.push_back("VK_EXT_debug_maker"); 
+                if (_debugUtilsAvailable && _debugUtilsEnabled)
+                    layers.push_back("VK_EXT_DEBUG_UTILS_EXTENSION_NAME"); 
             }
 
             static void AddEnabledExtension(std::vector<const char*>& extensions)
             {
-                if (_debugMarkersAvailable && _debugMarkersEnabled)
-                    extensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+                if (_debugUtilsAvailable && _debugUtilsEnabled)
+                    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             }
 
-            static void SetDebugMarkersEnabled(bool available) { _debugMarkersEnabled = available; }
+            static void SetDebugUtilsEnabled(bool available) { _debugUtilsEnabled = available; }
 
         private:
             static bool _initialized;
-            static bool _debugMarkersEnabled;
-            static bool _debugMarkersAvailable;
+            static bool _debugUtilsEnabled;
+            static bool _debugUtilsAvailable;
 
-            static PFN_vkDebugMarkerSetObjectTagEXT fnDebugMarkerSetObjectTag;
-            static PFN_vkDebugMarkerSetObjectNameEXT fnDebugMarkerSetObjectName;
-            static PFN_vkCmdDebugMarkerBeginEXT fnCmdDebugMarkerBegin;
-            static PFN_vkCmdDebugMarkerEndEXT fnCmdDebugMarkerEnd;
-            static PFN_vkCmdDebugMarkerInsertEXT fnCmdDebugMarkerInsert;
+            static PFN_vkSetDebugUtilsObjectTagEXT fnSetDebugUtilsObjectTag;
+            static PFN_vkSetDebugUtilsObjectNameEXT fnSetDebugUtilsObjectName;
+            static PFN_vkCmdBeginDebugUtilsLabelEXT fnCmdBeginDebugUtilsLabel;
+            static PFN_vkCmdEndDebugUtilsLabelEXT fnCmdEndDebugUtilsLabel;
+            static PFN_vkCmdInsertDebugUtilsLabelEXT fnCmdInsertDebugUtilsLabel;
 
             friend class RenderDeviceVK;
         };

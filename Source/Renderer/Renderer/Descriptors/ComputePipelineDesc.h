@@ -11,6 +11,8 @@ namespace Renderer
     struct ComputePipelineDesc
     {
         ComputeShaderID computeShader = ComputeShaderID::Invalid();
+
+        std::string debugName;
     };
     PRAGMA_NO_PADDING_END;
 

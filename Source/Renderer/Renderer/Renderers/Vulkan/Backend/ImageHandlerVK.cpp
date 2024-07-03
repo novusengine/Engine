@@ -202,6 +202,12 @@ namespace Renderer
             vkGetSwapchainImagesKHR(_device->_device, swapChain, &imageCount, images);
             image.image = images[index];
 
+            for (u32 i = 0; i < 3; i++)
+            {
+                std::string imageName = "swapchain";
+                DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)images[index], VK_OBJECT_TYPE_IMAGE, imageName.c_str());
+            }
+
             CreateImageViews(image, format);
 
             // Transition image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_GENERAL
@@ -589,8 +595,6 @@ namespace Renderer
 
         void ImageHandlerVK::CreateImage(Image& image, VkFormat& format)
         {
-            // ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
-
             // Create image
             VkImageCreateInfo imageInfo = {};
             imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -691,6 +695,8 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create image!");
             }
+
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.image, VK_OBJECT_TYPE_IMAGE, image.desc.debugName.c_str());
         }
 
         void ImageHandlerVK::CreateImage(DepthImage& image)
@@ -746,6 +752,8 @@ namespace Renderer
                 NC_LOG_CRITICAL("Failed to create image!");
             }
 
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.image, VK_OBJECT_TYPE_IMAGE, image.desc.debugName.c_str());
+
             // Create Depth View
             VkImageViewCreateInfo depthViewInfo = {};
             depthViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -768,7 +776,7 @@ namespace Renderer
                 NC_LOG_CRITICAL("Failed to create depth image view!");
             }
 
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.depthView, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT, image.desc.debugName.c_str());
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.depthView, VK_OBJECT_TYPE_IMAGE_VIEW, image.desc.debugName.c_str());
 
             // Transition image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
             _device->TransitionImageLayout(image.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, 1);
@@ -813,12 +821,17 @@ namespace Renderer
                 {
                     NC_LOG_CRITICAL("Failed to create color image view!");
                 }
+
+                std::string mipName = image.desc.debugName + " mip " + std::to_string(i);
+                DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.mipViews[i], VK_OBJECT_TYPE_IMAGE_VIEW, mipName.c_str());
             }
 
             if (vkCreateImageView(_device->_device, &colorViewInfo, nullptr, &image.colorView) != VK_SUCCESS)
             {
                 NC_LOG_CRITICAL("Failed to create color image view!");
             }
+
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.colorView, VK_OBJECT_TYPE_IMAGE_VIEW, image.desc.debugName.c_str());
 
             // Also create mipViews that are arrays of the specific view, down to the last mip
             colorViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -833,9 +846,12 @@ namespace Renderer
                 {
                     NC_LOG_CRITICAL("Failed to create color image view!");
                 }
+
+                std::string mipName = image.desc.debugName + " mip array " + std::to_string(i);
+                DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.mipArrayViews[i], VK_OBJECT_TYPE_IMAGE_VIEW, mipName.c_str());
             }
 
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.colorView, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT, image.desc.debugName.c_str());
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)image.colorView, VK_OBJECT_TYPE_IMAGE_VIEW, image.desc.debugName.c_str());
 
             if (!image.isSwapchain)
             {

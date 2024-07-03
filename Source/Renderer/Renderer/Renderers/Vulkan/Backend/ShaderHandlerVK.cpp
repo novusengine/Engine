@@ -124,7 +124,7 @@ namespace Renderer
                 NC_LOG_CRITICAL("Failed to create shader module!");
             }
 
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)shaderModule, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT, debugName.c_str());
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)shaderModule, VK_OBJECT_TYPE_SHADER_MODULE, debugName.c_str());
 
             return shaderModule;
         }

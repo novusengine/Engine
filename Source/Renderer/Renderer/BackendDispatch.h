@@ -60,6 +60,7 @@ namespace Renderer
         static void ImageBarrier(Renderer* renderer, CommandListID commandList, const void* data);
         static void DepthImageBarrier(Renderer* renderer, CommandListID commandList, const void* data);
         static void BufferBarrier(Renderer* renderer, CommandListID commandList, const void* data);
+        static void UploadBufferBarrier(Renderer* renderer, CommandListID commandList, const void*);
 
         static void DrawImgui(Renderer* renderer, CommandListID commandList, const void* data);
 

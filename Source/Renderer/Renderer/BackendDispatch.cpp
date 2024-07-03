@@ -319,6 +319,12 @@ namespace Renderer
         renderer->BufferBarrier(commandList, actualData->bufferID, actualData->from);
     }
 
+    void BackendDispatch::UploadBufferBarrier(Renderer* renderer, CommandListID commandList, const void*)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        renderer->UploadBufferBarrier(commandList);
+    }
+
     void BackendDispatch::DrawImgui(Renderer* renderer, CommandListID commandList, const void* data)
     {
         ZoneScopedC(tracy::Color::Red3);

@@ -814,7 +814,7 @@ namespace Renderer
                 NC_LOG_CRITICAL("Failed to create image!");
             }
 
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.image, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT, texture.debugName.c_str());
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.image, VK_OBJECT_TYPE_IMAGE, texture.debugName.c_str());
 
             //_device->TransitionImageLayout(texture.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture.layers, texture.mipLevels);
 
@@ -844,7 +844,7 @@ namespace Renderer
                 texture.imguiTextureHandle = ImGui_ImplVulkan_AddTexture(imguiSampler, texture.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
 
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.imageView, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT, texture.debugName.c_str());
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.imageView, VK_OBJECT_TYPE_IMAGE_VIEW, texture.debugName.c_str());
         }
 
         u32 TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash)

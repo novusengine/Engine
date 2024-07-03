@@ -4,41 +4,42 @@
 #include "DescriptorSetResource.h"
 
 // Commands
+#include "Commands/AddSignalSemaphore.h"
+#include "Commands/AddWaitSemaphore.h"
+#include "Commands/BeginTrace.h"
+#include "Commands/BindDescriptorSet.h"
+#include "Commands/BufferBarrier.h"
 #include "Commands/Clear.h"
+#include "Commands/CopyBuffer.h"
+#include "Commands/CopyImage.h"
+#include "Commands/DepthImageBarrier.h"
+#include "Commands/Dispatch.h"
+#include "Commands/DispatchIndirect.h"
 #include "Commands/Draw.h"
-#include "Commands/DrawIndirect.h"
-#include "Commands/DrawIndirectCount.h"
+#include "Commands/DrawImgui.h"
 #include "Commands/DrawIndexed.h"
 #include "Commands/DrawIndexedIndirect.h"
 #include "Commands/DrawIndexedIndirectCount.h"
-#include "Commands/Dispatch.h"
-#include "Commands/DispatchIndirect.h"
-#include "Commands/PopMarker.h"
-#include "Commands/PushMarker.h"
-#include "Commands/SetPipeline.h"
-#include "Commands/SetDepthBias.h"
-#include "Commands/SetScissorRect.h"
-#include "Commands/SetViewport.h"
-#include "Commands/SetVertexBuffer.h"
-#include "Commands/SetIndexBuffer.h"
-#include "Commands/SetBuffer.h"
-#include "Commands/BindDescriptorSet.h"
-#include "Commands/MarkFrameStart.h"
-#include "Commands/BeginTrace.h"
+#include "Commands/DrawIndirect.h"
+#include "Commands/DrawIndirectCount.h"
 #include "Commands/EndTrace.h"
-#include "Commands/AddSignalSemaphore.h"
-#include "Commands/AddWaitSemaphore.h"
-#include "Commands/CopyImage.h"
-#include "Commands/CopyBuffer.h"
-#include "Commands/FillBuffer.h"
-#include "Commands/UpdateBuffer.h"
-#include "Commands/ImageBarrier.h"
-#include "Commands/DepthImageBarrier.h"
-#include "Commands/BufferBarrier.h"
-#include "Commands/DrawImgui.h"
-#include "Commands/PushConstant.h"
-#include "Commands/TimeQuery.h"
 #include "Commands/FidelityFXCommands.h"
+#include "Commands/FillBuffer.h"
+#include "Commands/ImageBarrier.h"
+#include "Commands/MarkFrameStart.h"
+#include "Commands/PopMarker.h"
+#include "Commands/PushConstant.h"
+#include "Commands/PushMarker.h"
+#include "Commands/SetBuffer.h"
+#include "Commands/SetDepthBias.h"
+#include "Commands/SetIndexBuffer.h"
+#include "Commands/SetPipeline.h"
+#include "Commands/SetScissorRect.h"
+#include "Commands/SetVertexBuffer.h"
+#include "Commands/SetViewport.h"
+#include "Commands/TimeQuery.h"
+#include "Commands/UpdateBuffer.h"
+#include "Commands/UploadBufferBarrier.h"
 
 namespace Renderer
 {
@@ -885,6 +886,15 @@ namespace Renderer
         BufferID bufferID = _resources->GetBuffer(resource);
 
         BufferBarrier(bufferID, from);
+    }
+
+    void CommandList::UploadBufferBarrier()
+    {
+        Commands::UploadBufferBarrier* command = AddCommand<Commands::UploadBufferBarrier>();
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::UploadBufferBarrier::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
     }
 
     void CommandList::DrawImgui()
