@@ -1,6 +1,5 @@
 #include "PacketHandler.h"
 #include "Client.h"
-#include "Packet.h"
 
 namespace Network
 {
@@ -11,14 +10,18 @@ namespace Network
         handlers[static_cast<u16>(opcode)] = handler;
     }
 
-    bool PacketHandler::CallHandler(SocketID socketID, std::shared_ptr<Packet> packet)
+    bool PacketHandler::CallHandler(SocketID socketID, std::shared_ptr<Bytebuffer>& packet)
     {
-        if (packet->header.opcode <= Opcode::INVALID || packet->header.opcode > Opcode::MAX_COUNT)
+        Network::PacketHeader header;
+        if (!packet->Get(header))
             return false;
 
-        const OpcodeHandler& opcodeHandler = handlers[static_cast<u16>(packet->header.opcode)];
+        if (header.opcode <= Opcode::INVALID || header.opcode > Opcode::MAX_COUNT)
+            return false;
 
-        if (!opcodeHandler.handler || packet->header.size < opcodeHandler.minSize || (packet->header.size > opcodeHandler.maxSize && opcodeHandler.maxSize != -1))
+        const OpcodeHandler& opcodeHandler = handlers[static_cast<u16>(header.opcode)];
+
+        if (!opcodeHandler.handler || header.size < opcodeHandler.minSize || (header.size > opcodeHandler.maxSize && opcodeHandler.maxSize != -1))
             return false;
 
         return opcodeHandler.handler(socketID, packet);

@@ -874,6 +874,14 @@ namespace Renderer
 
             builder.BindSampler(descriptor.nameHash, imageInfo);
         }
+        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_SAMPLER_ARRAY)
+        {
+            ZoneScopedN("SamplerArray");
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.sampler = _samplerHandler->GetSampler(descriptor.samplerID);
+
+            builder.BindSamplerArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
+        }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE)
         {
             ZoneScopedN("Texture");

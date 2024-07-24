@@ -19,6 +19,7 @@ namespace Renderer
         DESCRIPTOR_TYPE_BUFFER,
         DESCRIPTOR_TYPE_BUFFER_ARRAY,
         DESCRIPTOR_TYPE_SAMPLER,
+        DESCRIPTOR_TYPE_SAMPLER_ARRAY,
         DESCRIPTOR_TYPE_TEXTURE,
         DESCRIPTOR_TYPE_TEXTURE_ARRAY,
         DESCRIPTOR_TYPE_IMAGE,
@@ -85,6 +86,7 @@ namespace Renderer
         void BindArray(StringUtils::StringHash nameHash, BufferID bufferID, u32 arrayIndex);
 
         void Bind(StringUtils::StringHash nameHash, SamplerID samplerID);
+        void BindArray(StringUtils::StringHash nameHash, SamplerID samplerID, u32 arrayIndex);
 
         void Bind(StringUtils::StringHash nameHash, TextureID textureID);
 

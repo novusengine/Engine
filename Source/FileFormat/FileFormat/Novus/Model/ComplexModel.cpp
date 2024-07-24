@@ -1491,6 +1491,12 @@ namespace Model
                                 if (texture.textureHash != textureHash)
                                     continue;
 
+                                if (texture.flags.wrapX != mapObjectMaterial.flags.ClampTextureS)
+                                    continue;
+
+                                if (texture.flags.wrapY != mapObjectMaterial.flags.ClampTextureT)
+                                    continue;
+
                                 textureIndex = j;
                                 break;
                             }
@@ -1500,8 +1506,8 @@ namespace Model
                                 ComplexModel::Texture& texture = out.textures.emplace_back();
 
                                 texture.type = ComplexModel::Texture::Type::None;
-                                texture.flags.wrapX = mapObjectMaterial.flags.ClampTextureS;
-                                texture.flags.wrapY = mapObjectMaterial.flags.ClampTextureT;
+                                texture.flags.wrapX = mapObjectMaterial.flags.ClampTextureS == false;
+                                texture.flags.wrapY = mapObjectMaterial.flags.ClampTextureT == false;
                                 texture.textureHash = textureHash;
 
                                 textureIndex = numTextures;

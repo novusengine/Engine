@@ -50,6 +50,9 @@ namespace Renderer
             void BindSampler(i32 set, i32 binding, VkDescriptorImageInfo& imageInfo);
             void BindSampler(u32 nameHash, VkDescriptorImageInfo& imageInfo);
 
+            void BindSamplerArrayIndex(i32 set, i32 binding, u32 arrayIndex, VkDescriptorImageInfo& imageInfo);
+            void BindSamplerArrayIndex(u32 nameHash, VkDescriptorImageInfo& imageInfo, u32 arrayIndex);
+
             void BindImage(i32 set, i32 binding, const VkDescriptorImageInfo& imageInfo, bool imageWrite = false);
             void BindImage(u32 nameHash, const VkDescriptorImageInfo& imageInfo);
 

@@ -5,7 +5,6 @@ class Bytebuffer;
 
 namespace Network
 {
-    struct Packet;
 
     enum class Opcode : u16
     {
@@ -29,13 +28,13 @@ namespace Network
         SMSG_SEND_REALM_CONNECTION_INFO,
         SMSG_REQUEST_REALM_CONNECTION_INFO,
 
-        SMSG_CREATE_PLAYER,
-        SMSG_CREATE_ENTITY,
-        SMSG_DELETE_ENTITY,
-        SMSG_UPDATE_ENTITY,
-        MSG_MOVE_ENTITY,
-        MSG_MOVE_HEARTBEAT_ENTITY,
-        MSG_MOVE_STOP_ENTITY,
+        SMSG_PLAYER_CREATE,
+        SMSG_ENTITY_CREATE,
+        SMSG_ENTITY_DESTROY,
+        SMSG_ENTITY_UPDATE,
+        MSG_ENTITY_MOVE,
+        MSG_ENTITY_MOVE_HEARTBEAT,
+        MSG_ENTITY_MOVE_STOP,
         CMSG_STORELOC,
         SMSG_STORELOC,
         CMSG_GOTO,
@@ -43,8 +42,24 @@ namespace Network
         SMSG_ENTITY_RESOURCES_UPDATE,
         SMSG_ENTITY_ATTRIBUTES_UPDATE,
         SMSG_ENTITY_RATINGS_UPDATE,
+        SMSG_ENTITY_DISPLAYINFO_UPDATE,
 
         MSG_ENTITY_TARGET_UPDATE,
+
+        CMSG_REQUEST_SPELLCAST,
+        SMSG_SEND_SPELLCAST_RESULT,
+        SMSG_ENTITY_CAST_SPELL,
+
+        SMSG_COMBAT_EVENT,
+
+        CMSG_CHEAT_DAMAGE,
+        CMSG_CHEAT_KILL,
+        CMSG_CHEAT_RESURRECT,
+        CMSG_CHEAT_MORPH,
+        CMSG_CHEAT_CREATE_CHARACTER,
+        SMSG_CHEAT_CREATE_CHARACTER_RESULT,
+        CMSG_CHEAT_DELETE_CHARACTER,
+        SMSG_CHEAT_DELETE_CHARACTER_RESULT,
 
         MAX_COUNT
     };
@@ -90,6 +105,13 @@ namespace Network
         u16 port;
     };
 
+    struct PacketHeader
+    {
+    public:
+        Opcode opcode = Opcode::INVALID;
+        u16 size = 0;
+    };
+
     enum class SocketID : u32 {}; // 8 Bits for versioning, 24 bits for value
     constexpr SocketID SOCKET_ID_INVALID = static_cast<SocketID>(-1);
     constexpr u32 SOCKET_ID_BITS = sizeof(std::underlying_type<SocketID>::type) * 8;
@@ -115,6 +137,6 @@ namespace Network
     {
     public:
         SocketID socketID = SOCKET_ID_INVALID;
-        std::shared_ptr<Packet> packet = nullptr;
+        std::shared_ptr<Bytebuffer> buffer = nullptr;
     };
 }

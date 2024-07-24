@@ -25,6 +25,8 @@ namespace Network
         Socket::Result Read();
         Socket::Result Read(void* data, size_t size);
 
+        bool IsInitialized() { return _isInitialized; }
+
     public:
         bool IsConnected() { return _isConnected; }
         std::shared_ptr<Bytebuffer>& GetReadBuffer() { return _socket->GetReadBuffer(); }

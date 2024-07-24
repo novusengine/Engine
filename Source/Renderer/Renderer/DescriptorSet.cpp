@@ -66,6 +66,29 @@ namespace Renderer
         boundDescriptor.samplerID = samplerID;
     }
 
+    void DescriptorSet::BindArray(StringUtils::StringHash nameHash, SamplerID samplerID, u32 arrayIndex)
+    {
+        NC_ASSERT(!_locked, "DescriptorSet : Tried to BindArray a SamplerID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+
+        for (u32 i = 0; i < _boundDescriptors.size(); i++)
+        {
+            if (nameHash == _boundDescriptors[i].nameHash && arrayIndex == _boundDescriptors[i].arrayIndex)
+            {
+                _boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_SAMPLER_ARRAY;
+                _boundDescriptors[i].samplerID = samplerID;
+                _boundDescriptors[i].arrayIndex = arrayIndex;
+
+                return;
+            }
+        }
+
+        Descriptor& boundDescriptor = _boundDescriptors.emplace_back();
+        boundDescriptor.nameHash = nameHash;
+        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_SAMPLER_ARRAY;
+        boundDescriptor.samplerID = samplerID;
+        boundDescriptor.arrayIndex = arrayIndex;
+    }
+
     void DescriptorSet::Bind(StringUtils::StringHash nameHash, TextureID textureID)
     {
         NC_ASSERT(!_locked, "DescriptorSet : Tried to Bind a TextureID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");

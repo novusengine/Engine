@@ -3,6 +3,7 @@
 
 #include <Base/Types.h>
 #include <Base/Container/StringTable.h>
+#include <Base/Math/Geometry.h>
 #include <Base/Memory/Bytebuffer.h>
 
 #include <limits>
@@ -533,6 +534,233 @@ namespace ClientDB::Definitions
                 if (!buffer->PutU32(cameraIDs[i]))
                     return false;
             }
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct AnimationData : public Base
+    {
+    public:
+        u16 fallback;
+        u8 behaviorTier;
+        u32 behaviorID;
+        u32 flags[2];
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct CreatureDisplayInfo : public Base
+    {
+    public:
+        u16 modelID;
+        u16 soundID;
+        i8 sizeClass;
+        f32 creatureModelScale;
+        u8 creatureModelAlpha;
+        u8 bloodID;
+        i32 extendedDisplayInfoID;
+        u16 npcSoundID;
+        u16 particleColorID;
+        i32 portraitCreatureDisplayInfoID;
+        i32 portraitTextureFileDataID;
+        u16 objectEffectPackageID;
+        u16 animReplacementSetID;
+        u8 flags;
+        i32 stateSpellVisualKitID;
+        f32 playerOverrideScale;
+        f32 petInstanceScale;
+        i8 unarmedWeaponType;
+        i32 mountPoofSpellVisualKitID;
+        i32 dissolveEffectID;
+        i8 gender;
+        i32 dissolveOutEffectID;
+        i8 creatureModelMinLod;
+        u32 textureVariations[4];
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct CreatureDisplayInfoExtra : public Base
+    {
+    public:
+        i8 displayRaceID;
+        i8 displaySexID;
+        i8 displayClassID;
+        i8 skinID;
+        i8 faceID;
+        i8 hairStyleID;
+        i8 hairColorID;
+        i8 facialHairID;
+        i8 flags;
+        u32 bakedTextureHash;
+        u8 customDisplayOptions[3];
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct CreatureModelData : public Base
+    {
+    public:
+        Geometry::AABoundingBox boundingBox;
+        u32 flags;
+        u32 modelHash;
+        u32 bloodID;
+        u32 footprintTextureID;
+        f32 footprintTextureLength;
+        f32 footprintTextureWidth;
+        f32 footprintParticleScale;
+        u32 foleyMaterialID;
+        u32 footstepCameraEffectID;
+        u32 deathThudCameraEffectID;
+        u32 soundID;
+        u32 sizeClass;
+        f32 collisionWidth;
+        f32 collisionHeight;
+        f32 worldEffectScale;
+        u32 creatureGeosetDataID;
+        f32 hoverHeight;
+        f32 attachedEffectScale;
+        f32 modelScale;
+        f32 missileCollisionRadius;
+        f32 missileCollisionPush;
+        f32 missileCollisionRaise;
+        f32 mountHeight;
+        f32 overrideLootEffectScale;
+        f32 overrideNameScale;
+        f32 overrideSelectionRadius;
+        f32 tamedPetBaseScale;
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct TextureFileData : public Base
+    {
+    public:
+        u32 textureHash;
+        u8 usage;
+        u32 materialResourcesID;
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct CharSection : public Base
+    {
+    public:
+        u8 raceID;
+        u8 sexID;
+        u8 baseSection;
+        u8 varationIndex;
+        u8 colorIndex;
+        u16 flags;
+        u32 textureHashes[3];
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
 
             return true;
         }

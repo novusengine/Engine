@@ -12,6 +12,9 @@ namespace Network
     {
         if (_isInitialized == true)
         {
+            if (mode == _socket->GetMode())
+                return Reinit();
+
             return Socket::Result::ERROR_CLIENT_ALREADY_INITIALIZED;
         }
 

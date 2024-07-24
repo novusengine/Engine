@@ -101,11 +101,7 @@ namespace ClientDB
 		}
         bool HasRow(u32 id)
         {
-            u32 maxID = _minID + Count();
-            if (id < _minID || id > maxID)
-                return false;
-
-            const T* row = _rows[id - _minID];
+            const T* row = GetRow(id);
             return row != nullptr;
         }
 

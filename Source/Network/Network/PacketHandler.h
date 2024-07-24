@@ -7,10 +7,11 @@
 
 #include <memory>
 
+class Bytebuffer;
+
 namespace Network
 {
-    struct Packet;
-    typedef bool (*MessageHandlerFn)(SocketID, std::shared_ptr<Packet>);
+    typedef bool (*MessageHandlerFn)(SocketID, std::shared_ptr<Bytebuffer>&);
 
     struct OpcodeHandler
     {
@@ -30,7 +31,7 @@ namespace Network
         PacketHandler();
 
         void SetMessageHandler(Opcode opcode, OpcodeHandler handler);
-        bool CallHandler(SocketID socketID, std::shared_ptr<Packet> packet);
+        bool CallHandler(SocketID socketID, std::shared_ptr<Bytebuffer>& packet);
 
     private:
         OpcodeHandler handlers[static_cast<u16>(Opcode::MAX_COUNT)];

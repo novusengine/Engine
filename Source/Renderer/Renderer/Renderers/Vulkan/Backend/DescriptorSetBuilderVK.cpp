@@ -158,6 +158,42 @@ namespace Renderer
             BindSampler(bindInfo.set, bindInfo.binding, imageInfo);
         }
 
+        void DescriptorSetBuilderVK::BindSamplerArrayIndex(i32 set, i32 binding, u32 arrayIndex, VkDescriptorImageInfo& imageInfo)
+        {
+            ZoneScoped;
+
+            for (auto& imageWrite : _imageWrites)
+            {
+                if (imageWrite.dstBinding == binding && imageWrite.dstSet == set && imageWrite.dstArrayIndex == arrayIndex)
+                {
+                    imageWrite.imageInfo = imageInfo;
+                    return;
+                }
+            }
+
+            ImageWriteDescriptor newWrite;
+            newWrite.dstSet = set;
+            newWrite.dstBinding = binding;
+            newWrite.dstArrayIndex = arrayIndex;
+            newWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+            newWrite.imageInfo = imageInfo;
+
+            _imageWrites.push_back(newWrite);
+        }
+
+        void DescriptorSetBuilderVK::BindSamplerArrayIndex(u32 nameHash, VkDescriptorImageInfo& imageInfo, u32 arrayIndex)
+        {
+            ZoneScoped;
+
+            if (!_hashedNameToBindInfoIndex.contains(nameHash))
+                return;
+
+            u32 bindInfoIndex = _hashedNameToBindInfoIndex[nameHash];
+            BindInfo& bindInfo = _bindInfos[bindInfoIndex];
+
+            BindSamplerArrayIndex(bindInfo.set, bindInfo.binding, arrayIndex, imageInfo);
+        }
+
         void DescriptorSetBuilderVK::BindImage(i32 set, i32 binding, const VkDescriptorImageInfo& imageInfo, bool imageWrite)
         {
             ZoneScoped;

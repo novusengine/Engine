@@ -26,7 +26,7 @@ namespace Network
         Socket::Result Stop();
 
         void CloseSocketID(SocketID socketID);
-        void SendPacket(SocketMessageEvent& messageRequest);
+        void SendPacket(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer);
 
     public:
         const std::string& GetHostname() { return _hostname; }

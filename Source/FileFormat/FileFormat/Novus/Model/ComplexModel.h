@@ -268,7 +268,7 @@ namespace Model
                 u16 disableBackfaceCulling : 1;
                 u16 depthTest : 1;
                 u16 depthWrite : 1;
-                u16 : 5;
+                u16 : 11;
             };
 
             enum class BlendingMode : u16

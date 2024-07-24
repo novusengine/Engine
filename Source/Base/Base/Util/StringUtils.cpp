@@ -176,6 +176,22 @@ namespace StringUtils
         return Contains(str, substr);
     }
 
+    bool StringIsAlphaAndAtLeastLength(const std::string& input, u16 maxLength)
+    {
+        // Check if the string is at least maxLength characters long
+        if (input.length() < maxLength)
+            return false;
+
+        // Check each character to ensure it is an English alphabet letter
+        for (char c : input)
+        {
+            if (!std::isalpha(static_cast<unsigned char>(c)))
+                return false;
+        }
+
+        return true;
+    }
+
     std::wstring StringToWString(const std::string& s)
     {
         std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;

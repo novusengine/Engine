@@ -1,11 +1,11 @@
 #include "Server.h"
 #include "Client.h"
-#include "Packet.h"
 #include "Util/DefineUtil.h"
 
 #include "Base/Memory/Bytebuffer.h"
 #include "Base/Util/DebugHandler.h"
 
+#include <memory>
 #include <chrono>
 using namespace std::chrono_literals;
 
@@ -93,9 +93,15 @@ namespace Network
         _disconnectRequest.enqueue(disconnectedEvent);
     }
 
-    void Server::SendPacket(SocketMessageEvent& messageRequest)
+    void Server::SendPacket(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer)
     {
-        _messageRequests.enqueue(messageRequest);
+        SocketMessageEvent request =
+        {
+            .socketID = socketID,
+            .buffer = buffer
+        };
+
+        _messageRequests.enqueue(request);
     }
 
     Socket::Result Server::Accept(std::shared_ptr<Client> netClient)
@@ -209,7 +215,7 @@ namespace Network
 
                     if (connection.client)
                     {
-                        connection.client->Send(messageEvent.packet->payload);
+                        connection.client->Send(messageEvent.buffer);
                     }
                 }
             }
@@ -224,64 +230,59 @@ namespace Network
                 Socket::Result readResult = connection.client->Read();
                 if (readResult == Socket::Result::SUCCESS)
                 {
-#ifdef NC_Debug
+#ifdef NC_DEBUG
                     const ConnectionInfo& connectionInfo = connection.client->GetSocket()->GetConnectionInfo();
-#endif // NC_Debug
+#endif // NC_DEBUG
 
                     std::shared_ptr<Bytebuffer>& buffer = connection.client->GetReadBuffer();
                     while (size_t activeSize = buffer->GetActiveSize())
                     {
                         // We have received a partial header and need to read more
-                        if (activeSize < sizeof(Packet::Header))
+                        if (activeSize < sizeof(PacketHeader))
                         {
                             buffer->Normalize();
                             break;
                         }
 
-                        Packet::Header* header = reinterpret_cast<Packet::Header*>(buffer->GetReadPointer());
+                        PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer->GetReadPointer());
 
                         if (header->opcode == Opcode::INVALID || header->opcode > Opcode::MAX_COUNT)
                         {
-#ifdef NC_Debug
+#ifdef NC_DEBUG
                             NC_LOG_ERROR("Network : Received Invalid Opcode ({0}) from (SocketId : {1}, \"{2}:{3}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
-#endif // NC_Debug
+#endif // NC_DEBUG
                             CloseSocketID(connection.id);
                             break;
                         }
 
                         if (header->size > DEFAULT_BUFFER_SIZE)
                         {
-#ifdef NC_Debug
+#ifdef NC_DEBUG
                             NC_LOG_ERROR("Network : Received Invalid Opcode Size ({0} : {1}) from (SocketId : {2}, \"{3}:{4}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), header->size, static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
-#endif // NC_Debug
+#endif // NC_DEBUG
                             CloseSocketID(connection.id);
                             break;
                         }
 
-                        size_t receivedPayloadSize = activeSize - sizeof(Packet::Header);
+                        size_t receivedPayloadSize = activeSize - sizeof(PacketHeader);
                         if (receivedPayloadSize < header->size)
                         {
                             buffer->Normalize();
                             break;
                         }
 
-                        buffer->SkipRead(sizeof(Packet::Header));
+                        buffer->SkipRead(sizeof(PacketHeader));
 
-                        std::shared_ptr<Packet> packet = Packet::Borrow();
+                        std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
                         {
-                            // Header
-                            {
-                                packet->header = *header;
-                            }
-
                             // Payload
                             {
-                                if (packet->header.size)
+                                messageBuffer->Put(*header);
+
+                                if (header->size)
                                 {
-                                    packet->payload = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
-                                    packet->payload->size = packet->header.size;
-                                    packet->payload->writtenData = packet->header.size;
-                                    std::memcpy(packet->payload->GetDataPointer(), buffer->GetReadPointer(), packet->header.size);
+                                    std::memcpy(messageBuffer->GetWritePointer(), buffer->GetReadPointer(), header->size);
+                                    messageBuffer->SkipWrite(header->size);
 
                                     // Skip Payload
                                     buffer->SkipRead(header->size);
@@ -290,10 +291,15 @@ namespace Network
 
                             SocketMessageEvent messageEvent;
                             messageEvent.socketID = socketID;
-                            messageEvent.packet = std::move(packet);
+                            messageEvent.buffer = std::move(messageBuffer);
 
                             _messageEvents.enqueue(messageEvent);
                         }
+                    }
+
+                    if (buffer->GetActiveSize() == 0)
+                    {
+                        buffer->Reset();
                     }
                 }
                 else if (readResult != Socket::Result::ERROR_WOULD_BLOCK)
