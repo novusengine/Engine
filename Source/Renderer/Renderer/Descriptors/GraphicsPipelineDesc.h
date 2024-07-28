@@ -41,6 +41,8 @@ namespace Renderer
         States states;
 
         // Everything below this isn't hashable in the PipelineHandler since it will depend on the RenderGraph (which gets recreated every frame)
+        std::string debugName = "";
+
         std::function<ImageID(ImageResource resource)> ResourceToImageID = nullptr;
         std::function<DepthImageID(DepthImageResource resource)> ResourceToDepthImageID = nullptr;
         std::function<ImageID(ImageMutableResource resource)> MutableResourceToImageID = nullptr;

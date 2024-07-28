@@ -66,7 +66,9 @@ namespace Renderer
             "VK_KHR_shader_subgroup_extended_types",
             "VK_EXT_descriptor_indexing",
             "VK_EXT_sampler_filter_minmax",
-            "VK_EXT_host_query_reset"
+            "VK_EXT_host_query_reset",
+            "VK_KHR_shader_float16_int8",
+            "VK_KHR_shader_atomic_int64"
         };
 
         RenderDeviceVK::RenderDeviceVK(Novus::Window* window)
@@ -155,7 +157,7 @@ namespace Renderer
         void RenderDeviceVK::InitOnce()
         {
 //#if _DEBUG
-            DebugMarkerUtilVK::SetDebugMarkersEnabled(true);
+            DebugMarkerUtilVK::SetDebugUtilsEnabled(true);
 //#endif
             InitVulkan();
             SetupDebugMessenger();
@@ -319,12 +321,17 @@ namespace Renderer
             createInfo.pApplicationInfo = &appInfo;
 
             // Check extensions
-            uint32_t extensionCount = 0;
-            vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-            std::vector<VkExtensionProperties> extensions(extensionCount);
-            vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
             auto requiredExtensions = GetRequiredExtensions();
+            auto remainingRequiredExtensions = requiredExtensions;
+            if (!CheckInstanceExtensionSupport(remainingRequiredExtensions))
+            {
+                for (auto& extension : remainingRequiredExtensions)
+                {
+                    NC_LOG_ERROR("Missing required extension: {}", extension);
+                }
+
+                NC_LOG_CRITICAL("Required extensions are missing!");
+            }
 
             createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
             createInfo.ppEnabledExtensionNames = requiredExtensions.data();
@@ -348,6 +355,8 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create Vulkan instance!");
             }
+
+            DebugMarkerUtilVK::InitializeFunctions(_instance);
         }
 
         VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
@@ -505,7 +514,6 @@ namespace Renderer
             {
                 enabledExtensions.push_back(extension);
             }
-            DebugMarkerUtilVK::AddEnabledExtension(enabledExtensions);
 
             createInfo.enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size());
             createInfo.ppEnabledExtensionNames = enabledExtensions.data();
@@ -528,8 +536,6 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create logical device!");
             }
-
-            DebugMarkerUtilVK::InitializeFunctions(_device);
 
             vkGetDeviceQueue(_device, indices.graphicsFamily.value(), 0, &_graphicsQueue);
             vkGetDeviceQueue(_device, indices.transferFamily.value(), 0, &_transferQueue);
@@ -850,6 +856,30 @@ namespace Renderer
             return indices;
         }
 
+        bool RenderDeviceVK::CheckInstanceExtensionSupport(std::vector<const char*>& requiredExtensions)
+        {
+            // Check extensions
+            uint32_t extensionCount = 0;
+            vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+            std::vector<VkExtensionProperties> extensions(extensionCount);
+            vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+            for (auto extension : extensions)
+            {
+                requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), requiredExtensions.end(),
+                        [&extension](const char* requiredExtension) 
+                        {
+                            return std::strcmp(requiredExtension, extension.extensionName) == 0;
+                        }),
+                        requiredExtensions.end()
+                    );
+
+                DebugMarkerUtilVK::CheckExtension(extension);
+            }
+
+            return requiredExtensions.empty();
+        }
+
         bool RenderDeviceVK::CheckDeviceExtensionSupport(VkPhysicalDevice device)
         {
             uint32_t extensionCount;
@@ -863,8 +893,6 @@ namespace Renderer
             for (const auto& extension : availableExtensions)
             {
                 requiredExtensions.erase(extension.extensionName);
-
-                DebugMarkerUtilVK::CheckExtension(extension);
             }
 
             return requiredExtensions.empty();

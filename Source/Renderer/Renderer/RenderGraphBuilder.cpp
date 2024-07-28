@@ -85,6 +85,7 @@ namespace Renderer
                     NC_LOG_CRITICAL("Please implement more of these");
                 }
 
+                commandList.ImageBarrier(resource);
                 _resources.SetLastBarrier(imageID, currentPassIndex);
             }
 
@@ -96,6 +97,7 @@ namespace Renderer
                 const DepthImageDesc& imageDesc = _renderer->GetImageDesc(imageID);
                 commandList.Clear(resource, imageDesc.depthClearValue);
 
+                commandList.ImageBarrier(resource);
                 _resources.SetLastBarrier(imageID, currentPassIndex);
             }
         }

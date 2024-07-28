@@ -1101,7 +1101,7 @@ namespace Renderer
             }
 
             VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
-            Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT, DescriptorSetToName(slot));
+            Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_OBJECT_TYPE_DESCRIPTOR_SET, DescriptorSetToName(slot));
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(graphicsPipelineID);
 
@@ -1126,7 +1126,7 @@ namespace Renderer
             }
 
             VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
-            Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT, DescriptorSetToName(slot));
+            Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_OBJECT_TYPE_DESCRIPTOR_SET, DescriptorSetToName(slot));
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(computePipelineID);
 
@@ -1360,6 +1360,12 @@ namespace Renderer
         vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
     }
 
+    void RendererVK::UploadBufferBarrier(CommandListID commandListID)
+    {
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        _uploadBufferHandler->SyncBarrier(commandBuffer);
+    }
+
     void RendererVK::PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size)
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
@@ -1402,6 +1408,7 @@ namespace Renderer
     {
         CommandListID commandListID = _commandListHandler->BeginCommandList(Backend::QueueType::Graphics);
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)commandBuffer, VK_OBJECT_TYPE_COMMAND_BUFFER,"Present CommandList");
         
         // Tracy profiling
         PushMarker(commandListID, Color::PastelRed, "Present Blitting");
@@ -1425,14 +1432,16 @@ namespace Renderer
         u32 semaphoreIndex = swapChain->frameIndex;
 
         VkFence frameFence = _commandListHandler->GetCurrentFence();
+        Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)frameFence, VK_OBJECT_TYPE_FENCE, "Present Frame Fence");
+
+        VkSemaphore imageAvailableSemaphore = _semaphoreHandler->GetVkSemaphore(swapChain->imageAvailableSemaphores.Get(semaphoreIndex));
+        Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)imageAvailableSemaphore, VK_OBJECT_TYPE_SEMAPHORE, "Present Image Available Semaphore");
 
         // Acquire next swapchain image
         VkResult result;
         u32 frameIndex;
         {
             ZoneScopedNC("Present::AcquireNextImage", tracy::Color::Red);
-            VkSemaphore imageAvailableSemaphore = _semaphoreHandler->GetVkSemaphore(swapChain->imageAvailableSemaphores.Get(semaphoreIndex));
-
             result = vkAcquireNextImageKHR(_device->_device, swapChain->swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &frameIndex);
 
             if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -1452,18 +1461,18 @@ namespace Renderer
             if (semaphoreID != SemaphoreID::Invalid())
             {
                 VkSemaphore semaphore = _semaphoreHandler->GetVkSemaphore(semaphoreID);
+                Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)semaphore, VK_OBJECT_TYPE_SEMAPHORE, "Present Wait Semaphore");
+
                 _commandListHandler->AddWaitSemaphore(commandListID, semaphore); // Wait for the provided semaphore to finish
             }
 
-            VkSemaphore imageAvailableSemaphore = _semaphoreHandler->GetVkSemaphore(swapChain->imageAvailableSemaphores.Get(semaphoreIndex));
             VkSemaphore blitFinishedSemaphore = _semaphoreHandler->GetVkSemaphore(swapChain->blitFinishedSemaphores.Get(semaphoreIndex));
+            Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)imageAvailableSemaphore, VK_OBJECT_TYPE_SEMAPHORE, "Present Blit Finished Semaphore");
 
             _commandListHandler->AddWaitSemaphore(commandListID, imageAvailableSemaphore); // Wait for swapchain image to be available
             _commandListHandler->AddSignalSemaphore(commandListID, blitFinishedSemaphore); // Signal that blitting is done
         }
         
-        VkImage image = _imageHandler->GetImage(imageID);
-
         // Create sampler
         SamplerDesc samplerDesc;
         samplerDesc.enabled = true;
@@ -1549,6 +1558,7 @@ namespace Renderer
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);
             Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(pipelineID);
             
+            ImageBarrier(commandListID, imageID);
             BeginPipeline(commandListID, pipelineID);
 
             SetViewport(commandListID, _lastViewport);
@@ -1597,8 +1607,8 @@ namespace Renderer
 
         // Present
         {
-            ImageID swapchainImageID = swapChain->imageIDs.Get(frameIndex);
-            VkImage image = _imageHandler->GetImage(swapchainImageID);
+            //ImageID swapchainImageID = swapChain->imageIDs.Get(frameIndex);
+            //VkImage image = _imageHandler->GetImage(swapchainImageID);
 
             VkSemaphore blitFinishedSemaphore = _semaphoreHandler->GetVkSemaphore(swapChain->blitFinishedSemaphores.Get(semaphoreIndex));
 
@@ -1725,6 +1735,12 @@ namespace Renderer
         // Transition depth image from VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.depthBuffer.resource, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1, 1);
         // Transition image from VK_IMAGE_LAYOUT_GENERAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        if (normalImage != ImageID::Invalid())
+        {
+            const ImageDesc& normalImageDesc = _imageHandler->GetImageDesc(normalImage);
+            _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.normalBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, normalImageDesc.depth, normalImageDesc.mipLevels);
+        }
+        // Transition image from VK_IMAGE_LAYOUT_GENERAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         const ImageDesc& outputImageDesc = _imageHandler->GetImageDesc(outputImage);
         _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.outputBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outputImageDesc.depth, outputImageDesc.mipLevels);
 
@@ -1737,6 +1753,12 @@ namespace Renderer
 
         // Transition depth image from VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL to VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
         _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.depthBuffer.resource, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, 1);
+        // Transition image from VK_IMAGE_LAYOUT_GENERAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        if (normalImage != ImageID::Invalid())
+        {
+            const ImageDesc& normalImageDesc = _imageHandler->GetImageDesc(normalImage);
+            _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.normalBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, normalImageDesc.depth, normalImageDesc.mipLevels);
+        }
         // Transition image from VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL to VK_IMAGE_LAYOUT_GENERAL
         _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.outputBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, outputImageDesc.depth, outputImageDesc.mipLevels);
     }

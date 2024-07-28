@@ -70,6 +70,8 @@ namespace Renderer
 
         DynamicArray<DescriptorSet*> trackedDescriptorSets;
 
+        std::string currentPassName;
+
         static robin_hood::unordered_map<u32, u32> imageIDToResource;
         static robin_hood::unordered_map<u32, u32> depthImageIDToResource;
         static robin_hood::unordered_map<u32, u32> bufferIDToResource;
@@ -92,6 +94,9 @@ namespace Renderer
 
     void RenderGraphResources::InitializePipelineDesc(GraphicsPipelineDesc& desc)
     {
+        RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
+        desc.debugName = data->currentPassName;
+
         desc.ResourceToImageID = [&](ImageResource resource)
         {
             return GetImage(resource);
@@ -112,6 +117,8 @@ namespace Renderer
 
     void RenderGraphResources::InitializePipelineDesc(ComputePipelineDesc& desc)
     {
+        RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
+        desc.debugName = data->currentPassName;
     }
 
     const ImageDesc& RenderGraphResources::GetImageDesc(ImageResource resource)
@@ -700,5 +707,11 @@ namespace Renderer
         }
 
         data->trackedDepthImageLastBarrier[index] = passID;
+    }
+
+    void RenderGraphResources::SetPassName(std::string passName)
+    {
+        RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
+        data->currentPassName = passName;
     }
 }

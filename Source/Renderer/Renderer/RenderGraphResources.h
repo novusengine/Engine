@@ -137,12 +137,15 @@ namespace Renderer
         void SetLastBarrier(ImageID imageID, u32 passID);
         void SetLastBarrier(DepthImageID imageID, u32 passID);
 
+        void SetPassName(std::string passName);
+
     private:
         Renderer* _renderer = nullptr;
         Memory::Allocator* _allocator = nullptr;
 
         IRenderGraphResourcesData* _data = nullptr;
 
+        friend class RenderGraph;
         friend class RenderGraphBuilder;
         friend class CommandList;
         friend class DescriptorSetResource;

@@ -154,6 +154,7 @@ namespace Renderer
         virtual void ImageBarrier(CommandListID commandListID, ImageID imageID) = 0;
         virtual void ImageBarrier(CommandListID commandListID, DepthImageID imageID) = 0;
         virtual void BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from) = 0;
+        virtual void UploadBufferBarrier(CommandListID commandListID) = 0;
 
         virtual void PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size) = 0;
         virtual void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) = 0;

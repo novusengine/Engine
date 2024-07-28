@@ -5,12 +5,13 @@ namespace Renderer
     namespace Backend
     {
         bool DebugMarkerUtilVK::_initialized = false;
-        bool DebugMarkerUtilVK::_debugMarkersAvailable = false;
-        bool DebugMarkerUtilVK::_debugMarkersEnabled = false;
-        PFN_vkDebugMarkerSetObjectTagEXT DebugMarkerUtilVK::fnDebugMarkerSetObjectTag = nullptr;
-        PFN_vkDebugMarkerSetObjectNameEXT DebugMarkerUtilVK::fnDebugMarkerSetObjectName = nullptr;
-        PFN_vkCmdDebugMarkerBeginEXT DebugMarkerUtilVK::fnCmdDebugMarkerBegin = nullptr;
-        PFN_vkCmdDebugMarkerEndEXT DebugMarkerUtilVK::fnCmdDebugMarkerEnd = nullptr;
-        PFN_vkCmdDebugMarkerInsertEXT DebugMarkerUtilVK::fnCmdDebugMarkerInsert = nullptr;
+        bool DebugMarkerUtilVK::_debugUtilsEnabled = false;
+        bool DebugMarkerUtilVK::_debugUtilsAvailable = false;
+
+        PFN_vkSetDebugUtilsObjectTagEXT DebugMarkerUtilVK::fnSetDebugUtilsObjectTag = nullptr;
+        PFN_vkSetDebugUtilsObjectNameEXT DebugMarkerUtilVK::fnSetDebugUtilsObjectName = nullptr;
+        PFN_vkCmdBeginDebugUtilsLabelEXT DebugMarkerUtilVK::fnCmdBeginDebugUtilsLabel = nullptr;
+        PFN_vkCmdEndDebugUtilsLabelEXT DebugMarkerUtilVK::fnCmdEndDebugUtilsLabel = nullptr;
+        PFN_vkCmdInsertDebugUtilsLabelEXT DebugMarkerUtilVK::fnCmdInsertDebugUtilsLabel = nullptr;
     }
 }

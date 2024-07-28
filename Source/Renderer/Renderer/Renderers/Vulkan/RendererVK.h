@@ -137,6 +137,7 @@ namespace Renderer
         void ImageBarrier(CommandListID commandListID, ImageID imageID) override;
         void ImageBarrier(CommandListID commandListID, DepthImageID imageID) override;
         void BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from) override;
+        void UploadBufferBarrier(CommandListID commandListID) override;
 
         void PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size) override;
         void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) override;

@@ -126,6 +126,7 @@ namespace Renderer
         void ImageBarrier(DepthImageMutableResource resource);
         void BufferBarrier(BufferResource resource, BufferPassUsage from);
         void BufferBarrier(BufferMutableResource resource, BufferPassUsage from);
+        void UploadBufferBarrier();
         
         void DrawImgui();
 

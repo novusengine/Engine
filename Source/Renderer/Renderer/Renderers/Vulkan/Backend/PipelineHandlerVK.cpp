@@ -5,6 +5,7 @@
 #include "ImageHandlerVK.h"
 #include "SpirvReflect.h"
 #include "DescriptorSetBuilderVK.h"
+#include "DebugMarkerUtilVK.h"
 
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/XXHash64.h>
@@ -281,9 +282,10 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create render pass!");
             }
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.renderPass, VK_OBJECT_TYPE_RENDER_PASS, desc.debugName.c_str());
 
             // -- Create Framebuffer --
-            CreateFramebuffer(pipeline);
+            CreateFramebuffer(pipeline, desc.debugName);
 
             // -- Get Reflection data from shader --
             std::vector<BindInfo> bindInfos;
@@ -364,6 +366,7 @@ namespace Renderer
                 {
                     NC_LOG_CRITICAL("Failed to create descriptor set layout!");
                 }
+                DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.descriptorSetLayouts[i], VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, desc.debugName.c_str());
             }
 
             // -- Create Push Constant Range from reflected SPIR-V --
@@ -590,6 +593,7 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create pipeline layout!");
             }
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.pipelineLayout, VK_OBJECT_TYPE_PIPELINE_LAYOUT, desc.debugName.c_str());
 
             // Set up dynamic viewport and scissor
             std::vector<VkDynamicState> dynamicStates;
@@ -626,8 +630,7 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create graphics pipeline!");
             }
-
-            
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.pipeline, VK_OBJECT_TYPE_PIPELINE, desc.debugName.c_str());
 
             GraphicsPipelineID pipelineID = GraphicsPipelineID(static_cast<gIDType>(nextID));
             pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, pipelineID, this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
@@ -696,6 +699,7 @@ namespace Renderer
                 {
                     NC_LOG_CRITICAL("Failed to create descriptor set layout!");
                 }
+                DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.descriptorSetLayouts[i], VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, desc.debugName.c_str());
             }
 
             VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -709,6 +713,7 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create pipeline layout!");
             }
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.pipelineLayout, VK_OBJECT_TYPE_PIPELINE_LAYOUT, desc.debugName.c_str());
 
             VkPipelineShaderStageCreateInfo shaderStage = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
             shaderStage.module = _shaderHandler->GetShaderModule(desc.computeShader);
@@ -723,6 +728,7 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create compute pipeline!");
             }
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.pipeline, VK_OBJECT_TYPE_PIPELINE, desc.debugName.c_str());
 
             ComputePipelineID pipelineID = ComputePipelineID(static_cast<cIDType>(nextID));
             pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, pipelineID, this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
@@ -954,7 +960,7 @@ namespace Renderer
             return sets[setNumber];
         }
 
-        void PipelineHandlerVK::CreateFramebuffer(GraphicsPipeline& pipeline)
+        void PipelineHandlerVK::CreateFramebuffer(GraphicsPipeline& pipeline, const std::string& debugName)
         {
             u32 numAttachments = pipeline.numRenderTargets;
             
@@ -993,6 +999,7 @@ namespace Renderer
             {
                 NC_LOG_CRITICAL("Failed to create framebuffer!");
             }
+            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.framebuffer, VK_OBJECT_TYPE_FRAMEBUFFER, debugName.c_str());
         }
     }
 }

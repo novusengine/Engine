@@ -1,11 +1,12 @@
 #include "UploadBufferHandlerVK.h"
 #include "BufferHandlerVK.h"
-#include "TextureHandlerVK.h"
 #include "CommandListHandlerVK.h"
-#include "SemaphoreHandlerVK.h"
+#include "DebugMarkerUtilVK.h"
 #include "RenderDeviceVK.h"
 #include "Renderer/Renderers/Vulkan/RendererVK.h"
 #include "Renderer/RenderSettings.h"
+#include "SemaphoreHandlerVK.h"
+#include "TextureHandlerVK.h"
 
 #include <Base/Container/ConcurrentQueue.h>
 #include <Base/Container/SafeVector.h>
@@ -113,6 +114,9 @@ namespace Renderer
             bool needsWait = false;
             std::mutex submitMutex;
             SemaphoreID uploadFinishedSemaphore;
+
+            // These are copies of the barriers which needs to run on the main commandlist
+            moodycamel::ConcurrentQueue<VkBufferMemoryBarrier> bufferMemoryBarriers;
         };
 
         void UploadBufferHandlerVK::Init(RendererVK* renderer, RenderDeviceVK* device, BufferHandlerVK* bufferHandler, TextureHandlerVK* textureHandler, SemaphoreHandlerVK* semaphoreHandler, CommandListHandlerVK* commandListHandler)
@@ -182,8 +186,8 @@ namespace Renderer
             std::scoped_lock lock(data->submitMutex);
 
             CommandListID commandListID = _commandListHandler->BeginCommandList(QueueType::Graphics);
-
             VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+            DebugMarkerUtilVK::PushMarker(commandBuffer, Color::PastelPurple, "Uploads");
 
 #if TRACY_ENABLE
             TracySourceLocation(ExecuteUpload, "ExecuteUpload", tracy::Color::Yellow2);
@@ -193,7 +197,7 @@ namespace Renderer
 
             for (u32 i = 0; i < data->stagingBuffers.Num; i++)
             {
-                StagingBuffer& stagingBuffer = data->stagingBuffers.Get(i);
+                StagingBuffer& stagingBuffer = data->stagingBuffers.Get(i); 
 
                 if (stagingBuffer.bufferStatus == BufferStatus::READY && stagingBuffer.totalHandles > 0)
                 {
@@ -212,6 +216,7 @@ namespace Renderer
             _commandListHandler->AddSignalSemaphore(commandListID, semaphore);
             data->needsWait = true;
 
+            DebugMarkerUtilVK::PopMarker(commandBuffer);
             _commandListHandler->EndCommandList(commandListID, VK_NULL_HANDLE);
 
             // Reset staging buffer allocators and uploadToBufferTasks
@@ -252,6 +257,21 @@ namespace Renderer
             }
 
             data->isDirty = false;
+        }
+
+        void UploadBufferHandlerVK::SyncBarrier(VkCommandBuffer commandBuffer)
+        {
+            UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+
+            VkBufferMemoryBarrier barriers[64];
+            u32 numDequeued = static_cast<u32>(data->bufferMemoryBarriers.try_dequeue_bulk(&barriers[0], 64));
+
+            while (numDequeued > 0) 
+            {
+                vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, numDequeued, &barriers[0], 0, nullptr);
+
+                numDequeued = static_cast<u32>(data->bufferMemoryBarriers.try_dequeue_bulk(&barriers[0], 64)); // Try to dequeue more
+            }
         }
 
         std::shared_ptr<UploadBuffer> UploadBufferHandlerVK::CreateUploadBuffer(BufferID targetBuffer, size_t targetOffset, size_t size)
@@ -524,8 +544,6 @@ namespace Renderer
 
         void UploadBufferHandlerVK::ExecuteStagingBuffer(VkCommandBuffer commandBuffer, StagingBuffer& stagingBuffer)
         {
-            //UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
-
             {
                 UploadTask* task;
                 while (stagingBuffer.uploadTasks.try_dequeue(task))
@@ -635,6 +653,11 @@ namespace Renderer
             }
 
             vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
+
+            UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+            bufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+            bufferBarrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+            data->bufferMemoryBarriers.enqueue(bufferBarrier);
         }
 
         void UploadBufferHandlerVK::HandleUploadToTextureTask(VkCommandBuffer commandBuffer, StagingBuffer& stagingBuffer, UploadToTextureTask* uploadToTextureTask)
@@ -772,6 +795,11 @@ namespace Renderer
                 bufferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
                 vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
+
+                UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+                bufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+                bufferBarrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+                data->bufferMemoryBarriers.enqueue(bufferBarrier);
             }
         }
 

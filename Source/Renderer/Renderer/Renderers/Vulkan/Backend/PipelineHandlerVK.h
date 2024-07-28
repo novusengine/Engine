@@ -87,7 +87,7 @@ namespace Renderer
             bool TryFindExistingCPipeline(u64 descHash, size_t& id);
             DescriptorSetLayoutData& GetDescriptorSet(i32 setNumber, std::vector<DescriptorSetLayoutData>& sets);
             
-            void CreateFramebuffer(GraphicsPipeline& pipeline);
+            void CreateFramebuffer(GraphicsPipeline& pipeline, const std::string& debugName);
 
         private:
             Memory::Allocator* _allocator;

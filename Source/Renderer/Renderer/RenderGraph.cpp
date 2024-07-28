@@ -130,6 +130,8 @@ namespace Renderer
         commandList.BeginTimeQuery(totalTimeQueryID);
 
         commandList.PushMarker("RenderGraph", Color::PastelBlue);
+        commandList.UploadBufferBarrier();
+
         for (u32 i = 0; i < data->passes.Count(); i++)
         {
             IRenderPass* pass = data->passes[i];
@@ -145,6 +147,7 @@ namespace Renderer
             commandList.BeginTimeQuery(passTimeQueryID);
 
             commandList.PushMarker(pass->_name, Color::PastelGreen);
+            resources.SetPassName(pass->_name);
 
             commandList.SetCurrentPassIndex(i);
             _renderGraphBuilder->PrePass(commandList, i, pass->_name);
