@@ -23,6 +23,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <cstddef>
 
 ///
 /// @defgroup ffxSDK SDK
