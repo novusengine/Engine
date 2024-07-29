@@ -26,6 +26,7 @@
 #include <FidelityFX/host/backends/vk/ffx_vk.h>
 #include <ffx_shader_blobs.h>
 #include <codecvt>
+#include <cstring>
 
 // prototypes for functions in the interface
 FfxUInt32              GetSDKVersionVK(FfxInterface* backendInterface);
