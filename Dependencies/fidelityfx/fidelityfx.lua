@@ -27,6 +27,10 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     Solution.Util.SetFiles(files)
     Solution.Util.SetIncludes(includeDirs)
     Solution.Util.SetDefines(defines)
+        
+    Solution.Util.SetFilter("system:linux", function()
+        Solution.Util.SetDefines("FFX_GCC")
+    end)
 end)
 
 Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
@@ -34,4 +38,8 @@ Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
     Solution.Util.SetIncludes({ basePath .. "/sdk/include", basePath .. "/sdk/src/backends/shared" })
     Solution.Util.SetDefines("FFX_CACAO")
     Solution.Util.SetLinks(dep.Name)
+
+    Solution.Util.SetFilter("system:linux", function()
+        Solution.Util.SetDefines("FFX_GCC")
+    end)
 end)
