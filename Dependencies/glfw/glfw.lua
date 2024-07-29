@@ -49,7 +49,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         Solution.Util.SetDefines({ "_GLFW_WIN32", "_CRT_SECURE_NO_WARNINGS" })
     end)
     
-    Solution.Util.SetFilter("platforms:Linux", function()
+    Solution.Util.SetFilter("system:linux", function()
         local files =
         {
             sourceDir .. "/x11_platform.h",
@@ -79,7 +79,7 @@ Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
         Solution.Util.SetDefines({ "_GLFW_WIN32", "_CRT_SECURE_NO_WARNINGS" })
     end)
 
-    Solution.Util.SetFilter("platforms:Linux", function()
+    Solution.Util.SetFilter("system:linux", function()
         Solution.Util.SetDefines({ "_GLFW_X11", "_CRT_SECURE_NO_WARNINGS" })
     end)
 end)
