@@ -17,6 +17,7 @@ namespace Network
         Socket::Result Reinit();
 
         Socket::Result Connect(u32 host, u16 port);
+        Socket::Result Connect(const char* hostname, u16 port);
         Socket::Result Connect(std::string& hostname, u16 port);
         Socket::Result Close();
         Socket::Result Send(void* data, size_t size);

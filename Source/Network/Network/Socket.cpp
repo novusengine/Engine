@@ -126,36 +126,31 @@ namespace Network
         return result;
     }
 
-    Socket::Result Socket::Connect(std::string& hostName, u16 port)
+    Socket::Result Socket::Connect(const char* hostName, u16 port)
     {
         if (_type != Type::CLIENT)
             return Result::ERROR_CONNECT_MODE_SERVER;
 
         Result result = Result::SUCCESS;
+        u32 host = 0;
+
 #ifdef _WIN32
-        hostent* localHost = gethostbyname(hostName.c_str());
+        hostent* localHost = gethostbyname(hostName);
+        if (!localHost)
+            return Result::ERROR_CLIENT_FAILED_TO_RESOLVE_HOSTNAME;
+
         char* localIP = inet_ntoa(*(struct in_addr*)*localHost->h_addr_list);
+        if (!localIP)
+            return Result::ERROR_CLIENT_FAILED_TO_CONVERT_HOSTNAME_TO_ADDRESS;
 
-        sockaddr_in serverAddr { };
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_addr.s_addr = inet_addr(localIP);
-        serverAddr.sin_port = htons(port);
-
-        i32 code = connect(_socket, (SOCKADDR*)&serverAddr, sizeof(serverAddr));
-        if (code == SOCKET_ERROR)
-        {
-            result = GetResultFromError(WSAGetLastError());
-        }
-
-        _connectInfo.ipAddr = serverAddr.sin_addr.S_un.S_addr;
-        _connectInfo.ipAddrStr = hostName;
-        _connectInfo.port = port;
-
-#elif __linux__
-        return Result::ERROR_NOT_IMPLEMENTED;
+        host = inet_addr(localIP);
 #endif
+        return Connect(host, port);
+    }
 
-        return result;
+    Socket::Result Socket::Connect(std::string& hostName, u16 port)
+    {
+        return Connect(hostName.c_str(), port);
     }
 
     Socket::Result Socket::Bind(std::string& hostName, u16 port)

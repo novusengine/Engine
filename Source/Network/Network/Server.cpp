@@ -237,8 +237,10 @@ namespace Network
                     std::shared_ptr<Bytebuffer>& buffer = connection.client->GetReadBuffer();
                     while (size_t activeSize = buffer->GetActiveSize())
                     {
+                        static constexpr u8 PacketHeaderSize = sizeof(PacketHeader);
+
                         // We have received a partial header and need to read more
-                        if (activeSize < sizeof(PacketHeader))
+                        if (activeSize < PacketHeaderSize)
                         {
                             buffer->Normalize();
                             break;
@@ -246,19 +248,10 @@ namespace Network
 
                         PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer->GetReadPointer());
 
-                        if (header->opcode == Opcode::INVALID || header->opcode > Opcode::MAX_COUNT)
+                        if (header->size > DEFAULT_BUFFER_SIZE - PacketHeaderSize)
                         {
 #ifdef NC_DEBUG
-                            NC_LOG_ERROR("Network : Received Invalid Opcode ({0}) from (SocketId : {1}, \"{2}:{3}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
-#endif // NC_DEBUG
-                            CloseSocketID(connection.id);
-                            break;
-                        }
-
-                        if (header->size > DEFAULT_BUFFER_SIZE)
-                        {
-#ifdef NC_DEBUG
-                            NC_LOG_ERROR("Network : Received Invalid Opcode Size ({0} : {1}) from (SocketId : {2}, \"{3}:{4}\")", static_cast<std::underlying_type<Opcode>::type>(header->opcode), header->size, static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
+                            NC_LOG_ERROR("Network : Received Invalid Opcode Size ({0} : {1}) from (SocketId : {2}, \"{3}:{4}\")", header->opcode, header->size, static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
 #endif // NC_DEBUG
                             CloseSocketID(connection.id);
                             break;

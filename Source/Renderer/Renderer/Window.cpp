@@ -41,10 +41,10 @@ namespace Novus
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-#if NC_Debug
-        _window = glfwCreateWindow(width, height, "CNovusCore (DEBUG)", NULL, NULL);
+#if NC_DEBUG
+        _window = glfwCreateWindow(width, height, "NovusEngine (DEBUG)", NULL, NULL);
 #else
-        _window = glfwCreateWindow(width, height, "CNovusCore", NULL, NULL);
+        _window = glfwCreateWindow(width, height, "NovusEngine", NULL, NULL);
 #endif
 
         if (!_window)

@@ -14,6 +14,7 @@ local modules =
     "Network/Network.lua",
     "FileFormat/FileFormat.lua",
     "Input/Input.lua",
+    "Gameplay/Gameplay.lua",
     "ShaderCooker/ShaderCooker.lua",
     "Renderer/Renderer.lua",
 }

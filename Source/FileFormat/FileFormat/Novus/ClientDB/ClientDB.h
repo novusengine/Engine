@@ -40,11 +40,11 @@ namespace ClientDB
             for (void* row : _rows)
             {
                 if (row)
-				    delete row;
-			}
-		}
+                    delete row;
+            }
+        }
 
-        void Each(std::function<void(const Storage<T>* storage, const T*)> func)
+        void Each(std::function<void(const Storage<T>* storage, const T*)> func) const
         {
             for (T* row : _rows)
             {
@@ -95,10 +95,10 @@ namespace ClientDB
         {
             u32 maxID = _minID + Count();
             if (id < _minID || id > maxID)
-				return nullptr;
+                return nullptr;
 
-			return _rows[id - _minID];
-		}
+            return _rows[id - _minID];
+        }
         bool HasRow(u32 id)
         {
             const T* row = GetRow(id);
@@ -135,8 +135,8 @@ namespace ClientDB
                     memset(_rows.data(), 0, sizeof(T*) * numNewRows);
 
                     _minID = newMinID;
-				}
-			}
+                }
+            }
 
             bool hasRowAtID = _rows[row.id - _minID] != nullptr;
             _numRows += 1 * !hasRowAtID;
@@ -182,7 +182,7 @@ namespace ClientDB
             u32 numRows = static_cast<u32>(_rows.size());
             return numRows;
         }
-        u32 GetNumRows()
+        u32 GetNumRows() const
         {
             return _numRows;
         }
@@ -221,16 +221,16 @@ namespace ClientDB
             if (header.version != CURRENT_VERSION)
             {
                 NC_LOG_ERROR("ClientDB::Storage::Read('{0}') - Version mismatch. Got: {1}, Expected: {2}", _name, header.version, CURRENT_VERSION);
-				return false;
-			}
+                return false;
+            }
 
             u32 maxID = 0;
 
-			if (!buffer->GetU32(_minID))
-				return false;
+            if (!buffer->GetU32(_minID))
+                return false;
 
-			if (!buffer->GetU32(maxID))
-				return false;
+            if (!buffer->GetU32(maxID))
+                return false;
 
             u32 numRows = maxID - _minID + 1;
             _rows.resize(numRows);
@@ -241,16 +241,16 @@ namespace ClientDB
 
             while (buffer->GetActiveSize() > 0)
             {
-				T* row = new T();
+                T* row = new T();
                 if (!row->Read(buffer, stringTable))
                 {
-					delete row;
-					return false;
-				}
+                    delete row;
+                    return false;
+                }
 
                 if (row->id < _minID || row->id > maxID)
                 {
-					NC_LOG_ERROR("ClientDB::Storage::Read('{0}') - Row ID out of bounds. Got: {1} (Min: {2}, Max: {3})", _name, row->id, _minID, maxID);
+                    NC_LOG_ERROR("ClientDB::Storage::Read('{0}') - Row ID out of bounds. Got: {1} (Min: {2}, Max: {3})", _name, row->id, _minID, maxID);
 
                     delete row;
                     continue;
@@ -260,10 +260,10 @@ namespace ClientDB
                 _numRows += 1 * !hasRowAtID;
 
                 _rows[row->id - _minID] = row;
-			}
+            }
 
-			return true;
-		}
+            return true;
+        }
 
         bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable)
         {
@@ -301,9 +301,9 @@ namespace ClientDB
                 if (!row)
                     continue;
 
-				if (!row->Write(buffer, stringTable))
-					return false;
-			}
+                if (!row->Write(buffer, stringTable))
+                    return false;
+            }
 
             return true;
         }

@@ -3,6 +3,7 @@
 
 #include <Base/Types.h>
 #include <Base/Container/StringTable.h>
+#include <Base/Math/Color.h>
 #include <Base/Math/Geometry.h>
 #include <Base/Memory/Bytebuffer.h>
 
@@ -748,6 +749,155 @@ namespace ClientDB::Definitions
         u8 colorIndex;
         u16 flags;
         u32 textureHashes[3];
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct Light : public Base
+    {
+    public:
+        u16 mapID;
+        vec3 position;
+        vec2 fallOff;
+        u16 lightParamsID[8];
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct LightParam : public Base
+    {
+    public:
+        struct Flags
+        {
+            u8 highlightSky : 1 = 0;
+            u8 : 7;
+        };
+
+    public:
+        Flags flags;
+        u16 lightSkyboxID;
+        f32 glow;
+        f32 waterShallowAlpha;
+        f32 waterDeepAlpha;
+        f32 oceanShallowAlpha;
+        f32 oceanDeepAlpha;
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct LightData : public Base
+    {
+    public:
+        u16 lightParamID;
+        u32 timestamp;
+        u32 diffuseColor;
+        u32 ambientColor;
+        u32 skyTopColor;
+        u32 skyMiddleColor;
+        u32 skyBand1Color;
+        u32 skyBand2Color;
+        u32 skySmogColor;
+        u32 skyFogColor;
+        u32 sunColor;
+        u32 sunFogColor;
+        f32 sunFogStrength;
+        u32 cloudSunColor;
+        u32 cloudEmissiveColor;
+        u32 cloudLayer1AmbientColor;
+        u32 cloudLayer2AmbientColor;
+        u32 oceanShallowColor;
+        u32 oceanDeepColor;
+        u32 riverShallowColor;
+        u32 riverDeepColor;
+        u32 shadowColor;
+        f32 fogEnd;
+        f32 fogScaler;
+        f32 fogDensity;
+        f32 sunFogAngle;
+        f32 cloudDensity;
+        u32 fogHeightColor;
+        u32 endFogColor;
+        u32 endFogHeightColor;
+
+    public:
+        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Get(*this))
+                return false;
+
+            return true;
+        }
+        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            if (!buffer->Put(*this))
+                return false;
+
+            return true;
+        }
+        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
+        {
+            return true;
+        }
+    };
+
+    struct LightSkybox : public Base
+    {
+    public:
+        u32 modelHash;
 
     public:
         bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
