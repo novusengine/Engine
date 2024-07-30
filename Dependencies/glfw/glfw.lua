@@ -20,7 +20,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         sourceDir .. "/input.c",
         sourceDir .. "/monitor.c",
         sourceDir .. "/vulkan.c",
-        sourceDir .. "/window.c"
+        sourceDir .. "/window.c",
         sourceDir .. "/platform.h"
     }
     Solution.Util.SetFiles(files)
