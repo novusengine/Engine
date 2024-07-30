@@ -160,9 +160,6 @@ namespace Renderer
         virtual void FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data) = 0;
         virtual void UpdateBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, void* data) = 0;
 
-        // FidelityFX Commands
-        virtual void DispatchCacao(CommandListID commandListID, FfxCacaoContext* context, DepthImageID depthImage, ImageID normalImage, ImageID outputImage, mat4x4* proj, mat4x4* normalsToView, f32 normalUnpackMul, f32 normalUnpackAdd) = 0;
-
         // Present functions
         virtual void Present(Novus::Window* window, ImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) = 0;
         virtual void Present(Novus::Window* window, DepthImageID image, SemaphoreID semaphoreID = SemaphoreID::Invalid()) = 0;
@@ -193,10 +190,6 @@ namespace Renderer
         virtual f32 GetLastTimeQueryDuration(TimeQueryID id) = 0;
 
         const std::vector<TimeQueryID>& GetFrameTimeQueries() { return _frameTimeQueries; }
-
-        // FidelityFX
-        virtual i32 ffxGetInterface(FfxInterface* backendInterface, void* scratchBuffer, size_t scratchBufferSize, size_t maxContexts) = 0;
-        virtual size_t ffxGetScratchMemorySize(size_t maxContexts) = 0;
 
         // Utils
         virtual void FlushGPU() = 0;
