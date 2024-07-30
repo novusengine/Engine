@@ -6,7 +6,7 @@ if not vulkanSDK then
 end
 
 local dep = Solution.Util.CreateDepTable("vulkan", {})
-local libPath = iif(os.istarget("windows"), vulkanSDK .. "/lib/vulkan-1.lib", vulkanSDK .. "/lib/vulkan-1.so")
+local libPath = iif(os.istarget("windows"), vulkanSDK .. "/lib/vulkan-1.lib", vulkanSDK .. "/lib/libvulkan.so.1")
 
 Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
     Solution.Util.SetIncludes(vulkanSDK .. "/include")
