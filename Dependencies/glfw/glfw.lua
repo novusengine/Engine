@@ -13,6 +13,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     {
         includeDir .. "/GLFW/glfw3.h",
         includeDir .. "/GLFW/glfw3native.h",
+        
 
         sourceDir .. "/context.c",
         sourceDir .. "/init.c",
@@ -20,6 +21,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         sourceDir .. "/monitor.c",
         sourceDir .. "/vulkan.c",
         sourceDir .. "/window.c"
+        sourceDir .. "/platform.h"
     }
     Solution.Util.SetFiles(files)
     Solution.Util.SetIncludes(dep.Path)
