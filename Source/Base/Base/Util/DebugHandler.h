@@ -3,9 +3,7 @@
 #include "Base/Platform.h"
 
 // None is defined in quill, but also x11 on Linux. We want to use the quill definition.
-#ifdef None
 #undef None
-#endif // None
 
 #include "quill/Backend.h"
 #include "quill/Frontend.h"
