@@ -46,9 +46,7 @@
 #define CoTaskMemAlloc malloc
 #define CoTaskMemFree free
 
-#ifndef ARRAYSIZE
 #define ARRAYSIZE(array) (sizeof(array) / sizeof(array[0]))
-#endif // ARRAYSIZE
 
 #define _countof(a) (sizeof(a) / sizeof(*(a)))
 
@@ -188,7 +186,7 @@
 
 #define vsnprintf_s vsnprintf
 #define strcat_s strcat
-#define strcpy_s(dst, n, src) strncpy(dst, src, n)
+#define strncpy_s(dst, n, src) strncpy(dst, src, n)
 #define _vscwprintf vwprintf
 #define vswprintf_s vswprintf
 #define swprintf_s swprintf
