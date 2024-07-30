@@ -9,7 +9,7 @@ local dependencies =
     "base64/base64.lua",
     "catch2/catch2.lua",
     "dxcompiler/dxcompiler.lua",
-    "enkiTS/enkiTS.lua",
+    "enkits/enkiTS.lua",
     "entt/entt.lua",
     "glfw/glfw.lua",
     "gli/gli.lua",
