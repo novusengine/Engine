@@ -1,5 +1,5 @@
 local mod = Solution.Util.CreateDepTable("dxcompiler", {})
-local libPath = iif(os.istarget("windows"), mod.Path .. "/lib/windows/dxcompiler.dll", mod.Path .. "/lib/linux/dxcompiler.so")
+local libPath = iif(os.istarget("windows"), mod.Path .. "/lib/windows/dxcompiler.dll", mod.Path .. "/lib/linux/libdxcompiler.so")
 
 Solution.Util.CreateDep(mod.Name, mod.Dependencies, function()
     Solution.Util.SetIncludes(mod.Path .. "/include")
