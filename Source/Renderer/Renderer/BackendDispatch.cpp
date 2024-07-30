@@ -35,7 +35,6 @@
 #include "Commands/DrawImgui.h"
 #include "Commands/PushConstant.h"
 #include "Commands/TimeQuery.h"
-#include "Commands/FidelityFXCommands.h"
 
 #include <tracy/Tracy.hpp>
 
@@ -337,13 +336,5 @@ namespace Renderer
         ZoneScopedC(tracy::Color::Red3);
         const Commands::PushConstant* actualData = static_cast<const Commands::PushConstant*>(data);
         renderer->PushConstant(commandList, actualData->data, actualData->offset, actualData->size);
-    }
-
-    // FidelityFX
-    void BackendDispatch::DispatchCacao(Renderer* renderer, CommandListID commandList, const void* data)
-    {
-        ZoneScopedC(tracy::Color::Red3);
-        const Commands::DispatchCacao* actualData = static_cast<const Commands::DispatchCacao*>(data);
-        renderer->DispatchCacao(commandList, actualData->context, actualData->depthImage, actualData->normalImage, actualData->outputImage, actualData->proj, actualData->normalsToView, actualData->normalUnpackMul, actualData->normalUnpackAdd);
     }
 }

@@ -17,7 +17,6 @@
 #include "DrawIndirect.h"
 #include "DrawIndirectCount.h"
 #include "EndTrace.h"
-#include "FidelityFXCommands.h"
 #include "FillBuffer.h"
 #include "ImageBarrier.h"
 #include "MarkFrameStart.h"
@@ -84,8 +83,5 @@ namespace Renderer
         const BackendDispatchFunction SetViewport::DISPATCH_FUNCTION = &BackendDispatch::SetViewport;
         const BackendDispatchFunction UpdateBuffer::DISPATCH_FUNCTION = &BackendDispatch::UpdateBuffer;
         const BackendDispatchFunction UploadBufferBarrier::DISPATCH_FUNCTION = &BackendDispatch::UploadBufferBarrier;
-
-        // FidelityFX
-        const BackendDispatchFunction DispatchCacao::DISPATCH_FUNCTION = &BackendDispatch::DispatchCacao;
     }
 }

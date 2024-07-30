@@ -17,7 +17,6 @@
 #include "Backend/FormatConverterVK.h"
 #include "Backend/DebugMarkerUtilVK.h"
 #include "Backend/TimeQueryHandlerVK.h"
-#include "Backend/ffx_vk.h"
 
 #include <Base/Container/SafeVector.h>
 #include <Base/Util/StringUtils.h>
@@ -27,8 +26,6 @@
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyVulkan.hpp>
 #include <imgui/backends/imgui_impl_vulkan.h>
-#include <FidelityFX/host/ffx_cacao.h>
-#include <FidelityFX/host/ffx_interface.h>
 
 namespace Renderer
 {
@@ -48,7 +45,6 @@ namespace Renderer
         _semaphoreHandler = new Backend::SemaphoreHandlerVK();
         _uploadBufferHandler = new Backend::UploadBufferHandlerVK();
         _timeQueryHandler = new Backend::TimeQueryHandlerVK();
-        _fidelityFXHandler = new Backend::FidelityFXHandlerVK();
 
         // Init
         _device->Init();
@@ -57,7 +53,6 @@ namespace Renderer
         _textureHandler->Init(_device, _bufferHandler, _uploadBufferHandler, _samplerHandler);
         _shaderHandler->Init(_device);
         _timeQueryHandler->Init(_device);
-        _fidelityFXHandler->Init(_device, _imageHandler);
         _pipelineHandler->Init(&_frameAllocator, _device, _shaderHandler, _imageHandler, _bufferHandler);
         _commandListHandler->Init(_device);
         _samplerHandler->Init(_device);
@@ -92,7 +87,6 @@ namespace Renderer
         delete(_samplerHandler);
         delete(_semaphoreHandler);
         delete(_timeQueryHandler);
-        delete(_fidelityFXHandler);
     }
 
     void RendererVK::SetShaderSourceDirectory(const std::string& path)
@@ -1712,57 +1706,6 @@ namespace Renderer
         vkCmdUpdateBuffer(commandBuffer, vkDstBuffer, dstOffset, size, data);
     }
 
-    void RendererVK::DispatchCacao(CommandListID commandListID, FfxCacaoContext* context, DepthImageID depthImage, ImageID normalImage, ImageID outputImage, mat4x4* proj, mat4x4* normalsToView, f32 normalUnpackMul, f32 normalUnpackAdd)
-    {
-        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
-
-        FfxCacaoDispatchDescription dispatchDescription = {};
-        dispatchDescription.commandList = commandBuffer;
-        dispatchDescription.depthBuffer = _fidelityFXHandler->ffxGetResource(depthImage, FFX_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-        wcsncpy(dispatchDescription.depthBuffer.name, L"DepthBuffer", 63);
-        if (normalImage != ImageID::Invalid())
-        {
-            dispatchDescription.normalBuffer = _fidelityFXHandler->ffxGetResource(normalImage, FFX_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-            wcsncpy(dispatchDescription.normalBuffer.name, L"NormalBuffer", 63);
-        }
-        dispatchDescription.outputBuffer = _fidelityFXHandler->ffxGetResource(outputImage, FFX_RESOURCE_STATE_PIXEL_COMPUTE_READ);
-        wcsncpy(dispatchDescription.outputBuffer.name, L"SSAOBuffer", 63);
-        dispatchDescription.proj = reinterpret_cast<FfxCacaoMat4x4*>(proj); // FidelityFX expects row major, GLM is column major so this needs to have been transposed already
-        dispatchDescription.normalsToView = reinterpret_cast<FfxCacaoMat4x4*>(normalsToView); // FidelityFX expects row major, GLM is column major so this needs to have been transposed already
-        dispatchDescription.normalUnpackMul = normalUnpackMul;
-        dispatchDescription.normalUnpackAdd = normalUnpackAdd;
-
-        // Transition depth image from VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.depthBuffer.resource, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1, 1);
-        // Transition image from VK_IMAGE_LAYOUT_GENERAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        if (normalImage != ImageID::Invalid())
-        {
-            const ImageDesc& normalImageDesc = _imageHandler->GetImageDesc(normalImage);
-            _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.normalBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, normalImageDesc.depth, normalImageDesc.mipLevels);
-        }
-        // Transition image from VK_IMAGE_LAYOUT_GENERAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        const ImageDesc& outputImageDesc = _imageHandler->GetImageDesc(outputImage);
-        _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.outputBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outputImageDesc.depth, outputImageDesc.mipLevels);
-
-        FfxErrorCode errorCode = ffxCacaoContextDispatch(context, &dispatchDescription);
-        if (errorCode != FfxErrorCodes::FFX_OK)
-        {
-            NC_LOG_CRITICAL("Failed to dispatch CACAO");
-            return;
-        }
-
-        // Transition depth image from VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL to VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-        _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.depthBuffer.resource, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, 1);
-        // Transition image from VK_IMAGE_LAYOUT_GENERAL to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        if (normalImage != ImageID::Invalid())
-        {
-            const ImageDesc& normalImageDesc = _imageHandler->GetImageDesc(normalImage);
-            _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.normalBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, normalImageDesc.depth, normalImageDesc.mipLevels);
-        }
-        // Transition image from VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL to VK_IMAGE_LAYOUT_GENERAL
-        _device->TransitionImageLayout(commandBuffer, (VkImage)dispatchDescription.outputBuffer.resource, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, outputImageDesc.depth, outputImageDesc.mipLevels);
-    }
-
     void* RendererVK::MapBuffer(BufferID buffer)
     {
         void* mappedMemory;
@@ -1789,52 +1732,6 @@ namespace Renderer
     f32 RendererVK::GetLastTimeQueryDuration(TimeQueryID id)
     {
         return _timeQueryHandler->GetLastTime(id);
-    }
-
-    i32 RendererVK::ffxGetInterface(FfxInterface* backendInterface, void* scratchBuffer, size_t scratchBufferSize, size_t maxContexts)
-    {
-        /*
-        FFX_RETURN_ON_ERROR(
-            !s_BackendRefCount,
-            FFX_ERROR_BACKEND_API_ERROR);
-        FFX_RETURN_ON_ERROR(
-            backendInterface,
-            FFX_ERROR_INVALID_POINTER);
-        FFX_RETURN_ON_ERROR(
-            scratchBuffer,
-            FFX_ERROR_INVALID_POINTER);
-        FFX_RETURN_ON_ERROR(
-            scratchBufferSize >= ffxGetScratchMemorySizeVK(((VkDeviceContext*)device)->vkPhysicalDevice, maxContexts),
-            FFX_ERROR_INSUFFICIENT_MEMORY);*/
-
-        backendInterface->fpGetSDKVersion = Backend::GetSDKVersionVK;
-        backendInterface->fpCreateBackendContext = Backend::CreateBackendContextVK;
-        backendInterface->fpGetDeviceCapabilities = Backend::GetDeviceCapabilitiesVK;
-        backendInterface->fpDestroyBackendContext = Backend::DestroyBackendContextVK;
-        backendInterface->fpCreateResource = Backend::CreateResourceVK;
-        backendInterface->fpDestroyResource = Backend::DestroyResourceVK;
-        backendInterface->fpRegisterResource = Backend::RegisterResourceVK;
-        backendInterface->fpGetResource = Backend::GetResourceVK;
-        backendInterface->fpUnregisterResources = Backend::UnregisterResourcesVK;
-        backendInterface->fpGetResourceDescription = Backend::GetResourceDescriptionVK;
-        backendInterface->fpCreatePipeline = Backend::CreatePipelineVK;
-        backendInterface->fpDestroyPipeline = Backend::DestroyPipelineVK;
-        backendInterface->fpScheduleGpuJob = Backend::ScheduleGpuJobVK;
-        backendInterface->fpExecuteGpuJobs = Backend::ExecuteGpuJobsVK;
-
-        // Memory assignments
-        backendInterface->scratchBuffer = scratchBuffer;
-        backendInterface->scratchBufferSize = scratchBufferSize;
-
-        // Map the device
-        backendInterface->device = _fidelityFXHandler;
-
-        return FFX_OK;
-    }
-
-    size_t RendererVK::ffxGetScratchMemorySize(size_t maxContexts)
-    {
-        return _fidelityFXHandler->ffxGetScratchMemorySize(maxContexts);
     }
 
     const std::string& RendererVK::GetGPUName()

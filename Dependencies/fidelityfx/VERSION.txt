@@ -1,2 +1,0 @@
-FidelityFX-SDK Release tag v 1.0.0
-https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v1.0.0
