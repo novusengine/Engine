@@ -14,14 +14,25 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         includeDir .. "/GLFW/glfw3.h",
         includeDir .. "/GLFW/glfw3native.h",
         
-
+        sourceDir .. "/internal.h",
+        sourceDir .. "/platform.h",
+        sourceDir .. "/mappings.h",
         sourceDir .. "/context.c",
         sourceDir .. "/init.c",
         sourceDir .. "/input.c",
         sourceDir .. "/monitor.c",
+        sourceDir .. "/platform.c",
         sourceDir .. "/vulkan.c",
         sourceDir .. "/window.c",
-        sourceDir .. "/platform.h"
+        sourceDir .. "/egl_context.c",
+        sourceDir .. "/osmesa_context.c",
+        sourceDir .. "/null_platform.h",
+        sourceDir .. "/null_joystick.h",
+        sourceDir .. "/null_init.c",
+
+        sourceDir .. "/null_monitor.c",
+        sourceDir .. "/null_window.c",
+        sourceDir .. "/null_joystick.c",
     }
     Solution.Util.SetFiles(files)
     Solution.Util.SetIncludes(dep.Path)
@@ -30,13 +41,11 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     Solution.Util.SetFilter("platforms:Win64", function()
         local files =
         {
-            sourceDir .. "/win32_platform.h",
-            sourceDir .. "/win32_joystick.h",
-            sourceDir .. "/wgl_context.h",
-            sourceDir .. "/egl_context.h",
-            sourceDir .. "/osmesa_context.h",
+            sourceDir .. "/win32_thread.h",
+            sourceDir .. "/win32_time.h",
 
             sourceDir .. "/win32_init.c",
+            sourceDir .. "/win32_module.c",
             sourceDir .. "/win32_joystick.c",
             sourceDir .. "/win32_monitor.c",
             sourceDir .. "/win32_time.c",
@@ -54,17 +63,16 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     Solution.Util.SetFilter("system:linux", function()
         local files =
         {
-            sourceDir .. "/x11_platform.h",
-            sourceDir .. "/linux_joystick.h",
-            sourceDir .. "/egl_context.h",
-
             sourceDir .. "/x11_init.c",
-            sourceDir .. "/linux_joystick.c",
             sourceDir .. "/x11_monitor.c",
+            sourceDir .. "/x11_window.c",
+            sourceDir .. "/xkb_unicode.c",
             sourceDir .. "/posix_time.c",
             sourceDir .. "/posix_thread.c",
-            sourceDir .. "/x11_window.c",
-            sourceDir .. "/egl_context.c"
+            sourceDir .. "/glx_context.c",
+            sourceDir .. "/egl_context.c",
+            sourceDir .. "/osmesa_context.c",
+            sourceDir .. "/linux_joystick.c"
         }
         
         Solution.Util.SetFiles(files)
