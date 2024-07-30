@@ -69,7 +69,9 @@ namespace Network
             ERROR_CLIENT_ALREADY_INITIALIZED,
             ERROR_CLIENT_UNCONNECTED,
             ERROR_CLIENT_ALREADY_CONNECTED,
-            ERROR_CLIENT_FAILED_TO_CLOSE
+            ERROR_CLIENT_FAILED_TO_CLOSE,
+            ERROR_CLIENT_FAILED_TO_RESOLVE_HOSTNAME,
+            ERROR_CLIENT_FAILED_TO_CONVERT_HOSTNAME_TO_ADDRESS,
         };
 
         Socket();
@@ -79,6 +81,7 @@ namespace Network
         static Socket::Result Create(Type type, Mode mode, std::shared_ptr<Socket>& out);
 
         Result Connect(u32 host, u16 port);
+        Result Connect(const char* hostName, u16 port);
         Result Connect(std::string& hostName, u16 port);
         Result Bind(std::string& hostName, u16 port);
         Result Accept(std::shared_ptr<Socket>& connection);

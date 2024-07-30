@@ -81,7 +81,7 @@ namespace Network
         return result;
     }
 
-    Socket::Result Client::Connect(std::string& hostname, u16 port)
+    Socket::Result Client::Connect(const char* hostname, u16 port)
     {
         if (_isInitialized == false)
         {
@@ -101,6 +101,11 @@ namespace Network
         }
 
         return result;
+    }
+
+    Socket::Result Client::Connect(std::string& hostname, u16 port)
+    {
+        return Connect(hostname.c_str(), port);
     }
 
     Socket::Result Client::Close()

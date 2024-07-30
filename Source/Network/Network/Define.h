@@ -6,96 +6,7 @@ class Bytebuffer;
 
 namespace Network
 {
-
-    enum class Opcode : u16
-    {
-        INVALID,
-        CMSG_LOGON_CHALLENGE,
-        SMSG_LOGON_CHALLENGE,
-        CMSG_LOGON_HANDSHAKE,
-        SMSG_LOGON_HANDSHAKE,
-        CMSG_CONNECTED,
-        SMSG_CONNECTED,
-        MSG_REQUEST_ADDRESS,
-        SMSG_SEND_ADDRESS,
-        MSG_REQUEST_INTERNAL_SERVER_INFO,
-        SMSG_SEND_FULL_INTERNAL_SERVER_INFO,
-        SMSG_SEND_ADD_INTERNAL_SERVER_INFO,
-        SMSG_SEND_REMOVE_INTERNAL_SERVER_INFO,
-
-        CMSG_REQUEST_REALMLIST,
-        SMSG_SEND_REALMLIST,
-        CMSG_SELECT_REALM,
-        SMSG_SEND_REALM_CONNECTION_INFO,
-        SMSG_REQUEST_REALM_CONNECTION_INFO,
-
-        SMSG_PLAYER_CREATE,
-        SMSG_ENTITY_CREATE,
-        SMSG_ENTITY_DESTROY,
-        SMSG_ENTITY_UPDATE,
-        MSG_ENTITY_MOVE,
-        MSG_ENTITY_MOVE_HEARTBEAT,
-        MSG_ENTITY_MOVE_STOP,
-        CMSG_STORELOC,
-        SMSG_STORELOC,
-        CMSG_GOTO,
-
-        SMSG_ENTITY_RESOURCES_UPDATE,
-        SMSG_ENTITY_ATTRIBUTES_UPDATE,
-        SMSG_ENTITY_RATINGS_UPDATE,
-        SMSG_ENTITY_DISPLAYINFO_UPDATE,
-
-        MSG_ENTITY_TARGET_UPDATE,
-
-        CMSG_REQUEST_SPELLCAST,
-        SMSG_SEND_SPELLCAST_RESULT,
-        SMSG_ENTITY_CAST_SPELL,
-
-        SMSG_COMBAT_EVENT,
-
-        CMSG_CHEAT_DAMAGE,
-        CMSG_CHEAT_KILL,
-        CMSG_CHEAT_RESURRECT,
-        CMSG_CHEAT_MORPH,
-        CMSG_CHEAT_CREATE_CHARACTER,
-        SMSG_CHEAT_CREATE_CHARACTER_RESULT,
-        CMSG_CHEAT_DELETE_CHARACTER,
-        SMSG_CHEAT_DELETE_CHARACTER_RESULT,
-
-        MAX_COUNT
-    };
-
-    enum class ConnectionStatus : u8
-    {
-        AUTH_NONE,
-        AUTH_CHALLENGE,
-        AUTH_HANDSHAKE,
-        AUTH_FAILED,
-        AUTH_SUCCESS,
-        CONNECTED,
-    };
-
-    enum class AddressType : u8
-    {
-        AUTH,
-        REALM,
-        WORLD,
-        INSTANCE,
-        CHAT,
-        LOADBALANCE,
-        REGION,
-        COUNT,
-        INVALID
-    };
-
-    enum class RegionType : u8
-    {
-        NA,
-        SA,
-        EU,
-        OCEANIC,
-        COUNT
-    };
+    typedef u16 OpcodeType;
 
     struct ConnectionInfo
     {
@@ -109,7 +20,7 @@ namespace Network
     struct PacketHeader
     {
     public:
-        Opcode opcode = Opcode::INVALID;
+        OpcodeType opcode = 0;
         u16 size = 0;
     };
 

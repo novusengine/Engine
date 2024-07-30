@@ -62,7 +62,7 @@ namespace DB2::WDC3
                             unpackedBits = *reinterpret_cast<u32*>(&unpackedBitsSigned);
                         }
 
-                        T result = static_cast<T>(unpackedBits);
+                        T result = *reinterpret_cast<T*>(&unpackedBits);
                         return result;
                     }
 
