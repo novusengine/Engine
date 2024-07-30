@@ -1,5 +1,8 @@
 -- Determines the system premake will generate a solution for
-BuildSettings:Add("Solution Type", "vs2022", true)
+local compiler = iif(os.istarget("windows"), "vs2022", "gmake2")
+BuildSettings:Add("Solution Type", compiler, true)
+
+
 BuildSettings:Add("Multithreaded Compilation", true) -- Used to enable multi threaded compilation
 BuildSettings:Add("Multithreaded Core Count", 0) -- Used to adjust the allowed number of cores when enabling multi threaded compilation (0 = All) (Assuming the selected build environment supports it)
 
@@ -7,6 +10,7 @@ BuildSettings:Add("Multithreaded Core Count", 0) -- Used to adjust the allowed n
 BuildSettings:Add("Enable Tracy", false)
 
 -- Enables/Disables the UnitTest Project
+
 BuildSettings:Add("Build UnitTests", true)
 
 -- Settings for Luau

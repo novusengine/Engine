@@ -13,13 +13,15 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     {
         includeDir .. "/GLFW/glfw3.h",
         includeDir .. "/GLFW/glfw3native.h",
+        
 
         sourceDir .. "/context.c",
         sourceDir .. "/init.c",
         sourceDir .. "/input.c",
         sourceDir .. "/monitor.c",
         sourceDir .. "/vulkan.c",
-        sourceDir .. "/window.c"
+        sourceDir .. "/window.c",
+        sourceDir .. "/platform.h"
     }
     Solution.Util.SetFiles(files)
     Solution.Util.SetIncludes(dep.Path)
@@ -49,7 +51,24 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         Solution.Util.SetDefines({ "_GLFW_WIN32", "_CRT_SECURE_NO_WARNINGS" })
     end)
     
-    Solution.Util.SetFilter("platforms:Linux", function()
+    Solution.Util.SetFilter("system:linux", function()
+        local files =
+        {
+            sourceDir .. "/x11_platform.h",
+            sourceDir .. "/linux_joystick.h",
+            sourceDir .. "/egl_context.h",
+
+            sourceDir .. "/x11_init.c",
+            sourceDir .. "/linux_joystick.c",
+            sourceDir .. "/x11_monitor.c",
+            sourceDir .. "/posix_time.c",
+            sourceDir .. "/posix_thread.c",
+            sourceDir .. "/x11_window.c",
+            sourceDir .. "/egl_context.c"
+        }
+        
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetDefines({ "_GLFW_X11", "_CRT_SECURE_NO_WARNINGS" })
         Solution.Util.SetLinks({ "pthread" })
     end)
 end)
@@ -60,5 +79,9 @@ Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
     
     Solution.Util.SetFilter("platforms:Win64", function()
         Solution.Util.SetDefines({ "_GLFW_WIN32", "_CRT_SECURE_NO_WARNINGS" })
+    end)
+
+    Solution.Util.SetFilter("system:linux", function()
+        Solution.Util.SetDefines({ "_GLFW_X11", "_CRT_SECURE_NO_WARNINGS" })
     end)
 end)

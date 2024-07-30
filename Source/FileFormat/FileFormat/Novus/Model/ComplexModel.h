@@ -236,26 +236,13 @@ namespace Model
 
         struct CullingData
         {
-            union
-            {
-                struct
-                {
-                    hvec3 center;
-                    hvec3 extents;
-                };
-                struct
-                {
-                    hvec3 min;
-                    hvec3 max;
-                };
-            };
+        public:
+            hvec3 center;
+            hvec3 extents;
 
             f32 boundingSphereRadius;
 
-            CullingData()
-                : center(hvec3(static_cast<f16>(0.0f))),
-                extents(hvec3(static_cast<f16>(0.0f))),
-                boundingSphereRadius(0.0f) {}
+            CullingData() : center(f16(0.0f)), extents(f16(0.0f)), boundingSphereRadius(0.0f) { }
         };
 
         struct Material
