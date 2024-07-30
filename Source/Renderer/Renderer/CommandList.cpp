@@ -23,7 +23,6 @@
 #include "Commands/DrawIndirect.h"
 #include "Commands/DrawIndirectCount.h"
 #include "Commands/EndTrace.h"
-#include "Commands/FidelityFXCommands.h"
 #include "Commands/FillBuffer.h"
 #include "Commands/ImageBarrier.h"
 #include "Commands/MarkFrameStart.h"
@@ -916,30 +915,6 @@ namespace Renderer
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         Commands::PushConstant::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
-#endif
-    }
-
-    // FidelityFX
-    void CommandList::DispatchCacao(FfxCacaoContext* context, DepthImageResource depthResource, ImageResource normalResource, ImageMutableResource outputResource, mat4x4* proj, mat4x4* normalsToView, f32 normalUnpackMul, f32 normalUnpackAdd)
-    {
-        assert(proj != nullptr);
-        assert(normalsToView != nullptr);
-
-        Commands::DispatchCacao* command = AddCommand<Commands::DispatchCacao>();
-        command->context = context;
-        command->depthImage = _resources->GetImage(depthResource);
-        if (normalResource != ImageResource::Invalid())
-        {
-            command->normalImage = _resources->GetImage(normalResource);
-        }
-        command->outputImage = _resources->GetImage(outputResource);
-        command->proj = proj;
-        command->normalsToView = normalsToView;
-        command->normalUnpackMul = normalUnpackMul;
-        command->normalUnpackAdd = normalUnpackAdd;
-
-#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
-        Commands::DispatchCacao::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
 }
