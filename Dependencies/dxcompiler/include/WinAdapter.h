@@ -46,7 +46,9 @@
 #define CoTaskMemAlloc malloc
 #define CoTaskMemFree free
 
+#ifndef ARRAYSIZE
 #define ARRAYSIZE(array) (sizeof(array) / sizeof(array[0]))
+#endif // ARRAYSIZE
 
 #define _countof(a) (sizeof(a) / sizeof(*(a)))
 
