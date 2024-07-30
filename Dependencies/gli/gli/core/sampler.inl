@@ -1,4 +1,6 @@
+#ifndef GLM_ENABLE_EXPERIMENTAL
 #define GLM_ENABLE_EXPERIMENTAL
+#endif // GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/wrap.hpp>
 
 namespace gli{
