@@ -335,6 +335,10 @@ Solution.Util.SetLinks = function(linksToAdd)
     links (linksToAdd)
 end
 
+Solution.Util.SetLibDirs = function(dirsToAdd)
+    libdirs (dirsToAdd)
+end
+
 Solution.Util.GetFilesForCpp = function(basePath)
     local files = 
     {
