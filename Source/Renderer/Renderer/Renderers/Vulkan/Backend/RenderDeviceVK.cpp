@@ -30,6 +30,8 @@
 
 #if WIN32
 #include <vulkan/vulkan_win32.h>
+#else
+#include <vulkan/vulkan_xlib.h>
 #endif
 
 #include <imgui/backends/imgui_impl_vulkan.h>
