@@ -252,10 +252,11 @@ namespace Model
 
             f32 boundingSphereRadius;
 
-            CullingData()
-                : center(hvec3(static_cast<f16>(0.0f))),
-                extents(hvec3(static_cast<f16>(0.0f))),
-                boundingSphereRadius(0.0f) {}
+            CullingData() : boundingSphereRadius(0.0f)
+            {
+                center = hvec3(0.0f, 0.0f, 0.0f);
+                extents = hvec3(0.0f, 0.0f, 0.0f);
+            }
         };
 
         struct Material
