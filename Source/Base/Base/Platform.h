@@ -68,7 +68,5 @@ static_assert(false, "Please add PRAGMA_ENABLE_OPTIMIZATION/PRAGMA_DISABLE_OPTIM
 #ifndef strcpy_s
 #define strcpy_s(dest, count)  strcpy((dest), (count))
 #endif // strcpy_s
-#ifndef ARRAYSIZE
 #define ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
-#endif // ARRAYSIZE
 #endif
