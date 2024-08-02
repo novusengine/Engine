@@ -203,7 +203,8 @@ namespace Renderer
 
             if (!std::filesystem::exists(sourcePath))
             {
-                NC_LOG_CRITICAL("Tried to load a shader ({0}) which does not exist at expected location ({1})", shaderPath.c_str(), sourcePath.string().c_str());
+                NC_LOG_WARNING("Tried to check a shader ({0}) which does not exist at expected location ({1}), assuming shader may already be compiled", shaderPath.c_str(), sourcePath.string().c_str());
+                return false;
             }
 
             return _shaderCache->HasChanged(sourcePath);
