@@ -62,13 +62,13 @@ namespace Renderer
             FileReader file(fontPathStr);
             if (!file.Open())
             {
-                NC_LOG_WARNING("Could not open Font file %s. Using fallback font", fontPath.c_str());
+                NC_LOG_WARNING("Could not open Font file {0}. Using fallback font", fontPath.c_str());
 
                 path = std::filesystem::absolute(FALLBACK_FONT_PATH);
                 file.SetPath(path.string());
                 if (!file.Open())
                 {
-                    NC_LOG_CRITICAL("Could not open Fallback Font file %s.", FALLBACK_FONT_PATH);
+                    NC_LOG_CRITICAL("Could not open Fallback Font file {0}.", FALLBACK_FONT_PATH);
                 }
             }
 

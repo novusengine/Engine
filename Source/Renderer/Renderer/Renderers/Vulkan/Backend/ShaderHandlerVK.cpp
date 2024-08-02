@@ -184,24 +184,26 @@ namespace Renderer
         bool ShaderHandlerVK::NeedsCompile(const std::string& shaderPath)
         {
             ZoneScoped;
+
+            // Check if Force recompile is enabled
+            if (_forceRecompileAll)
+            {
+                return true; 
+            }
+
+            // If the shader binary does not exist, we want to compile it
+            std::filesystem::path binPath = GetShaderBinPath(shaderPath);
+            if (!std::filesystem::exists(binPath))
+            {
+                return true;
+            }
+
             std::filesystem::path sourcePath = _shaderCompiler->GetSourceDirPath() / shaderPath;
             sourcePath = std::filesystem::absolute(sourcePath.make_preferred());
 
             if (!std::filesystem::exists(sourcePath))
             {
-                NC_LOG_CRITICAL("Tried to load a shader (%s) which does not exist at expected location (%s)", shaderPath.c_str(), sourcePath.string().c_str());
-            }
-
-            if (_forceRecompileAll)
-            {
-                return true; // If we should force recompile all shaders, we want to compile it
-            }
-
-            std::filesystem::path binPath = GetShaderBinPath(shaderPath);
-
-            if (!std::filesystem::exists(binPath))
-            {
-                return true; // If the shader binary does not exist, we want to compile it
+                NC_LOG_CRITICAL("Tried to load a shader ({0}) which does not exist at expected location ({1})", shaderPath.c_str(), sourcePath.string().c_str());
             }
 
             return _shaderCache->HasChanged(sourcePath);

@@ -37,7 +37,7 @@ namespace Renderer
         {
             if (name.length() >= 32)
             {
-                NC_LOG_CRITICAL("We encountered a render pass name (%s) that is longer than 31 characters, we have this limit because we store the string internally and not on the heap.", name.c_str());
+                NC_LOG_CRITICAL("We encountered a render pass name ({0}) that is longer than 31 characters, we have this limit because we store the string internally and not on the heap.", name.c_str());
             }
 
             strcpy_s(_name, name.c_str());

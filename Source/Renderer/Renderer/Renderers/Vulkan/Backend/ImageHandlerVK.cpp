@@ -249,7 +249,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImageDesc with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImageDesc with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].desc;
@@ -267,7 +267,7 @@ namespace Renderer
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthImageDesc with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthImageDesc with bad DepthImageID ({0})", static_cast<DepthImageID::type>(id));
             }
 
             return data.depthImages[static_cast<DepthImageID::type>(id)].desc;
@@ -285,7 +285,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
 
             const ImageDesc& desc = GetImageDesc(id);
@@ -360,7 +360,7 @@ namespace Renderer
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDimension with bad DepthImageID ({0})", static_cast<DepthImageID::type>(id));
             }
 
             const DepthImageDesc& desc = GetImageDesc(id);
@@ -430,7 +430,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].image;
@@ -448,7 +448,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].colorView;
@@ -466,7 +466,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
 
             ImageID::type tid = static_cast<ImageID::type>(id);
@@ -495,7 +495,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
             
             ImageID::type tid = static_cast<ImageID::type>(id);
@@ -519,7 +519,7 @@ namespace Renderer
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetImage with bad DepthImageID ({0})", static_cast<DepthImageID::type>(id));
             }
 
             return data.depthImages[static_cast<DepthImageID::type>(id)].image;
@@ -537,7 +537,7 @@ namespace Renderer
 
             if (static_cast<DepthImageID::type>(id) >= data.depthImages.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthView with bad DepthImageID (%u)", static_cast<DepthImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetDepthView with bad DepthImageID ({0})", static_cast<DepthImageID::type>(id));
             }
 
             return data.depthImages[static_cast<DepthImageID::type>(id)].depthView;
@@ -555,7 +555,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].imguiTextureHandle;
@@ -573,7 +573,7 @@ namespace Renderer
 
             if (static_cast<ImageID::type>(id) >= data.images.size())
             {
-                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID (%u)", static_cast<ImageID::type>(id));
+                NC_LOG_CRITICAL("Tried to ImageHandlerVK::GetColorView with bad ImageID ({0})", static_cast<ImageID::type>(id));
             }
 
             return data.images[static_cast<ImageID::type>(id)].isSwapchain;

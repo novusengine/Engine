@@ -836,7 +836,7 @@ namespace Renderer
             }
         }
 
-        NC_LOG_ERROR("While creating DescriptorSet we encountered binding (%s) of type (%u) which did not have a matching BindInfo in the bound shaders", name.c_str(), type);
+        NC_LOG_ERROR("While creating DescriptorSet we encountered binding ({0}) of type ({1}) which did not have a matching BindInfo in the bound shaders", name.c_str(), type);
         return false;
     }
 
