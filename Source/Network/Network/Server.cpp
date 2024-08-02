@@ -188,22 +188,6 @@ namespace Network
                 }
             }
 
-            // Handle Socket Disconnect Requests
-            {
-                SocketDisconnectedEvent disconnectedEvent;
-                while (_disconnectRequest.try_dequeue(disconnectedEvent))
-                {
-                    u32 index = Util::DefineUtil::GetSocketIDValue(disconnectedEvent.socketID);
-
-                    Connection& connection = _connections[index];
-
-                    if (connection.client)
-                    {
-                        Close(connection);
-                    }
-                }
-            }
-
             // Handle Socket Message Requests
             {
                 SocketMessageEvent messageEvent;
@@ -212,11 +196,37 @@ namespace Network
                     u32 index = Util::DefineUtil::GetSocketIDValue(messageEvent.socketID);
 
                     Connection& connection = _connections[index];
+                    if (!connection.client)
+                        continue;
 
-                    if (connection.client)
-                    {
-                        connection.client->Send(messageEvent.buffer);
-                    }
+                    u32 eventVersion = Util::DefineUtil::GetSocketIDVersion(messageEvent.socketID);
+                    u32 connectionVersion = Util::DefineUtil::GetSocketIDVersion(connection.id);
+
+                    if (eventVersion != connectionVersion)
+                        continue;
+
+                    connection.client->Send(messageEvent.buffer);
+                }
+            }
+
+            // Handle Socket Disconnect Requests
+            {
+                SocketDisconnectedEvent disconnectedEvent;
+                while (_disconnectRequest.try_dequeue(disconnectedEvent))
+                {
+                    u32 index = Util::DefineUtil::GetSocketIDValue(disconnectedEvent.socketID);
+
+                    Connection& connection = _connections[index];
+                    if (!connection.client)
+                        continue;
+
+                    u32 eventVersion = Util::DefineUtil::GetSocketIDVersion(disconnectedEvent.socketID);
+                    u32 connectionVersion = Util::DefineUtil::GetSocketIDVersion(connection.id);
+
+                    if (eventVersion != connectionVersion)
+                        continue;
+
+                    Close(connection);
                 }
             }
 

@@ -13,20 +13,19 @@ namespace Network
         Client_SendCheatCommand,
         Server_SendCheatCommandResult,
 
-        Server_PlayerCreate,
+        Server_SetMover,
         Server_EntityCreate,
         Server_EntityDestroy,
-        Server_EntityUpdate,
+        Server_EntityDisplayInfoUpdate,
         Shared_EntityMove,
         Shared_EntityMoveStop,
         Server_EntityResourcesUpdate,
-        Server_EntityDisplayInfoUpdate,
         Shared_EntityTargetUpdate,
         Server_EntityCastSpell,
 
         Client_LocalRequestSpellCast,
-
         Server_SendSpellCastResult,
+
         Server_SendCombatEvent,
 
         Count
