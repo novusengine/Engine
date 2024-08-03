@@ -32,7 +32,7 @@ namespace Renderer
     RendererVK::RendererVK(Novus::Window* window)
         : _device(new Backend::RenderDeviceVK(window))
     {
-        _frameAllocator.Init(4 * 1024 * 1024, "Renderer Allocator");
+        _frameAllocator.Init(16 * 1024 * 1024, "Renderer Allocator");
 
         // Create handlers
         _bufferHandler = new Backend::BufferHandlerVK();
