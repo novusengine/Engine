@@ -283,6 +283,17 @@ namespace Network
 
                         buffer->SkipRead(sizeof(MessageHeader));
 
+                        if (header->flags.isPing)
+                        {
+                            MessageHeader pongHeader;
+                            pongHeader.flags.isPing = 1;
+
+                            std::shared_ptr<Bytebuffer> pongBuffer = Bytebuffer::Borrow<PacketHeaderSize>();
+                            pongBuffer->Put(pongHeader);
+
+                            SendPacket(socketID, pongBuffer);
+                        }
+
                         std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
                         {
                             // Payload

@@ -18,10 +18,13 @@ namespace Network
             return false;
 
         GameOpcode opcode = static_cast<GameOpcode>(header.opcode);
+        if (header.flags.isPing)
+            opcode = GameOpcode::Shared_Ping;
+
         if (opcode == GameOpcode::Invalid || opcode >= GameOpcode::Count)
             return false;
 
-        const GameMessageHandler& opcodeHandler = _handlers[static_cast<u16>(header.opcode)];
+        const GameMessageHandler& opcodeHandler = _handlers[static_cast<u16>(opcode)];
         bool isSmallerThanMinSize = header.size < opcodeHandler.minSize;
         bool isLargerThanMaxSize = header.size > opcodeHandler.maxSize && opcodeHandler.maxSize != -1;
 

@@ -20,8 +20,15 @@ namespace Network
     struct MessageHeader
     {
     public:
+        struct Flags
+        {
+            u8 isPing : 1;
+        };
+
+    public:
         OpcodeType opcode = 0;
         u16 size = 0;
+        Flags flags = { 0 };
     };
 
     struct Message

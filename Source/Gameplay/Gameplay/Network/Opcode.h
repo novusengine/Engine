@@ -10,8 +10,8 @@ namespace Network
         Client_Connect,
         Server_Connected,
 
-        Client_Ping,
-        Server_Pong,
+        Shared_Ping,
+        Server_UpdateStats,
 
         Client_SendCheatCommand,
         Server_SendCheatCommandResult,
