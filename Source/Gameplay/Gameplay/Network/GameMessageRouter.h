@@ -13,7 +13,7 @@ class Bytebuffer;
 
 namespace Network
 {
-    typedef bool (*MessageHandlerFn)(SocketID, std::shared_ptr<Bytebuffer>&);
+    typedef bool (*MessageHandlerFn)(SocketID, Message& message);
 
     struct GameMessageHandler
     {
@@ -33,7 +33,7 @@ namespace Network
         GameMessageRouter();
 
         void SetMessageHandler(GameOpcode opcode, GameMessageHandler&& handler);
-        bool CallHandler(SocketID socketID, std::shared_ptr<Bytebuffer>& packet);
+        bool CallHandler(SocketID socketID, Message& message);
 
     private:
         GameMessageHandler _handlers[static_cast<OpcodeType>(GameOpcode::Count)];

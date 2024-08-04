@@ -98,7 +98,10 @@ namespace Network
         SocketMessageEvent request =
         {
             .socketID = socketID,
-            .buffer = buffer
+            .message =
+            {
+                .buffer = buffer
+            }
         };
 
         _messageRequests.enqueue(request);
@@ -157,6 +160,8 @@ namespace Network
     {
         while (!_isStopped)
         {
+            u64 timeSinceThisUpdateStart = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
             std::shared_ptr<Client> netClient = std::make_shared<Client>();
 
             Socket::Result result = Accept(netClient);
@@ -205,7 +210,7 @@ namespace Network
                     if (eventVersion != connectionVersion)
                         continue;
 
-                    connection.client->Send(messageEvent.buffer);
+                    connection.client->Send(messageEvent.message.buffer);
                 }
             }
 
@@ -233,6 +238,8 @@ namespace Network
             // Read Sockets
             for (const SocketID socketID : _activeSockets)
             {
+                u64 timeSinceThisSocketUpdate = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
                 u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
 
                 Connection& connection = _connections[index];
@@ -247,7 +254,7 @@ namespace Network
                     std::shared_ptr<Bytebuffer>& buffer = connection.client->GetReadBuffer();
                     while (size_t activeSize = buffer->GetActiveSize())
                     {
-                        static constexpr u8 PacketHeaderSize = sizeof(PacketHeader);
+                        static constexpr u8 PacketHeaderSize = sizeof(MessageHeader);
 
                         // We have received a partial header and need to read more
                         if (activeSize < PacketHeaderSize)
@@ -256,7 +263,7 @@ namespace Network
                             break;
                         }
 
-                        PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer->GetReadPointer());
+                        MessageHeader* header = reinterpret_cast<MessageHeader*>(buffer->GetReadPointer());
 
                         if (header->size > DEFAULT_BUFFER_SIZE - PacketHeaderSize)
                         {
@@ -267,14 +274,14 @@ namespace Network
                             break;
                         }
 
-                        size_t receivedPayloadSize = activeSize - sizeof(PacketHeader);
+                        size_t receivedPayloadSize = activeSize - sizeof(MessageHeader);
                         if (receivedPayloadSize < header->size)
                         {
                             buffer->Normalize();
                             break;
                         }
 
-                        buffer->SkipRead(sizeof(PacketHeader));
+                        buffer->SkipRead(sizeof(MessageHeader));
 
                         std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
                         {
@@ -294,7 +301,11 @@ namespace Network
 
                             SocketMessageEvent messageEvent;
                             messageEvent.socketID = socketID;
-                            messageEvent.buffer = std::move(messageBuffer);
+                            messageEvent.message.buffer = std::move(messageBuffer);
+                            messageEvent.message.timestampProcessed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                            messageEvent.message.networkSleepDiff = static_cast<u16>(timeSinceThisUpdateStart - _timeSinceLastUpdateFinish);
+                            messageEvent.message.networkUpdateDiff = static_cast<u16>(timeSinceThisSocketUpdate - timeSinceThisUpdateStart);
+                            messageEvent.message.timeToProcess = static_cast<u16>(messageEvent.message.timestampProcessed - timeSinceThisSocketUpdate);
 
                             _messageEvents.enqueue(messageEvent);
                         }
@@ -311,6 +322,7 @@ namespace Network
                 }
             }
 
+            _timeSinceLastUpdateFinish = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
             std::this_thread::sleep_for(1ms);
         }
     }

@@ -17,11 +17,21 @@ namespace Network
         u16 port;
     };
 
-    struct PacketHeader
+    struct MessageHeader
     {
     public:
         OpcodeType opcode = 0;
         u16 size = 0;
+    };
+
+    struct Message
+    {
+    public:
+        u64 timestampProcessed = 0; // Specifies the timestamp when the message was processed
+        u16 networkSleepDiff = 0; // Specifies the time wasted sleeping in network thread
+        u16 networkUpdateDiff = 0; // Specifies the time wasted in network update
+        u16 timeToProcess = 0; // Specifies the time taken to process the message since the socket this message was received on started updating
+        std::shared_ptr<Bytebuffer> buffer;
     };
 
     enum class SocketID : u32 {}; // 8 Bits for versioning, 24 bits for value
@@ -49,6 +59,6 @@ namespace Network
     {
     public:
         SocketID socketID = SOCKET_ID_INVALID;
-        std::shared_ptr<Bytebuffer> buffer = nullptr;
+        Message message;
     };
 }

@@ -3,7 +3,7 @@
 
 namespace GameDefine
 {
-    enum class Race : u8
+    enum class UnitRace : u8
     {
         None        = 0,
         Human       = 1,
@@ -24,7 +24,7 @@ namespace GameDefine
         Other   = 3
     };
 
-    enum class GameClass : u8
+    enum class UnitClass : u8
     {
         None    = 0,
         Warrior = 1,

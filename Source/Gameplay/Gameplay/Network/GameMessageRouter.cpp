@@ -11,10 +11,10 @@ namespace Network
         _handlers[static_cast<u16>(opcode)] = std::move(handler);
     }
 
-    bool GameMessageRouter::CallHandler(SocketID socketID, std::shared_ptr<Bytebuffer>& packet)
+    bool GameMessageRouter::CallHandler(SocketID socketID, Message& message)
     {
-        Network::PacketHeader header;
-        if (!packet->Get(header))
+        Network::MessageHeader header;
+        if (!message.buffer->Get(header))
             return false;
 
         GameOpcode opcode = static_cast<GameOpcode>(header.opcode);
@@ -28,6 +28,6 @@ namespace Network
         if (!opcodeHandler.handler || isSmallerThanMinSize || isLargerThanMaxSize)
             return false;
 
-        return opcodeHandler.handler(socketID, packet);
+        return opcodeHandler.handler(socketID, message);
     }
 }

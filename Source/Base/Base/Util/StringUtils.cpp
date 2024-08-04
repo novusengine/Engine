@@ -192,6 +192,17 @@ namespace StringUtils
         return true;
     }
 
+    bool StringIsNumeric(const std::string& input)
+    {
+        for (char c : input)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(c)))
+                return false;
+        }
+
+        return true;
+    }
+
     std::wstring StringToWString(const std::string& s)
     {
         std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;

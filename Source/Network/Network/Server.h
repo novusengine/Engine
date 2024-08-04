@@ -49,6 +49,8 @@ namespace Network
         std::string _hostname = "";
         u16 _port = 0;
 
+        u64 _timeSinceLastUpdateFinish = 0;
+
         std::shared_ptr<Socket> _socket = nullptr;
 
         std::vector<Connection> _connections;

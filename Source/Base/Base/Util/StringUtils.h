@@ -26,6 +26,7 @@ namespace StringUtils
     bool Contains(std::string const& fullString, std::string const& substring);
     bool SearchString(const std::string& ref, const std::string& key, bool insensitive);
     bool StringIsAlphaAndAtLeastLength(const std::string& input, u16 maxLength);
+    bool StringIsNumeric(const std::string& input);
 
     std::wstring StringToWString(const std::string& s);
     std::string WStringToString(const std::wstring& wstr);

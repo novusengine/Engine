@@ -27,6 +27,10 @@ namespace Network
         Demorph,
         Teleport,
         CreateCharacter,
-        DeleteCharacter
+        DeleteCharacter,
+        SetRace,
+        SetGender,
+        SetClass,
+        SetLevel,
     };
 }

@@ -199,7 +199,7 @@ public:
         if (!CanPerformRead(readSize))
             return false;
 
-        val = *reinterpret_cast<f64*>(_data[readData]);
+        val = *reinterpret_cast<f64*>(&_data[readData]);
         readData += readSize;
         return true;
     }
