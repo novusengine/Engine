@@ -20,7 +20,7 @@ PRAGMA_CLANG_DIAGNOSTIC_IGNORE(-Wnon-pod-varargs);
 #define NC_LOG_INFO(fmt, ...) LOG_INFO(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
 #define NC_LOG_WARNING(fmt, ...) LOG_WARNING(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
 #define NC_LOG_ERROR(fmt, ...) LOG_ERROR(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
-#define NC_LOG_CRITICAL(fmt, ...) LOG_CRITICAL(NC_GET_LOGGER(), fmt, ##__VA_ARGS__); ReleaseModeBreakpoint();
+#define NC_LOG_CRITICAL(fmt, ...) LOG_CRITICAL(NC_GET_LOGGER(), fmt, ##__VA_ARGS__); NC_GET_LOGGER()->flush_log(); ReleaseModeBreakpoint();
 #define NC_LOG_BACKTRACE(fmt, ...) LOG_BACKTRACE(NC_GET_LOGGER(), fmt, ##__VA_ARGS__);
 #define NC_ASSERT(assertion, fmt, ...) if (!(assertion)) { NC_LOG_CRITICAL(fmt, ##__VA_ARGS__); }
 
