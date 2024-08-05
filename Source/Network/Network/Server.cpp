@@ -291,7 +291,7 @@ namespace Network
                             std::shared_ptr<Bytebuffer> pongBuffer = Bytebuffer::Borrow<PacketHeaderSize>();
                             pongBuffer->Put(pongHeader);
 
-                            SendPacket(socketID, pongBuffer);
+                            connection.client->Send(pongBuffer);
                         }
 
                         std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
