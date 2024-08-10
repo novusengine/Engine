@@ -6,14 +6,13 @@ class Bytebuffer;
 
 namespace Network
 {
+    typedef u32 BufferID;
     typedef u16 OpcodeType;
 
     struct ConnectionInfo
     {
     public:
-        u32 ipAddr;
-        std::string ipAddrStr;
-
+        std::string ipAddr;
         u16 port;
     };
 
@@ -34,10 +33,6 @@ namespace Network
     struct Message
     {
     public:
-        u64 timestampProcessed = 0; // Specifies the timestamp when the message was processed
-        u16 networkSleepDiff = 0; // Specifies the time wasted sleeping in network thread
-        u16 networkUpdateDiff = 0; // Specifies the time wasted in network update
-        u16 timeToProcess = 0; // Specifies the time taken to process the message since the socket this message was received on started updating
         std::shared_ptr<Bytebuffer> buffer;
     };
 
@@ -49,7 +44,7 @@ namespace Network
     constexpr u32 SOCKET_ID_VERSION_MASK = (1 << SOCKET_ID_VERSION_BITS) - 1;
     constexpr u32 SOCKET_ID_VALUE_MASK = (1 << SOCKET_ID_VALUE_BITS) - 1;
 
-    constexpr u32 DEFAULT_BUFFER_SIZE = 8192;
+    constexpr u32 DEFAULT_BUFFER_SIZE = 2048;
 
     struct SocketConnectedEvent
     {

@@ -3,179 +3,195 @@
 #include "Base/Util/DebugHandler.h"
 
 #include <entt/entt.hpp>
+#include <tracy/Tracy.hpp>
 
 namespace Network
 {
-    Client::Client() { }
-
-    Socket::Result Client::Init(Socket::Mode mode)
+    Client::Client(asio::io_context& ioContext, std::shared_ptr<asio::ip::tcp::resolver>& resolver) : _asioContext(ioContext), _resolver(resolver)
     {
-        if (_isInitialized == true)
-        {
-            if (mode == _socket->GetMode())
-                return Reinit();
-
-            return Socket::Result::ERROR_CLIENT_ALREADY_INITIALIZED;
-        }
-
-        Socket::Result result = Socket::Create(Socket::Type::CLIENT, mode, _socket);
-
-        if (_socket)
-        {
-            _isInitialized = true;
-        }
-
-        return result;
+        _readBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
     }
 
-    Socket::Result Client::Reinit()
+    void Client::Stop()
     {
-        if (_isInitialized == false)
+        if (!IsConnected())
+            return;
+
+        try
         {
-            return Socket::Result::ERROR_CLIENT_UNINITIALIZED;
+            _socket->shutdown(asio::ip::tcp::socket::shutdown_both);
+            _socket->close();
+        }
+        catch (const std::exception& e)
+        {
+            NC_LOG_ERROR("Network::Client : Stop Exception ({0})", e.what());
         }
 
-        _socket->Close();
+        _socket = nullptr;
+        _readBuffer->Reset();
 
-        _isConnected = false;
-        _isInitialized = false;
+        _nextBufferID = 0;
+        _activeBuffers.clear();
 
-        return Init(_socket->GetMode());
+        Network::SocketMessageEvent messageEvent;
+        while (_messageEvents.try_dequeue(messageEvent)) {}
     }
 
-    Socket::Result Client::Init(std::shared_ptr<Socket>& socket)
+    bool Client::Connect(const char* address, u16 port)
     {
-        if (_isInitialized == true)
+        if (IsConnected())
         {
-            return Socket::Result::ERROR_CLIENT_ALREADY_INITIALIZED;
+            NC_LOG_ERROR("Network::Client : Connect Failed (Already connected)");
+            return false;
         }
 
-        _isInitialized = true;
-        _isConnected = true;
-        _socket = socket;
+        if (!address)
+        {
+            NC_LOG_ERROR("Network::Client : Connect Failed (Address passed as nullptr)");
+            return false;
+        }
 
-        return Socket::Result::SUCCESS;
+        asio::ip::tcp::resolver::results_type endpoints = _resolver->resolve(address, std::to_string(port));
+        if (endpoints.empty())
+        {
+            NC_LOG_ERROR("Network::Client : Connect Failed (Failed to resolve endpoint)");
+            return false;
+        }
+
+        auto endpoint = (*endpoints).endpoint();
+
+        asio::error_code ec;
+        auto socket = std::make_shared<asio::ip::tcp::socket>(_asioContext);
+        socket->connect(endpoint, ec);
+
+        if (ec)
+        {
+            NC_LOG_ERROR("Network::Client : Connect Failed ({0})", ec.message());
+            return false;
+        }
+
+        _socket = std::move(socket);
+        _socket->non_blocking(true);
+
+        ReadMessageHeader();
+        NC_LOG_INFO("Network::Client : Connected to {0}:{1}", endpoint.address().to_string(), endpoint.port());
+        return true;
+    }
+    void Client::Send(std::shared_ptr<Bytebuffer>& buffer)
+    {
+        if (!IsConnected())
+        {
+            return;
+        }
+
+        const BufferID bufferID = _nextBufferID++;
+        _activeBuffers[bufferID] = buffer;
+
+        asio::async_write(*_socket, asio::buffer(buffer->GetDataPointer(), buffer->writtenData), [this, bufferID](std::error_code ec, std::size_t length)
+        {
+            if (ec)
+            {
+                NC_LOG_ERROR("Network::Client : Send Failed ({0})", ec.message());
+                Stop();
+            }
+        
+            ClearBuffer(bufferID);
+        });
     }
 
-    Socket::Result Client::Connect(u32 host, u16 port)
+    void Client::ReadMessageHeader()
     {
-        if (_isInitialized == false)
+        asio::async_read(*_socket, asio::buffer(_readBuffer->GetDataPointer(), sizeof(MessageHeader)), [this](std::error_code ec, std::size_t length)
         {
-            NC_LOG_ERROR("[Networking] Attempted to call Connect on uninitialized Client");
-            return Socket::Result::ERROR_CLIENT_UNINITIALIZED;
-        }
-
-        if (_isConnected == true)
-        {
-            NC_LOG_ERROR("[Networking] Attempted to call Connect on connected Client");
-            return Socket::Result::ERROR_CLIENT_ALREADY_CONNECTED;
-        }
-
-        Socket::Result result = _socket->Connect(host, port);
-        if (result == Socket::Result::SUCCESS ||
-            result == Socket::Result::ERROR_WOULD_BLOCK)
-        {
-            _isConnected = true;
-        }
-
-        return result;
+            if (!ec)
+            {
+                auto* header = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer());
+                _readBuffer->SkipWrite(length);
+        
+                if (header->size > DEFAULT_BUFFER_SIZE - sizeof(MessageHeader))
+                {
+                    NC_LOG_ERROR("Network::Client : ReadHeader Failed (Message Size Too Large)");
+                    Stop();
+                    return;
+                }
+        
+                if (header->size > 0)
+                {
+                    ReadMessageBody();
+                }
+                else
+                {
+                    std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<sizeof(MessageHeader)>();
+                    {
+                        messageBuffer->Put(*header);
+                    }
+        
+                    // Emit Message Event
+                    EnqueueMessage(messageBuffer);
+        
+                    // Reset Read Buffer
+                    _readBuffer->Reset();
+        
+                    ReadMessageHeader();
+                }
+            }
+            else
+            {
+                NC_LOG_ERROR("Network::Client : ReadHeader Failed ({0})", ec.message());
+                Stop();
+            }
+        });
     }
 
-    Socket::Result Client::Connect(const char* hostname, u16 port)
+    void Client::ReadMessageBody()
     {
-        if (_isInitialized == false)
-        {
-            return Socket::Result::ERROR_CLIENT_UNINITIALIZED;
-        }
+        NC_ASSERT(_readBuffer && _readBuffer->writtenData == sizeof(MessageHeader), "Network::ServerSession : ReadMessageBody Failed (Invalid Buffer)");
 
-        if (_isConnected == true)
+        u32 sizeToRead = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer())->size;
+        asio::async_read(*_socket, asio::buffer(_readBuffer->GetWritePointer(), sizeToRead), [this](std::error_code ec, std::size_t length)
         {
-            return Socket::Result::ERROR_CLIENT_ALREADY_CONNECTED;
-        }
-
-        Socket::Result result = _socket->Connect(hostname, port);
-        if (result == Socket::Result::SUCCESS ||
-            result == Socket::Result::ERROR_WOULD_BLOCK)
-        {
-            _isConnected = true;
-        }
-
-        return result;
+            if (!ec)
+            {
+                auto* header = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer());
+                _readBuffer->SkipRead(sizeof(MessageHeader));
+        
+                std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
+                {
+                    messageBuffer->Put(*header);
+        
+                    // Payload
+                    {
+                        std::memcpy(messageBuffer->GetWritePointer(), _readBuffer->GetReadPointer(), header->size);
+                        messageBuffer->SkipWrite(header->size);
+                    }
+                }
+        
+                // Emit Message Event
+                EnqueueMessage(messageBuffer);
+        
+                // Reset Read Buffer
+                _readBuffer->Reset();
+        
+                ReadMessageHeader();
+            }
+            else
+            {
+                NC_LOG_ERROR("Network::Client : ReadBody Failed ({0})", ec.message());
+                Stop();
+            }
+        });
     }
 
-    Socket::Result Client::Connect(std::string& hostname, u16 port)
+    void Client::EnqueueMessage(std::shared_ptr<Bytebuffer>& buffer)
     {
-        return Connect(hostname.c_str(), port);
+        SocketMessageEvent messageEvent;
+        messageEvent.socketID = SOCKET_ID_INVALID;
+        messageEvent.message.buffer = std::move(buffer);
+        _messageEvents.enqueue(messageEvent);
     }
 
-    Socket::Result Client::Close()
+    void Client::ClearBuffer(BufferID bufferID)
     {
-        if (_isInitialized == false)
-            return Socket::Result::ERROR_CLIENT_UNINITIALIZED;
-
-        if (_isConnected == false)
-            return Socket::Result::ERROR_CLIENT_UNCONNECTED;
-
-        _isConnected = false;
-
-        Socket::Result result = _socket->Close();
-        return result;
-    }
-
-    Socket::Result Client::Send(void* data, size_t size)
-    {
-        if (_isInitialized == false)
-        {
-            return Socket::Result::ERROR_CLIENT_UNINITIALIZED;
-        }
-
-        if (_isConnected == false)
-        {
-            return Socket::Result::ERROR_CLIENT_UNCONNECTED;
-        }
-
-        Socket::Result result = _socket->Send(data, size);
-        if (result != Socket::Result::SUCCESS &&
-            result != Socket::Result::ERROR_WOULD_BLOCK)
-        {
-            Close();
-        }
-
-        return result;
-    }
-
-    Socket::Result Client::Send(std::shared_ptr<Bytebuffer>& buffer)
-    {
-        return Send(buffer->GetDataPointer(), buffer->writtenData);
-    }
-
-    Socket::Result Client::Read()
-    {
-        if (!_isConnected)
-            return Socket::Result::ERROR_CLIENT_UNCONNECTED;
-
-        Socket::Result result = _socket->Read();
-        if (result != Socket::Result::SUCCESS &&
-            result != Socket::Result::ERROR_WOULD_BLOCK)
-        {
-            Close();
-        }
-
-        return result;
-    }
-
-    Socket::Result Client::Read(void* data, size_t size)
-    {
-        if (!_isConnected)
-            return Socket::Result::ERROR_CLIENT_UNCONNECTED;
-
-        Socket::Result result = _socket->Read(data, size);
-        if (result != Socket::Result::SUCCESS &&
-            result != Socket::Result::ERROR_WOULD_BLOCK)
-        {
-            Close();
-        }
-
-        return result;
+        _activeBuffers.erase(bufferID);
     }
 }

@@ -11,330 +11,226 @@ using namespace std::chrono_literals;
 
 namespace Network
 {
-    Server::Server()
+    void ServerSession::Start()
+    {
+        _readBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
+        _pongBuffer = Bytebuffer::Borrow<sizeof(MessageHeader)>();
+
+        MessageHeader pongHeader;
+        pongHeader.flags.isPing = 1;
+
+        _pongBuffer->Put(pongHeader);
+
+        ReadMessageHeader();
+    }
+
+    void ServerSession::Close()
+    {
+        if (!_socket.is_open())
+            return;
+
+        std::error_code ec;
+        _socket.shutdown(asio::socket_base::shutdown_both, ec);
+        if (!ec)
+        {
+            _socket.close(ec);
+        }
+    }
+
+    void ServerSession::Write(const std::shared_ptr<Bytebuffer>& buffer)
+    {
+        asio::async_write(_socket, asio::buffer(buffer->GetDataPointer(), buffer->writtenData), [this](std::error_code ec, std::size_t length)
+        {
+            if (ec || !this)
+            {
+                NC_LOG_ERROR("Network::ServerSession : Write Failed ({0})", ec.message());
+                CloseInternal();
+            }
+        });
+    }
+
+    void ServerSession::WriteBuffer(const BufferID bufferID, const std::shared_ptr<Bytebuffer>& buffer)
+    {
+        asio::async_write(_socket, asio::buffer(buffer->GetDataPointer(), buffer->writtenData), [this, bufferID](std::error_code ec, std::size_t length)
+        {
+            if (ec || !this)
+            {
+                NC_LOG_ERROR("Network::ServerSession : WriteBuffer Failed ({0})", ec.message());
+                CloseInternal();
+            }
+
+            ClearBuffer(bufferID);
+        });
+    }
+
+    void ServerSession::ReadMessageHeader()
+    {
+        asio::async_read(_socket, asio::buffer(_readBuffer->GetDataPointer(), sizeof(MessageHeader)), [this](std::error_code ec, std::size_t length)
+        {
+            if (ec || !this)
+            {
+                NC_LOG_ERROR("Network::ServerSession : ReadHeader Failed ({0})", ec.message());
+                CloseInternal();
+                return;
+            }
+
+            auto* header = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer());
+            _readBuffer->SkipWrite(length);
+
+            if (header->size > DEFAULT_BUFFER_SIZE - sizeof(MessageHeader))
+            {
+                NC_LOG_ERROR("Network::ServerSession : ReadHeader Failed (Message Size Too Large)");
+                CloseInternal();
+                return;
+            }
+
+            if (header->flags.isPing)
+            {
+                Write(_pongBuffer);
+            }
+
+            if (header->size > 0)
+            {
+                ReadMessageBody();
+            }
+            else
+            {
+                std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<sizeof(MessageHeader)>();
+                {
+                    messageBuffer->Put(*header);
+                }
+
+                // Emit Message Event
+                EnqueueMessage(_socketID, messageBuffer);
+
+                // Reset Read Buffer
+                _readBuffer->Reset();
+
+                ReadMessageHeader();
+            }
+        });
+    }
+
+    void ServerSession::ReadMessageBody()
+    {
+        NC_ASSERT(_readBuffer && _readBuffer->writtenData == sizeof(MessageHeader), "Network::ServerSession : ReadMessageBody Failed (Invalid Buffer)");
+
+        u32 sizeToRead = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer())->size;
+        asio::async_read(_socket, asio::buffer(_readBuffer->GetWritePointer(), sizeToRead), [this](std::error_code ec, std::size_t length)
+        {
+            if (ec || !this)
+            {
+                NC_LOG_ERROR("Network::ServerSession : ReadBody Failed ({0})", ec.message());
+                CloseInternal();
+                return;
+            }
+
+            auto* header = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer());
+            _readBuffer->SkipRead(sizeof(MessageHeader));
+
+            std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
+            {
+                messageBuffer->Put(*header);
+
+                // Payload
+                {
+                    std::memcpy(messageBuffer->GetWritePointer(), _readBuffer->GetReadPointer(), header->size);
+                    messageBuffer->SkipWrite(header->size);
+                }
+            }
+
+            // Emit Message Event
+            EnqueueMessage(_socketID, messageBuffer);
+
+            // Reset Read Buffer
+            _readBuffer->Reset();
+
+            ReadMessageHeader();
+        });
+    }
+
+    void ServerSession::ClearBuffer(BufferID bufferID)
+    {
+        _server->_activeBuffers.erase(bufferID);
+    }
+
+    void ServerSession::EnqueueMessage(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer)
+    {
+        if (!_server)
+            return;
+
+        SocketMessageEvent messageEvent;
+        messageEvent.socketID = _socketID;
+        messageEvent.message.buffer = std::move(buffer);
+        _server->_inMessageEvents.enqueue(messageEvent);
+    }
+
+    void ServerSession::CloseInternal()
+    {
+        u32 isClosing = _isClosing.fetch_add(1);
+        if (isClosing || !_socket.is_open())
+            return;
+
+        Close();
+
+        _server->DeferCloseSocketID(_socketID);
+        u32 isHandleClosedRequestsMessageScheduled = _server->_handleClosedRequestsScheduled.fetch_add(1);
+        if (isHandleClosedRequestsMessageScheduled == 0)
+        {
+            asio::post(_server->_asioContext, std::bind(&Server::ProcessDeferredCloseRequests, _server));
+        }
+    }
+
+    Server::Server(u16 port) : _asioAcceptor(_asioContext, tcp::endpoint(tcp::v4(), port)), _asioSocket(_asioContext), _connectedEvents(1024), _disconnectedEvents(1024), _disconnectRequests(1024), _inMessageEvents(1024), _outMessageEvents(1024)
     {
         _connections.resize(512);
+        _activeBuffers.reserve(1024);
     }
 
-    Socket::Result Server::Init(Socket::Mode mode, std::string& hostname, u16 port)
+    bool Server::Start()
     {
-        Socket::Result createResult = Socket::Create(Socket::Type::SERVER, mode, _socket);
-        if (createResult != Socket::Result::SUCCESS)
-        {
-            return createResult;
-        }
+        if (_asioThread != nullptr)
+            return false;
 
-        _socket->SetBlockingState(false);
+        ListenForNewConnection();
+        _asioThread = new std::thread([this]() { _asioContext.run(); });
 
-        _hostname = hostname;
-        _port = port;
-
-        Socket::Result bindResult = _socket->Bind(_hostname, port);
-        if (bindResult != Socket::Result::SUCCESS)
-        {
-            return bindResult;
-        }
-
-        // Setup Threads
-        {
-            std::thread processThread = std::thread(&Server::Process, this);
-            processThread.detach();
-        }
-
-        _isInitialized = true;
-
-        return Socket::Result::SUCCESS;
-    }
-
-    Socket::Result Server::Stop()
-    {
-        if (_isStopped)
-        {
-            NC_LOG_ERROR("[Networking] Attempted to call Stop on an already closed Server");
-            return Socket::Result::ERROR_SERVER_ALREADY_STOPPED;
-        }
-
-        _isStopped = true;
-
-        for (Connection& connection : _connections)
-        {
-            connection.id = SOCKET_ID_INVALID;
-
-            if (connection.client)
-            {
-                connection.client->Close();
-                connection.client = nullptr;
-            }
-        }
-
-        _activeSockets.clear();
-
-        // Empty connected queue
-        {
-            SocketConnectedEvent connectedEvent;
-            while (_connectedEvents.try_dequeue(connectedEvent)) {}
-        }
-
-        // Empty message queue
-        {
-            SocketMessageEvent messageEvent;
-            while (_messageEvents.try_dequeue(messageEvent)) {}
-        }
-
-        Socket::Result result = _socket->Close();
-        return result;
+        return true;
     }
 
     void Server::CloseSocketID(SocketID socketID)
     {
-        SocketDisconnectedEvent disconnectedEvent;
-        disconnectedEvent.socketID = socketID;
+        if (socketID == SOCKET_ID_INVALID)
+        {
+            NC_LOG_ERROR("Network::Server : CloseSocketID Failed (Invalid SocketID)");
+            return;
+        }
 
-        _disconnectRequest.enqueue(disconnectedEvent);
+        DeferCloseSocketID(socketID);
+        u32 isHandleClosedRequestsMessageScheduled = _handleClosedRequestsScheduled.fetch_add(1);
+        if (isHandleClosedRequestsMessageScheduled == 0)
+        {
+            asio::post(_asioContext, std::bind(&Server::ProcessDeferredCloseRequests, this));
+        }
     }
 
     void Server::SendPacket(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer)
     {
-        SocketMessageEvent request =
+        if (socketID == SOCKET_ID_INVALID)
         {
-            .socketID = socketID,
-            .message =
-            {
-                .buffer = buffer
-            }
-        };
-
-        _messageRequests.enqueue(request);
-    }
-
-    Socket::Result Server::Accept(std::shared_ptr<Client> netClient)
-    {
-        if (_isInitialized == false)
-        {
-            NC_LOG_ERROR("[Networking] Attempted to call Accept on uninitialized Server");
-            return Socket::Result::ERROR_SERVER_UNINITIALIZED;
+            NC_LOG_ERROR("Network::Server : SendPacket Failed (Invalid SocketID)");
+            return;
         }
 
-        std::shared_ptr<Socket> connection = nullptr;
-        Socket::Result acceptResult = _socket->Accept(connection);
-        if (acceptResult != Socket::Result::SUCCESS)
+        SocketMessageEvent messageEvent;
+        messageEvent.socketID = socketID;
+        messageEvent.message.buffer = buffer;
+        _outMessageEvents.enqueue(messageEvent);
+
+        u32 flushOutMessageEventsScheduled = _flushOutMessageEventsScheduled.fetch_add(1);
+        if (flushOutMessageEventsScheduled == 0)
         {
-            return acceptResult;
-        }
-
-        Socket::Result initResult = netClient->Init(connection);
-        if (initResult != Socket::Result::SUCCESS)
-        {
-            return initResult;
-        }
-
-        netClient->GetSocket()->SetBlockingState(false);
-        return Socket::Result::SUCCESS;
-    }
-
-    Socket::Result Server::Close(Connection& connection)
-    {
-        if (!connection.client)
-        {
-            return Socket::Result::ERROR_CLIENT_UNCONNECTED;
-        }
-
-        Socket::Result closeResult = connection.client->Close();
-        if (closeResult != Socket::Result::SUCCESS &&
-            closeResult != Socket::Result::ERROR_CLIENT_UNCONNECTED)
-        {
-            return closeResult;
-        }
-
-        SocketDisconnectedEvent disconnectedEvent;
-        disconnectedEvent.socketID = connection.id;
-        _disconnectedEvents.enqueue(disconnectedEvent);
-
-        _activeSockets.erase(connection.id);
-        connection.client = nullptr;
-
-        return Socket::Result::SUCCESS;
-    }
-
-    void Server::Process()
-    {
-        while (!_isStopped)
-        {
-            u64 timeSinceThisUpdateStart = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-
-            std::shared_ptr<Client> netClient = std::make_shared<Client>();
-
-            Socket::Result result = Accept(netClient);
-            if (result == Socket::Result::SUCCESS)
-            {
-                SocketID socketID = GetNextSocketID();
-
-                // Close Connection if we have too many already
-                if (socketID == SOCKET_ID_INVALID)
-                {
-                    netClient->Close();
-                }
-                else
-                {
-                    u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
-
-                    Connection& connection = _connections[index];
-                    connection.client = std::move(netClient);
-
-                    {
-                        SocketConnectedEvent connectedEvent;
-                        connectedEvent.socketID = socketID;
-                        connectedEvent.connectionInfo = connection.client->GetSocket()->GetConnectionInfo();
-
-                        _connectedEvents.enqueue(connectedEvent);
-                    }
-
-                    _activeSockets.emplace(socketID);
-                }
-            }
-
-            // Handle Socket Message Requests
-            {
-                SocketMessageEvent messageEvent;
-                while (_messageRequests.try_dequeue(messageEvent))
-                {
-                    u32 index = Util::DefineUtil::GetSocketIDValue(messageEvent.socketID);
-
-                    Connection& connection = _connections[index];
-                    if (!connection.client)
-                        continue;
-
-                    u32 eventVersion = Util::DefineUtil::GetSocketIDVersion(messageEvent.socketID);
-                    u32 connectionVersion = Util::DefineUtil::GetSocketIDVersion(connection.id);
-
-                    if (eventVersion != connectionVersion)
-                        continue;
-
-                    connection.client->Send(messageEvent.message.buffer);
-                }
-            }
-
-            // Handle Socket Disconnect Requests
-            {
-                SocketDisconnectedEvent disconnectedEvent;
-                while (_disconnectRequest.try_dequeue(disconnectedEvent))
-                {
-                    u32 index = Util::DefineUtil::GetSocketIDValue(disconnectedEvent.socketID);
-
-                    Connection& connection = _connections[index];
-                    if (!connection.client)
-                        continue;
-
-                    u32 eventVersion = Util::DefineUtil::GetSocketIDVersion(disconnectedEvent.socketID);
-                    u32 connectionVersion = Util::DefineUtil::GetSocketIDVersion(connection.id);
-
-                    if (eventVersion != connectionVersion)
-                        continue;
-
-                    Close(connection);
-                }
-            }
-
-            // Read Sockets
-            for (const SocketID socketID : _activeSockets)
-            {
-                u64 timeSinceThisSocketUpdate = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-
-                u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
-
-                Connection& connection = _connections[index];
-
-                Socket::Result readResult = connection.client->Read();
-                if (readResult == Socket::Result::SUCCESS)
-                {
-#ifdef NC_DEBUG
-                    const ConnectionInfo& connectionInfo = connection.client->GetSocket()->GetConnectionInfo();
-#endif // NC_DEBUG
-
-                    std::shared_ptr<Bytebuffer>& buffer = connection.client->GetReadBuffer();
-                    while (size_t activeSize = buffer->GetActiveSize())
-                    {
-                        static constexpr u8 PacketHeaderSize = sizeof(MessageHeader);
-
-                        // We have received a partial header and need to read more
-                        if (activeSize < PacketHeaderSize)
-                        {
-                            buffer->Normalize();
-                            break;
-                        }
-
-                        MessageHeader* header = reinterpret_cast<MessageHeader*>(buffer->GetReadPointer());
-
-                        if (header->size > DEFAULT_BUFFER_SIZE - PacketHeaderSize)
-                        {
-#ifdef NC_DEBUG
-                            NC_LOG_ERROR("Network : Received Invalid Opcode Size ({0} : {1}) from (SocketId : {2}, \"{3}:{4}\")", header->opcode, header->size, static_cast<u32>(socketID), connectionInfo.ipAddrStr, connectionInfo.port);
-#endif // NC_DEBUG
-                            CloseSocketID(connection.id);
-                            break;
-                        }
-
-                        size_t receivedPayloadSize = activeSize - sizeof(MessageHeader);
-                        if (receivedPayloadSize < header->size)
-                        {
-                            buffer->Normalize();
-                            break;
-                        }
-
-                        buffer->SkipRead(sizeof(MessageHeader));
-
-                        if (header->flags.isPing)
-                        {
-                            MessageHeader pongHeader;
-                            pongHeader.flags.isPing = 1;
-
-                            std::shared_ptr<Bytebuffer> pongBuffer = Bytebuffer::Borrow<PacketHeaderSize>();
-                            pongBuffer->Put(pongHeader);
-
-                            connection.client->Send(pongBuffer);
-                        }
-
-                        std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
-                        {
-                            // Payload
-                            {
-                                messageBuffer->Put(*header);
-
-                                if (header->size)
-                                {
-                                    std::memcpy(messageBuffer->GetWritePointer(), buffer->GetReadPointer(), header->size);
-                                    messageBuffer->SkipWrite(header->size);
-
-                                    // Skip Payload
-                                    buffer->SkipRead(header->size);
-                                }
-                            }
-
-                            SocketMessageEvent messageEvent;
-                            messageEvent.socketID = socketID;
-                            messageEvent.message.buffer = std::move(messageBuffer);
-                            messageEvent.message.timestampProcessed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                            messageEvent.message.networkSleepDiff = static_cast<u16>(timeSinceThisUpdateStart - _timeSinceLastUpdateFinish);
-                            messageEvent.message.networkUpdateDiff = static_cast<u16>(timeSinceThisSocketUpdate - timeSinceThisUpdateStart);
-                            messageEvent.message.timeToProcess = static_cast<u16>(messageEvent.message.timestampProcessed - timeSinceThisSocketUpdate);
-
-                            _messageEvents.enqueue(messageEvent);
-                        }
-                    }
-
-                    if (buffer->GetActiveSize() == 0)
-                    {
-                        buffer->Reset();
-                    }
-                }
-                else if (readResult != Socket::Result::ERROR_WOULD_BLOCK)
-                {
-                    Close(connection);
-                }
-            }
-
-            _timeSinceLastUpdateFinish = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-            std::this_thread::sleep_for(1ms);
+            asio::post(_asioContext, std::bind(&Server::ProcessDeferredOutMessageRequests, this));
         }
     }
 
@@ -365,5 +261,112 @@ namespace Network
         }
 
         return result;
+    }
+
+    void Server::ListenForNewConnection()
+    {
+        _asioAcceptor.async_accept(_asioSocket, [this](std::error_code ec)
+        {
+            if (!ec)
+            {
+                SocketID socketID = GetNextSocketID();
+
+                if (socketID != SOCKET_ID_INVALID)
+                {
+                    auto remoteEndpoint = _asioSocket.remote_endpoint();
+                    auto address = remoteEndpoint.address();
+
+                    // Add the new connection
+                    u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
+
+                    // Set Receive/Send Buffer Size
+                    _asioSocket.set_option(asio::socket_base::receive_buffer_size(DEFAULT_BUFFER_SIZE));
+                    _asioSocket.set_option(asio::socket_base::send_buffer_size(DEFAULT_BUFFER_SIZE));
+
+                    // Disable nagle's algorithm
+                    _asioSocket.set_option(asio::ip::tcp::no_delay(true));
+
+                    Connection& connection = _connections[index];
+                    connection.client = std::make_shared<ServerSession>(this, socketID, std::move(_asioSocket));
+                    connection.client->Start();
+
+                    // Emit connected event
+                    SocketConnectedEvent connectedEvent;
+                    connectedEvent.socketID = socketID;
+                    connectedEvent.connectionInfo.ipAddr = address.to_string();
+                    connectedEvent.connectionInfo.port = remoteEndpoint.port();
+                    _connectedEvents.enqueue(connectedEvent);
+                }
+                else
+                {
+                    NC_LOG_ERROR("Network::Server : New Connection Failed (No Available SocketID)");
+                }
+
+                // Schedule the next accept
+                ListenForNewConnection();
+            }
+            else
+            {
+                NC_LOG_ERROR("Network::Server : New Connection Failed ({0})", ec.message());
+            }
+        });
+    }
+
+    void Server::ProcessDeferredOutMessageRequests()
+    {
+        SocketMessageEvent messageEvent;
+        while (_outMessageEvents.try_dequeue(messageEvent))
+        {
+            SocketID socketID = messageEvent.socketID;
+            std::shared_ptr<Bytebuffer>& buffer = messageEvent.message.buffer;
+
+            u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
+            Connection& connection = _connections[index];
+
+            if (!connection.client || connection.id != socketID)
+            {
+                NC_LOG_ERROR("Network::Server : ProcessDeferredOutMessageRequests Failed (Client Not Found)");
+                continue;
+            }
+
+            const BufferID bufferID = _nextBufferID++;
+            _activeBuffers[bufferID] = buffer;
+
+            connection.client->WriteBuffer(bufferID, buffer);
+        }
+
+        _flushOutMessageEventsScheduled.store(0);
+    }
+
+    void Server::ProcessDeferredCloseRequests()
+    {
+        SocketDisconnectedEvent disconnectedEvent;
+        while (_disconnectRequests.try_dequeue(disconnectedEvent))
+        {
+            SocketID socketID = disconnectedEvent.socketID;
+            u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
+            Connection& connection = _connections[index];
+
+            if (!connection.client && connection.id == socketID)
+            {
+                NC_LOG_ERROR("Network::Server : CloseSocketID Failed (Client Not Found)");
+                continue;
+            }
+
+            connection.client->Close();
+            connection.client = nullptr;
+
+            // Emit disconnected event
+            SocketDisconnectedEvent disconnectedEvent;
+            disconnectedEvent.socketID = socketID;
+            _disconnectedEvents.enqueue(disconnectedEvent);
+        }
+
+        _handleClosedRequestsScheduled.store(0);
+    }
+
+    void Server::DeferCloseSocketID(SocketID socketID)
+    {
+        _disconnectRequests.enqueue({ socketID });
     }
 }

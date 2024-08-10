@@ -30,4 +30,9 @@ Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
 
     Solution.Util.SetIncludes({ dep.Path, sourceDir })
     Solution.Util.SetLinks(dep.Name)
+
+    local isEnabled = BuildSettings:Get("Enable Tracy")
+    if isEnabled then
+        Solution.Util.SetDefines({ "TRACY_ENABLE" })
+    end
 end)

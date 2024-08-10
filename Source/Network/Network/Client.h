@@ -1,46 +1,47 @@
 #pragma once
 #include "Define.h"
-#include "Socket.h"
 
 #include "Base/Types.h"
+#include "Base/Container/ConcurrentQueue.h"
 #include "Base/Memory/Bytebuffer.h"
+#include "Base/Util/DebugHandler.h"
 
+#include <asio/asio.hpp>
 #include <entt/fwd.hpp>
+#include <robinhood/robinhood.h>
 
 namespace Network
 {
     class Client
     {
     public:
-        Client();
-        Socket::Result Init(Socket::Mode mode);
-        Socket::Result Reinit();
+        Client(asio::io_context& asioContext, std::shared_ptr<asio::ip::tcp::resolver>& resolver);
 
-        Socket::Result Connect(u32 host, u16 port);
-        Socket::Result Connect(const char* hostname, u16 port);
-        Socket::Result Connect(std::string& hostname, u16 port);
-        Socket::Result Close();
-        Socket::Result Send(void* data, size_t size);
-        Socket::Result Send(std::shared_ptr<Bytebuffer>& buffer);
+        void Stop();
 
-        Socket::Result Read();
-        Socket::Result Read(void* data, size_t size);
+        bool Connect(const char* address, u16 port);
+        void Send(std::shared_ptr<Bytebuffer>& buffer);
 
-        bool IsInitialized() { return _isInitialized; }
+        bool IsConnected() { return _socket != nullptr; }
 
-    public:
-        bool IsConnected() { return _isConnected; }
-        std::shared_ptr<Bytebuffer>& GetReadBuffer() { return _socket->GetReadBuffer(); }
-        std::shared_ptr<Socket>& GetSocket() { return _socket; }
+        moodycamel::ConcurrentQueue<SocketMessageEvent>& GetMessageEvents() { return _messageEvents; };
 
     private:
-        Socket::Result Init(std::shared_ptr<Socket>& socket);
+        void ReadMessageHeader();
+        void ReadMessageBody();
+
+        void EnqueueMessage(std::shared_ptr<Bytebuffer>& buffer);
+        void ClearBuffer(BufferID bufferID);
 
     private:
-        friend class Server;
-        bool _isInitialized = false;
-        bool _isConnected = false;
+        asio::io_context& _asioContext;
+        std::shared_ptr<asio::ip::tcp::socket> _socket = nullptr;
+        std::shared_ptr<asio::ip::tcp::resolver> _resolver = nullptr;
 
-        std::shared_ptr<Socket> _socket = nullptr;
+        BufferID _nextBufferID = 0;
+        robin_hood::unordered_map<BufferID, std::shared_ptr<Bytebuffer>> _activeBuffers;
+
+        std::shared_ptr<Bytebuffer> _readBuffer;
+        moodycamel::ConcurrentQueue<SocketMessageEvent> _messageEvents;
     };
 }
