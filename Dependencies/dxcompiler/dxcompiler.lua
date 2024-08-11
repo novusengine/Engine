@@ -9,5 +9,5 @@ Solution.Util.CreateDep(mod.Name, mod.Dependencies, function()
     Solution.Util.SetLinks(link)
 end)
 
-local libPath = iif(os.istarget("windows"), mod.Path .. "/lib/windows/dxcompiler.dll", mod.Path .. "/lib/linux/dxcompiler.so")
+local libPath = iif(os.istarget("windows"), mod.Path .. "/lib/windows/dxcompiler.dll", mod.Path .. "/lib/linux/libdxcompiler.so")
 BuildSettings:Add("DXCompiler Dynamic Lib Path", libPath)
