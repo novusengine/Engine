@@ -1,6 +1,4 @@
 #pragma once
-#include "ClientDB.h"
-
 #include <Base/Types.h>
 #include <Base/Container/StringTable.h>
 #include <Base/Math/Color.h>
