@@ -5,7 +5,7 @@ Solution.Util.CreateDep(mod.Name, mod.Dependencies, function()
     
     local libPath = iif(os.istarget("windows"), mod.Path .. "/lib/windows", mod.Path .. "/lib/linux")
     Solution.Util.SetLibDirs(libPath)
-    local link = iif(os.istarget("windows"), libPath .. "/dxcompiler.lib", libPath .. "/dxcompiler.so")
+    local link = iif(os.istarget("windows"), libPath .. "/dxcompiler.lib", libPath .. "/dxcompiler")
     Solution.Util.SetLinks(link)
 end)
 
