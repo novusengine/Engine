@@ -37,7 +37,7 @@ namespace ClientDB
         Storage(const std::string& name) : _name(name) { }
         ~Storage()
         {
-            for (void* row : _rows)
+            for (T* row : _rows)
             {
                 if (row)
                     delete row;
