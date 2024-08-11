@@ -6,8 +6,6 @@
 
 #include "EmitCommonX64.h"
 
-LUAU_FASTFLAG(LuauCodegenInstG)
-
 namespace Luau
 {
 namespace CodeGen
@@ -172,7 +170,8 @@ void IrRegAllocX64::freeLastUseReg(IrInst& target, uint32_t instIdx)
 
 void IrRegAllocX64::freeLastUseRegs(const IrInst& inst, uint32_t instIdx)
 {
-    auto checkOp = [this, instIdx](IrOp op) {
+    auto checkOp = [this, instIdx](IrOp op)
+    {
         if (op.kind == IrOpKind::Inst)
             freeLastUseReg(function.instructions[op.index], instIdx);
     };
@@ -183,9 +182,7 @@ void IrRegAllocX64::freeLastUseRegs(const IrInst& inst, uint32_t instIdx)
     checkOp(inst.d);
     checkOp(inst.e);
     checkOp(inst.f);
-
-    if (FFlag::LuauCodegenInstG)
-        checkOp(inst.g);
+    checkOp(inst.g);
 }
 
 bool IrRegAllocX64::isLastUseReg(const IrInst& target, uint32_t instIdx) const

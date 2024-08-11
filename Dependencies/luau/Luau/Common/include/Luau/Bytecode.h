@@ -360,8 +360,8 @@ enum LuauOpcode
 
     // SUBRK, DIVRK: compute arithmetic operation between the constant and a source register and put the result into target register
     // A: target register
-    // B: source register
-    // C: constant table index (0..255); must refer to a number
+    // B: constant table index (0..255); must refer to a number
+    // C: source register
     LOP_SUBRK,
     LOP_DIVRK,
 
@@ -443,7 +443,6 @@ enum LuauBytecodeTag
     LBC_VERSION_MAX = 6,
     LBC_VERSION_TARGET = 5,
     // Type encoding version
-    LBC_TYPE_VERSION_DEPRECATED = 1,
     LBC_TYPE_VERSION_MIN = 1,
     LBC_TYPE_VERSION_MAX = 3,
     LBC_TYPE_VERSION_TARGET = 3,

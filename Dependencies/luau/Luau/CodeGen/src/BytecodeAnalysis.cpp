@@ -11,9 +11,6 @@
 
 #include <algorithm>
 
-LUAU_FASTFLAGVARIABLE(LuauCodegenAnalyzeHostVectorOps, false)
-LUAU_FASTFLAGVARIABLE(LuauCodegenLoadTypeUpvalCheck, false)
-LUAU_FASTFLAGVARIABLE(LuauCodegenUserdataOps, false)
 LUAU_FASTFLAGVARIABLE(LuauCodegenFastcall3, false)
 
 namespace Luau
@@ -72,11 +69,6 @@ void loadBytecodeTypeInfo(IrFunction& function)
     uint32_t upvalCount = readVarInt(data, offset);
     uint32_t localCount = readVarInt(data, offset);
 
-    if (!FFlag::LuauCodegenLoadTypeUpvalCheck)
-    {
-        CODEGEN_ASSERT(upvalCount == unsigned(proto->nups));
-    }
-
     if (typeSize != 0)
     {
         uint8_t* types = (uint8_t*)data + offset;
@@ -94,10 +86,7 @@ void loadBytecodeTypeInfo(IrFunction& function)
 
     if (upvalCount != 0)
     {
-        if (FFlag::LuauCodegenLoadTypeUpvalCheck)
-        {
-            CODEGEN_ASSERT(upvalCount == unsigned(proto->nups));
-        }
+        CODEGEN_ASSERT(upvalCount == unsigned(proto->nups));
 
         typeInfo.upvalueTypes.resize(upvalCount);
 
@@ -127,12 +116,17 @@ void loadBytecodeTypeInfo(IrFunction& function)
 static void prepareRegTypeInfoLookups(BytecodeTypeInfo& typeInfo)
 {
     // Sort by register first, then by end PC
-    std::sort(typeInfo.regTypes.begin(), typeInfo.regTypes.end(), [](const BytecodeRegTypeInfo& a, const BytecodeRegTypeInfo& b) {
-        if (a.reg != b.reg)
-            return a.reg < b.reg;
+    std::sort(
+        typeInfo.regTypes.begin(),
+        typeInfo.regTypes.end(),
+        [](const BytecodeRegTypeInfo& a, const BytecodeRegTypeInfo& b)
+        {
+            if (a.reg != b.reg)
+                return a.reg < b.reg;
 
-        return a.endpc < b.endpc;
-    });
+            return a.endpc < b.endpc;
+        }
+    );
 
     // Prepare data for all registers as 'regTypes' might be missing temporaries
     typeInfo.regTypeOffsets.resize(256 + 1);
@@ -759,50 +753,27 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
 
                 regTags[ra] = LBC_TYPE_ANY;
 
-                if (FFlag::LuauCodegenUserdataOps)
+                TString* str = gco2ts(function.proto->k[kc].value.gc);
+                const char* field = getstr(str);
+
+                if (bcType.a == LBC_TYPE_VECTOR)
                 {
-                    TString* str = gco2ts(function.proto->k[kc].value.gc);
-                    const char* field = getstr(str);
-
-                    if (bcType.a == LBC_TYPE_VECTOR)
+                    if (str->len == 1)
                     {
-                        if (str->len == 1)
-                        {
-                            // Same handling as LOP_GETTABLEKS block in lvmexecute.cpp - case-insensitive comparison with "X" / "Y" / "Z"
-                            char ch = field[0] | ' ';
+                        // Same handling as LOP_GETTABLEKS block in lvmexecute.cpp - case-insensitive comparison with "X" / "Y" / "Z"
+                        char ch = field[0] | ' ';
 
-                            if (ch == 'x' || ch == 'y' || ch == 'z')
-                                regTags[ra] = LBC_TYPE_NUMBER;
-                        }
+                        if (ch == 'x' || ch == 'y' || ch == 'z')
+                            regTags[ra] = LBC_TYPE_NUMBER;
+                    }
 
-                        if (FFlag::LuauCodegenAnalyzeHostVectorOps && regTags[ra] == LBC_TYPE_ANY && hostHooks.vectorAccessBytecodeType)
-                            regTags[ra] = hostHooks.vectorAccessBytecodeType(field, str->len);
-                    }
-                    else if (isCustomUserdataBytecodeType(bcType.a))
-                    {
-                        if (regTags[ra] == LBC_TYPE_ANY && hostHooks.userdataAccessBytecodeType)
-                            regTags[ra] = hostHooks.userdataAccessBytecodeType(bcType.a, field, str->len);
-                    }
+                    if (regTags[ra] == LBC_TYPE_ANY && hostHooks.vectorAccessBytecodeType)
+                        regTags[ra] = hostHooks.vectorAccessBytecodeType(field, str->len);
                 }
-                else
+                else if (isCustomUserdataBytecodeType(bcType.a))
                 {
-                    if (bcType.a == LBC_TYPE_VECTOR)
-                    {
-                        TString* str = gco2ts(function.proto->k[kc].value.gc);
-                        const char* field = getstr(str);
-
-                        if (str->len == 1)
-                        {
-                            // Same handling as LOP_GETTABLEKS block in lvmexecute.cpp - case-insensitive comparison with "X" / "Y" / "Z"
-                            char ch = field[0] | ' ';
-
-                            if (ch == 'x' || ch == 'y' || ch == 'z')
-                                regTags[ra] = LBC_TYPE_NUMBER;
-                        }
-
-                        if (FFlag::LuauCodegenAnalyzeHostVectorOps && regTags[ra] == LBC_TYPE_ANY && hostHooks.vectorAccessBytecodeType)
-                            regTags[ra] = hostHooks.vectorAccessBytecodeType(field, str->len);
-                    }
+                    if (regTags[ra] == LBC_TYPE_ANY && hostHooks.userdataAccessBytecodeType)
+                        regTags[ra] = hostHooks.userdataAccessBytecodeType(bcType.a, field, str->len);
                 }
 
                 bcType.result = regTags[ra];
@@ -839,8 +810,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
                     regTags[ra] = LBC_TYPE_NUMBER;
                 else if (bcType.a == LBC_TYPE_VECTOR && bcType.b == LBC_TYPE_VECTOR)
                     regTags[ra] = LBC_TYPE_VECTOR;
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
 
                 bcType.result = regTags[ra];
@@ -871,8 +841,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
                     if (bcType.b == LBC_TYPE_NUMBER || bcType.b == LBC_TYPE_VECTOR)
                         regTags[ra] = LBC_TYPE_VECTOR;
                 }
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                 {
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
                 }
@@ -894,8 +863,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
 
                 if (bcType.a == LBC_TYPE_NUMBER && bcType.b == LBC_TYPE_NUMBER)
                     regTags[ra] = LBC_TYPE_NUMBER;
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
 
                 bcType.result = regTags[ra];
@@ -917,8 +885,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
                     regTags[ra] = LBC_TYPE_NUMBER;
                 else if (bcType.a == LBC_TYPE_VECTOR && bcType.b == LBC_TYPE_VECTOR)
                     regTags[ra] = LBC_TYPE_VECTOR;
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
 
                 bcType.result = regTags[ra];
@@ -949,8 +916,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
                     if (bcType.b == LBC_TYPE_NUMBER || bcType.b == LBC_TYPE_VECTOR)
                         regTags[ra] = LBC_TYPE_VECTOR;
                 }
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                 {
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
                 }
@@ -972,8 +938,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
 
                 if (bcType.a == LBC_TYPE_NUMBER && bcType.b == LBC_TYPE_NUMBER)
                     regTags[ra] = LBC_TYPE_NUMBER;
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
 
                 bcType.result = regTags[ra];
@@ -994,8 +959,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
                     regTags[ra] = LBC_TYPE_NUMBER;
                 else if (bcType.a == LBC_TYPE_VECTOR && bcType.b == LBC_TYPE_VECTOR)
                     regTags[ra] = LBC_TYPE_VECTOR;
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
 
                 bcType.result = regTags[ra];
@@ -1024,8 +988,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
                     if (bcType.b == LBC_TYPE_NUMBER || bcType.b == LBC_TYPE_VECTOR)
                         regTags[ra] = LBC_TYPE_VECTOR;
                 }
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType &&
-                         (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
+                else if (hostHooks.userdataMetamethodBytecodeType && (isCustomUserdataBytecodeType(bcType.a) || isCustomUserdataBytecodeType(bcType.b)))
                 {
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, bcType.b, opcodeToHostMetamethod(op));
                 }
@@ -1057,7 +1020,7 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
                     regTags[ra] = LBC_TYPE_NUMBER;
                 else if (bcType.a == LBC_TYPE_VECTOR)
                     regTags[ra] = LBC_TYPE_VECTOR;
-                else if (FFlag::LuauCodegenUserdataOps && hostHooks.userdataMetamethodBytecodeType && isCustomUserdataBytecodeType(bcType.a))
+                else if (hostHooks.userdataMetamethodBytecodeType && isCustomUserdataBytecodeType(bcType.a))
                     regTags[ra] = hostHooks.userdataMetamethodBytecodeType(bcType.a, LBC_TYPE_ANY, HostMetamethod::Minus);
 
                 bcType.result = regTags[ra];
@@ -1213,45 +1176,29 @@ void analyzeBytecodeTypes(IrFunction& function, const HostIrHooks& hostHooks)
 
                 bcType.result = LBC_TYPE_FUNCTION;
 
-                if (FFlag::LuauCodegenUserdataOps)
-                {
-                    TString* str = gco2ts(function.proto->k[kc].value.gc);
-                    const char* field = getstr(str);
+                TString* str = gco2ts(function.proto->k[kc].value.gc);
+                const char* field = getstr(str);
 
-                    if (FFlag::LuauCodegenAnalyzeHostVectorOps && bcType.a == LBC_TYPE_VECTOR && hostHooks.vectorNamecallBytecodeType)
-                        knownNextCallResult = LuauBytecodeType(hostHooks.vectorNamecallBytecodeType(field, str->len));
-                    else if (isCustomUserdataBytecodeType(bcType.a) && hostHooks.userdataNamecallBytecodeType)
-                        knownNextCallResult = LuauBytecodeType(hostHooks.userdataNamecallBytecodeType(bcType.a, field, str->len));
-                }
-                else
-                {
-                    if (FFlag::LuauCodegenAnalyzeHostVectorOps && bcType.a == LBC_TYPE_VECTOR && hostHooks.vectorNamecallBytecodeType)
-                    {
-                        TString* str = gco2ts(function.proto->k[kc].value.gc);
-                        const char* field = getstr(str);
-
-                        knownNextCallResult = LuauBytecodeType(hostHooks.vectorNamecallBytecodeType(field, str->len));
-                    }
-                }
+                if (bcType.a == LBC_TYPE_VECTOR && hostHooks.vectorNamecallBytecodeType)
+                    knownNextCallResult = LuauBytecodeType(hostHooks.vectorNamecallBytecodeType(field, str->len));
+                else if (isCustomUserdataBytecodeType(bcType.a) && hostHooks.userdataNamecallBytecodeType)
+                    knownNextCallResult = LuauBytecodeType(hostHooks.userdataNamecallBytecodeType(bcType.a, field, str->len));
                 break;
             }
             case LOP_CALL:
             {
-                if (FFlag::LuauCodegenAnalyzeHostVectorOps)
+                int ra = LUAU_INSN_A(*pc);
+
+                if (knownNextCallResult != LBC_TYPE_ANY)
                 {
-                    int ra = LUAU_INSN_A(*pc);
+                    bcType.result = knownNextCallResult;
 
-                    if (knownNextCallResult != LBC_TYPE_ANY)
-                    {
-                        bcType.result = knownNextCallResult;
+                    knownNextCallResult = LBC_TYPE_ANY;
 
-                        knownNextCallResult = LBC_TYPE_ANY;
-
-                        regTags[ra] = bcType.result;
-                    }
-
-                    refineRegType(bcTypeInfo, ra, i, bcType.result);
+                    regTags[ra] = bcType.result;
                 }
+
+                refineRegType(bcTypeInfo, ra, i, bcType.result);
                 break;
             }
             case LOP_GETUPVAL:

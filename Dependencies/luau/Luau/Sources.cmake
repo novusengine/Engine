@@ -7,6 +7,7 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS "3.19")
         Common/include/Luau/BytecodeUtils.h
         Common/include/Luau/DenseHash.h
         Common/include/Luau/ExperimentalFlags.h
+        Common/include/Luau/Variant.h
         Common/include/Luau/VecDeque.h
     )
 endif()
@@ -162,6 +163,7 @@ target_sources(Luau.CodeGen PRIVATE
 # Luau.Analysis Sources
 target_sources(Luau.Analysis PRIVATE
     Analysis/include/Luau/Anyification.h
+    Analysis/include/Luau/AnyTypeSummary.h
     Analysis/include/Luau/ApplyTypeFunction.h
     Analysis/include/Luau/AstJsonEncoder.h
     Analysis/include/Luau/AstQuery.h
@@ -219,8 +221,8 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/include/Luau/TypeChecker2.h
     Analysis/include/Luau/TypeCheckLimits.h
     Analysis/include/Luau/TypedAllocator.h
-    Analysis/include/Luau/TypeFamily.h
-    Analysis/include/Luau/TypeFamilyReductionGuesser.h
+    Analysis/include/Luau/TypeFunction.h
+    Analysis/include/Luau/TypeFunctionReductionGuesser.h
     Analysis/include/Luau/TypeFwd.h
     Analysis/include/Luau/TypeInfer.h
     Analysis/include/Luau/TypeOrPack.h
@@ -232,10 +234,10 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/include/Luau/Unifier.h
     Analysis/include/Luau/Unifier2.h
     Analysis/include/Luau/UnifierSharedState.h
-    Analysis/include/Luau/Variant.h
     Analysis/include/Luau/VisitType.h
 
     Analysis/src/Anyification.cpp
+    Analysis/src/AnyTypeSummary.cpp
     Analysis/src/ApplyTypeFunction.cpp
     Analysis/src/AstJsonEncoder.cpp
     Analysis/src/AstQuery.cpp
@@ -283,8 +285,8 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/src/TypeAttach.cpp
     Analysis/src/TypeChecker2.cpp
     Analysis/src/TypedAllocator.cpp
-    Analysis/src/TypeFamily.cpp
-    Analysis/src/TypeFamilyReductionGuesser.cpp
+    Analysis/src/TypeFunction.cpp
+    Analysis/src/TypeFunctionReductionGuesser.cpp
     Analysis/src/TypeInfer.cpp
     Analysis/src/TypeOrPack.cpp
     Analysis/src/TypePack.cpp
@@ -293,6 +295,19 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/src/Unifiable.cpp
     Analysis/src/Unifier.cpp
     Analysis/src/Unifier2.cpp
+)
+
+# Luau.EqSat Sources
+target_sources(Luau.EqSat PRIVATE
+    EqSat/include/Luau/EGraph.h
+    EqSat/include/Luau/Id.h
+    EqSat/include/Luau/Language.h
+    EqSat/include/Luau/LanguageHash.h
+    EqSat/include/Luau/Slice.h
+    EqSat/include/Luau/UnionFind.h
+
+    EqSat/src/Id.cpp
+    EqSat/src/UnionFind.cpp
 )
 
 # Luau.VM Sources
@@ -395,6 +410,7 @@ endif()
 if(TARGET Luau.UnitTest)
     # Luau.UnitTest Sources
     target_sources(Luau.UnitTest PRIVATE
+        tests/AnyTypeSummary.test.cpp 
         tests/AssemblyBuilderA64.test.cpp
         tests/AssemblyBuilderX64.test.cpp
         tests/AstJsonEncoder.test.cpp
@@ -418,6 +434,9 @@ if(TARGET Luau.UnitTest)
         tests/DiffAsserts.cpp
         tests/DiffAsserts.h
         tests/Differ.test.cpp
+        tests/EqSat.language.test.cpp
+        tests/EqSat.propositional.test.cpp
+        tests/EqSat.slice.test.cpp
         tests/Error.test.cpp
         tests/Fixture.cpp
         tests/Fixture.h
@@ -454,7 +473,7 @@ if(TARGET Luau.UnitTest)
         tests/ToString.test.cpp
         tests/Transpiler.test.cpp
         tests/TxnLog.test.cpp
-        tests/TypeFamily.test.cpp
+        tests/TypeFunction.test.cpp
         tests/TypeInfer.aliases.test.cpp
         tests/TypeInfer.annotations.test.cpp
         tests/TypeInfer.anyerror.test.cpp

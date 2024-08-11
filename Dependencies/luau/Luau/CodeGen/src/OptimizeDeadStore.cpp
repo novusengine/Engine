@@ -9,8 +9,6 @@
 
 #include "lobject.h"
 
-LUAU_FASTFLAG(LuauCodegenUserdataOps)
-
 // TODO: optimization can be improved by knowing which registers are live in at each VM exit
 
 namespace Luau
@@ -305,8 +303,16 @@ struct RemoveDeadStoreState
     bool hasGcoToClear = false;
 };
 
-static bool tryReplaceTagWithFullStore(RemoveDeadStoreState& state, IrBuilder& build, IrFunction& function, IrBlock& block, uint32_t instIndex,
-    IrOp targetOp, IrOp tagOp, StoreRegInfo& regInfo)
+static bool tryReplaceTagWithFullStore(
+    RemoveDeadStoreState& state,
+    IrBuilder& build,
+    IrFunction& function,
+    IrBlock& block,
+    uint32_t instIndex,
+    IrOp targetOp,
+    IrOp tagOp,
+    StoreRegInfo& regInfo
+)
 {
     uint8_t tag = function.tagOp(tagOp);
 
@@ -361,8 +367,16 @@ static bool tryReplaceTagWithFullStore(RemoveDeadStoreState& state, IrBuilder& b
     return false;
 }
 
-static bool tryReplaceValueWithFullStore(RemoveDeadStoreState& state, IrBuilder& build, IrFunction& function, IrBlock& block, uint32_t instIndex,
-    IrOp targetOp, IrOp valueOp, StoreRegInfo& regInfo)
+static bool tryReplaceValueWithFullStore(
+    RemoveDeadStoreState& state,
+    IrBuilder& build,
+    IrFunction& function,
+    IrBlock& block,
+    uint32_t instIndex,
+    IrOp targetOp,
+    IrOp valueOp,
+    StoreRegInfo& regInfo
+)
 {
     // If the tag+value pair is established, we can mark both as dead and use a single split TValue store
     if (regInfo.tagInstIdx != ~0u && regInfo.valueInstIdx != ~0u)
@@ -596,8 +610,6 @@ static void markDeadStoresInInst(RemoveDeadStoreState& state, IrBuilder& build, 
         state.checkLiveIns(inst.d);
         break;
     case IrCmd::CHECK_USERDATA_TAG:
-        CODEGEN_ASSERT(FFlag::LuauCodegenUserdataOps);
-
         state.checkLiveIns(inst.c);
         break;
 

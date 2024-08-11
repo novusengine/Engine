@@ -49,11 +49,16 @@ struct Unifier2
 
     std::vector<ConstraintV> incompleteSubtypes;
     // null if not in a constraint solving context
-    DenseHashSet<const void*>* uninhabitedTypeFamilies;
+    DenseHashSet<const void*>* uninhabitedTypeFunctions;
 
     Unifier2(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes, NotNull<Scope> scope, NotNull<InternalErrorReporter> ice);
-    Unifier2(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes, NotNull<Scope> scope, NotNull<InternalErrorReporter> ice,
-        DenseHashSet<const void*>* uninhabitedTypeFamilies);
+    Unifier2(
+        NotNull<TypeArena> arena,
+        NotNull<BuiltinTypes> builtinTypes,
+        NotNull<Scope> scope,
+        NotNull<InternalErrorReporter> ice,
+        DenseHashSet<const void*>* uninhabitedTypeFunctions
+    );
 
     /** Attempt to commit the subtype relation subTy <: superTy to the type
      * graph.

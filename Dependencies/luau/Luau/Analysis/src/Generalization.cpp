@@ -26,8 +26,14 @@ struct MutatingGeneralizer : TypeOnceVisitor
     bool isWithinFunction = false;
     bool avoidSealingTables = false;
 
-    MutatingGeneralizer(NotNull<BuiltinTypes> builtinTypes, NotNull<Scope> scope, NotNull<DenseHashSet<TypeId>> cachedTypes,
-        DenseHashMap<const void*, size_t> positiveTypes, DenseHashMap<const void*, size_t> negativeTypes, bool avoidSealingTables)
+    MutatingGeneralizer(
+        NotNull<BuiltinTypes> builtinTypes,
+        NotNull<Scope> scope,
+        NotNull<DenseHashSet<TypeId>> cachedTypes,
+        DenseHashMap<const void*, size_t> positiveTypes,
+        DenseHashMap<const void*, size_t> negativeTypes,
+        bool avoidSealingTables
+    )
         : TypeOnceVisitor(/* skipBoundTypes */ true)
         , builtinTypes(builtinTypes)
         , scope(scope)
@@ -804,7 +810,7 @@ struct TypeCacher : TypeOnceVisitor
         return false;
     }
 
-    bool visit(TypeId ty, const TypeFamilyInstanceType& tfit) override
+    bool visit(TypeId ty, const TypeFunctionInstanceType& tfit) override
     {
         if (isCached(ty) || isUncacheable(ty))
             return false;
@@ -860,15 +866,21 @@ struct TypeCacher : TypeOnceVisitor
         return false;
     }
 
-    bool visit(TypePackId tp, const TypeFamilyInstanceTypePack&) override
+    bool visit(TypePackId tp, const TypeFunctionInstanceTypePack&) override
     {
         markUncacheable(tp);
         return false;
     }
 };
 
-std::optional<TypeId> generalize(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes, NotNull<Scope> scope,
-    NotNull<DenseHashSet<TypeId>> cachedTypes, TypeId ty, bool avoidSealingTables)
+std::optional<TypeId> generalize(
+    NotNull<TypeArena> arena,
+    NotNull<BuiltinTypes> builtinTypes,
+    NotNull<Scope> scope,
+    NotNull<DenseHashSet<TypeId>> cachedTypes,
+    TypeId ty,
+    bool avoidSealingTables
+)
 {
     ty = follow(ty);
 

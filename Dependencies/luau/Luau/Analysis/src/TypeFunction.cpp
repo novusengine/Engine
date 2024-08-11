@@ -1,6 +1,6 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 
-#include "Luau/TypeFamily.h"
+#include "Luau/TypeFunction.h"
 
 #include "Luau/Common.h"
 #include "Luau/ConstraintSolver.h"
@@ -15,7 +15,7 @@
 #include "Luau/ToString.h"
 #include "Luau/TxnLog.h"
 #include "Luau/Type.h"
-#include "Luau/TypeFamilyReductionGuesser.h"
+#include "Luau/TypeFunctionReductionGuesser.h"
 #include "Luau/TypeFwd.h"
 #include "Luau/TypeUtils.h"
 #include "Luau/Unifier2.h"
@@ -24,10 +24,10 @@
 
 #include <iterator>
 
-// used to control emitting CodeTooComplex warnings on type family reduction
+// used to control emitting CodeTooComplex warnings on type function reduction
 LUAU_DYNAMIC_FASTINTVARIABLE(LuauTypeFamilyGraphReductionMaximumSteps, 1'000'000);
 
-// used to control the limits of type family application over union type arguments
+// used to control the limits of type function application over union type arguments
 // e.g. `mul<a | b, c | d>` blows up into `mul<a, c> | mul<a, d> | mul<b, c> | mul<b, d>`
 LUAU_DYNAMIC_FASTINTVARIABLE(LuauTypeFamilyApplicationCartesianProductLimit, 5'000);
 
@@ -49,7 +49,7 @@ struct InstanceCollector : TypeOnceVisitor
     TypeOrTypePackIdSet shouldGuess{nullptr};
     std::vector<TypeId> cyclicInstance;
 
-    bool visit(TypeId ty, const TypeFamilyInstanceType&) override
+    bool visit(TypeId ty, const TypeFunctionInstanceType&) override
     {
         // TypeOnceVisitor performs a depth-first traversal in the absence of
         // cycles. This means that by pushing to the front of the queue, we will
@@ -58,7 +58,7 @@ struct InstanceCollector : TypeOnceVisitor
         // we want to reduce the innermost Add<number, number> instantiation
         // first.
 
-        if (DFInt::LuauTypeFamilyUseGuesserDepth >= 0 && typeFamilyDepth > DFInt::LuauTypeFamilyUseGuesserDepth)
+        if (DFInt::LuauTypeFamilyUseGuesserDepth >= 0 && typeFunctionDepth > DFInt::LuauTypeFamilyUseGuesserDepth)
             shouldGuess.insert(ty);
 
         tys.push_front(ty);
@@ -70,7 +70,7 @@ struct InstanceCollector : TypeOnceVisitor
     {
         /// Detected cyclic type pack
         TypeId t = follow(ty);
-        if (get<TypeFamilyInstanceType>(t))
+        if (get<TypeFunctionInstanceType>(t))
             cyclicInstance.push_back(t);
     }
 
@@ -79,7 +79,7 @@ struct InstanceCollector : TypeOnceVisitor
         return false;
     }
 
-    bool visit(TypePackId tp, const TypeFamilyInstanceTypePack&) override
+    bool visit(TypePackId tp, const TypeFunctionInstanceTypePack&) override
     {
         // TypeOnceVisitor performs a depth-first traversal in the absence of
         // cycles. This means that by pushing to the front of the queue, we will
@@ -88,7 +88,7 @@ struct InstanceCollector : TypeOnceVisitor
         // we want to reduce the innermost Add<number, number> instantiation
         // first.
 
-        if (DFInt::LuauTypeFamilyUseGuesserDepth >= 0 && typeFamilyDepth > DFInt::LuauTypeFamilyUseGuesserDepth)
+        if (DFInt::LuauTypeFamilyUseGuesserDepth >= 0 && typeFunctionDepth > DFInt::LuauTypeFamilyUseGuesserDepth)
             shouldGuess.insert(tp);
 
         tps.push_front(tp);
@@ -97,28 +97,35 @@ struct InstanceCollector : TypeOnceVisitor
     }
 };
 
-struct FamilyReducer
+struct TypeFunctionReducer
 {
-    TypeFamilyContext ctx;
+    TypeFunctionContext ctx;
 
     VecDeque<TypeId> queuedTys;
     VecDeque<TypePackId> queuedTps;
     TypeOrTypePackIdSet shouldGuess;
-    std::vector<TypeId> cyclicTypeFamilies;
+    std::vector<TypeId> cyclicTypeFunctions;
     TypeOrTypePackIdSet irreducible{nullptr};
-    FamilyGraphReductionResult result;
+    FunctionGraphReductionResult result;
     bool force = false;
 
     // Local to the constraint being reduced.
     Location location;
 
-    FamilyReducer(VecDeque<TypeId> queuedTys, VecDeque<TypePackId> queuedTps, TypeOrTypePackIdSet shouldGuess, std::vector<TypeId> cyclicTypes,
-        Location location, TypeFamilyContext ctx, bool force = false)
+    TypeFunctionReducer(
+        VecDeque<TypeId> queuedTys,
+        VecDeque<TypePackId> queuedTps,
+        TypeOrTypePackIdSet shouldGuess,
+        std::vector<TypeId> cyclicTypes,
+        Location location,
+        TypeFunctionContext ctx,
+        bool force = false
+    )
         : ctx(ctx)
         , queuedTys(std::move(queuedTys))
         , queuedTps(std::move(queuedTps))
         , shouldGuess(std::move(shouldGuess))
-        , cyclicTypeFamilies(std::move(cyclicTypes))
+        , cyclicTypeFunctions(std::move(cyclicTypes))
         , force(force)
         , location(location)
     {
@@ -126,7 +133,7 @@ struct FamilyReducer
 
     enum class SkipTestResult
     {
-        CyclicTypeFamily,
+        CyclicTypeFunction,
         Irreducible,
         Defer,
         Okay,
@@ -136,12 +143,12 @@ struct FamilyReducer
     {
         ty = follow(ty);
 
-        if (is<TypeFamilyInstanceType>(ty))
+        if (is<TypeFunctionInstanceType>(ty))
         {
-            for (auto t : cyclicTypeFamilies)
+            for (auto t : cyclicTypeFunctions)
             {
                 if (ty == t)
-                    return SkipTestResult::CyclicTypeFamily;
+                    return SkipTestResult::CyclicTypeFunction;
             }
 
             if (!irreducible.contains(ty))
@@ -161,7 +168,7 @@ struct FamilyReducer
     {
         ty = follow(ty);
 
-        if (is<TypeFamilyInstanceTypePack>(ty))
+        if (is<TypeFunctionInstanceTypePack>(ty))
         {
             if (!irreducible.contains(ty))
                 return SkipTestResult::Defer;
@@ -180,7 +187,10 @@ struct FamilyReducer
     void replace(T subject, T replacement)
     {
         if (subject->owningArena != ctx.arena.get())
-            ctx.ice->ice("Attempting to modify a type family instance from another arena", location);
+        {
+            result.errors.emplace_back(location, InternalError{"Attempting to modify a type function instance from another arena"});
+            return;
+        }
 
         if (FFlag::DebugLuauLogTypeFamilies)
             printf("%s -> %s\n", toString(subject, {true}).c_str(), toString(replacement, {true}).c_str());
@@ -194,7 +204,7 @@ struct FamilyReducer
     }
 
     template<typename T>
-    void handleFamilyReduction(T subject, TypeFamilyReductionResult<T> reduction)
+    void handleTypeFunctionReduction(T subject, TypeFunctionReductionResult<T> reduction)
     {
         if (reduction.result)
             replace(subject, *reduction.result);
@@ -208,15 +218,19 @@ struct FamilyReducer
                     printf("%s is uninhabited\n", toString(subject, {true}).c_str());
 
                 if constexpr (std::is_same_v<T, TypeId>)
-                    result.errors.push_back(TypeError{location, UninhabitedTypeFamily{subject}});
+                    result.errors.push_back(TypeError{location, UninhabitedTypeFunction{subject}});
                 else if constexpr (std::is_same_v<T, TypePackId>)
-                    result.errors.push_back(TypeError{location, UninhabitedTypePackFamily{subject}});
+                    result.errors.push_back(TypeError{location, UninhabitedTypePackFunction{subject}});
             }
             else if (!reduction.uninhabited && !force)
             {
                 if (FFlag::DebugLuauLogTypeFamilies)
-                    printf("%s is irreducible; blocked on %zu types, %zu packs\n", toString(subject, {true}).c_str(), reduction.blockedTypes.size(),
-                        reduction.blockedPacks.size());
+                    printf(
+                        "%s is irreducible; blocked on %zu types, %zu packs\n",
+                        toString(subject, {true}).c_str(),
+                        reduction.blockedTypes.size(),
+                        reduction.blockedPacks.size()
+                    );
 
                 for (TypeId b : reduction.blockedTypes)
                     result.blockedTypes.insert(b);
@@ -298,7 +312,7 @@ struct FamilyReducer
             if (FFlag::DebugLuauLogTypeFamilies)
                 printf("Flagged %s for reduction with guesser.\n", toString(subject, {true}).c_str());
 
-            TypeFamilyReductionGuesser guesser{ctx.arena, ctx.builtins, ctx.normalizer};
+            TypeFunctionReductionGuesser guesser{ctx.arena, ctx.builtins, ctx.normalizer};
             auto guessed = guesser.guess(subject);
 
             if (guessed)
@@ -329,14 +343,14 @@ struct FamilyReducer
         if (FFlag::DebugLuauLogTypeFamilies)
             printf("Trying to reduce %s\n", toString(subject, {true}).c_str());
 
-        if (const TypeFamilyInstanceType* tfit = get<TypeFamilyInstanceType>(subject))
+        if (const TypeFunctionInstanceType* tfit = get<TypeFunctionInstanceType>(subject))
         {
             SkipTestResult testCyclic = testForSkippability(subject);
 
-            if (!testParameters(subject, tfit) && testCyclic != SkipTestResult::CyclicTypeFamily)
+            if (!testParameters(subject, tfit) && testCyclic != SkipTestResult::CyclicTypeFunction)
             {
                 if (FFlag::DebugLuauLogTypeFamilies)
-                    printf("Irreducible due to irreducible/pending and a non-cyclic family\n");
+                    printf("Irreducible due to irreducible/pending and a non-cyclic function\n");
 
                 return;
             }
@@ -344,8 +358,8 @@ struct FamilyReducer
             if (tryGuessing(subject))
                 return;
 
-            TypeFamilyReductionResult<TypeId> result = tfit->family->reducer(subject, tfit->typeArguments, tfit->packArguments, NotNull{&ctx});
-            handleFamilyReduction(subject, result);
+            TypeFunctionReductionResult<TypeId> result = tfit->function->reducer(subject, tfit->typeArguments, tfit->packArguments, NotNull{&ctx});
+            handleTypeFunctionReduction(subject, result);
         }
     }
 
@@ -360,7 +374,7 @@ struct FamilyReducer
         if (FFlag::DebugLuauLogTypeFamilies)
             printf("Trying to reduce %s\n", toString(subject, {true}).c_str());
 
-        if (const TypeFamilyInstanceTypePack* tfit = get<TypeFamilyInstanceTypePack>(subject))
+        if (const TypeFunctionInstanceTypePack* tfit = get<TypeFunctionInstanceTypePack>(subject))
         {
             if (!testParameters(subject, tfit))
                 return;
@@ -368,8 +382,9 @@ struct FamilyReducer
             if (tryGuessing(subject))
                 return;
 
-            TypeFamilyReductionResult<TypePackId> result = tfit->family->reducer(subject, tfit->typeArguments, tfit->packArguments, NotNull{&ctx});
-            handleFamilyReduction(subject, result);
+            TypeFunctionReductionResult<TypePackId> result =
+                tfit->function->reducer(subject, tfit->typeArguments, tfit->packArguments, NotNull{&ctx});
+            handleTypeFunctionReduction(subject, result);
         }
     }
 
@@ -382,10 +397,17 @@ struct FamilyReducer
     }
 };
 
-static FamilyGraphReductionResult reduceFamiliesInternal(VecDeque<TypeId> queuedTys, VecDeque<TypePackId> queuedTps, TypeOrTypePackIdSet shouldGuess,
-    std::vector<TypeId> cyclics, Location location, TypeFamilyContext ctx, bool force)
+static FunctionGraphReductionResult reduceFunctionsInternal(
+    VecDeque<TypeId> queuedTys,
+    VecDeque<TypePackId> queuedTps,
+    TypeOrTypePackIdSet shouldGuess,
+    std::vector<TypeId> cyclics,
+    Location location,
+    TypeFunctionContext ctx,
+    bool force
+)
 {
-    FamilyReducer reducer{std::move(queuedTys), std::move(queuedTps), std::move(shouldGuess), std::move(cyclics), location, ctx, force};
+    TypeFunctionReducer reducer{std::move(queuedTys), std::move(queuedTps), std::move(shouldGuess), std::move(cyclics), location, ctx, force};
     int iterationCount = 0;
 
     while (!reducer.done())
@@ -403,7 +425,7 @@ static FamilyGraphReductionResult reduceFamiliesInternal(VecDeque<TypeId> queued
     return std::move(reducer.result);
 }
 
-FamilyGraphReductionResult reduceFamilies(TypeId entrypoint, Location location, TypeFamilyContext ctx, bool force)
+FunctionGraphReductionResult reduceTypeFunctions(TypeId entrypoint, Location location, TypeFunctionContext ctx, bool force)
 {
     InstanceCollector collector;
 
@@ -413,17 +435,24 @@ FamilyGraphReductionResult reduceFamilies(TypeId entrypoint, Location location, 
     }
     catch (RecursionLimitException&)
     {
-        return FamilyGraphReductionResult{};
+        return FunctionGraphReductionResult{};
     }
 
     if (collector.tys.empty() && collector.tps.empty())
         return {};
 
-    return reduceFamiliesInternal(std::move(collector.tys), std::move(collector.tps), std::move(collector.shouldGuess),
-        std::move(collector.cyclicInstance), location, ctx, force);
+    return reduceFunctionsInternal(
+        std::move(collector.tys),
+        std::move(collector.tps),
+        std::move(collector.shouldGuess),
+        std::move(collector.cyclicInstance),
+        location,
+        ctx,
+        force
+    );
 }
 
-FamilyGraphReductionResult reduceFamilies(TypePackId entrypoint, Location location, TypeFamilyContext ctx, bool force)
+FunctionGraphReductionResult reduceTypeFunctions(TypePackId entrypoint, Location location, TypeFunctionContext ctx, bool force)
 {
     InstanceCollector collector;
 
@@ -433,24 +462,37 @@ FamilyGraphReductionResult reduceFamilies(TypePackId entrypoint, Location locati
     }
     catch (RecursionLimitException&)
     {
-        return FamilyGraphReductionResult{};
+        return FunctionGraphReductionResult{};
     }
 
     if (collector.tys.empty() && collector.tps.empty())
         return {};
 
-    return reduceFamiliesInternal(std::move(collector.tys), std::move(collector.tps), std::move(collector.shouldGuess),
-        std::move(collector.cyclicInstance), location, ctx, force);
+    return reduceFunctionsInternal(
+        std::move(collector.tys),
+        std::move(collector.tps),
+        std::move(collector.shouldGuess),
+        std::move(collector.cyclicInstance),
+        location,
+        ctx,
+        force
+    );
 }
 
 bool isPending(TypeId ty, ConstraintSolver* solver)
 {
-    return is<BlockedType, PendingExpansionType, TypeFamilyInstanceType>(ty) || (solver && solver->hasUnresolvedConstraints(ty));
+    return is<BlockedType, PendingExpansionType, TypeFunctionInstanceType>(ty) || (solver && solver->hasUnresolvedConstraints(ty));
 }
 
 template<typename F, typename... Args>
-static std::optional<TypeFamilyReductionResult<TypeId>> tryDistributeTypeFamilyApp(F f, TypeId instance, const std::vector<TypeId>& typeParams,
-    const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx, Args&&... args)
+static std::optional<TypeFunctionReductionResult<TypeId>> tryDistributeTypeFunctionApp(
+    F f,
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx,
+    Args&&... args
+)
 {
     // op (a | b) (c | d) ~ (op a (c | d)) | (op b (c | d)) ~ (op a c) | (op a d) | (op b c) | (op b d)
     bool uninhabited = false;
@@ -480,7 +522,7 @@ static std::optional<TypeFamilyReductionResult<TypeId>> tryDistributeTypeFamilyA
 
         cartesianProductSize *= std::distance(begin(ut), end(ut));
 
-        // TODO: We'd like to report that the type family application is too complex here.
+        // TODO: We'd like to report that the type function application is too complex here.
         if (size_t(DFInt::LuauTypeFamilyApplicationCartesianProductLimit) <= cartesianProductSize)
             return {{std::nullopt, true, {}, {}}};
     }
@@ -495,7 +537,7 @@ static std::optional<TypeFamilyReductionResult<TypeId>> tryDistributeTypeFamilyA
     {
         arguments[unionIndex] = option;
 
-        TypeFamilyReductionResult<TypeId> result = f(instance, arguments, packParams, ctx, args...);
+        TypeFunctionReductionResult<TypeId> result = f(instance, arguments, packParams, ctx, args...);
         blockedTypes.insert(blockedTypes.end(), result.blockedTypes.begin(), result.blockedTypes.end());
         uninhabited |= result.uninhabited;
 
@@ -513,8 +555,8 @@ static std::optional<TypeFamilyReductionResult<TypeId>> tryDistributeTypeFamilyA
         if (results.size() == 1)
             return {{results[0], false, {}, {}}};
 
-        TypeId resultTy = ctx->arena->addType(TypeFamilyInstanceType{
-            NotNull{&kBuiltinTypeFamilies.unionFamily},
+        TypeId resultTy = ctx->arena->addType(TypeFunctionInstanceType{
+            NotNull{&builtinTypeFunctions().unionFunc},
             std::move(results),
             {},
         });
@@ -525,12 +567,16 @@ static std::optional<TypeFamilyReductionResult<TypeId>> tryDistributeTypeFamilyA
     return std::nullopt;
 }
 
-TypeFamilyReductionResult<TypeId> notFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> notTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 1 || !packParams.empty())
     {
-        ctx->ice->ice("not type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("not type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -542,19 +588,23 @@ TypeFamilyReductionResult<TypeId> notFamilyFn(
     if (isPending(ty, ctx->solver))
         return {std::nullopt, false, {ty}, {}};
 
-    if (auto result = tryDistributeTypeFamilyApp(notFamilyFn, instance, typeParams, packParams, ctx))
+    if (auto result = tryDistributeTypeFunctionApp(notTypeFunction, instance, typeParams, packParams, ctx))
         return *result;
 
     // `not` operates on anything and returns a `boolean` always.
     return {ctx->builtins->booleanType, false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> lenFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> lenTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 1 || !packParams.empty())
     {
-        ctx->ice->ice("len type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("len type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -601,7 +651,7 @@ TypeFamilyReductionResult<TypeId> lenFamilyFn(
     if (normTy->hasTopTable() || get<TableType>(normalizedOperand))
         return {ctx->builtins->numberType, false, {}, {}};
 
-    if (auto result = tryDistributeTypeFamilyApp(notFamilyFn, instance, typeParams, packParams, ctx))
+    if (auto result = tryDistributeTypeFunctionApp(notTypeFunction, instance, typeParams, packParams, ctx))
         return *result;
 
     // findMetatableEntry demands the ability to emit errors, so we must give it
@@ -641,12 +691,16 @@ TypeFamilyReductionResult<TypeId> lenFamilyFn(
     return {ctx->builtins->numberType, false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> unmFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> unmTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 1 || !packParams.empty())
     {
-        ctx->ice->ice("unm type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("unm type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -686,7 +740,7 @@ TypeFamilyReductionResult<TypeId> unmFamilyFn(
     if (normTy->isExactlyNumber())
         return {ctx->builtins->numberType, false, {}, {}};
 
-    if (auto result = tryDistributeTypeFamilyApp(notFamilyFn, instance, typeParams, packParams, ctx))
+    if (auto result = tryDistributeTypeFunctionApp(notTypeFunction, instance, typeParams, packParams, ctx))
         return *result;
 
     // findMetatableEntry demands the ability to emit errors, so we must give it
@@ -728,7 +782,7 @@ TypeFamilyReductionResult<TypeId> unmFamilyFn(
         return {std::nullopt, true, {}, {}};
 }
 
-NotNull<Constraint> TypeFamilyContext::pushConstraint(ConstraintV&& c)
+NotNull<Constraint> TypeFunctionContext::pushConstraint(ConstraintV&& c)
 {
     LUAU_ASSERT(solver);
     NotNull<Constraint> newConstraint = solver->pushConstraint(scope, constraint ? constraint->location : Location{}, std::move(c));
@@ -741,12 +795,17 @@ NotNull<Constraint> TypeFamilyContext::pushConstraint(ConstraintV&& c)
     return newConstraint;
 }
 
-TypeFamilyReductionResult<TypeId> numericBinopFamilyFn(TypeId instance, const std::vector<TypeId>& typeParams,
-    const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx, const std::string metamethod)
+TypeFunctionReductionResult<TypeId> numericBinopTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx,
+    const std::string metamethod
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("encountered a type family instance without the required argument structure");
+        ctx->ice->ice("encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -784,7 +843,7 @@ TypeFamilyReductionResult<TypeId> numericBinopFamilyFn(TypeId instance, const st
         rhsTy = *rhsMaybeGeneralized;
     }
 
-    // TODO: Normalization needs to remove cyclic type families from a `NormalizedType`.
+    // TODO: Normalization needs to remove cyclic type functions from a `NormalizedType`.
     std::shared_ptr<const NormalizedType> normLhsTy = ctx->normalizer->normalize(lhsTy);
     std::shared_ptr<const NormalizedType> normRhsTy = ctx->normalizer->normalize(rhsTy);
 
@@ -800,7 +859,7 @@ TypeFamilyReductionResult<TypeId> numericBinopFamilyFn(TypeId instance, const st
     if (normLhsTy->isExactlyNumber() && normRhsTy->isExactlyNumber())
         return {ctx->builtins->numberType, false, {}, {}};
 
-    if (auto result = tryDistributeTypeFamilyApp(numericBinopFamilyFn, instance, typeParams, packParams, ctx, metamethod))
+    if (auto result = tryDistributeTypeFunctionApp(numericBinopTypeFunction, instance, typeParams, packParams, ctx, metamethod))
         return *result;
 
     // findMetatableEntry demands the ability to emit errors, so we must give it
@@ -844,96 +903,128 @@ TypeFamilyReductionResult<TypeId> numericBinopFamilyFn(TypeId instance, const st
     return {extracted.head.front(), false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> addFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> addTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("add type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("add type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return numericBinopFamilyFn(instance, typeParams, packParams, ctx, "__add");
+    return numericBinopTypeFunction(instance, typeParams, packParams, ctx, "__add");
 }
 
-TypeFamilyReductionResult<TypeId> subFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> subTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("sub type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("sub type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return numericBinopFamilyFn(instance, typeParams, packParams, ctx, "__sub");
+    return numericBinopTypeFunction(instance, typeParams, packParams, ctx, "__sub");
 }
 
-TypeFamilyReductionResult<TypeId> mulFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> mulTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("mul type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("mul type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return numericBinopFamilyFn(instance, typeParams, packParams, ctx, "__mul");
+    return numericBinopTypeFunction(instance, typeParams, packParams, ctx, "__mul");
 }
 
-TypeFamilyReductionResult<TypeId> divFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> divTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("div type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("div type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return numericBinopFamilyFn(instance, typeParams, packParams, ctx, "__div");
+    return numericBinopTypeFunction(instance, typeParams, packParams, ctx, "__div");
 }
 
-TypeFamilyReductionResult<TypeId> idivFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> idivTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("integer div type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("integer div type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return numericBinopFamilyFn(instance, typeParams, packParams, ctx, "__idiv");
+    return numericBinopTypeFunction(instance, typeParams, packParams, ctx, "__idiv");
 }
 
-TypeFamilyReductionResult<TypeId> powFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> powTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("pow type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("pow type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return numericBinopFamilyFn(instance, typeParams, packParams, ctx, "__pow");
+    return numericBinopTypeFunction(instance, typeParams, packParams, ctx, "__pow");
 }
 
-TypeFamilyReductionResult<TypeId> modFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> modTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("modulo type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("modulo type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return numericBinopFamilyFn(instance, typeParams, packParams, ctx, "__mod");
+    return numericBinopTypeFunction(instance, typeParams, packParams, ctx, "__mod");
 }
 
-TypeFamilyReductionResult<TypeId> concatFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> concatTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("concat type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("concat type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -984,7 +1075,7 @@ TypeFamilyReductionResult<TypeId> concatFamilyFn(
     if ((normLhsTy->isSubtypeOfString() || normLhsTy->isExactlyNumber()) && (normRhsTy->isSubtypeOfString() || normRhsTy->isExactlyNumber()))
         return {ctx->builtins->stringType, false, {}, {}};
 
-    if (auto result = tryDistributeTypeFamilyApp(concatFamilyFn, instance, typeParams, packParams, ctx))
+    if (auto result = tryDistributeTypeFunctionApp(concatTypeFunction, instance, typeParams, packParams, ctx))
         return *result;
 
     // findMetatableEntry demands the ability to emit errors, so we must give it
@@ -1036,12 +1127,16 @@ TypeFamilyReductionResult<TypeId> concatFamilyFn(
     return {ctx->builtins->stringType, false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> andFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> andTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("and type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("and type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1087,12 +1182,16 @@ TypeFamilyReductionResult<TypeId> andFamilyFn(
     return {overallResult.result, false, std::move(blockedTypes), {}};
 }
 
-TypeFamilyReductionResult<TypeId> orFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> orTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("or type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("or type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1138,13 +1237,18 @@ TypeFamilyReductionResult<TypeId> orFamilyFn(
     return {overallResult.result, false, std::move(blockedTypes), {}};
 }
 
-static TypeFamilyReductionResult<TypeId> comparisonFamilyFn(TypeId instance, const std::vector<TypeId>& typeParams,
-    const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx, const std::string metamethod)
+static TypeFunctionReductionResult<TypeId> comparisonTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx,
+    const std::string metamethod
+)
 {
 
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("encountered a type family instance without the required argument structure");
+        ctx->ice->ice("encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1159,7 +1263,7 @@ static TypeFamilyReductionResult<TypeId> comparisonFamilyFn(TypeId instance, con
     else if (isPending(rhsTy, ctx->solver))
         return {std::nullopt, false, {rhsTy}, {}};
 
-    // Algebra Reduction Rules for comparison family functions
+    // Algebra Reduction Rules for comparison type functions
     // Note that comparing to never tells you nothing about the other operand
     // lt< 'a , never> -> continue
     // lt< never, 'a>  -> continue
@@ -1170,7 +1274,7 @@ static TypeFamilyReductionResult<TypeId> comparisonFamilyFn(TypeId instance, con
     bool rhsFree = get<FreeType>(rhsTy) != nullptr;
     if (canSubmitConstraint)
     {
-        // Implement injective type families for comparison type families
+        // Implement injective type functions for comparison type functions
         // lt <number, t> implies t is number
         // lt <t, number> implies t is number
         if (lhsFree && isNumber(rhsTy))
@@ -1235,7 +1339,7 @@ static TypeFamilyReductionResult<TypeId> comparisonFamilyFn(TypeId instance, con
     if (normLhsTy->isExactlyNumber() && normRhsTy->isExactlyNumber())
         return {ctx->builtins->booleanType, false, {}, {}};
 
-    if (auto result = tryDistributeTypeFamilyApp(comparisonFamilyFn, instance, typeParams, packParams, ctx, metamethod))
+    if (auto result = tryDistributeTypeFunctionApp(comparisonTypeFunction, instance, typeParams, packParams, ctx, metamethod))
         return *result;
 
     // findMetatableEntry demands the ability to emit errors, so we must give it
@@ -1277,36 +1381,48 @@ static TypeFamilyReductionResult<TypeId> comparisonFamilyFn(TypeId instance, con
     return {ctx->builtins->booleanType, false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> ltFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> ltTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("lt type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("lt type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return comparisonFamilyFn(instance, typeParams, packParams, ctx, "__lt");
+    return comparisonTypeFunction(instance, typeParams, packParams, ctx, "__lt");
 }
 
-TypeFamilyReductionResult<TypeId> leFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> leTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("le type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("le type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return comparisonFamilyFn(instance, typeParams, packParams, ctx, "__le");
+    return comparisonTypeFunction(instance, typeParams, packParams, ctx, "__le");
 }
 
-TypeFamilyReductionResult<TypeId> eqFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> eqTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("eq type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("eq type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1378,7 +1494,7 @@ TypeFamilyReductionResult<TypeId> eqFamilyFn(
                 return {ctx->builtins->falseType, false, {}, {}};
         }
 
-        return {std::nullopt, true, {}, {}}; // if it's not, then this family is irreducible!
+        return {std::nullopt, true, {}, {}}; // if it's not, then this type function is irreducible!
     }
 
     mmType = follow(*mmType);
@@ -1432,12 +1548,16 @@ struct FindRefinementBlockers : TypeOnceVisitor
 };
 
 
-TypeFamilyReductionResult<TypeId> refineFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> refineTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 2 || !packParams.empty())
     {
-        ctx->ice->ice("refine type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("refine type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1517,12 +1637,16 @@ TypeFamilyReductionResult<TypeId> refineFamilyFn(
     return {resultTy, false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> singletonFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> singletonTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 1 || !packParams.empty())
     {
-        ctx->ice->ice("singleton type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("singleton type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1554,12 +1678,16 @@ TypeFamilyReductionResult<TypeId> singletonFamilyFn(
     return {ctx->builtins->unknownType, false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> unionFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> unionTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (!packParams.empty())
     {
-        ctx->ice->ice("union type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("union type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1615,12 +1743,16 @@ TypeFamilyReductionResult<TypeId> unionFamilyFn(
 }
 
 
-TypeFamilyReductionResult<TypeId> intersectFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> intersectTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (!packParams.empty())
     {
-        ctx->ice->ice("intersect type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("intersect type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1670,7 +1802,7 @@ TypeFamilyReductionResult<TypeId> intersectFamilyFn(
 // computes the keys of `ty` into `result`
 // `isRaw` parameter indicates whether or not we should follow __index metamethods
 // returns `false` if `result` should be ignored because the answer is "all strings"
-bool computeKeysOf(TypeId ty, Set<std::string>& result, DenseHashSet<TypeId>& seen, bool isRaw, NotNull<TypeFamilyContext> ctx)
+bool computeKeysOf(TypeId ty, Set<std::string>& result, DenseHashSet<TypeId>& seen, bool isRaw, NotNull<TypeFunctionContext> ctx)
 {
     // if the type is the top table type, the answer is just "all strings"
     if (get<PrimitiveType>(ty))
@@ -1722,12 +1854,16 @@ bool computeKeysOf(TypeId ty, Set<std::string>& result, DenseHashSet<TypeId>& se
     return false;
 }
 
-TypeFamilyReductionResult<TypeId> keyofFamilyImpl(
-    const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx, bool isRaw)
+TypeFunctionReductionResult<TypeId> keyofFunctionImpl(
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx,
+    bool isRaw
+)
 {
     if (typeParams.size() != 1 || !packParams.empty())
     {
-        ctx->ice->ice("keyof type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("keyof type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
@@ -1839,35 +1975,48 @@ TypeFamilyReductionResult<TypeId> keyofFamilyImpl(
     return {ctx->arena->addType(UnionType{singletons}), false, {}, {}};
 }
 
-TypeFamilyReductionResult<TypeId> keyofFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> keyofTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 1 || !packParams.empty())
     {
-        ctx->ice->ice("keyof type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("keyof type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return keyofFamilyImpl(typeParams, packParams, ctx, /* isRaw */ false);
+    return keyofFunctionImpl(typeParams, packParams, ctx, /* isRaw */ false);
 }
 
-TypeFamilyReductionResult<TypeId> rawkeyofFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> rawkeyofTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     if (typeParams.size() != 1 || !packParams.empty())
     {
-        ctx->ice->ice("rawkeyof type family: encountered a type family instance without the required argument structure");
+        ctx->ice->ice("rawkeyof type function: encountered a type function instance without the required argument structure");
         LUAU_ASSERT(false);
     }
 
-    return keyofFamilyImpl(typeParams, packParams, ctx, /* isRaw */ true);
+    return keyofFunctionImpl(typeParams, packParams, ctx, /* isRaw */ true);
 }
 
 /* Searches through table's or class's props/indexer to find the property of `ty`
    If found, appends that property to `result` and returns true
    Else, returns false */
 bool searchPropsAndIndexer(
-    TypeId ty, TableType::Props tblProps, std::optional<TableIndexer> tblIndexer, DenseHashSet<TypeId>& result, NotNull<TypeFamilyContext> ctx)
+    TypeId ty,
+    TableType::Props tblProps,
+    std::optional<TableIndexer> tblIndexer,
+    DenseHashSet<TypeId>& result,
+    NotNull<TypeFunctionContext> ctx
+)
 {
     ty = follow(ty);
 
@@ -1917,7 +2066,7 @@ bool searchPropsAndIndexer(
 /* Handles recursion / metamethods of tables/classes
    `isRaw` parameter indicates whether or not we should follow __index metamethods
    returns false if property of `ty` could not be found */
-bool tblIndexInto(TypeId indexer, TypeId indexee, DenseHashSet<TypeId>& result, NotNull<TypeFamilyContext> ctx, bool isRaw)
+bool tblIndexInto(TypeId indexer, TypeId indexee, DenseHashSet<TypeId>& result, NotNull<TypeFunctionContext> ctx, bool isRaw)
 {
     indexer = follow(indexer);
     indexee = follow(indexee);
@@ -1957,15 +2106,13 @@ bool tblIndexInto(TypeId indexer, TypeId indexee, DenseHashSet<TypeId>& result, 
 /* Vocabulary note: indexee refers to the type that contains the properties,
                     indexer refers to the type that is used to access indexee
    Example:         index<Person, "name"> => `Person` is the indexee and `"name"` is the indexer */
-TypeFamilyReductionResult<TypeId> indexFamilyFn(
-    TypeId instance, const std::vector<TypeId>& typeParams, const std::vector<TypePackId>& packParams, NotNull<TypeFamilyContext> ctx)
+TypeFunctionReductionResult<TypeId> indexFunctionImpl(
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx,
+    bool isRaw
+)
 {
-    if (typeParams.size() != 2 || !packParams.empty())
-    {
-        ctx->ice->ice("index type family: encountered a type family instance without the required argument structure");
-        LUAU_ASSERT(false);
-    }
-
     TypeId indexeeTy = follow(typeParams.at(0));
     std::shared_ptr<const NormalizedType> indexeeNormTy = ctx->normalizer->normalize(indexeeTy);
 
@@ -2003,11 +2150,13 @@ TypeFamilyReductionResult<TypeId> indexFamilyFn(
         typesToFind = &singleType;
 
     DenseHashSet<TypeId> properties{{}}; // vector of types that will be returned
-    bool isRaw = false;
 
     if (indexeeNormTy->hasClasses())
     {
         LUAU_ASSERT(!indexeeNormTy->hasTables());
+
+        if (isRaw) // rawget should never reduce for classes (to match the behavior of the rawget global function)
+            return {std::nullopt, true, {}, {}};
 
         // at least one class is guaranteed to be in the iterator by .hasClasses()
         for (auto classesIter = indexeeNormTy->classes.ordering.begin(); classesIter != indexeeNormTy->classes.ordering.end(); ++classesIter)
@@ -2021,7 +2170,7 @@ TypeFamilyReductionResult<TypeId> indexFamilyFn(
 
             for (TypeId ty : *typesToFind)
             {
-                // Search for all instances of indexer in class->props and class->indexer using `indexInto`
+                // Search for all instances of indexer in class->props and class->indexer
                 if (searchPropsAndIndexer(ty, classTy->props, classTy->indexer, properties, ctx))
                     continue; // Indexer was found in this class, so we can move on to the next
 
@@ -2054,9 +2203,15 @@ TypeFamilyReductionResult<TypeId> indexFamilyFn(
     }
 
     // Call `follow()` on each element to resolve all Bound types before returning
-    std::transform(properties.begin(), properties.end(), properties.begin(), [](TypeId ty) {
-        return follow(ty);
-    });
+    std::transform(
+        properties.begin(),
+        properties.end(),
+        properties.begin(),
+        [](TypeId ty)
+        {
+            return follow(ty);
+        }
+    );
 
     // If the type being reduced to is a single type, no need to union
     if (properties.size() == 1)
@@ -2065,73 +2220,116 @@ TypeFamilyReductionResult<TypeId> indexFamilyFn(
     return {ctx->arena->addType(UnionType{std::vector<TypeId>(properties.begin(), properties.end())}), false, {}, {}};
 }
 
-BuiltinTypeFamilies::BuiltinTypeFamilies()
-    : notFamily{"not", notFamilyFn}
-    , lenFamily{"len", lenFamilyFn}
-    , unmFamily{"unm", unmFamilyFn}
-    , addFamily{"add", addFamilyFn}
-    , subFamily{"sub", subFamilyFn}
-    , mulFamily{"mul", mulFamilyFn}
-    , divFamily{"div", divFamilyFn}
-    , idivFamily{"idiv", idivFamilyFn}
-    , powFamily{"pow", powFamilyFn}
-    , modFamily{"mod", modFamilyFn}
-    , concatFamily{"concat", concatFamilyFn}
-    , andFamily{"and", andFamilyFn}
-    , orFamily{"or", orFamilyFn}
-    , ltFamily{"lt", ltFamilyFn}
-    , leFamily{"le", leFamilyFn}
-    , eqFamily{"eq", eqFamilyFn}
-    , refineFamily{"refine", refineFamilyFn}
-    , singletonFamily{"singleton", singletonFamilyFn}
-    , unionFamily{"union", unionFamilyFn}
-    , intersectFamily{"intersect", intersectFamilyFn}
-    , keyofFamily{"keyof", keyofFamilyFn}
-    , rawkeyofFamily{"rawkeyof", rawkeyofFamilyFn}
-    , indexFamily{"index", indexFamilyFn}
+TypeFunctionReductionResult<TypeId> indexTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
+{
+    if (typeParams.size() != 2 || !packParams.empty())
+    {
+        ctx->ice->ice("index type function: encountered a type function instance without the required argument structure");
+        LUAU_ASSERT(false);
+    }
+
+    return indexFunctionImpl(typeParams, packParams, ctx, /* isRaw */ false);
+}
+
+TypeFunctionReductionResult<TypeId> rawgetTypeFunction(
+    TypeId instance,
+    const std::vector<TypeId>& typeParams,
+    const std::vector<TypePackId>& packParams,
+    NotNull<TypeFunctionContext> ctx
+)
+{
+    if (typeParams.size() != 2 || !packParams.empty())
+    {
+        ctx->ice->ice("rawget type function: encountered a type function instance without the required argument structure");
+        LUAU_ASSERT(false);
+    }
+
+    return indexFunctionImpl(typeParams, packParams, ctx, /* isRaw */ true);
+}
+
+BuiltinTypeFunctions::BuiltinTypeFunctions()
+    : notFunc{"not", notTypeFunction}
+    , lenFunc{"len", lenTypeFunction}
+    , unmFunc{"unm", unmTypeFunction}
+    , addFunc{"add", addTypeFunction}
+    , subFunc{"sub", subTypeFunction}
+    , mulFunc{"mul", mulTypeFunction}
+    , divFunc{"div", divTypeFunction}
+    , idivFunc{"idiv", idivTypeFunction}
+    , powFunc{"pow", powTypeFunction}
+    , modFunc{"mod", modTypeFunction}
+    , concatFunc{"concat", concatTypeFunction}
+    , andFunc{"and", andTypeFunction}
+    , orFunc{"or", orTypeFunction}
+    , ltFunc{"lt", ltTypeFunction}
+    , leFunc{"le", leTypeFunction}
+    , eqFunc{"eq", eqTypeFunction}
+    , refineFunc{"refine", refineTypeFunction}
+    , singletonFunc{"singleton", singletonTypeFunction}
+    , unionFunc{"union", unionTypeFunction}
+    , intersectFunc{"intersect", intersectTypeFunction}
+    , keyofFunc{"keyof", keyofTypeFunction}
+    , rawkeyofFunc{"rawkeyof", rawkeyofTypeFunction}
+    , indexFunc{"index", indexTypeFunction}
+    , rawgetFunc{"rawget", rawgetTypeFunction}
 {
 }
 
-void BuiltinTypeFamilies::addToScope(NotNull<TypeArena> arena, NotNull<Scope> scope) const
+void BuiltinTypeFunctions::addToScope(NotNull<TypeArena> arena, NotNull<Scope> scope) const
 {
-    // make a type function for a one-argument type family
-    auto mkUnaryTypeFamily = [&](const TypeFamily* family) {
+    // make a type function for a one-argument type function
+    auto mkUnaryTypeFunction = [&](const TypeFunction* tf)
+    {
         TypeId t = arena->addType(GenericType{"T"});
         GenericTypeDefinition genericT{t};
 
-        return TypeFun{{genericT}, arena->addType(TypeFamilyInstanceType{NotNull{family}, {t}, {}})};
+        return TypeFun{{genericT}, arena->addType(TypeFunctionInstanceType{NotNull{tf}, {t}, {}})};
     };
 
-    // make a type function for a two-argument type family
-    auto mkBinaryTypeFamily = [&](const TypeFamily* family) {
+    // make a type function for a two-argument type function
+    auto mkBinaryTypeFunction = [&](const TypeFunction* tf)
+    {
         TypeId t = arena->addType(GenericType{"T"});
         TypeId u = arena->addType(GenericType{"U"});
         GenericTypeDefinition genericT{t};
         GenericTypeDefinition genericU{u, {t}};
 
-        return TypeFun{{genericT, genericU}, arena->addType(TypeFamilyInstanceType{NotNull{family}, {t, u}, {}})};
+        return TypeFun{{genericT, genericU}, arena->addType(TypeFunctionInstanceType{NotNull{tf}, {t, u}, {}})};
     };
 
-    scope->exportedTypeBindings[lenFamily.name] = mkUnaryTypeFamily(&lenFamily);
-    scope->exportedTypeBindings[unmFamily.name] = mkUnaryTypeFamily(&unmFamily);
+    scope->exportedTypeBindings[lenFunc.name] = mkUnaryTypeFunction(&lenFunc);
+    scope->exportedTypeBindings[unmFunc.name] = mkUnaryTypeFunction(&unmFunc);
 
-    scope->exportedTypeBindings[addFamily.name] = mkBinaryTypeFamily(&addFamily);
-    scope->exportedTypeBindings[subFamily.name] = mkBinaryTypeFamily(&subFamily);
-    scope->exportedTypeBindings[mulFamily.name] = mkBinaryTypeFamily(&mulFamily);
-    scope->exportedTypeBindings[divFamily.name] = mkBinaryTypeFamily(&divFamily);
-    scope->exportedTypeBindings[idivFamily.name] = mkBinaryTypeFamily(&idivFamily);
-    scope->exportedTypeBindings[powFamily.name] = mkBinaryTypeFamily(&powFamily);
-    scope->exportedTypeBindings[modFamily.name] = mkBinaryTypeFamily(&modFamily);
-    scope->exportedTypeBindings[concatFamily.name] = mkBinaryTypeFamily(&concatFamily);
+    scope->exportedTypeBindings[addFunc.name] = mkBinaryTypeFunction(&addFunc);
+    scope->exportedTypeBindings[subFunc.name] = mkBinaryTypeFunction(&subFunc);
+    scope->exportedTypeBindings[mulFunc.name] = mkBinaryTypeFunction(&mulFunc);
+    scope->exportedTypeBindings[divFunc.name] = mkBinaryTypeFunction(&divFunc);
+    scope->exportedTypeBindings[idivFunc.name] = mkBinaryTypeFunction(&idivFunc);
+    scope->exportedTypeBindings[powFunc.name] = mkBinaryTypeFunction(&powFunc);
+    scope->exportedTypeBindings[modFunc.name] = mkBinaryTypeFunction(&modFunc);
+    scope->exportedTypeBindings[concatFunc.name] = mkBinaryTypeFunction(&concatFunc);
 
-    scope->exportedTypeBindings[ltFamily.name] = mkBinaryTypeFamily(&ltFamily);
-    scope->exportedTypeBindings[leFamily.name] = mkBinaryTypeFamily(&leFamily);
-    scope->exportedTypeBindings[eqFamily.name] = mkBinaryTypeFamily(&eqFamily);
+    scope->exportedTypeBindings[ltFunc.name] = mkBinaryTypeFunction(&ltFunc);
+    scope->exportedTypeBindings[leFunc.name] = mkBinaryTypeFunction(&leFunc);
+    scope->exportedTypeBindings[eqFunc.name] = mkBinaryTypeFunction(&eqFunc);
 
-    scope->exportedTypeBindings[keyofFamily.name] = mkUnaryTypeFamily(&keyofFamily);
-    scope->exportedTypeBindings[rawkeyofFamily.name] = mkUnaryTypeFamily(&rawkeyofFamily);
+    scope->exportedTypeBindings[keyofFunc.name] = mkUnaryTypeFunction(&keyofFunc);
+    scope->exportedTypeBindings[rawkeyofFunc.name] = mkUnaryTypeFunction(&rawkeyofFunc);
 
-    scope->exportedTypeBindings[indexFamily.name] = mkBinaryTypeFamily(&indexFamily);
+    scope->exportedTypeBindings[indexFunc.name] = mkBinaryTypeFunction(&indexFunc);
+    scope->exportedTypeBindings[rawgetFunc.name] = mkBinaryTypeFunction(&rawgetFunc);
+}
+
+const BuiltinTypeFunctions& builtinTypeFunctions()
+{
+    static std::unique_ptr<const BuiltinTypeFunctions> result = std::make_unique<BuiltinTypeFunctions>();
+
+    return *result;
 }
 
 } // namespace Luau

@@ -8,7 +8,6 @@
 #include "doctest.h"
 
 LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
-LUAU_FASTFLAG(LuauAttributeSyntax);
 LUAU_FASTFLAG(LuauNativeAttribute);
 LUAU_FASTFLAG(LintRedundantNativeAttribute);
 
@@ -28,7 +27,7 @@ end
     REQUIRE(0 == result.warnings.size());
 }
 
-TEST_CASE_FIXTURE(Fixture, "type_family_fully_reduces")
+TEST_CASE_FIXTURE(Fixture, "type_function_fully_reduces")
 {
     LintResult result = lint(R"(
 function fib(n)
@@ -314,8 +313,9 @@ fnB() -- prints "false", "nil"
 )");
 
     REQUIRE(1 == result.warnings.size());
-    CHECK_EQ(result.warnings[0].text,
-        "Global 'moreInternalLogic' is only used in the enclosing function defined at line 2; consider changing it to local");
+    CHECK_EQ(
+        result.warnings[0].text, "Global 'moreInternalLogic' is only used in the enclosing function defined at line 2; consider changing it to local"
+    );
 }
 
 TEST_CASE_FIXTURE(Fixture, "LocalShadowLocal")
@@ -715,8 +715,10 @@ end
     CHECK_EQ(result.warnings[0].location.begin.line, 1);
     CHECK_EQ(result.warnings[0].text, "For loop starts at 0, but arrays start at 1");
     CHECK_EQ(result.warnings[1].location.begin.line, 7);
-    CHECK_EQ(result.warnings[1].text,
-        "For loop should iterate backwards; did you forget to specify -1 as step? Also consider changing 0 to 1 since arrays start at 1");
+    CHECK_EQ(
+        result.warnings[1].text,
+        "For loop should iterate backwards; did you forget to specify -1 as step? Also consider changing 0 to 1 since arrays start at 1"
+    );
 }
 
 TEST_CASE_FIXTURE(Fixture, "UnbalancedAssignment")
@@ -807,14 +809,20 @@ return f1,f2,f3,f4,f5,f6,f7
 
     REQUIRE(3 == result.warnings.size());
     CHECK_EQ(result.warnings[0].location.begin.line, 5);
-    CHECK_EQ(result.warnings[0].text,
-        "Function 'f1' can implicitly return no values even though there's an explicit return at line 5; add explicit return to silence");
+    CHECK_EQ(
+        result.warnings[0].text,
+        "Function 'f1' can implicitly return no values even though there's an explicit return at line 5; add explicit return to silence"
+    );
     CHECK_EQ(result.warnings[1].location.begin.line, 29);
-    CHECK_EQ(result.warnings[1].text,
-        "Function 'f4' can implicitly return no values even though there's an explicit return at line 26; add explicit return to silence");
+    CHECK_EQ(
+        result.warnings[1].text,
+        "Function 'f4' can implicitly return no values even though there's an explicit return at line 26; add explicit return to silence"
+    );
     CHECK_EQ(result.warnings[2].location.begin.line, 45);
-    CHECK_EQ(result.warnings[2].text,
-        "Function can implicitly return no values even though there's an explicit return at line 45; add explicit return to silence");
+    CHECK_EQ(
+        result.warnings[2].text,
+        "Function can implicitly return no values even though there's an explicit return at line 45; add explicit return to silence"
+    );
 }
 
 TEST_CASE_FIXTURE(Fixture, "ImplicitReturnInfiniteLoop")
@@ -864,11 +872,15 @@ return f1,f2,f3,f4
 
     REQUIRE(2 == result.warnings.size());
     CHECK_EQ(result.warnings[0].location.begin.line, 26);
-    CHECK_EQ(result.warnings[0].text,
-        "Function 'f3' can implicitly return no values even though there's an explicit return at line 22; add explicit return to silence");
+    CHECK_EQ(
+        result.warnings[0].text,
+        "Function 'f3' can implicitly return no values even though there's an explicit return at line 22; add explicit return to silence"
+    );
     CHECK_EQ(result.warnings[1].location.begin.line, 37);
-    CHECK_EQ(result.warnings[1].text,
-        "Function 'f4' can implicitly return no values even though there's an explicit return at line 33; add explicit return to silence");
+    CHECK_EQ(
+        result.warnings[1].text,
+        "Function 'f4' can implicitly return no values even though there's an explicit return at line 33; add explicit return to silence"
+    );
 }
 
 TEST_CASE_FIXTURE(Fixture, "TypeAnnotationsShouldNotProduceWarnings")
@@ -1313,10 +1325,15 @@ TEST_CASE_FIXTURE(Fixture, "use_all_parent_scopes_for_globals")
 {
     ScopePtr testScope = frontend.addEnvironment("Test");
     unfreeze(frontend.globals.globalTypes);
-    frontend.loadDefinitionFile(frontend.globals, testScope, R"(
+    frontend.loadDefinitionFile(
+        frontend.globals,
+        testScope,
+        R"(
         declare Foo: number
     )",
-        "@test", /* captureComments */ false);
+        "@test",
+        /* captureComments */ false
+    );
     freeze(frontend.globals.globalTypes);
 
     fileResolver.environments["A"] = "Test";
@@ -1396,7 +1413,8 @@ TEST_CASE_FIXTURE(Fixture, "DuplicateLocalFunction")
     options.enableWarning(LintWarning::Code_DuplicateFunction);
     options.enableWarning(LintWarning::Code_LocalShadow);
 
-    LintResult result = lint(R"(
+    LintResult result = lint(
+        R"(
         local function x() end
 
         print(x)
@@ -1405,7 +1423,8 @@ TEST_CASE_FIXTURE(Fixture, "DuplicateLocalFunction")
 
         return x
     )",
-        options);
+        options
+    );
 
     REQUIRE_EQ(1, result.warnings.size());
 
@@ -1485,7 +1504,7 @@ TEST_CASE_FIXTURE(Fixture, "LintHygieneUAF")
 TEST_CASE_FIXTURE(BuiltinsFixture, "DeprecatedApiTyped")
 {
     unfreeze(frontend.globals.globalTypes);
-    TypeId instanceType = frontend.globals.globalTypes.addType(ClassType{"Instance", {}, std::nullopt, std::nullopt, {}, {}, "Test"});
+    TypeId instanceType = frontend.globals.globalTypes.addType(ClassType{"Instance", {}, std::nullopt, std::nullopt, {}, {}, "Test", {}});
     persist(instanceType);
     frontend.globals.globalScope->exportedTypeBindings["Instance"] = TypeFun{{}, instanceType};
 
@@ -1610,21 +1629,31 @@ table.create(42, {} :: {})
 )");
 
     REQUIRE(10 == result.warnings.size());
-    CHECK_EQ(result.warnings[0].text, "table.insert will insert the value before the last element, which is likely a bug; consider removing the "
-                                      "second argument or wrap it in parentheses to silence");
+    CHECK_EQ(
+        result.warnings[0].text,
+        "table.insert will insert the value before the last element, which is likely a bug; consider removing the "
+        "second argument or wrap it in parentheses to silence"
+    );
     CHECK_EQ(result.warnings[1].text, "table.insert will append the value to the table; consider removing the second argument for efficiency");
     CHECK_EQ(result.warnings[2].text, "table.insert uses index 0 but arrays are 1-based; did you mean 1 instead?");
     CHECK_EQ(result.warnings[3].text, "table.remove uses index 0 but arrays are 1-based; did you mean 1 instead?");
-    CHECK_EQ(result.warnings[4].text, "table.remove will remove the value before the last element, which is likely a bug; consider removing the "
-                                      "second argument or wrap it in parentheses to silence");
-    CHECK_EQ(result.warnings[5].text,
-        "table.insert may change behavior if the call returns more than one result; consider adding parentheses around second argument");
+    CHECK_EQ(
+        result.warnings[4].text,
+        "table.remove will remove the value before the last element, which is likely a bug; consider removing the "
+        "second argument or wrap it in parentheses to silence"
+    );
+    CHECK_EQ(
+        result.warnings[5].text,
+        "table.insert may change behavior if the call returns more than one result; consider adding parentheses around second argument"
+    );
     CHECK_EQ(result.warnings[6].text, "table.move uses index 0 but arrays are 1-based; did you mean 1 instead?");
     CHECK_EQ(result.warnings[7].text, "table.move uses index 0 but arrays are 1-based; did you mean 1 instead?");
     CHECK_EQ(
-        result.warnings[8].text, "table.create with a table literal will reuse the same object for all elements; consider using a for loop instead");
+        result.warnings[8].text, "table.create with a table literal will reuse the same object for all elements; consider using a for loop instead"
+    );
     CHECK_EQ(
-        result.warnings[9].text, "table.create with a table literal will reuse the same object for all elements; consider using a for loop instead");
+        result.warnings[9].text, "table.create with a table literal will reuse the same object for all elements; consider using a for loop instead"
+    );
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "TableOperationsIndexer")
@@ -1771,10 +1800,16 @@ _ = (math.random() < 0.5 and false) or 42 -- currently ignored
 )");
 
     REQUIRE(2 == result.warnings.size());
-    CHECK_EQ(result.warnings[0].text, "The and-or expression always evaluates to the second alternative because the first alternative is false; "
-                                      "consider using if-then-else expression instead");
-    CHECK_EQ(result.warnings[1].text, "The and-or expression always evaluates to the second alternative because the first alternative is nil; "
-                                      "consider using if-then-else expression instead");
+    CHECK_EQ(
+        result.warnings[0].text,
+        "The and-or expression always evaluates to the second alternative because the first alternative is false; "
+        "consider using if-then-else expression instead"
+    );
+    CHECK_EQ(
+        result.warnings[1].text,
+        "The and-or expression always evaluates to the second alternative because the first alternative is nil; "
+        "consider using if-then-else expression instead"
+    );
 }
 
 TEST_CASE_FIXTURE(Fixture, "WrongComment")
@@ -1960,7 +1995,7 @@ local _ = a <= (b == 0)
 
 TEST_CASE_FIXTURE(Fixture, "RedundantNativeAttribute")
 {
-    ScopedFastFlag sff[] = {{FFlag::LuauAttributeSyntax, true}, {FFlag::LuauNativeAttribute, true}, {FFlag::LintRedundantNativeAttribute, true}};
+    ScopedFastFlag sff[] = {{FFlag::LuauNativeAttribute, true}, {FFlag::LintRedundantNativeAttribute, true}};
 
     LintResult result = lint(R"(
 --!native

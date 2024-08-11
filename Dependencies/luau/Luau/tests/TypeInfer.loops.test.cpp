@@ -202,7 +202,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "for_in_loop_with_zero_iterators_dcr")
         for key in no_iter() do end
     )");
 
-    LUAU_REQUIRE_ERROR_COUNT(1, result);
+    LUAU_REQUIRE_ERROR_COUNT(2, result);
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "for_in_with_a_custom_iterator_should_type_check")
@@ -465,7 +465,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "iter_constraint_before_loop_body")
 TEST_CASE_FIXTURE(BuiltinsFixture, "rbxl_place_file_crash_for_wrong_constraints")
 {
     CheckResult result = check(R"(
-local VehicleParameters = { 
+local VehicleParameters = {
     -- These are default values in the case the package structure is broken
 	StrutSpringStiffnessFront = 28000,
 }
@@ -767,10 +767,13 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "loop_iter_metamethod_not_enough_returns")
     )");
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
-    CHECK(result.errors[0] == TypeError{
-                                  Location{{2, 36}, {2, 37}},
-                                  GenericError{"__iter must return at least one value"},
-                              });
+    CHECK(
+        result.errors[0] ==
+        TypeError{
+            Location{{2, 36}, {2, 37}},
+            GenericError{"__iter must return at least one value"},
+        }
+    );
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "loop_iter_metamethod_ok")

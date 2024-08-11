@@ -18,14 +18,14 @@ Luau.SetupAst = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
-            includeDir .. "/**.h",
             sourceDir .. "/**.c",
             sourceDir .. "/**.cpp"
         }
+
         Solution.Util.SetFiles(files)
         Solution.Util.SetIncludes(includeDir)
         Solution.Util.SetDefines(defines)
@@ -45,7 +45,7 @@ Luau.SetupCompiler = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
@@ -72,11 +72,10 @@ Luau.SetupConfig = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
-            includeDir .. "/**.h",
             sourceDir .. "/**.c",
             sourceDir .. "/**.cpp"
         }
@@ -99,11 +98,10 @@ Luau.SetupAnalysis = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
-            includeDir .. "/**.h",
             sourceDir .. "/**.c",
             sourceDir .. "/**.cpp"
         }
@@ -130,11 +128,10 @@ Luau.SetupVM = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
-            includeDir .. "/**.h",
             sourceDir .. "/**.c",
             sourceDir .. "/**.cpp"
         }
@@ -162,11 +159,10 @@ Luau.SetupCodeGen = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
-            includeDir .. "/**.h",
             sourceDir .. "/**.c",
             sourceDir .. "/**.cpp"
         }
@@ -189,11 +185,10 @@ Luau.SetupIsocline = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
-            includeDir .. "/isocline.h",
             sourceDir .. "/isocline.c"
         }
         Solution.Util.SetFiles(files)

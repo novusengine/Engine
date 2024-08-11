@@ -5,6 +5,7 @@
 #include "Luau/Substitution.h"
 #include "Luau/TypeFwd.h"
 #include "Luau/Unifiable.h"
+#include "Luau/VisitType.h"
 
 namespace Luau
 {
@@ -16,8 +17,15 @@ struct TypeCheckLimits;
 // A substitution which replaces generic types in a given set by free types.
 struct ReplaceGenerics : Substitution
 {
-    ReplaceGenerics(const TxnLog* log, TypeArena* arena, NotNull<BuiltinTypes> builtinTypes, TypeLevel level, Scope* scope,
-        const std::vector<TypeId>& generics, const std::vector<TypePackId>& genericPacks)
+    ReplaceGenerics(
+        const TxnLog* log,
+        TypeArena* arena,
+        NotNull<BuiltinTypes> builtinTypes,
+        TypeLevel level,
+        Scope* scope,
+        const std::vector<TypeId>& generics,
+        const std::vector<TypePackId>& genericPacks
+    )
         : Substitution(log, arena)
         , builtinTypes(builtinTypes)
         , level(level)
@@ -27,8 +35,15 @@ struct ReplaceGenerics : Substitution
     {
     }
 
-    void resetState(const TxnLog* log, TypeArena* arena, NotNull<BuiltinTypes> builtinTypes, TypeLevel level, Scope* scope,
-        const std::vector<TypeId>& generics, const std::vector<TypePackId>& genericPacks);
+    void resetState(
+        const TxnLog* log,
+        TypeArena* arena,
+        NotNull<BuiltinTypes> builtinTypes,
+        TypeLevel level,
+        Scope* scope,
+        const std::vector<TypeId>& generics,
+        const std::vector<TypePackId>& genericPacks
+    );
 
     NotNull<BuiltinTypes> builtinTypes;
 
@@ -72,6 +87,59 @@ struct Instantiation : Substitution
     TypePackId clean(TypePackId tp) override;
 };
 
+// Used to find if a FunctionType requires generic type cleanup during instantiation
+struct GenericTypeFinder : TypeOnceVisitor
+{
+    bool found = false;
+
+    bool visit(TypeId ty) override
+    {
+        return !found;
+    }
+
+    bool visit(TypePackId ty) override
+    {
+        return !found;
+    }
+
+    bool visit(TypeId ty, const Luau::FunctionType& ftv) override
+    {
+        if (ftv.hasNoFreeOrGenericTypes)
+            return false;
+
+        if (!ftv.generics.empty() || !ftv.genericPacks.empty())
+            found = true;
+
+        return !found;
+    }
+
+    bool visit(TypeId ty, const Luau::TableType& ttv) override
+    {
+        if (ttv.state == Luau::TableState::Generic)
+            found = true;
+
+        return !found;
+    }
+
+    bool visit(TypeId ty, const Luau::GenericType&) override
+    {
+        found = true;
+        return false;
+    }
+
+    bool visit(TypePackId ty, const Luau::GenericTypePack&) override
+    {
+        found = true;
+        return false;
+    }
+
+    bool visit(TypeId ty, const Luau::ClassType&) override
+    {
+        // During function instantiation, classes are not traversed even if they have generics
+        return false;
+    }
+};
+
 /** Attempt to instantiate a type.  Only used under local type inference.
  *
  * When given a generic function type, instantiate() will return a copy with the
@@ -87,6 +155,11 @@ struct Instantiation : Substitution
  * limits to be exceeded.
  */
 std::optional<TypeId> instantiate(
-    NotNull<BuiltinTypes> builtinTypes, NotNull<TypeArena> arena, NotNull<TypeCheckLimits> limits, NotNull<Scope> scope, TypeId ty);
+    NotNull<BuiltinTypes> builtinTypes,
+    NotNull<TypeArena> arena,
+    NotNull<TypeCheckLimits> limits,
+    NotNull<Scope> scope,
+    TypeId ty
+);
 
 } // namespace Luau

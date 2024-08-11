@@ -19,7 +19,6 @@
 LUAU_FASTFLAG(LuauFixLocationSpanTableIndexExpr);
 LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
 LUAU_FASTFLAG(LuauInstantiateInSubtyping);
-LUAU_FASTFLAG(LuauLeadingBarAndAmpersand2)
 LUAU_FASTINT(LuauCheckRecursionLimit);
 LUAU_FASTINT(LuauNormalizeCacheLimit);
 LUAU_FASTINT(LuauRecursionLimit);
@@ -59,8 +58,10 @@ TEST_CASE_FIXTURE(Fixture, "tc_error")
     {
         LUAU_REQUIRE_ERROR_COUNT(1, result);
 
-        CHECK_EQ(result.errors[0],
-            (TypeError{Location{Position{0, 35}, Position{0, 36}}, TypeMismatch{builtinTypes->numberType, builtinTypes->stringType}}));
+        CHECK_EQ(
+            result.errors[0],
+            (TypeError{Location{Position{0, 35}, Position{0, 36}}, TypeMismatch{builtinTypes->numberType, builtinTypes->stringType}})
+        );
     }
 }
 
@@ -77,10 +78,16 @@ TEST_CASE_FIXTURE(Fixture, "tc_error_2")
     {
         LUAU_REQUIRE_ERROR_COUNT(1, result);
 
-        CHECK_EQ(result.errors[0], (TypeError{Location{Position{0, 18}, Position{0, 22}}, TypeMismatch{
-                                                                                              requireType("a"),
-                                                                                              builtinTypes->stringType,
-                                                                                          }}));
+        CHECK_EQ(
+            result.errors[0],
+            (TypeError{
+                Location{Position{0, 18}, Position{0, 22}},
+                TypeMismatch{
+                    requireType("a"),
+                    builtinTypes->stringType,
+                }
+            })
+        );
     }
 }
 
@@ -733,9 +740,14 @@ TEST_CASE_FIXTURE(Fixture, "no_stack_overflow_from_isoptional")
 
     CHECK_EQ("*error-type*", toString(*t0));
 
-    auto it = std::find_if(result.errors.begin(), result.errors.end(), [](TypeError& err) {
-        return get<OccursCheckFailed>(err);
-    });
+    auto it = std::find_if(
+        result.errors.begin(),
+        result.errors.end(),
+        [](TypeError& err)
+        {
+            return get<OccursCheckFailed>(err);
+        }
+    );
     CHECK(it != result.errors.end());
 }
 
@@ -1575,7 +1587,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "bad_iter_metamethod")
 
 TEST_CASE_FIXTURE(Fixture, "leading_bar")
 {
-    ScopedFastFlag sff{FFlag::LuauLeadingBarAndAmpersand2, true};
     CheckResult result = check(R"(
         type Bar = | number
     )");
@@ -1586,7 +1597,6 @@ TEST_CASE_FIXTURE(Fixture, "leading_bar")
 
 TEST_CASE_FIXTURE(Fixture, "leading_bar_question_mark")
 {
-    ScopedFastFlag sff{FFlag::LuauLeadingBarAndAmpersand2, true};
     CheckResult result = check(R"(
         type Bar = |?
     )");
@@ -1598,7 +1608,6 @@ TEST_CASE_FIXTURE(Fixture, "leading_bar_question_mark")
 
 TEST_CASE_FIXTURE(Fixture, "leading_ampersand")
 {
-    ScopedFastFlag sff{FFlag::LuauLeadingBarAndAmpersand2, true};
     CheckResult result = check(R"(
         type Amp = & string
     )");
@@ -1609,7 +1618,6 @@ TEST_CASE_FIXTURE(Fixture, "leading_ampersand")
 
 TEST_CASE_FIXTURE(Fixture, "leading_bar_no_type")
 {
-    ScopedFastFlag sff{FFlag::LuauLeadingBarAndAmpersand2, true};
     CheckResult result = check(R"(
         type Bar = |
     )");
@@ -1621,7 +1629,6 @@ TEST_CASE_FIXTURE(Fixture, "leading_bar_no_type")
 
 TEST_CASE_FIXTURE(Fixture, "leading_ampersand_no_type")
 {
-    ScopedFastFlag sff{FFlag::LuauLeadingBarAndAmpersand2, true};
     CheckResult result = check(R"(
         type Amp = &
     )");

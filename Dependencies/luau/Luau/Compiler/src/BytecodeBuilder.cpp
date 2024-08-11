@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <string.h>
 
-LUAU_FASTFLAGVARIABLE(LuauCompileTypeInfo, false)
 LUAU_FASTFLAG(LuauCompileUserdataInfo)
 LUAU_FASTFLAG(LuauCompileFastcall3)
 
@@ -283,11 +282,8 @@ void BytecodeBuilder::endFunction(uint8_t maxstacksize, uint8_t numupvalues, uin
     debugLocals.clear();
     debugUpvals.clear();
 
-    if (FFlag::LuauCompileTypeInfo)
-    {
-        typedLocals.clear();
-        typedUpvals.clear();
-    }
+    typedLocals.clear();
+    typedUpvals.clear();
 
     constantMap.clear();
     tableShapeMap.clear();
@@ -387,7 +383,8 @@ int32_t BytecodeBuilder::addConstantVector(float x, float y, float z, float w)
 
     ConstantKey k = {Constant::Type_Vector};
     static_assert(
-        sizeof(k.value) == sizeof(x) + sizeof(y) && sizeof(k.extra) == sizeof(z) + sizeof(w), "Expecting vector to have four 32-bit components");
+        sizeof(k.value) == sizeof(x) + sizeof(y) && sizeof(k.extra) == sizeof(z) + sizeof(w), "Expecting vector to have four 32-bit components"
+    );
     memcpy(&k.value, &x, sizeof(x));
     memcpy((char*)&k.value + sizeof(x), &y, sizeof(y));
     memcpy(&k.extra, &z, sizeof(z));
@@ -559,8 +556,6 @@ void BytecodeBuilder::setFunctionTypeInfo(std::string value)
 
 void BytecodeBuilder::pushLocalTypeInfo(LuauBytecodeType type, uint8_t reg, uint32_t startpc, uint32_t endpc)
 {
-    LUAU_ASSERT(FFlag::LuauCompileTypeInfo);
-
     TypedLocal local;
     local.type = type;
     local.reg = reg;
@@ -572,8 +567,6 @@ void BytecodeBuilder::pushLocalTypeInfo(LuauBytecodeType type, uint8_t reg, uint
 
 void BytecodeBuilder::pushUpvalTypeInfo(LuauBytecodeType type)
 {
-    LUAU_ASSERT(FFlag::LuauCompileTypeInfo);
-
     TypedUpval upval;
     upval.type = type;
 
@@ -712,7 +705,7 @@ void BytecodeBuilder::finalize()
 
     writeStringTable(bytecode);
 
-    if (FFlag::LuauCompileTypeInfo && FFlag::LuauCompileUserdataInfo)
+    if (FFlag::LuauCompileUserdataInfo)
     {
         // Write the mapping between used type name indices and their name
         for (uint32_t i = 0; i < uint32_t(userdataTypes.size()); i++)
@@ -747,42 +740,34 @@ void BytecodeBuilder::writeFunction(std::string& ss, uint32_t id, uint8_t flags)
 
     writeByte(ss, flags);
 
-    if (FFlag::LuauCompileTypeInfo)
+    if (!func.typeinfo.empty() || !typedUpvals.empty() || !typedLocals.empty())
     {
-        if (!func.typeinfo.empty() || !typedUpvals.empty() || !typedLocals.empty())
+        // collect type info into a temporary string to know the overall size of type data
+        tempTypeInfo.clear();
+        writeVarInt(tempTypeInfo, uint32_t(func.typeinfo.size()));
+        writeVarInt(tempTypeInfo, uint32_t(typedUpvals.size()));
+        writeVarInt(tempTypeInfo, uint32_t(typedLocals.size()));
+
+        tempTypeInfo.append(func.typeinfo);
+
+        for (const TypedUpval& l : typedUpvals)
+            writeByte(tempTypeInfo, l.type);
+
+        for (const TypedLocal& l : typedLocals)
         {
-            // collect type info into a temporary string to know the overall size of type data
-            tempTypeInfo.clear();
-            writeVarInt(tempTypeInfo, uint32_t(func.typeinfo.size()));
-            writeVarInt(tempTypeInfo, uint32_t(typedUpvals.size()));
-            writeVarInt(tempTypeInfo, uint32_t(typedLocals.size()));
-
-            tempTypeInfo.append(func.typeinfo);
-
-            for (const TypedUpval& l : typedUpvals)
-                writeByte(tempTypeInfo, l.type);
-
-            for (const TypedLocal& l : typedLocals)
-            {
-                writeByte(tempTypeInfo, l.type);
-                writeByte(tempTypeInfo, l.reg);
-                writeVarInt(tempTypeInfo, l.startpc);
-                LUAU_ASSERT(l.endpc >= l.startpc);
-                writeVarInt(tempTypeInfo, l.endpc - l.startpc);
-            }
-
-            writeVarInt(ss, uint32_t(tempTypeInfo.size()));
-            ss.append(tempTypeInfo);
+            writeByte(tempTypeInfo, l.type);
+            writeByte(tempTypeInfo, l.reg);
+            writeVarInt(tempTypeInfo, l.startpc);
+            LUAU_ASSERT(l.endpc >= l.startpc);
+            writeVarInt(tempTypeInfo, l.endpc - l.startpc);
         }
-        else
-        {
-            writeVarInt(ss, 0);
-        }
+
+        writeVarInt(ss, uint32_t(tempTypeInfo.size()));
+        ss.append(tempTypeInfo);
     }
     else
     {
-        writeVarInt(ss, uint32_t(func.typeinfo.size()));
-        ss.append(func.typeinfo);
+        writeVarInt(ss, 0);
     }
 
     // instructions
@@ -1123,9 +1108,14 @@ void BytecodeBuilder::expandJumps()
     const int kMaxJumpDistanceConservative = 32767 / 3;
 
     // we will need to process jumps in order
-    std::sort(jumps.begin(), jumps.end(), [](const Jump& lhs, const Jump& rhs) {
-        return lhs.source < rhs.source;
-    });
+    std::sort(
+        jumps.begin(),
+        jumps.end(),
+        [](const Jump& lhs, const Jump& rhs)
+        {
+            return lhs.source < rhs.source;
+        }
+    );
 
     // first, let's add jump thunks for every jump with a distance that's too big
     // we will create new instruction buffers, with remap table keeping track of the moves: remap[oldpc] = newpc
@@ -1251,10 +1241,10 @@ uint8_t BytecodeBuilder::getVersion()
 
 uint8_t BytecodeBuilder::getTypeEncodingVersion()
 {
-    if (FFlag::LuauCompileTypeInfo && FFlag::LuauCompileUserdataInfo)
+    if (FFlag::LuauCompileUserdataInfo)
         return LBC_TYPE_VERSION_TARGET;
 
-    return FFlag::LuauCompileTypeInfo ? 2 : LBC_TYPE_VERSION_DEPRECATED;
+    return 2;
 }
 
 #ifdef LUAU_ASSERTENABLED
@@ -1783,8 +1773,7 @@ void BytecodeBuilder::validateVariadic() const
             // variadic sequence since they are never executed if FASTCALL does anything, so it's okay to skip their validation until CALL
             // (we can't simply start a variadic sequence here because that would trigger assertions during linked CALL validation)
         }
-        else if (op == LOP_CLOSEUPVALS || op == LOP_NAMECALL || op == LOP_GETIMPORT || op == LOP_MOVE || op == LOP_GETUPVAL || op == LOP_GETGLOBAL ||
-                 op == LOP_GETTABLEKS || op == LOP_COVERAGE)
+        else if (op == LOP_CLOSEUPVALS || op == LOP_NAMECALL || op == LOP_GETIMPORT || op == LOP_MOVE || op == LOP_GETUPVAL || op == LOP_GETGLOBAL || op == LOP_GETTABLEKS || op == LOP_COVERAGE)
         {
             // instructions inside a variadic sequence must be neutral (can't change L->top)
             // while there are many neutral instructions like this, here we check that the instruction is one of the few
@@ -1852,7 +1841,7 @@ void BytecodeBuilder::dumpConstant(std::string& result, int k) const
     }
     case Constant::Type_Import:
     {
-        int id0 = -1, id1 = -1, id2 = -1;
+        int32_t id0 = -1, id1 = -1, id2 = -1;
         if (int count = decomposeImportId(data.valueImport, id0, id1, id2))
         {
             {
@@ -2262,12 +2251,16 @@ void BytecodeBuilder::dumpInstruction(const uint32_t* code, std::string& result,
         break;
 
     case LOP_CAPTURE:
-        formatAppend(result, "CAPTURE %s %c%d\n",
+        formatAppend(
+            result,
+            "CAPTURE %s %c%d\n",
             LUAU_INSN_A(insn) == LCT_UPVAL ? "UPVAL"
             : LUAU_INSN_A(insn) == LCT_REF ? "REF"
             : LUAU_INSN_A(insn) == LCT_VAL ? "VAL"
                                            : "",
-            LUAU_INSN_A(insn) == LCT_UPVAL ? 'U' : 'R', LUAU_INSN_B(insn));
+            LUAU_INSN_A(insn) == LCT_UPVAL ? 'U' : 'R',
+            LUAU_INSN_B(insn)
+        );
         break;
 
     case LOP_JUMPXEQKNIL:
@@ -2362,86 +2355,91 @@ std::string BytecodeBuilder::dumpCurrentFunction(std::vector<int>& dumpinstoffs)
                 LUAU_ASSERT(l.endpc <= lines.size()); // endpc is exclusive in the debug info, but it's more intuitive to print inclusive data
 
                 // it would be nice to emit name as well but it requires reverse lookup through stringtable
-                formatAppend(result, "local %d: reg %d, start pc %d line %d, end pc %d line %d\n", int(i), l.reg, l.startpc, lines[l.startpc],
-                    l.endpc - 1, lines[l.endpc - 1]);
+                formatAppend(
+                    result,
+                    "local %d: reg %d, start pc %d line %d, end pc %d line %d\n",
+                    int(i),
+                    l.reg,
+                    l.startpc,
+                    lines[l.startpc],
+                    l.endpc - 1,
+                    lines[l.endpc - 1]
+                );
             }
         }
     }
 
-    if (FFlag::LuauCompileTypeInfo)
+    if (dumpFlags & Dump_Types)
     {
-        if (dumpFlags & Dump_Types)
+        const std::string& typeinfo = functions.back().typeinfo;
+
+        if (FFlag::LuauCompileUserdataInfo)
         {
-            const std::string& typeinfo = functions.back().typeinfo;
-
-            if (FFlag::LuauCompileUserdataInfo)
+            // Arguments start from third byte in function typeinfo string
+            for (uint8_t i = 2; i < typeinfo.size(); ++i)
             {
-                // Arguments start from third byte in function typeinfo string
-                for (uint8_t i = 2; i < typeinfo.size(); ++i)
-                {
-                    uint8_t et = typeinfo[i];
+                uint8_t et = typeinfo[i];
 
-                    const char* userdata = tryGetUserdataTypeName(LuauBytecodeType(et));
-                    const char* name = userdata ? userdata : getBaseTypeString(et);
-                    const char* optional = (et & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
+                const char* userdata = tryGetUserdataTypeName(LuauBytecodeType(et));
+                const char* name = userdata ? userdata : getBaseTypeString(et);
+                const char* optional = (et & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
 
-                    formatAppend(result, "R%d: %s%s [argument]\n", i - 2, name, optional);
-                }
-
-                for (size_t i = 0; i < typedUpvals.size(); ++i)
-                {
-                    const TypedUpval& l = typedUpvals[i];
-
-                    const char* userdata = tryGetUserdataTypeName(l.type);
-                    const char* name = userdata ? userdata : getBaseTypeString(l.type);
-                    const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
-
-                    formatAppend(result, "U%d: %s%s\n", int(i), name, optional);
-                }
-
-                for (size_t i = 0; i < typedLocals.size(); ++i)
-                {
-                    const TypedLocal& l = typedLocals[i];
-
-                    const char* userdata = tryGetUserdataTypeName(l.type);
-                    const char* name = userdata ? userdata : getBaseTypeString(l.type);
-                    const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
-
-                    formatAppend(result, "R%d: %s%s from %d to %d\n", l.reg, name, optional, l.startpc, l.endpc);
-                }
+                formatAppend(result, "R%d: %s%s [argument]\n", i - 2, name, optional);
             }
-            else
+
+            for (size_t i = 0; i < typedUpvals.size(); ++i)
             {
-                // Arguments start from third byte in function typeinfo string
-                for (uint8_t i = 2; i < typeinfo.size(); ++i)
-                {
-                    uint8_t et = typeinfo[i];
+                const TypedUpval& l = typedUpvals[i];
 
-                    const char* base = getBaseTypeString(et);
-                    const char* optional = (et & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
+                const char* userdata = tryGetUserdataTypeName(l.type);
+                const char* name = userdata ? userdata : getBaseTypeString(l.type);
+                const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
 
-                    formatAppend(result, "R%d: %s%s [argument]\n", i - 2, base, optional);
-                }
+                formatAppend(result, "U%d: %s%s\n", int(i), name, optional);
+            }
 
-                for (size_t i = 0; i < typedUpvals.size(); ++i)
-                {
-                    const TypedUpval& l = typedUpvals[i];
+            for (size_t i = 0; i < typedLocals.size(); ++i)
+            {
+                const TypedLocal& l = typedLocals[i];
 
-                    const char* base = getBaseTypeString(l.type);
-                    const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
+                const char* userdata = tryGetUserdataTypeName(l.type);
+                const char* name = userdata ? userdata : getBaseTypeString(l.type);
+                const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
 
-                    formatAppend(result, "U%d: %s%s\n", int(i), base, optional);
-                }
+                formatAppend(result, "R%d: %s%s from %d to %d\n", l.reg, name, optional, l.startpc, l.endpc);
+            }
+        }
+        else
+        {
+            // Arguments start from third byte in function typeinfo string
+            for (uint8_t i = 2; i < typeinfo.size(); ++i)
+            {
+                uint8_t et = typeinfo[i];
 
-                for (size_t i = 0; i < typedLocals.size(); ++i)
-                {
-                    const TypedLocal& l = typedLocals[i];
+                const char* base = getBaseTypeString(et);
+                const char* optional = (et & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
 
-                    const char* base = getBaseTypeString(l.type);
-                    const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
+                formatAppend(result, "R%d: %s%s [argument]\n", i - 2, base, optional);
+            }
 
-                    formatAppend(result, "R%d: %s%s from %d to %d\n", l.reg, base, optional, l.startpc, l.endpc);
-                }
+            for (size_t i = 0; i < typedUpvals.size(); ++i)
+            {
+                const TypedUpval& l = typedUpvals[i];
+
+                const char* base = getBaseTypeString(l.type);
+                const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
+
+                formatAppend(result, "U%d: %s%s\n", int(i), base, optional);
+            }
+
+            for (size_t i = 0; i < typedLocals.size(); ++i)
+            {
+                const TypedLocal& l = typedLocals[i];
+
+                const char* base = getBaseTypeString(l.type);
+                const char* optional = (l.type & LBC_TYPE_OPTIONAL_BIT) ? "?" : "";
+
+                formatAppend(result, "R%d: %s%s from %d to %d\n", l.reg, base, optional, l.startpc, l.endpc);
             }
         }
     }

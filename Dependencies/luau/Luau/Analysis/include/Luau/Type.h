@@ -32,7 +32,7 @@ struct TypeArena;
 struct Scope;
 using ScopePtr = std::shared_ptr<Scope>;
 
-struct TypeFamily;
+struct TypeFunction;
 struct Constraint;
 
 /**
@@ -276,8 +276,8 @@ struct WithPredicate
     }
 };
 
-using MagicFunction = std::function<std::optional<WithPredicate<TypePackId>>(
-    struct TypeChecker&, const std::shared_ptr<struct Scope>&, const class AstExprCall&, WithPredicate<TypePackId>)>;
+using MagicFunction = std::function<std::optional<
+    WithPredicate<TypePackId>>(struct TypeChecker&, const std::shared_ptr<struct Scope>&, const class AstExprCall&, WithPredicate<TypePackId>)>;
 
 struct MagicFunctionCallContext
 {
@@ -305,19 +305,46 @@ struct FunctionType
     FunctionType(TypePackId argTypes, TypePackId retTypes, std::optional<FunctionDefinition> defn = {}, bool hasSelf = false);
 
     // Global polymorphic function
-    FunctionType(std::vector<TypeId> generics, std::vector<TypePackId> genericPacks, TypePackId argTypes, TypePackId retTypes,
-        std::optional<FunctionDefinition> defn = {}, bool hasSelf = false);
+    FunctionType(
+        std::vector<TypeId> generics,
+        std::vector<TypePackId> genericPacks,
+        TypePackId argTypes,
+        TypePackId retTypes,
+        std::optional<FunctionDefinition> defn = {},
+        bool hasSelf = false
+    );
 
     // Local monomorphic function
     FunctionType(TypeLevel level, TypePackId argTypes, TypePackId retTypes, std::optional<FunctionDefinition> defn = {}, bool hasSelf = false);
     FunctionType(
-        TypeLevel level, Scope* scope, TypePackId argTypes, TypePackId retTypes, std::optional<FunctionDefinition> defn = {}, bool hasSelf = false);
+        TypeLevel level,
+        Scope* scope,
+        TypePackId argTypes,
+        TypePackId retTypes,
+        std::optional<FunctionDefinition> defn = {},
+        bool hasSelf = false
+    );
 
     // Local polymorphic function
-    FunctionType(TypeLevel level, std::vector<TypeId> generics, std::vector<TypePackId> genericPacks, TypePackId argTypes, TypePackId retTypes,
-        std::optional<FunctionDefinition> defn = {}, bool hasSelf = false);
-    FunctionType(TypeLevel level, Scope* scope, std::vector<TypeId> generics, std::vector<TypePackId> genericPacks, TypePackId argTypes,
-        TypePackId retTypes, std::optional<FunctionDefinition> defn = {}, bool hasSelf = false);
+    FunctionType(
+        TypeLevel level,
+        std::vector<TypeId> generics,
+        std::vector<TypePackId> genericPacks,
+        TypePackId argTypes,
+        TypePackId retTypes,
+        std::optional<FunctionDefinition> defn = {},
+        bool hasSelf = false
+    );
+    FunctionType(
+        TypeLevel level,
+        Scope* scope,
+        std::vector<TypeId> generics,
+        std::vector<TypePackId> genericPacks,
+        TypePackId argTypes,
+        TypePackId retTypes,
+        std::optional<FunctionDefinition> defn = {},
+        bool hasSelf = false
+    );
 
     std::optional<FunctionDefinition> definition;
     /// These should all be generic
@@ -398,9 +425,15 @@ struct Property
     // DEPRECATED
     // TODO: Kill all constructors in favor of `Property::rw(TypeId read, TypeId write)` and friends.
     Property();
-    Property(TypeId readTy, bool deprecated = false, const std::string& deprecatedSuggestion = "", std::optional<Location> location = std::nullopt,
-        const Tags& tags = {}, const std::optional<std::string>& documentationSymbol = std::nullopt,
-        std::optional<Location> typeLocation = std::nullopt);
+    Property(
+        TypeId readTy,
+        bool deprecated = false,
+        const std::string& deprecatedSuggestion = "",
+        std::optional<Location> location = std::nullopt,
+        const Tags& tags = {},
+        const std::optional<std::string>& documentationSymbol = std::nullopt,
+        std::optional<Location> typeLocation = std::nullopt
+    );
 
     // DEPRECATED: Should only be called in non-RWP! We assert that the `readTy` is not nullopt.
     // TODO: Kill once we don't have non-RWP.
@@ -499,10 +532,19 @@ struct ClassType
     Tags tags;
     std::shared_ptr<ClassUserData> userData;
     ModuleName definitionModuleName;
+    std::optional<Location> definitionLocation;
     std::optional<TableIndexer> indexer;
 
-    ClassType(Name name, Props props, std::optional<TypeId> parent, std::optional<TypeId> metatable, Tags tags,
-        std::shared_ptr<ClassUserData> userData, ModuleName definitionModuleName)
+    ClassType(
+        Name name,
+        Props props,
+        std::optional<TypeId> parent,
+        std::optional<TypeId> metatable,
+        Tags tags,
+        std::shared_ptr<ClassUserData> userData,
+        ModuleName definitionModuleName,
+        std::optional<Location> definitionLocation
+    )
         : name(name)
         , props(props)
         , parent(parent)
@@ -510,11 +552,21 @@ struct ClassType
         , tags(tags)
         , userData(userData)
         , definitionModuleName(definitionModuleName)
+        , definitionLocation(definitionLocation)
     {
     }
 
-    ClassType(Name name, Props props, std::optional<TypeId> parent, std::optional<TypeId> metatable, Tags tags,
-        std::shared_ptr<ClassUserData> userData, ModuleName definitionModuleName, std::optional<TableIndexer> indexer)
+    ClassType(
+        Name name,
+        Props props,
+        std::optional<TypeId> parent,
+        std::optional<TypeId> metatable,
+        Tags tags,
+        std::shared_ptr<ClassUserData> userData,
+        ModuleName definitionModuleName,
+        std::optional<Location> definitionLocation,
+        std::optional<TableIndexer> indexer
+    )
         : name(name)
         , props(props)
         , parent(parent)
@@ -522,41 +574,42 @@ struct ClassType
         , tags(tags)
         , userData(userData)
         , definitionModuleName(definitionModuleName)
+        , definitionLocation(definitionLocation)
         , indexer(indexer)
     {
     }
 };
 
 /**
- * An instance of a type family that has not yet been reduced to a more concrete
+ * An instance of a type function that has not yet been reduced to a more concrete
  * type. The constraint solver receives a constraint to reduce each
- * TypeFamilyInstanceType to a concrete type. A design detail is important to
- * note here: the parameters for this instantiation of the type family are
+ * TypeFunctionInstanceType to a concrete type. A design detail is important to
+ * note here: the parameters for this instantiation of the type function are
  * contained within this type, so that they can be substituted.
  */
-struct TypeFamilyInstanceType
+struct TypeFunctionInstanceType
 {
-    NotNull<const TypeFamily> family;
+    NotNull<const TypeFunction> function;
 
     std::vector<TypeId> typeArguments;
     std::vector<TypePackId> packArguments;
 
-    TypeFamilyInstanceType(NotNull<const TypeFamily> family, std::vector<TypeId> typeArguments, std::vector<TypePackId> packArguments)
-        : family(family)
+    TypeFunctionInstanceType(NotNull<const TypeFunction> function, std::vector<TypeId> typeArguments, std::vector<TypePackId> packArguments)
+        : function(function)
         , typeArguments(typeArguments)
         , packArguments(packArguments)
     {
     }
 
-    TypeFamilyInstanceType(const TypeFamily& family, std::vector<TypeId> typeArguments)
-        : family{&family}
+    TypeFunctionInstanceType(const TypeFunction& function, std::vector<TypeId> typeArguments)
+        : function{&function}
         , typeArguments(typeArguments)
         , packArguments{}
     {
     }
 
-    TypeFamilyInstanceType(const TypeFamily& family, std::vector<TypeId> typeArguments, std::vector<TypePackId> packArguments)
-        : family{&family}
+    TypeFunctionInstanceType(const TypeFunction& function, std::vector<TypeId> typeArguments, std::vector<TypePackId> packArguments)
+        : function{&function}
         , typeArguments(typeArguments)
         , packArguments(packArguments)
     {
@@ -657,9 +710,26 @@ struct NegationType
 
 using ErrorType = Unifiable::Error;
 
-using TypeVariant =
-    Unifiable::Variant<TypeId, FreeType, GenericType, PrimitiveType, SingletonType, BlockedType, PendingExpansionType, FunctionType, TableType,
-        MetatableType, ClassType, AnyType, UnionType, IntersectionType, LazyType, UnknownType, NeverType, NegationType, TypeFamilyInstanceType>;
+using TypeVariant = Unifiable::Variant<
+    TypeId,
+    FreeType,
+    GenericType,
+    PrimitiveType,
+    SingletonType,
+    BlockedType,
+    PendingExpansionType,
+    FunctionType,
+    TableType,
+    MetatableType,
+    ClassType,
+    AnyType,
+    UnionType,
+    IntersectionType,
+    LazyType,
+    UnknownType,
+    NeverType,
+    NegationType,
+    TypeFunctionInstanceType>;
 
 struct Type final
 {

@@ -32,7 +32,10 @@ TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_returns_any")
 
     LUAU_REQUIRE_NO_ERRORS(result);
 
-    CHECK(builtinTypes->anyType == requireType("a"));
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        CHECK("any?" == toString(requireType("a")));
+    else
+        CHECK(builtinTypes->anyType == requireType("a"));
 }
 
 TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_returns_any2")
@@ -50,7 +53,10 @@ TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_returns_any2")
 
     LUAU_REQUIRE_NO_ERRORS(result);
 
-    CHECK("any" == toString(requireType("a")));
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        CHECK("any?" == toString(requireType("a")));
+    else
+        CHECK("any" == toString(requireType("a")));
 }
 
 TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_is_any")
@@ -66,7 +72,10 @@ TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_is_any")
 
     LUAU_REQUIRE_NO_ERRORS(result);
 
-    CHECK("any" == toString(requireType("a")));
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        CHECK("any?" == toString(requireType("a")));
+    else
+        CHECK("any" == toString(requireType("a")));
 }
 
 TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_is_any2")
@@ -80,7 +89,10 @@ TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_is_any2")
         end
     )");
 
-    CHECK("any" == toString(requireType("a")));
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        CHECK("any?" == toString(requireType("a")));
+    else
+        CHECK("any" == toString(requireType("a")));
 }
 
 TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_is_any_pack")
@@ -96,7 +108,10 @@ TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_is_any_pack")
 
     LUAU_REQUIRE_NO_ERRORS(result);
 
-    CHECK("any" == toString(requireType("a")));
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        CHECK("any?" == toString(requireType("a")));
+    else
+        CHECK("any" == toString(requireType("a")));
 }
 
 TEST_CASE_FIXTURE(Fixture, "for_in_loop_iterator_is_error")
@@ -291,7 +306,11 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "replace_every_free_type_when_unifying_a_comp
     )");
 
     LUAU_REQUIRE_NO_ERRORS(result);
-    CHECK_EQ("any", toString(requireType("b")));
+
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+        CHECK_EQ("any?", toString(requireType("b")));
+    else
+        CHECK_EQ("any", toString(requireType("b")));
 }
 
 TEST_CASE_FIXTURE(Fixture, "call_to_any_yields_any")
@@ -386,6 +405,20 @@ stat = stat and tonumber(stat) or stat
     LUAU_REQUIRE_NO_ERRORS(result);
 }
 
+TEST_CASE_FIXTURE(BuiltinsFixture, "table_of_any_calls")
+{
+    CheckResult result = check(R"(
+        local function testFunc(input: {any})
+        end
+
+        local v = {true}
+
+        testFunc(v)
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(result);
+}
+
 TEST_CASE_FIXTURE(Fixture, "intersection_of_any_can_have_props")
 {
     // *blocked-130* ~ hasProp any & ~(false?), "_status"
@@ -399,6 +432,15 @@ end
 )");
 
     CHECK("(any, any) -> any" == toString(requireType("foo")));
+}
+
+TEST_CASE_FIXTURE(Fixture, "cast_to_table_of_any")
+{
+    CheckResult result = check(R"(
+        local v = {true} :: {any}
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(result);
 }
 
 TEST_SUITE_END();

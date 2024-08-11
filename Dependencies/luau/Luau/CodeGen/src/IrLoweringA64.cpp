@@ -11,11 +11,8 @@
 #include "lstate.h"
 #include "lgc.h"
 
-LUAU_FASTFLAG(LuauCodegenSplitDoarith)
-LUAU_FASTFLAG(LuauCodegenUserdataOps)
-LUAU_FASTFLAGVARIABLE(LuauCodegenUserdataAlloc, false)
-LUAU_FASTFLAGVARIABLE(LuauCodegenUserdataOpsFixA64, false)
 LUAU_FASTFLAG(LuauCodegenFastcall3)
+LUAU_FASTFLAG(LuauCodegenMathSign)
 
 namespace Luau
 {
@@ -240,6 +237,7 @@ static bool emitBuiltin(AssemblyBuilderA64& build, IrFunction& function, IrRegAl
     }
     case LBF_MATH_SIGN:
     {
+        CODEGEN_ASSERT(!FFlag::LuauCodegenMathSign);
         CODEGEN_ASSERT(nresults == 1);
         build.ldr(d0, mem(rBase, arg * sizeof(TValue) + offsetof(TValue, value.n)));
         build.fcmpz(d0);
@@ -280,10 +278,14 @@ IrLoweringA64::IrLoweringA64(AssemblyBuilderA64& build, ModuleHelpers& helpers, 
     , valueTracker(function)
     , exitHandlerMap(~0u)
 {
-    valueTracker.setRestoreCallack(this, [](void* context, IrInst& inst) {
-        IrLoweringA64* self = static_cast<IrLoweringA64*>(context);
-        self->regs.restoreReg(self->build, inst);
-    });
+    valueTracker.setRestoreCallack(
+        this,
+        [](void* context, IrInst& inst)
+        {
+            IrLoweringA64* self = static_cast<IrLoweringA64*>(context);
+            self->regs.restoreReg(self->build, inst);
+        }
+    );
 }
 
 void IrLoweringA64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
@@ -697,6 +699,24 @@ void IrLoweringA64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
         build.fabs(inst.regA64, temp);
         break;
     }
+    case IrCmd::SIGN_NUM:
+    {
+        CODEGEN_ASSERT(FFlag::LuauCodegenMathSign);
+
+        inst.regA64 = regs.allocReuse(KindA64::d, index, {inst.a});
+
+        RegisterA64 temp = tempDouble(inst.a);
+        RegisterA64 temp0 = regs.allocTemp(KindA64::d);
+        RegisterA64 temp1 = regs.allocTemp(KindA64::d);
+
+        build.fcmpz(temp);
+        build.fmov(temp0, 0.0);
+        build.fmov(temp1, 1.0);
+        build.fcsel(inst.regA64, temp1, temp0, getConditionFP(IrCondition::Greater));
+        build.fmov(temp1, -1.0);
+        build.fcsel(inst.regA64, temp1, inst.regA64, getConditionFP(IrCondition::Less));
+        break;
+    }
     case IrCmd::ADD_VEC:
     {
         inst.regA64 = regs.allocReuse(KindA64::q, index, {inst.a, inst.b});
@@ -1058,8 +1078,6 @@ void IrLoweringA64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
     }
     case IrCmd::NEW_USERDATA:
     {
-        CODEGEN_ASSERT(FFlag::LuauCodegenUserdataAlloc);
-
         regs.spill(build, index);
         build.mov(x0, rState);
         build.mov(x1, intOp(inst.a));
@@ -1283,47 +1301,38 @@ void IrLoweringA64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
         else
             build.add(x3, rBase, uint16_t(vmRegOp(inst.c) * sizeof(TValue)));
 
-        if (FFlag::LuauCodegenSplitDoarith)
+        switch (TMS(intOp(inst.d)))
         {
-            switch (TMS(intOp(inst.d)))
-            {
-            case TM_ADD:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithadd)));
-                break;
-            case TM_SUB:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithsub)));
-                break;
-            case TM_MUL:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithmul)));
-                break;
-            case TM_DIV:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithdiv)));
-                break;
-            case TM_IDIV:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithidiv)));
-                break;
-            case TM_MOD:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithmod)));
-                break;
-            case TM_POW:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithpow)));
-                break;
-            case TM_UNM:
-                build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithunm)));
-                break;
-            default:
-                CODEGEN_ASSERT(!"Invalid doarith helper operation tag");
-                break;
-            }
+        case TM_ADD:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithadd)));
+            break;
+        case TM_SUB:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithsub)));
+            break;
+        case TM_MUL:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithmul)));
+            break;
+        case TM_DIV:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithdiv)));
+            break;
+        case TM_IDIV:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithidiv)));
+            break;
+        case TM_MOD:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithmod)));
+            break;
+        case TM_POW:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithpow)));
+            break;
+        case TM_UNM:
+            build.ldr(x4, mem(rNativeContext, offsetof(NativeContext, luaV_doarithunm)));
+            break;
+        default:
+            CODEGEN_ASSERT(!"Invalid doarith helper operation tag");
+            break;
+        }
 
-            build.blr(x4);
-        }
-        else
-        {
-            build.mov(w4, TMS(intOp(inst.d)));
-            build.ldr(x5, mem(rNativeContext, offsetof(NativeContext, luaV_doarith)));
-            build.blr(x5);
-        }
+        build.blr(x4);
 
         emitUpdateBase(build);
         break;
@@ -1698,18 +1707,11 @@ void IrLoweringA64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
     }
     case IrCmd::CHECK_USERDATA_TAG:
     {
-        CODEGEN_ASSERT(FFlag::LuauCodegenUserdataOps);
-
         Label fresh; // used when guard aborts execution or jumps to a VM exit
         Label& fail = getTargetLabel(inst.c, fresh);
         RegisterA64 temp = regs.allocTemp(KindA64::w);
         build.ldrb(temp, mem(regOp(inst.a), offsetof(Udata, tag)));
-
-        if (FFlag::LuauCodegenUserdataOpsFixA64)
-            build.cmp(temp, intOp(inst.b));
-        else
-            build.cmp(temp, tagOp(inst.b));
-
+        build.cmp(temp, intOp(inst.b));
         build.b(ConditionA64::NotEqual, fail);
         finalizeTargetLabel(inst.c, fresh);
         break;
@@ -2678,66 +2680,34 @@ AddressA64 IrLoweringA64::tempAddr(IrOp op, int offset)
 
 AddressA64 IrLoweringA64::tempAddrBuffer(IrOp bufferOp, IrOp indexOp, uint8_t tag)
 {
-    if (FFlag::LuauCodegenUserdataOps)
+    CODEGEN_ASSERT(tag == LUA_TUSERDATA || tag == LUA_TBUFFER);
+    int dataOffset = tag == LUA_TBUFFER ? offsetof(Buffer, data) : offsetof(Udata, data);
+
+    if (indexOp.kind == IrOpKind::Inst)
     {
-        CODEGEN_ASSERT(tag == LUA_TUSERDATA || tag == LUA_TBUFFER);
-        int dataOffset = tag == LUA_TBUFFER ? offsetof(Buffer, data) : offsetof(Udata, data);
+        RegisterA64 temp = regs.allocTemp(KindA64::x);
+        build.add(temp, regOp(bufferOp), regOp(indexOp)); // implicit uxtw
+        return mem(temp, dataOffset);
+    }
+    else if (indexOp.kind == IrOpKind::Constant)
+    {
+        // Since the resulting address may be used to load any size, including 1 byte, from an unaligned offset, we are limited by unscaled
+        // encoding
+        if (unsigned(intOp(indexOp)) + dataOffset <= 255)
+            return mem(regOp(bufferOp), int(intOp(indexOp) + dataOffset));
 
-        if (indexOp.kind == IrOpKind::Inst)
-        {
-            RegisterA64 temp = regs.allocTemp(KindA64::x);
-            build.add(temp, regOp(bufferOp), regOp(indexOp)); // implicit uxtw
-            return mem(temp, dataOffset);
-        }
-        else if (indexOp.kind == IrOpKind::Constant)
-        {
-            // Since the resulting address may be used to load any size, including 1 byte, from an unaligned offset, we are limited by unscaled
-            // encoding
-            if (unsigned(intOp(indexOp)) + dataOffset <= 255)
-                return mem(regOp(bufferOp), int(intOp(indexOp) + dataOffset));
+        // indexOp can only be negative in dead code (since offsets are checked); this avoids assertion in emitAddOffset
+        if (intOp(indexOp) < 0)
+            return mem(regOp(bufferOp), dataOffset);
 
-            // indexOp can only be negative in dead code (since offsets are checked); this avoids assertion in emitAddOffset
-            if (intOp(indexOp) < 0)
-                return mem(regOp(bufferOp), dataOffset);
-
-            RegisterA64 temp = regs.allocTemp(KindA64::x);
-            emitAddOffset(build, temp, regOp(bufferOp), size_t(intOp(indexOp)));
-            return mem(temp, dataOffset);
-        }
-        else
-        {
-            CODEGEN_ASSERT(!"Unsupported instruction form");
-            return noreg;
-        }
+        RegisterA64 temp = regs.allocTemp(KindA64::x);
+        emitAddOffset(build, temp, regOp(bufferOp), size_t(intOp(indexOp)));
+        return mem(temp, dataOffset);
     }
     else
     {
-        if (indexOp.kind == IrOpKind::Inst)
-        {
-            RegisterA64 temp = regs.allocTemp(KindA64::x);
-            build.add(temp, regOp(bufferOp), regOp(indexOp)); // implicit uxtw
-            return mem(temp, offsetof(Buffer, data));
-        }
-        else if (indexOp.kind == IrOpKind::Constant)
-        {
-            // Since the resulting address may be used to load any size, including 1 byte, from an unaligned offset, we are limited by unscaled
-            // encoding
-            if (unsigned(intOp(indexOp)) + offsetof(Buffer, data) <= 255)
-                return mem(regOp(bufferOp), int(intOp(indexOp) + offsetof(Buffer, data)));
-
-            // indexOp can only be negative in dead code (since offsets are checked); this avoids assertion in emitAddOffset
-            if (intOp(indexOp) < 0)
-                return mem(regOp(bufferOp), offsetof(Buffer, data));
-
-            RegisterA64 temp = regs.allocTemp(KindA64::x);
-            emitAddOffset(build, temp, regOp(bufferOp), size_t(intOp(indexOp)));
-            return mem(temp, offsetof(Buffer, data));
-        }
-        else
-        {
-            CODEGEN_ASSERT(!"Unsupported instruction form");
-            return noreg;
-        }
+        CODEGEN_ASSERT(!"Unsupported instruction form");
+        return noreg;
     }
 }
 

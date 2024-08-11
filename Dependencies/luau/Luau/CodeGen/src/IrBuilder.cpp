@@ -13,9 +13,6 @@
 
 #include <string.h>
 
-LUAU_FASTFLAG(LuauCodegenAnalyzeHostVectorOps)
-LUAU_FASTFLAG(LuauLoadUserdataInfo)
-LUAU_FASTFLAG(LuauCodegenInstG)
 LUAU_FASTFLAG(LuauCodegenFastcall3)
 
 namespace Luau
@@ -103,16 +100,13 @@ static void buildArgumentTypeChecks(IrBuilder& build)
             build.inst(IrCmd::CHECK_TAG, load, build.constTag(LUA_TBUFFER), build.vmExit(kVmExitEntryGuardPc));
             break;
         default:
-            if (FFlag::LuauLoadUserdataInfo)
+            if (tag >= LBC_TYPE_TAGGED_USERDATA_BASE && tag < LBC_TYPE_TAGGED_USERDATA_END)
             {
-                if (tag >= LBC_TYPE_TAGGED_USERDATA_BASE && tag < LBC_TYPE_TAGGED_USERDATA_END)
-                {
-                    build.inst(IrCmd::CHECK_TAG, load, build.constTag(LUA_TUSERDATA), build.vmExit(kVmExitEntryGuardPc));
-                }
-                else
-                {
-                    CODEGEN_ASSERT(!"unknown argument type tag");
-                }
+                build.inst(IrCmd::CHECK_TAG, load, build.constTag(LUA_TUSERDATA), build.vmExit(kVmExitEntryGuardPc));
+            }
+            else
+            {
+                CODEGEN_ASSERT(!"unknown argument type tag");
             }
             break;
         }
@@ -438,8 +432,9 @@ void IrBuilder::translateInst(LuauOpcode op, const Instruction* pc, int i)
         translateInstDupTable(*this, pc, i);
         break;
     case LOP_SETLIST:
-        inst(IrCmd::SETLIST, constUint(i), vmReg(LUAU_INSN_A(*pc)), vmReg(LUAU_INSN_B(*pc)), constInt(LUAU_INSN_C(*pc) - 1), constUint(pc[1]),
-            undef());
+        inst(
+            IrCmd::SETLIST, constUint(i), vmReg(LUAU_INSN_A(*pc)), vmReg(LUAU_INSN_B(*pc)), constInt(LUAU_INSN_C(*pc) - 1), constUint(pc[1]), undef()
+        );
         break;
     case LOP_GETUPVAL:
         translateInstGetUpval(*this, pc, i);
@@ -534,15 +529,8 @@ void IrBuilder::translateInst(LuauOpcode op, const Instruction* pc, int i)
         translateInstCapture(*this, pc, i);
         break;
     case LOP_NAMECALL:
-        if (FFlag::LuauCodegenAnalyzeHostVectorOps)
-        {
-            if (translateInstNamecall(*this, pc, i))
-                cmdSkipTarget = i + 3;
-        }
-        else
-        {
-            translateInstNamecall(*this, pc, i);
-        }
+        if (translateInstNamecall(*this, pc, i))
+            cmdSkipTarget = i + 3;
         break;
     case LOP_PREPVARARGS:
         inst(IrCmd::FALLBACK_PREPVARARGS, constUint(i), constInt(LUAU_INSN_A(*pc)));
@@ -616,7 +604,8 @@ void IrBuilder::clone(const IrBlock& source, bool removeCurrentTerminator)
 {
     DenseHashMap<uint32_t, uint32_t> instRedir{~0u};
 
-    auto redirect = [&instRedir](IrOp& op) {
+    auto redirect = [&instRedir](IrOp& op)
+    {
         if (op.kind == IrOpKind::Inst)
         {
             if (const uint32_t* newIndex = instRedir.find(op.index))
@@ -653,9 +642,7 @@ void IrBuilder::clone(const IrBlock& source, bool removeCurrentTerminator)
         redirect(clone.d);
         redirect(clone.e);
         redirect(clone.f);
-
-        if (FFlag::LuauCodegenInstG)
-            redirect(clone.g);
+        redirect(clone.g);
 
         addUse(function, clone.a);
         addUse(function, clone.b);
@@ -663,18 +650,13 @@ void IrBuilder::clone(const IrBlock& source, bool removeCurrentTerminator)
         addUse(function, clone.d);
         addUse(function, clone.e);
         addUse(function, clone.f);
-
-        if (FFlag::LuauCodegenInstG)
-            addUse(function, clone.g);
+        addUse(function, clone.g);
 
         // Instructions that referenced the original will have to be adjusted to use the clone
         instRedir[index] = uint32_t(function.instructions.size());
 
         // Reconstruct the fresh clone
-        if (FFlag::LuauCodegenInstG)
-            inst(clone.cmd, clone.a, clone.b, clone.c, clone.d, clone.e, clone.f, clone.g);
-        else
-            inst(clone.cmd, clone.a, clone.b, clone.c, clone.d, clone.e, clone.f);
+        inst(clone.cmd, clone.a, clone.b, clone.c, clone.d, clone.e, clone.f, clone.g);
     }
 }
 
@@ -772,31 +754,11 @@ IrOp IrBuilder::inst(IrCmd cmd, IrOp a, IrOp b, IrOp c, IrOp d, IrOp e)
 
 IrOp IrBuilder::inst(IrCmd cmd, IrOp a, IrOp b, IrOp c, IrOp d, IrOp e, IrOp f)
 {
-    if (FFlag::LuauCodegenInstG)
-    {
-        return inst(cmd, a, b, c, d, e, f, {});
-    }
-    else
-    {
-        uint32_t index = uint32_t(function.instructions.size());
-        function.instructions.push_back({cmd, a, b, c, d, e, f});
-
-        CODEGEN_ASSERT(!inTerminatedBlock);
-
-        if (isBlockTerminator(cmd))
-        {
-            function.blocks[activeBlockIdx].finish = index;
-            inTerminatedBlock = true;
-        }
-
-        return {IrOpKind::Inst, index};
-    }
+    return inst(cmd, a, b, c, d, e, f, {});
 }
 
 IrOp IrBuilder::inst(IrCmd cmd, IrOp a, IrOp b, IrOp c, IrOp d, IrOp e, IrOp f, IrOp g)
 {
-    CODEGEN_ASSERT(FFlag::LuauCodegenInstG);
-
     uint32_t index = uint32_t(function.instructions.size());
     function.instructions.push_back({cmd, a, b, c, d, e, f, g});
 
