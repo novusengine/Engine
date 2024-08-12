@@ -11,7 +11,11 @@ local function PrintError(msg)
     end
 
     local callerName = debugInfo.name
-    error("[" .. callerName .. "]" .. " : " .. msg, 2)
+    if callerName == nil then
+        error(": " .. msg, 2)
+    else
+        error("[" .. callerName .. "]" .. " : " .. msg, 2)
+    end
 end
 
 --[[ DumpObject(object, [limit], [indent])   Recursively print arbitrary data. 
