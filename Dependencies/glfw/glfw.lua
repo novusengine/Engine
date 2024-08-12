@@ -75,7 +75,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         
         Solution.Util.SetFiles(files)
         Solution.Util.SetDefines({ "_GLFW_X11", "_CRT_SECURE_NO_WARNINGS" })
-        Solution.Util.SetLinks({ "pthread" })
+        Solution.Util.SetLinks({ "pthread", "X11" })
     end)
 end)
 
@@ -89,5 +89,6 @@ Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
 
     Solution.Util.SetFilter("system:linux", function()
         Solution.Util.SetDefines({ "_GLFW_X11", "_CRT_SECURE_NO_WARNINGS" })
+        Solution.Util.SetLinks({ "pthread", "X11" })
     end)
 end)
