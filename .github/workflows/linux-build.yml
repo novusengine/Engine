@@ -5,7 +5,7 @@ on:
 
 jobs:
   linux-build:
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux]
 
     strategy:
       fail-fast: false
@@ -21,21 +21,20 @@ jobs:
       with:
         version: "5.0.0-beta1"
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update && sudo apt-get install -yq clang libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libvulkan-dev
-        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100
+#    - name: Install dependencies
+#      run: |
+#        sudo apt-get update && sudo apt-get install -yq clang libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libvulkan-dev
+#        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100
 
-    - name: Install Vulkan SDK
-      run: |
-        wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
-        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
-        sudo apt update
-        sudo apt install vulkan-sdk
+#    - name: Install Vulkan SDK
+#      run: |
+#        wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
+#        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+#        sudo apt update
+#        sudo apt install vulkan-sdk
 
     - name: Run Premake
       run: |
-        export VULKAN_SDK=/usr/include/vulkan
         premake5 gmake2
 
     - name: Build
