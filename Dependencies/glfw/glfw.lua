@@ -62,6 +62,8 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         local files =
         {
             sourceDir .. "/x11_init.c",
+            sourceDir .. "/posix_module.c",
+            sourceDir .. "/posix_poll.c",
             sourceDir .. "/x11_monitor.c",
             sourceDir .. "/x11_window.c",
             sourceDir .. "/xkb_unicode.c",
