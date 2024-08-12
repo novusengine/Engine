@@ -2,7 +2,7 @@ local osEnvName = "VULKAN_SDK"
 local vulkanSDK = os.getenv(osEnvName)
 
 if not vulkanSDK then
-    Solution.Util.PrintError("Failed to find System Environment Variable '" .. osEnvName .. ". Please ensure Vulkan is installed and configured properly")
+    Solution.Util.PrintError("Failed to find System Environment Variable '" .. osEnvName .. "'. Please ensure Vulkan is installed and configured properly")
 end
 
 local dep = Solution.Util.CreateDepTable("vulkan", {})
