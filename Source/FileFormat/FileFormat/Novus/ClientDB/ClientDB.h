@@ -27,7 +27,7 @@ namespace ClientDB
     {
     public:
         static_assert(std::is_same<Definitions::Base, T>::value || std::is_base_of<Definitions::Base, T>::value, "ClientDB::Storage Type must derive from Base");
-        static const u32 CURRENT_VERSION = 2;
+        inline static const u32 CURRENT_VERSION = 2;
 
         struct Flags
         {
