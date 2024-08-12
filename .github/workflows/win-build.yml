@@ -9,6 +9,8 @@ jobs:
     
     strategy:
       fail-fast: false
+      matrix:
+        build-type: [RelDebug]
       
     steps:
     - uses: actions/checkout@v4
@@ -22,4 +24,4 @@ jobs:
 
     - name: Build
       run: |
-        msbuild /m /p:Configuration=Debug Build/Engine.sln
+        msbuild /m /p:Configuration=${{ matrix.build-type }} Build/Engine.sln
