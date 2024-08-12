@@ -52,8 +52,6 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
             sourceDir .. "/win32_thread.c",
             sourceDir .. "/win32_window.c",
             sourceDir .. "/wgl_context.c",
-            sourceDir .. "/egl_context.c",
-            sourceDir .. "/osmesa_context.c"
         }
         
         Solution.Util.SetFiles(files)
@@ -70,8 +68,6 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
             sourceDir .. "/posix_time.c",
             sourceDir .. "/posix_thread.c",
             sourceDir .. "/glx_context.c",
-            sourceDir .. "/egl_context.c",
-            sourceDir .. "/osmesa_context.c",
             sourceDir .. "/linux_joystick.c"
         }
         
