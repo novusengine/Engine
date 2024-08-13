@@ -1,7 +1,7 @@
 local dep = Solution.Util.CreateDepTable("Glfw", {})
 
 Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "GLFW_INCLUDE_VULKAN" }
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "_CRT_SECURE_NO_WARNINGS" }
 
     Solution.Util.SetLanguage("C++")
     Solution.Util.SetCppDialect(20)
@@ -55,7 +55,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         }
         
         Solution.Util.SetFiles(files)
-        Solution.Util.SetDefines({ "_GLFW_WIN32", "GLFW_EXPOSE_NATIVE_WIN32" })
+        Solution.Util.SetDefines({ "_GLFW_WIN32" })
     end)
 
     Solution.Util.SetFilter("system:linux", function()
@@ -86,7 +86,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
                 sourceDir .. "/x11_platform.c",
             }
             Solution.Util.SetFiles(files)
-            Solution.Util.SetDefines({ "_GLFW_X11", "GLFW_EXPOSE_NATIVE_X11" })
+            Solution.Util.SetDefines({ "_GLFW_X11" })
             Solution.Util.SetLinks({ "X11" })
         end
         
@@ -100,7 +100,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
 
             }
             Solution.Util.SetFiles(files)
-            Solution.Util.SetDefines({ "_GLFW_WAYLAND", "GLFW_EXPOSE_NATIVE_WAYLAND" })
+            Solution.Util.SetDefines({ "_GLFW_WAYLAND" })
             Solution.Util.SetLinks({ "wayland-dev" })
         end
     end)
