@@ -80,10 +80,11 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         if(useXorg) then
             local files = 
             {
+                sourceDir .. "/x11_platform.h",
+                
                 sourceDir .. "/x11_init.c",
                 sourceDir .. "/x11_monitor.c",
                 sourceDir .. "/x11_window.c",
-                sourceDir .. "/x11_platform.c",
             }
             Solution.Util.SetFiles(files)
             Solution.Util.SetDefines({ "_GLFW_X11" })
@@ -93,11 +94,11 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         if(useWayland and not useXorg) then
             local files = 
             {
+                sourceDir .. "/wl_platform.h",
+                
                 sourceDir .. "/wl_init.c",
                 sourceDir .. "/wl_monitor.c",
                 sourceDir .. "/wl_window.c",
-                sourceDir .. "/wl_platform.c",
-
             }
             Solution.Util.SetFiles(files)
             Solution.Util.SetDefines({ "_GLFW_WAYLAND" })
