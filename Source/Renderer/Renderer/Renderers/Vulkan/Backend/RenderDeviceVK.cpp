@@ -16,12 +16,6 @@
 
 #pragma warning (push)
 #pragma warning(disable : 4005)
-#if WIN32
-#define GLFW_EXPOSE_NATIVE_WIN32
-#else
-#define GLFW_EXPOSE_NATIVE_X11
-#endif
-#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #pragma warning(pop)

@@ -25,6 +25,11 @@ BuildSettings:Add("Typesafe Enable Precondition Checks", false)
 BuildSettings:Add("Typesafe Enable Wrapper", false)
 BuildSettings:Add("Typesafe Arithmetic Policy", 0) -- (0 = "default", 1 = "ub", 2 = "checked")
 
+-- Settings for Window System on Linux
+-- These are ignored on Windows
+BuildSettings:Add("Using X11", true)
+BuildSettings:Add("Using Wayland", false)
+
 -- Custom (DO NOT TOUCH)
 local isMSVC = string.sub(_ACTION, 1, 2) == "vs"
 BuildSettings:Add("Using MSVC", isMSVC)
