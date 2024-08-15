@@ -88,13 +88,27 @@ Solution.Util.CreateModuleTable = function(name, dependencies)
 end
 
 Solution.Util.CreateDepTable = function(name, dependencies)
-    local dependency = { Name = name }
+    local dependency = { Name = name, Cache = {} }
 
     dependency.NameLow = string.lower(dependency.Name)
     dependency.Path = path.getabsolute(dependency.NameLow .. "/", Solution.Projects.Current.DependencyDir)
     dependency.Dependencies = dependencies
 
     return dependency
+end
+
+-- Cache a value inside the dep table
+function Solution.Util.SetDepCache(dep, key, data)
+    dep.Cache[key] = data
+end
+
+-- Retrieve a cached value from the dep table, or return nil if not cached
+function Solution.Util.GetDepCache(dep, key)
+    if dep.Cache[key] then
+        return dep.Cache[key]
+    end
+    
+    return nil
 end
 
 Solution.Util.IncludeSubmodule = function(name, rootDir, binDir)
