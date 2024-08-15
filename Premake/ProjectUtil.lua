@@ -97,13 +97,23 @@ Solution.Util.CreateDepTable = function(name, dependencies)
     return dependency
 end
 
+Solution.Util.GetDepTable = function(depName)
+    local depInternalName = "Dependency-" .. depName
+    local dep = _G[depInternalName]
+    if (dep == nil) then
+        Solution.Util.PrintError("Tried to fetch undeclared dependency '" .. depName .. "'")
+    end
+    
+    return dep
+end
+
 -- Cache a value inside the dep table
-function Solution.Util.SetDepCache(dep, key, data)
+Solution.Util.SetDepCache = function(dep, key, data)
     dep.Cache[key] = data
 end
 
 -- Retrieve a cached value from the dep table, or return nil if not cached
-function Solution.Util.GetDepCache(dep, key)
+Solution.Util.GetDepCache = function(dep, key)
     if dep.Cache[key] then
         return dep.Cache[key]
     end
