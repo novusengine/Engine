@@ -5,7 +5,7 @@ Solution.Util.SetGroup(Solution.DependencyGroup)
 
 local dependencies =
 {
-    "vulkan.lua",
+    "vulkan/vulkan.lua",
     "base64/base64.lua",
     "catch2/catch2.lua",
     "dxcompiler/dxcompiler.lua",
