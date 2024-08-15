@@ -19,8 +19,6 @@ local function getVulkanInfo()
     
     if #libs == 0 or #includeDirs == 0 then
         Solution.Util.PrintError("Failed to find Vulkan SDK with system variable '" .. envName .. "'. Please ensure Vulkan is installed and configured properly")
-    else
-        print("Found Vulkan SDK at: "..table.unpack(includeDirs))
     end
     
     return includeDirs, libs
