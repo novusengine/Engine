@@ -35,6 +35,7 @@ jobs:
 
     - name: Run Premake
       run: |
+        export VULKAN_SDK=/usr/include/vulkan
         premake5 gmake2
 
     - name: Build
