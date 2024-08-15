@@ -2,23 +2,21 @@ local function getVulkanInfo()
     local envName = "VULKAN_SDK"
     local includeDirs = {}
     local libs = {}
-    
-    if os.target() == "windows" then
-        local vulkanSDK = os.getenv(envName)
-        if vulkanSDK then
-            table.insert(includeDirs, vulkanSDK .. "/include")
-            table.insert(libs, vulkanSDK .. "/lib/vulkan-1.lib")
-        end
-    else
-        local vulkanSDK = io.popen("echo $"..envName):read("*a"):gsub("\n", "")
-        if vulkanSDK ~= "" then
-            table.insert(includeDirs, vulkanSDK .. "/include")
-            table.insert(libs, "vulkan")
-        end
+
+    -- Check if environment variable exists
+    local vulkanSDK = os.getenv(envName)
+    if not vulkanSDK then
+        Solution.Util.PrintError("Failed to find Vulkan SDK with system variable '" .. envName .. "'. Please ensure Vulkan is installed and configured properly")
     end
     
-    if #libs == 0 or #includeDirs == 0 then
-        Solution.Util.PrintError("Failed to find Vulkan SDK with system variable '" .. envName .. "'. Please ensure Vulkan is installed and configured properly")
+    -- Add Includes path
+    table.insert(includeDirs, vulkanSDK .. "/include")
+    
+    -- Add Library
+    if os.target() == "windows" then
+        table.insert(libs, vulkanSDK .. "/lib/vulkan-1.lib")
+    else
+        table.insert(libs, "vulkan")
     end
     
     return includeDirs, libs
