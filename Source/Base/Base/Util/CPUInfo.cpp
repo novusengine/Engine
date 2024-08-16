@@ -4,13 +4,14 @@
 #ifdef _WIN32
 #include <limits.h>
 #include <intrin.h>
+#include <windows.h>
 #else
 #include <stdint.h>
+#include <unistd.h>
+//#include <hwloc.h>
 #endif
 
 using namespace std;
-
-#define MAX_INTEL_TOP_LVL 4
 
 class CPUID
 {
@@ -66,6 +67,7 @@ void CPUInfo::Print(i32 detailLevel)
         NC_LOG_INFO("[CPUInfo]: Supports SSE4.2: {0}", features.isSSE42 ? "yes" : "no");
         NC_LOG_INFO("[CPUInfo]: Supports AVX: {0}", features.isAVX ? "yes" : "no");
         NC_LOG_INFO("[CPUInfo]: Supports AVX2: {0}", features.isAVX2 ? "yes" : "no");
+        NC_LOG_INFO("[CPUInfo]: Supports AVX512F: {0}", features.isAVX512F ? "yes" : "no");
     }
 }
 
@@ -97,87 +99,71 @@ CPUInfo::CPUInfo()
     // Get AVX2 instructions availability
     CPUID cpuID7(7, 0);
     features.isAVX2 = cpuID7.EBX() & AVX2_POS;
+    features.isAVX512F = cpuID7.EBX() & AVX512F_POS;
 
     string upVId = _vendorId;
     for_each(upVId.begin(), upVId.end(), [](char& in)
     {
         in = ::toupper(in);
     });
+    
+    // get physical and logical core information
+#ifdef _WIN32
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
 
-    // Get num of cores
-    if (upVId.find("INTEL") != std::string::npos)
+    DWORD bufferSize = 0;
+    GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &bufferSize);
+    std::vector<uint8_t> buffer(bufferSize);
+    GetLogicalProcessorInformationEx(RelationProcessorCore, reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data()), &bufferSize);
+
+    i32 num_physical_cores = 0;
+    auto* ptr = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data());
+    while (bufferSize > 0)
     {
-        if (HFS >= 11)
+        if (ptr->Relationship == RelationProcessorCore)
         {
-            for (i32 lvl = 0; lvl < MAX_INTEL_TOP_LVL; ++lvl)
-            {
-                CPUID cpuID4(0x0B, lvl);
-                u32 currLevel = (LVL_TYPE & cpuID4.ECX()) >> 8;
-
-                switch (currLevel)
-                {
-                    case 0x01: _numThreadsPerCore = LVL_CORES & cpuID4.EBX(); break;
-                    case 0x02: _numThreads = LVL_CORES & cpuID4.EBX(); break;
-                    default: break;
-                }
-            }
-            _numCores = _numThreads / _numThreadsPerCore;
+            ++num_physical_cores;
         }
-        else
-        {
-            if (HFS >= 1)
-            {
-                _numThreads = (cpuID1.EBX() >> 16) & 0xFF;
-                if (HFS >= 4)
-                {
-                    _numCores = 1 + (CPUID(4, 0).EAX() >> 26) & 0x3F;
-                }
-            }
-            if (features.isHTT)
-            {
-                if (!(_numCores > 1))
-                {
-                    _numCores = 1;
-                    _numThreads = (_numThreads >= 2 ? _numThreads : 2);
-                }
-            }
-            else
-            {
-                _numCores = _numThreads = 1;
-            }
-        }
+        bufferSize -= ptr->Size;
+        ptr = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(reinterpret_cast<uint8_t*>(ptr) + ptr->Size);
     }
-    else if (upVId.find("AMD") != std::string::npos)
+
+    // set physical cores
+    _numCores = num_physical_cores;
+
+    // set logical cores
+    _numThreads = static_cast<i32>(sysinfo.dwNumberOfProcessors);
+#else
+    // init hwloc topology
+    //hwloc_topology_t topology;
+    //hwloc_topology_init(&topology);
+    //hwloc_topology_load(topology);
+
+    // get the number of physical cores
+    //i32 num_physical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_CORE);
+
+    // get the number of logical cores
+    //i32 num_logical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
+
+    // deinit hwloc
+    //hwloc_topology_destroy(topology);
+    
+    // set physical cores
+    _numCores = sysconf(_SC_NPROCESSORS_ONLN); //num_physical_cores;
+    // set logical cores
+    _numThreads = sysconf(_SC_NPROCESSORS_CONF); //num_logical_cores;
+#endif
+
+    // if set the amount of threads per core
+    if (_numThreads > _numCores)
     {
-        if (HFS >= 1)
-        {
-            _numThreads = (cpuID1.EBX() >> 16) & 0xFF;
-            if (CPUID(0x80000000, 0).EAX() >= 8)
-            {
-                _numCores = 1 + (CPUID(0x80000008, 0).ECX() & 0xFF);
-            }
-        }
-        if (features.isHTT)
-        {
-            if (!(_numCores > 1))
-            {
-                _numCores = 1;
-                _numThreads = (_numThreads >= 2 ? _numThreads : 2);
-            }
-            else
-            {
-                _numThreadsPerCore = 2;
-                _numCores = _numThreads / _numThreadsPerCore;
-            }
-        }
-        else
-        {
-            _numCores = _numThreads = 1;
-        }
+        _numThreadsPerCore = _numThreads / _numCores;
+        features.isHTT = 1;
     }
     else
     {
-        //NC_LOG_CRITICAL("Unexpected vendor id ({0})", upVId.c_str());
+        _numThreadsPerCore = 1;
     }
 
     // Get processor brand string
