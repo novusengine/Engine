@@ -1,63 +1,14 @@
-local function populateDepCache(dep)
-    local cachedData = Solution.Util.GetDepCache(dep, "cache")
-    
-    if not cachedData then
-        -- static library only uses libDefine, dependency uses both libDefine and depDefine
-        local libDefine = { "_CRT_SECURE_NO_WARNINGS" }
-        local depDefine = { "GLFW_INCLUDE_VULKAN" }
-        local link = {}
-        
-        if os.target() == "windows" then
-            -- add win32 defines
-            Solution.Util.MergeIntoTable(libDefine, { "_GLFW_WIN32" })
-            Solution.Util.MergeIntoTable(depDefine, { "GLFW_EXPOSE_NATIVE_WIN32" })
-        else
-            local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
-            if(useXorg) then
-                -- add x11 defines and libraries
-                Solution.Util.MergeIntoTable(libDefine, { "_GLFW_X11" })
-                Solution.Util.MergeIntoTable(depDefine, { "GLFW_EXPOSE_NATIVE_X11" })
-                Solution.Util.MergeIntoTable(link, { "X11" })
-            end
-            
-            if(useWayland and not useXorg) then
-                -- add wayland defines and libraries
-                Solution.Util.MergeIntoTable(libDefine, { "_GLFW_WAYLAND" })
-                Solution.Util.MergeIntoTable(depDefine, { "GLFW_EXPOSE_NATIVE_WAYLAND" })
-                Solution.Util.MergeIntoTable(link, { "wayland-dev" })
-            end
-            
-            Solution.Util.MergeIntoTable(link, { "pthread" })
-        end
-        cachedData = { libDefines = libDefine, depDefines = depDefine, links = link }
-        Solution.Util.SetDepCache(dep, "cache", cachedData)
-    end
-    
-    return cachedData
-end
-
 local dep = Solution.Util.CreateDepTable("Glfw", {})
 
 Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
     Solution.Util.SetLanguage("C++")
     Solution.Util.SetCppDialect(20)
 
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
-    local links = {}
-
-    -- either get or generate cached defines and links
-    local cachedData = Solution.Util.GetDepCache(dep, "cache")
-    if not cachedData then
-        cachedData = populateDepCache(dep)
-    end
-    
-    -- merge cached data into local tables
-    Solution.Util.MergeIntoTable(defines, cachedData.libDefines)
-    Solution.Util.MergeIntoTable(links, cachedData.links)
-
-    -- gather generic and platform specific source files
     local sourceDir = dep.Path .. "/src"
     local includeDir = dep.Path .. "/include"
+    
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "_CRT_SECURE_NO_WARNINGS" }
+    local links = {}
     local files =
     {
         includeDir .. "/GLFW/glfw3.h",
@@ -100,7 +51,8 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
             sourceDir .. "/wgl_context.c",
         }
         Solution.Util.MergeIntoTable(files, platformFiles)
-    else -- Linux
+        Solution.Util.MergeIntoTable(defines, { "_GLFW_WIN32" } )
+    else
         local platformFiles =
         {
             sourceDir .. "/posix_module.c",
@@ -112,6 +64,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
             sourceDir .. "/xkb_unicode.c",
         }
         Solution.Util.MergeIntoTable(files, platformFiles)
+        Solution.Util.MergeIntoTable(links, { "pthread" })
         
         local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
         if(useXorg) then
@@ -124,6 +77,8 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
                 sourceDir .. "/x11_window.c",
             }
             Solution.Util.MergeIntoTable(files, platformFiles)
+            Solution.Util.MergeIntoTable(defines, { "_GLFW_X11" } )
+            Solution.Util.MergeIntoTable(links, { "X11" } )
         end
         
         if(useWayland and not useXorg) then
@@ -136,26 +91,62 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
                 sourceDir .. "/wl_window.c",
             }
             Solution.Util.MergeIntoTable(files, platformFiles)
+            Solution.Util.MergeIntoTable(defines, { "_GLFW_WAYLAND" } )
+            Solution.Util.MergeIntoTable(links, { "wayland-dev" } )
         end
     end
-
-    -- set library data
+    
     Solution.Util.SetDefines(defines)
     Solution.Util.SetLinks(links)
     Solution.Util.SetFiles(files)
     Solution.Util.SetIncludes(dep.Path)
 end)
 
-Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
-    -- get cache from parent dependency table
+local function populateDepCache(dep)
     local cachedData = Solution.Util.GetDepCache(dep, "cache")
+    
     if not cachedData then
-        cachedData = populateDepCache(dep)
+        local def = { "GLFW_INCLUDE_VULKAN", "_CRT_SECURE_NO_WARNINGS" }
+        local link = {}
+        
+        if os.target() == "windows" then
+            -- add win32 defines
+            Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WIN32", "_GLFW_WIN32" })
+        else
+            local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
+            if(useXorg) then
+                -- add x11 defines and libraries
+                Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_X11", "_GLFW_X11" })
+                Solution.Util.MergeIntoTable(link, { "X11" })
+            end
+            
+            if(useWayland and not useXorg) then
+                -- add wayland defines and libraries
+                Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WAYLAND", "_GLFW_WAYLAND" })
+                Solution.Util.MergeIntoTable(link, { "wayland-dev" })
+            end
+            
+            Solution.Util.MergeIntoTable(link, { "pthread" })
+        end
+        cachedData = { defines = def, links = link }
+        Solution.Util.SetDepCache(dep, "cache", cachedData)
     end
+    
+    return cachedData
+end
 
-    -- set dependency data
-    local libDefines, depDefines, links = cachedData.libDefines, cachedData.depDefines, cachedData.links
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    -- get our own internal dependency table, and not the parent one
+    local depTable = Solution.Util.GetDepTable(dep.NameLow)
+    
+    -- get our own local cache
+    local cachedData = Solution.Util.GetDepCache(depTable, "cache")
+    if not cachedData then
+        cachedData = populateDepCache(depTable)
+    end
+    
+    local defines, links = cachedData.defines, cachedData.links
     Solution.Util.SetIncludes(dep.Path .. "/include")
     Solution.Util.SetLinks({ dep.Name, links })
-    Solution.Util.SetDefines({ libDefines, depDefines })
+    Solution.Util.SetDefines(defines)
 end)
