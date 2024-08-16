@@ -52,6 +52,8 @@ CPUInfo& CPUInfo::Get()
 
 void CPUInfo::Print(i32 detailLevel)
 {
+    NC_LOG_INFO("[CPUInfo]: Physical cores: {0}", _numCores);
+    NC_LOG_INFO("[CPUInfo]: Logical cores: {0}", _numThreads);
     if (detailLevel > 0)
     {
         NC_LOG_INFO("[CPUInfo]: {0}", _prettyName);
