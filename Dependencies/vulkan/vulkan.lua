@@ -24,14 +24,14 @@ end
 local dep = Solution.Util.CreateDepTable("vulkan", {})
 
 Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
-    local cachedData = Solution.Util.GetDepCache(dep, "cache")
+    local cachedData = Solution.Util.GetDepCache(dep.Name, "cache")
 
     local includeDirs, libs
     if cachedData then
         includeDirs, libs = cachedData.includes, cachedData.libs
     else
         includeDirs, libs = getVulkanInfo()
-        Solution.Util.SetDepCache(dep, "cache", { includes = includeDirs, libs = libs })
+        Solution.Util.SetDepCache(dep.Name, "cache", { includes = includeDirs, libs = libs })
     end
 
     Solution.Util.SetIncludes(includeDirs)

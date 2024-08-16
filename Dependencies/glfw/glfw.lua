@@ -102,8 +102,8 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     Solution.Util.SetIncludes(dep.Path)
 end)
 
-local function populateDepCache(dep)
-    local cachedData = Solution.Util.GetDepCache(dep, "cache")
+local function populateDepCache(depName)
+    local cachedData = Solution.Util.GetDepCache(depName, "cache")
     
     if not cachedData then
         local def = { "GLFW_INCLUDE_VULKAN", "_CRT_SECURE_NO_WARNINGS" }
@@ -129,20 +129,17 @@ local function populateDepCache(dep)
             Solution.Util.MergeIntoTable(link, { "pthread" })
         end
         cachedData = { defines = def, links = link }
-        Solution.Util.SetDepCache(dep, "cache", cachedData)
+        Solution.Util.SetDepCache(depName, "cache", cachedData)
     end
     
     return cachedData
 end
 
 Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
-    -- get our own internal dependency table, and not the parent one
-    local depTable = Solution.Util.GetDepTable(dep.NameLow)
-    
     -- get our own local cache
-    local cachedData = Solution.Util.GetDepCache(depTable, "cache")
+    local cachedData = Solution.Util.GetDepCache(dep.NameLow, "cache")
     if not cachedData then
-        cachedData = populateDepCache(depTable)
+        cachedData = populateDepCache(dep.NameLow)
     end
     
     local defines, links = cachedData.defines, cachedData.links
