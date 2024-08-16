@@ -1,14 +1,14 @@
 local dep = Solution.Util.CreateDepTable("Glfw", {})
 
 Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "_CRT_SECURE_NO_WARNINGS" }
-
     Solution.Util.SetLanguage("C++")
     Solution.Util.SetCppDialect(20)
 
     local sourceDir = dep.Path .. "/src"
     local includeDir = dep.Path .. "/include"
-
+    
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "_CRT_SECURE_NO_WARNINGS" }
+    local links = {}
     local files =
     {
         includeDir .. "/GLFW/glfw3.h",
@@ -34,12 +34,9 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         sourceDir .. "/null_window.c",
         sourceDir .. "/null_joystick.c",
     }
-    Solution.Util.SetFiles(files)
-    Solution.Util.SetIncludes(dep.Path)
-    Solution.Util.SetDefines(defines)
 
-    Solution.Util.SetFilter("platforms:Win64", function()
-        local files =
+    if os.target() == "windows" then
+        local platformFiles =
         {
             sourceDir .. "/win32_thread.h",
             sourceDir .. "/win32_time.h",
@@ -53,32 +50,25 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
             sourceDir .. "/win32_window.c",
             sourceDir .. "/wgl_context.c",
         }
-        
-        Solution.Util.SetFiles(files)
-        Solution.Util.SetDefines({ "_GLFW_WIN32" })
-    end)
-
-    Solution.Util.SetFilter("system:linux", function()
-        local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
-        
-        local files =
+        Solution.Util.MergeIntoTable(files, platformFiles)
+        Solution.Util.MergeIntoTable(defines, { "_GLFW_WIN32" } )
+    else
+        local platformFiles =
         {
-
             sourceDir .. "/posix_module.c",
             sourceDir .. "/posix_poll.c",
-
             sourceDir .. "/posix_time.c",
             sourceDir .. "/posix_thread.c",
             sourceDir .. "/glx_context.c",
             sourceDir .. "/linux_joystick.c",
             sourceDir .. "/xkb_unicode.c",
         }
+        Solution.Util.MergeIntoTable(files, platformFiles)
+        Solution.Util.MergeIntoTable(links, { "pthread" })
         
-        Solution.Util.SetFiles(files)
-        Solution.Util.SetLinks({ "pthread" })
-        
+        local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
         if(useXorg) then
-            local files = 
+            local platformFiles = 
             {
                 sourceDir .. "/x11_platform.h",
                 
@@ -86,13 +76,13 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
                 sourceDir .. "/x11_monitor.c",
                 sourceDir .. "/x11_window.c",
             }
-            Solution.Util.SetFiles(files)
-            Solution.Util.SetDefines({ "_GLFW_X11" })
-            Solution.Util.SetLinks({ "X11" })
+            Solution.Util.MergeIntoTable(files, platformFiles)
+            Solution.Util.MergeIntoTable(defines, { "_GLFW_X11" } )
+            Solution.Util.MergeIntoTable(links, { "X11" } )
         end
         
         if(useWayland and not useXorg) then
-            local files = 
+            local platformFiles = 
             {
                 sourceDir .. "/wl_platform.h",
                 
@@ -100,35 +90,63 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
                 sourceDir .. "/wl_monitor.c",
                 sourceDir .. "/wl_window.c",
             }
-            Solution.Util.SetFiles(files)
-            Solution.Util.SetDefines({ "_GLFW_WAYLAND" })
-            Solution.Util.SetLinks({ "wayland-dev" })
+            Solution.Util.MergeIntoTable(files, platformFiles)
+            Solution.Util.MergeIntoTable(defines, { "_GLFW_WAYLAND" } )
+            Solution.Util.MergeIntoTable(links, { "wayland-dev" } )
         end
-    end)
+    end
+    
+    Solution.Util.SetDefines(defines)
+    Solution.Util.SetLinks(links)
+    Solution.Util.SetFiles(files)
+    Solution.Util.SetIncludes(dep.Path)
 end)
 
-Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
-    Solution.Util.SetIncludes(dep.Path .. "/include")
-    Solution.Util.SetLinks(dep.Name)
-    Solution.Util.SetDefines({ "_CRT_SECURE_NO_WARNINGS", "GLFW_INCLUDE_VULKAN" })
+local function populateDepCache(dep)
+    local cachedData = Solution.Util.GetDepCache(dep, "cache")
     
-    Solution.Util.SetFilter("platforms:Win64", function()
-        Solution.Util.SetDefines({ "_GLFW_WIN32", "GLFW_EXPOSE_NATIVE_WIN32" })
-    end)
+    if not cachedData then
+        local def = { "GLFW_INCLUDE_VULKAN", "_CRT_SECURE_NO_WARNINGS" }
+        local link = {}
+        
+        if os.target() == "windows" then
+            -- add win32 defines
+            Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WIN32", "_GLFW_WIN32" })
+        else
+            local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
+            if(useXorg) then
+                -- add x11 defines and libraries
+                Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_X11", "_GLFW_X11" })
+                Solution.Util.MergeIntoTable(link, { "X11" })
+            end
+            
+            if(useWayland and not useXorg) then
+                -- add wayland defines and libraries
+                Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WAYLAND", "_GLFW_WAYLAND" })
+                Solution.Util.MergeIntoTable(link, { "wayland-dev" })
+            end
+            
+            Solution.Util.MergeIntoTable(link, { "pthread" })
+        end
+        cachedData = { defines = def, links = link }
+        Solution.Util.SetDepCache(dep, "cache", cachedData)
+    end
+    
+    return cachedData
+end
 
-    Solution.Util.SetFilter("system:linux", function()
-        local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
-        
-        if(useXorg) then
-            Solution.Util.SetDefines({ "_GLFW_X11", "GLFW_EXPOSE_NATIVE_X11" })
-            Solution.Util.SetLinks({ "X11" })
-        end
-        
-        if(useWayland and not useXorg) then
-            Solution.Util.SetDefines({ "_GLFW_WAYLAND", "GLFW_EXPOSE_NATIVE_WAYLAND" })
-            Solution.Util.SetLinks({ "wayland-dev" })
-        end
-        
-        Solution.Util.SetLinks({ "pthread" })
-    end)
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    -- get our own internal dependency table, and not the parent one
+    local depTable = Solution.Util.GetDepTable(dep.NameLow)
+    
+    -- get our own local cache
+    local cachedData = Solution.Util.GetDepCache(depTable, "cache")
+    if not cachedData then
+        cachedData = populateDepCache(depTable)
+    end
+    
+    local defines, links = cachedData.defines, cachedData.links
+    Solution.Util.SetIncludes(dep.Path .. "/include")
+    Solution.Util.SetLinks({ dep.Name, links })
+    Solution.Util.SetDefines(defines)
 end)

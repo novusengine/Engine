@@ -88,13 +88,37 @@ Solution.Util.CreateModuleTable = function(name, dependencies)
 end
 
 Solution.Util.CreateDepTable = function(name, dependencies)
-    local dependency = { Name = name }
+    local dependency = { Name = name, Cache = {} }
 
     dependency.NameLow = string.lower(dependency.Name)
     dependency.Path = path.getabsolute(dependency.NameLow .. "/", Solution.Projects.Current.DependencyDir)
     dependency.Dependencies = dependencies
 
     return dependency
+end
+
+Solution.Util.GetDepTable = function(depName)
+    local depInternalName = "Dependency-" .. depName
+    local dep = _G[depInternalName]
+    if (dep == nil) then
+        Solution.Util.PrintError("Tried to fetch undeclared dependency '" .. depName .. "'")
+    end
+    
+    return dep
+end
+
+-- Cache a value inside the dep table
+Solution.Util.SetDepCache = function(dep, key, data)
+    dep.Cache[key] = data
+end
+
+-- Retrieve a cached value from the dep table, or return nil if not cached
+Solution.Util.GetDepCache = function(dep, key)
+    if dep.Cache[key] then
+        return dep.Cache[key]
+    end
+    
+    return nil
 end
 
 Solution.Util.IncludeSubmodule = function(name, rootDir, binDir)
@@ -295,7 +319,8 @@ Solution.Util.CreateDep = function(name, dependencies, callback)
     local dependencyTable = 
     {
         Callback = callback,
-        Dependencies = dependencies
+        Dependencies = dependencies,
+        Cache = {}
     }
 
     _G[internalName] = dependencyTable
@@ -404,6 +429,12 @@ end
 
 Solution.Util.ClearFilter = function()
     filter { }
+end
+
+Solution.Util.MergeIntoTable = function(t, x)
+    for _, v in pairs(x) do
+        table.insert(t, v)
+    end
 end
 
 if InitBuildSettings == nil then
