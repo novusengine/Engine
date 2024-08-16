@@ -115,8 +115,7 @@ local function populateDepCache(dep)
         
         if os.target() == "windows" then
             -- add win32 defines
-            Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WIN32" })
-            Solution.Util.MergeIntoTable(link, { "_GLFW_WIN32" })
+            Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WIN32", "_GLFW_WIN32" })
         else
             local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
             if(useXorg) then
