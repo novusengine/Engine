@@ -7,8 +7,7 @@
 #include <windows.h>
 #else
 #include <stdint.h>
-#include <unistd.h>
-//#include <hwloc.h>
+#include <hwloc.h>
 #endif
 
 using namespace std;
@@ -138,23 +137,23 @@ CPUInfo::CPUInfo()
     _numThreads = static_cast<i32>(sysinfo.dwNumberOfProcessors);
 #else
     // init hwloc topology
-    //hwloc_topology_t topology;
-    //hwloc_topology_init(&topology);
-    //hwloc_topology_load(topology);
+    hwloc_topology_t topology;
+    hwloc_topology_init(&topology);
+    hwloc_topology_load(topology);
 
     // get the number of physical cores
-    //i32 num_physical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_CORE);
+    i32 num_physical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_CORE);
 
     // get the number of logical cores
-    //i32 num_logical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
+    i32 num_logical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
 
     // deinit hwloc
-    //hwloc_topology_destroy(topology);
+    hwloc_topology_destroy(topology);
     
     // set physical cores
-    _numCores = sysconf(_SC_NPROCESSORS_ONLN); //num_physical_cores;
+    _numCores = num_physical_cores;
     // set logical cores
-    _numThreads = sysconf(_SC_NPROCESSORS_CONF); //num_logical_cores;
+    _numThreads = num_logical_cores;
 #endif
 
     // if set the amount of threads per core
