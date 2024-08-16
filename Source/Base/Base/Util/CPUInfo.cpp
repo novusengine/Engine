@@ -118,20 +118,20 @@ CPUInfo::CPUInfo()
     std::vector<uint8_t> buffer(bufferSize);
     GetLogicalProcessorInformationEx(RelationProcessorCore, reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data()), &bufferSize);
 
-    i32 num_physical_cores = 0;
+    i32 numPhysicalCores = 0;
     auto* ptr = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data());
     while (bufferSize > 0)
     {
         if (ptr->Relationship == RelationProcessorCore)
         {
-            ++num_physical_cores;
+            ++numPhysicalCores;
         }
         bufferSize -= ptr->Size;
         ptr = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(reinterpret_cast<uint8_t*>(ptr) + ptr->Size);
     }
 
     // set physical cores
-    _numCores = num_physical_cores;
+    _numCores = numPhysicalCores;
 
     // set logical cores
     _numThreads = static_cast<i32>(sysinfo.dwNumberOfProcessors);
@@ -142,18 +142,18 @@ CPUInfo::CPUInfo()
     hwloc_topology_load(topology);
 
     // get the number of physical cores
-    i32 num_physical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_CORE);
+    i32 numPhysicalCores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_CORE);
 
     // get the number of logical cores
-    i32 num_logical_cores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
+    i32 numLogicalCores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
 
     // deinit hwloc
     hwloc_topology_destroy(topology);
     
     // set physical cores
-    _numCores = num_physical_cores;
+    _numCores = numPhysicalCores;
     // set logical cores
-    _numThreads = num_logical_cores;
+    _numThreads = numLogicalCores;
 #endif
 
     // if set the amount of threads per core
