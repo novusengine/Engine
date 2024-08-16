@@ -319,7 +319,8 @@ Solution.Util.CreateDep = function(name, dependencies, callback)
     local dependencyTable = 
     {
         Callback = callback,
-        Dependencies = dependencies
+        Dependencies = dependencies,
+        Cache = {}
     }
 
     _G[internalName] = dependencyTable

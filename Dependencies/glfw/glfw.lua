@@ -63,7 +63,6 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         
         local files =
         {
-
             sourceDir .. "/posix_module.c",
             sourceDir .. "/posix_poll.c",
 
@@ -107,28 +106,55 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     end)
 end)
 
-Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
-    Solution.Util.SetIncludes(dep.Path .. "/include")
-    Solution.Util.SetLinks(dep.Name)
-    Solution.Util.SetDefines({ "_CRT_SECURE_NO_WARNINGS", "GLFW_INCLUDE_VULKAN" })
+local function populateDepCache(dep)
+    local cachedData = Solution.Util.GetDepCache(dep, "cache")
     
-    Solution.Util.SetFilter("platforms:Win64", function()
-        Solution.Util.SetDefines({ "_GLFW_WIN32", "GLFW_EXPOSE_NATIVE_WIN32" })
-    end)
+    if not cachedData then
+        local def = { "GLFW_INCLUDE_VULKAN", "_CRT_SECURE_NO_WARNINGS" }
+        local link = {}
+        
+        if os.target() == "windows" then
+            -- add win32 defines
+            table.insert(def, "GLFW_EXPOSE_NATIVE_WIN32")
+            table.insert(def, "_GLFW_WIN32")
+        else
+            local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
+            
+            if(useXorg) then
+                -- add x11 defines and libraries
+                table.insert(def, "GLFW_EXPOSE_NATIVE_X11")
+                table.insert(def, "_GLFW_X11")
+                table.insert(link, "X11")
+            end
+            
+            if(useWayland and not useXorg) then
+                -- add wayland defines and libraries
+                table.insert(def, "GLFW_EXPOSE_NATIVE_WAYLAND")
+                table.insert(def, "_GLFW_WAYLAND")
+                table.insert(link, "wayland-dev")
+            end
+            
+            table.insert(link, "pthread")
+        end
+        cachedData = { defines = def, links = link }
+        Solution.Util.SetDepCache(dep, "cache", cachedData)
+    end
+    
+    return cachedData
+end
 
-    Solution.Util.SetFilter("system:linux", function()
-        local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
-        
-        if(useXorg) then
-            Solution.Util.SetDefines({ "_GLFW_X11", "GLFW_EXPOSE_NATIVE_X11" })
-            Solution.Util.SetLinks({ "X11" })
-        end
-        
-        if(useWayland and not useXorg) then
-            Solution.Util.SetDefines({ "_GLFW_WAYLAND", "GLFW_EXPOSE_NATIVE_WAYLAND" })
-            Solution.Util.SetLinks({ "wayland-dev" })
-        end
-        
-        Solution.Util.SetLinks({ "pthread" })
-    end)
+Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+    -- get our own internal dependency table, and not the parent one
+    local self = Solution.Util.GetDepTable(dep.NameLow)
+    
+    -- get our own local cache
+    local cachedData = Solution.Util.GetDepCache(self, "cache")
+    if not cachedData then
+        cachedData = populateDepCache(self)
+    end
+    
+    local defines, links = cachedData.defines, cachedData.links
+    Solution.Util.SetIncludes(dep.Path .. "/include")
+    Solution.Util.SetLinks({ dep.Name, links })
+    Solution.Util.SetDefines(defines)
 end)
