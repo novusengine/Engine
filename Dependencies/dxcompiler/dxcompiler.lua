@@ -10,7 +10,6 @@ Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
         libPath = iif(os.istarget("windows"), dep.Path .. "/lib/windows", dep.Path .. "/lib/linux")
         lib = iif(os.istarget("windows"), libPath .. "/dxcompiler.lib", libPath .. "/dxcompiler")
         Solution.Util.SetDepCache(dep.Name, "cache", { libPaths = libPath, libs = lib })
-        print(Solution.Util.GetDepCache(dep.Name, "cache"))
     end
     
     Solution.Util.SetLibDirs(libPath)
