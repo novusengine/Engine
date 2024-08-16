@@ -115,26 +115,23 @@ local function populateDepCache(dep)
         
         if os.target() == "windows" then
             -- add win32 defines
-            table.insert(def, "GLFW_EXPOSE_NATIVE_WIN32")
-            table.insert(def, "_GLFW_WIN32")
+            Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WIN32" })
+            Solution.Util.MergeIntoTable(link, { "_GLFW_WIN32" })
         else
             local useXorg, useWayland = BuildSettings:Get("Using X11"), BuildSettings:Get("Using Wayland")
-            
             if(useXorg) then
                 -- add x11 defines and libraries
-                table.insert(def, "GLFW_EXPOSE_NATIVE_X11")
-                table.insert(def, "_GLFW_X11")
-                table.insert(link, "X11")
+                Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_X11", "_GLFW_X11" })
+                Solution.Util.MergeIntoTable(link, { "X11" })
             end
             
             if(useWayland and not useXorg) then
                 -- add wayland defines and libraries
-                table.insert(def, "GLFW_EXPOSE_NATIVE_WAYLAND")
-                table.insert(def, "_GLFW_WAYLAND")
-                table.insert(link, "wayland-dev")
+                Solution.Util.MergeIntoTable(def, { "GLFW_EXPOSE_NATIVE_WAYLAND", "_GLFW_WAYLAND" })
+                Solution.Util.MergeIntoTable(link, { "wayland-dev" })
             end
             
-            table.insert(link, "pthread")
+            Solution.Util.MergeIntoTable(link, { "pthread" })
         end
         cachedData = { defines = def, links = link }
         Solution.Util.SetDepCache(dep, "cache", cachedData)

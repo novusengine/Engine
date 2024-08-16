@@ -431,6 +431,12 @@ Solution.Util.ClearFilter = function()
     filter { }
 end
 
+Solution.Util.MergeIntoTable = function(t, x)
+    for _, v in pairs(x) do
+        table.insert(t, v)
+    end
+end
+
 if InitBuildSettings == nil then
     function InitBuildSettings(silentFailOnDuplicateSetting)
         if BuildSettings == nil then
