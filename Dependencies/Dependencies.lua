@@ -23,7 +23,8 @@ local dependencies =
     "utfcpp/utfcpp.lua",
     "luau/luau.lua",
     "quill/quill.lua",
-    "asio/asio.lua"
+    "asio/asio.lua",
+    "hwloc/hwloc.lua"
 }
 
 for k,v in pairs(dependencies) do

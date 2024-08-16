@@ -23,7 +23,7 @@ jobs:
 
 #    - name: Install dependencies
 #      run: |
-#        sudo apt-get update && sudo apt-get install -yq clang libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libvulkan-dev
+#        sudo apt-get update && sudo apt-get install -yq clang libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libvulkan-dev hwloc libhwloc-dev
 #        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100
 
 #    - name: Install Vulkan SDK
