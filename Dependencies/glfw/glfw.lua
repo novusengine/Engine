@@ -42,11 +42,22 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     Solution.Util.SetLanguage("C++")
     Solution.Util.SetCppDialect(20)
 
-    local sourceDir = dep.Path .. "/src"
-    local includeDir = dep.Path .. "/include"
-
     local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
     local links = {}
+
+    -- either get or generate cached defines and links
+    local cachedData = Solution.Util.GetDepCache(dep, "cache")
+    if not cachedData then
+        cachedData = populateDepCache(dep)
+    end
+    
+    -- merge cached data into local tables
+    Solution.Util.MergeIntoTable(defines, cachedData.libDefines)
+    Solution.Util.MergeIntoTable(links, cachedData.links)
+
+    -- gather generic and platform specific source files
+    local sourceDir = dep.Path .. "/src"
+    local includeDir = dep.Path .. "/include"
     local files =
     {
         includeDir .. "/GLFW/glfw3.h",
@@ -89,12 +100,11 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
             sourceDir .. "/wgl_context.c",
         }
         Solution.Util.MergeIntoTable(files, platformFiles)
-    else
+    else -- Linux
         local platformFiles =
         {
             sourceDir .. "/posix_module.c",
             sourceDir .. "/posix_poll.c",
-
             sourceDir .. "/posix_time.c",
             sourceDir .. "/posix_thread.c",
             sourceDir .. "/glx_context.c",
@@ -128,17 +138,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
             Solution.Util.MergeIntoTable(files, platformFiles)
         end
     end
-    
-    -- either get or generate cached defines and links
-    local cachedData = Solution.Util.GetDepCache(dep, "cache")
-    if not cachedData then
-        cachedData = populateDepCache(dep)
-    end
-    
-    -- merge cache data into local tables
-    Solution.Util.MergeIntoTable(defines, cachedData.libDefines)
-    Solution.Util.MergeIntoTable(links, cachedData.links)
-    
+
     -- set library data
     Solution.Util.SetDefines(defines)
     Solution.Util.SetLinks(links)
@@ -152,7 +152,8 @@ Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
     if not cachedData then
         cachedData = populateDepCache(dep)
     end
-    
+
+    -- set dependency data
     local libDefines, depDefines, links = cachedData.libDefines, cachedData.depDefines, cachedData.links
     Solution.Util.SetIncludes(dep.Path .. "/include")
     Solution.Util.SetLinks({ dep.Name, links })
