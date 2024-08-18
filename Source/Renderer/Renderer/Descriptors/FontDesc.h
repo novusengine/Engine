@@ -8,7 +8,7 @@ namespace Renderer
     struct FontDesc
     {
         std::string path = "";
-        float size = 0.0f;
-        int padding = 3;
+        f32 size = 0.0f;
+        i32 padding = 5;
     };
 }

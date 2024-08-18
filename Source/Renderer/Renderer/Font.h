@@ -26,15 +26,21 @@ namespace Renderer
 
     struct Font
     {
-        static constexpr char* FALLBACK_FONT_PATH = (char*)"Data/fonts/Ubuntu/Ubuntu-Regular.ttf";
+        static constexpr char* FALLBACK_FONT_PATH = (char*)"Data/Fonts/Ubuntu-Regular.ttf";
 
         FontDesc desc;
 
         stbtt_fontinfo* fontInfo;
-        float scale;
+        
+        f32 scale;
+        i32 ascent;
+        i32 descent;
+        i32 lineGap;
+        f32 spaceGap;
 
         FontChar& GetChar(u32 character);
         TextureArrayID GetTextureArray();
+        vec2 CalculateTextSize(const std::string& text);
 
         static Font* GetDefaultFont(Renderer* renderer, f32 fontSize);
         static Font* GetFont(Renderer* renderer, const std::string& fontPath, f32 fontSize);

@@ -9,6 +9,7 @@
 #include <Base/Util/DebugHandler.h>
 
 #include <filesystem>
+#include <utfcpp/utf8.h>
 
 #undef CreateFont
 
@@ -84,7 +85,7 @@ namespace Renderer
 
     bool Font::InitChar(u32 character, FontChar& fontChar)
     {
-        fontChar.data = stbtt_GetCodepointSDF(fontInfo, scale, character, desc.padding, 128, 64.0f, &fontChar.width, &fontChar.height, &fontChar.xOffset, &fontChar.yOffset);
+        fontChar.data = stbtt_GetCodepointSDF(fontInfo, scale, character, desc.padding, 180, 36.0f, &fontChar.width, &fontChar.height, &fontChar.xOffset, &fontChar.yOffset);
 
         if (fontChar.width == 0 && fontChar.height == 0)
             return false;
@@ -117,6 +118,8 @@ namespace Renderer
 
         font->scale = stbtt_ScaleForPixelHeight(font->fontInfo, fontSize);
 
+        stbtt_GetFontVMetrics(font->fontInfo, &font->ascent, &font->descent, &font->lineGap);
+
         // Create texture array
         TextureArrayDesc desc;
         desc.size = 4096;
@@ -133,11 +136,41 @@ namespace Renderer
             }
         }
 
+        // Get the space gap
+        int advance;
+        stbtt_GetCodepointHMetrics(font->fontInfo, ' ', &advance, NULL);
+        font->spaceGap = advance * font->scale;
+
         return font;
     }
 
     TextureArrayID Font::GetTextureArray()
     {
         return _textureArray;
+    }
+
+    vec2 Font::CalculateTextSize(const std::string& text)
+    {
+        utf8::iterator it(text.begin(), text.begin(), text.end());
+        utf8::iterator endIt(text.end(), text.begin(), text.end());
+
+        vec2 size = vec2(0, 0);
+        for (; it != endIt; it++)
+        {
+            u32 c = *it;
+
+            if (c == ' ')
+            {
+                size.x += spaceGap;
+                continue;
+            }
+
+            FontChar& fontChar = GetChar(c);
+
+            size.x += fontChar.advance;
+            size.y = std::max(size.y, static_cast<f32>(fontChar.height));
+        }
+
+        return size;
     }
 }
