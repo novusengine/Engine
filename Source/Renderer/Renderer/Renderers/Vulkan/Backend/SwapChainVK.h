@@ -126,7 +126,7 @@ namespace Renderer
             VkSurfaceKHR surface;
             VkSwapchainKHR swapChain;
 
-            inline static const u32 FRAME_BUFFER_COUNT = 2;
+            static const u32 FRAME_BUFFER_COUNT = 2;
             FrameResource<ImageID, FRAME_BUFFER_COUNT> imageIDs;
             FrameResource<SemaphoreID, FRAME_BUFFER_COUNT> imageAvailableSemaphores;
             FrameResource<SemaphoreID, FRAME_BUFFER_COUNT> blitFinishedSemaphores;

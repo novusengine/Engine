@@ -85,14 +85,17 @@ namespace Renderer
 
     bool Font::InitChar(u32 character, FontChar& fontChar)
     {
-        fontChar.data = stbtt_GetCodepointSDF(fontInfo, scale, character, desc.padding, 180, 36.0f, &fontChar.width, &fontChar.height, &fontChar.xOffset, &fontChar.yOffset);
+        // We need to investigate the on edge value (192) and the pixel distance scale (32.0f) further 
+        fontChar.data = stbtt_GetCodepointSDF(fontInfo, scale, character, desc.padding, 192, 32.0f, &fontChar.width, &fontChar.height, &fontChar.xOffset, &fontChar.yOffset);
 
         if (fontChar.width == 0 && fontChar.height == 0)
             return false;
 
         int advance;
-        stbtt_GetCodepointHMetrics(fontInfo, character, &advance, NULL);
+        int leftSideBearing;
+        stbtt_GetCodepointHMetrics(fontInfo, character, &advance, &leftSideBearing);
         fontChar.advance = advance * scale;
+        fontChar.leftSideBearing = leftSideBearing * scale;
 
         DataTextureDesc textureDesc;
         textureDesc.width = fontChar.width;

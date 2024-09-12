@@ -15,6 +15,7 @@ namespace Renderer
     struct FontChar
     {
         f32 advance;
+        f32 leftSideBearing;
         i32 xOffset;
         i32 yOffset;
         i32 width = 0;
