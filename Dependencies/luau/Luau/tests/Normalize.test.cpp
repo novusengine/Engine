@@ -440,11 +440,11 @@ struct NormalizeFixture : Fixture
         registerHiddenTypes(&frontend);
     }
 
-    std::shared_ptr<const NormalizedType> toNormalizedType(const std::string& annotation)
+    std::shared_ptr<const NormalizedType> toNormalizedType(const std::string& annotation, int expectedErrors = 0)
     {
         normalizer.clearCaches();
         CheckResult result = check("type _Res = " + annotation);
-        LUAU_REQUIRE_NO_ERRORS(result);
+        LUAU_REQUIRE_ERROR_COUNT(expectedErrors, result);
 
         if (FFlag::DebugLuauDeferredConstraintResolution)
         {
@@ -662,7 +662,7 @@ TEST_CASE_FIXTURE(NormalizeFixture, "negated_function_is_anything_except_a_funct
 
 TEST_CASE_FIXTURE(NormalizeFixture, "specific_functions_cannot_be_negated")
 {
-    CHECK(nullptr == toNormalizedType("Not<(boolean) -> boolean>"));
+    CHECK(nullptr == toNormalizedType("Not<(boolean) -> boolean>", FFlag::DebugLuauDeferredConstraintResolution ? 1 : 0));
 }
 
 TEST_CASE_FIXTURE(NormalizeFixture, "trivial_intersection_inhabited")
@@ -847,6 +847,8 @@ TEST_CASE_FIXTURE(NormalizeFixture, "negations_of_classes")
         "(Parent | Unrelated | boolean | buffer | function | number | string | table | thread)?" ==
         toString(normal("Not<cls & Not<Parent> & Not<Child> & Not<Unrelated>>"))
     );
+
+    CHECK("Child" == toString(normal("(Child | Unrelated) & Not<Unrelated>")));
 }
 
 TEST_CASE_FIXTURE(NormalizeFixture, "classes_and_unknown")
@@ -873,7 +875,7 @@ TEST_CASE_FIXTURE(NormalizeFixture, "top_table_type")
 
 TEST_CASE_FIXTURE(NormalizeFixture, "negations_of_tables")
 {
-    CHECK(nullptr == toNormalizedType("Not<{}>"));
+    CHECK(nullptr == toNormalizedType("Not<{}>", FFlag::DebugLuauDeferredConstraintResolution ? 1 : 0));
     CHECK("(boolean | buffer | class | function | number | string | thread)?" == toString(normal("Not<tbl>")));
     CHECK("table" == toString(normal("Not<Not<tbl>>")));
 }
@@ -998,17 +1000,13 @@ TEST_CASE_FIXTURE(NormalizeFixture, "truthy_table_property_and_optional_table_wi
     ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
 
     // { x: ~(false?) }
-    TypeId t1 = arena.addType(TableType{
-        TableType::Props{{"x", builtinTypes->truthyType}}, std::nullopt, TypeLevel{}, TableState::Sealed
-    });
+    TypeId t1 = arena.addType(TableType{TableType::Props{{"x", builtinTypes->truthyType}}, std::nullopt, TypeLevel{}, TableState::Sealed});
 
     // { x: number? }?
-    TypeId t2 = arena.addType(UnionType{{
-        arena.addType(TableType{
-            TableType::Props{{"x", builtinTypes->optionalNumberType}}, std::nullopt, TypeLevel{}, TableState::Sealed
-        }),
-        builtinTypes->nilType
-    }});
+    TypeId t2 = arena.addType(UnionType{
+        {arena.addType(TableType{TableType::Props{{"x", builtinTypes->optionalNumberType}}, std::nullopt, TypeLevel{}, TableState::Sealed}),
+         builtinTypes->nilType}
+    });
 
     TypeId intersection = arena.addType(IntersectionType{{t2, t1}});
 

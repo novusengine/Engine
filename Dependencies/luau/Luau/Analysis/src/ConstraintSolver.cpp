@@ -924,6 +924,10 @@ bool ConstraintSolver::tryDispatch(const TypeAliasExpansionConstraint& c, NotNul
         return true;
     }
 
+    // Adding ReduceConstraint on type function for the constraint solver
+    if (auto typeFn = get<TypeFunctionInstanceType>(follow(tf->type)))
+        pushConstraint(NotNull(constraint->scope.get()), constraint->location, ReduceConstraint{tf->type});
+
     // If there are no parameters to the type function we can just use the type
     // directly.
     if (tf->typeParams.empty() && tf->typePackParams.empty())
@@ -1051,7 +1055,6 @@ bool ConstraintSolver::tryDispatch(const TypeAliasExpansionConstraint& c, NotNul
     // there are e.g. generic saturatedTypeArguments that go unused.
     const TableType* tfTable = getTableType(tf->type);
 
-    //clang-format off
     bool needsClone = follow(tf->type) == target || (tfTable != nullptr && tfTable == getTableType(target)) ||
                       std::any_of(
                           typeArguments.begin(),
@@ -1061,7 +1064,6 @@ bool ConstraintSolver::tryDispatch(const TypeAliasExpansionConstraint& c, NotNul
                               return other == target;
                           }
                       );
-    //clang-format on
 
     // Only tables have the properties we're trying to set.
     TableType* ttv = getMutableTableType(target);
@@ -1269,6 +1271,8 @@ bool ConstraintSolver::tryDispatch(const FunctionCallConstraint& c, NotNull<cons
 
     if (occursCheckPassed && c.callSite)
         (*c.astOverloadResolvedTypes)[c.callSite] = inferredTy;
+    else if (!occursCheckPassed)
+        reportError(OccursCheckFailed{}, constraint->location);
 
     InstantiationQueuer queuer{constraint->scope, constraint->location, this};
     queuer.traverse(overloadToUse);
@@ -1277,6 +1281,14 @@ bool ConstraintSolver::tryDispatch(const FunctionCallConstraint& c, NotNull<cons
     unblock(c.result, constraint->location);
 
     return true;
+}
+
+static AstExpr* unwrapGroup(AstExpr* expr)
+{
+    while (auto group = expr->as<AstExprGroup>())
+        expr = group->expr;
+
+    return expr;
 }
 
 bool ConstraintSolver::tryDispatch(const FunctionCheckConstraint& c, NotNull<const Constraint> constraint)
@@ -1352,7 +1364,7 @@ bool ConstraintSolver::tryDispatch(const FunctionCheckConstraint& c, NotNull<con
     {
         const TypeId expectedArgTy = follow(expectedArgs[i + typeOffset]);
         const TypeId actualArgTy = follow(argPackHead[i + typeOffset]);
-        const AstExpr* expr = c.callSite->args.data[i];
+        const AstExpr* expr = unwrapGroup(c.callSite->args.data[i]);
 
         (*c.astExpectedTypes)[expr] = expectedArgTy;
 
@@ -1695,7 +1707,10 @@ bool ConstraintSolver::tryDispatch(const AssignPropConstraint& c, NotNull<const 
     {
         const Property* prop = lookupClassProp(lhsClass, propName);
         if (!prop || !prop->writeTy.has_value())
+        {
+            bind(constraint, c.propType, builtinTypes->anyType);
             return true;
+        }
 
         bind(constraint, c.propType, *prop->writeTy);
         unify(constraint, rhsType, *prop->writeTy);

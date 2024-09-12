@@ -627,6 +627,11 @@ SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, TypeId sub
         result = isCovariantWith(env, p);
     else if (auto p = get2<SingletonType, SingletonType>(subTy, superTy))
         result = isCovariantWith(env, p);
+    else if (auto p = get2<FunctionType, PrimitiveType>(subTy, superTy))
+    {
+        auto [subFunction, superPrimitive] = p;
+        result.isSubtype = superPrimitive->type == PrimitiveType::Function;
+    }
     else if (auto p = get2<FunctionType, FunctionType>(subTy, superTy))
         result = isCovariantWith(env, p);
     else if (auto p = get2<TableType, TableType>(subTy, superTy))
@@ -639,6 +644,8 @@ SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, TypeId sub
         result = isCovariantWith(env, p);
     else if (auto p = get2<ClassType, TableType>(subTy, superTy))
         result = isCovariantWith(env, subTy, p.first, superTy, p.second);
+    else if (auto p = get2<TableType, PrimitiveType>(subTy, superTy))
+        result = isCovariantWith(env, p);
     else if (auto p = get2<PrimitiveType, TableType>(subTy, superTy))
         result = isCovariantWith(env, p);
     else if (auto p = get2<SingletonType, TableType>(subTy, superTy))
@@ -1368,6 +1375,15 @@ SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, const Func
     return result;
 }
 
+SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, const TableType* subTable, const PrimitiveType* superPrim)
+{
+    SubtypingResult result{false};
+    if (superPrim->type == PrimitiveType::Table)
+        result.isSubtype = true;
+
+    return result;
+}
+
 SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, const PrimitiveType* subPrim, const TableType* superTable)
 {
     SubtypingResult result{false};
@@ -1386,6 +1402,11 @@ SubtypingResult Subtyping::isCovariantWith(SubtypingEnvironment& env, const Prim
                 }
             }
         }
+    }
+    else if (subPrim->type == PrimitiveType::Table)
+    {
+        const bool isSubtype = superTable->props.empty() && !superTable->indexer.has_value();
+        return {isSubtype};
     }
 
     return result;

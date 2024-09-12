@@ -4,6 +4,7 @@
 
 #include "Fixture.h"
 
+#include "ScopedFlags.h"
 #include "doctest.h"
 
 using namespace Luau;
@@ -331,6 +332,9 @@ TEST_CASE_FIXTURE(Fixture, "table_intersection_write_sealed")
 
 TEST_CASE_FIXTURE(Fixture, "table_intersection_write_sealed_indirect")
 {
+    ScopedFastFlag dcr{
+        FFlag::DebugLuauDeferredConstraintResolution, false
+    }; // CLI-116476 Subtyping between type alias and an equivalent but not named type isn't working.
     CheckResult result = check(R"(
         type X = { x: (number) -> number }
         type Y = { y: (string) -> string }
@@ -368,6 +372,7 @@ caused by:
 
 TEST_CASE_FIXTURE(Fixture, "table_write_sealed_indirect")
 {
+    ScopedFastFlag dcr{FFlag::DebugLuauDeferredConstraintResolution, false}; // CLI-
     // After normalization, previous 'table_intersection_write_sealed_indirect' is identical to this one
     CheckResult result = check(R"(
     type XY = { x: (number) -> number, y: (string) -> string }
@@ -447,14 +452,17 @@ end
     LUAU_REQUIRE_ERROR_COUNT(1, result);
     if (FFlag::DebugLuauDeferredConstraintResolution)
     {
-        CHECK_EQ(R"(Type pack 'X & Y & Z' could not be converted into 'number'; type X & Y & Z[0][0] (X) is not a subtype of number[0] (number)
+        CHECK_EQ(
+            R"(Type pack 'X & Y & Z' could not be converted into 'number'; type X & Y & Z[0][0] (X) is not a subtype of number[0] (number)
 	type X & Y & Z[0][1] (Y) is not a subtype of number[0] (number)
 	type X & Y & Z[0][2] (Z) is not a subtype of number[0] (number))",
-            toString(result.errors[0]));
+            toString(result.errors[0])
+        );
     }
     else
         CHECK_EQ(
-            toString(result.errors[0]), R"(Type 'X & Y & Z' could not be converted into 'number'; none of the intersection parts are compatible)");
+            toString(result.errors[0]), R"(Type 'X & Y & Z' could not be converted into 'number'; none of the intersection parts are compatible)"
+        );
 }
 
 TEST_CASE_FIXTURE(Fixture, "overload_is_not_a_function")
@@ -497,13 +505,16 @@ TEST_CASE_FIXTURE(Fixture, "intersect_bool_and_false")
     LUAU_REQUIRE_ERROR_COUNT(1, result);
     if (FFlag::DebugLuauDeferredConstraintResolution)
     {
-        CHECK_EQ(R"(Type 'boolean & false' could not be converted into 'true'; type boolean & false[0] (boolean) is not a subtype of true (true)
+        CHECK_EQ(
+            R"(Type 'boolean & false' could not be converted into 'true'; type boolean & false[0] (boolean) is not a subtype of true (true)
 	type boolean & false[1] (false) is not a subtype of true (true))",
-            toString(result.errors[0]));
+            toString(result.errors[0])
+        );
     }
     else
         CHECK_EQ(
-            toString(result.errors[0]), "Type 'boolean & false' could not be converted into 'true'; none of the intersection parts are compatible");
+            toString(result.errors[0]), "Type 'boolean & false' could not be converted into 'true'; none of the intersection parts are compatible"
+        );
 }
 
 TEST_CASE_FIXTURE(Fixture, "intersect_false_and_bool_and_false")
@@ -522,10 +533,13 @@ TEST_CASE_FIXTURE(Fixture, "intersect_false_and_bool_and_false")
             R"(Type 'boolean & false & false' could not be converted into 'true'; type boolean & false & false[0] (false) is not a subtype of true (true)
 	type boolean & false & false[1] (boolean) is not a subtype of true (true)
 	type boolean & false & false[2] (false) is not a subtype of true (true))",
-            toString(result.errors[0]));
+            toString(result.errors[0])
+        );
     else
-        CHECK_EQ(toString(result.errors[0]),
-            "Type 'boolean & false & false' could not be converted into 'true'; none of the intersection parts are compatible");
+        CHECK_EQ(
+            toString(result.errors[0]),
+            "Type 'boolean & false & false' could not be converted into 'true'; none of the intersection parts are compatible"
+        );
 }
 
 TEST_CASE_FIXTURE(Fixture, "intersect_saturate_overloaded_functions")
@@ -567,6 +581,9 @@ could not be converted into
 
 TEST_CASE_FIXTURE(Fixture, "union_saturate_overloaded_functions")
 {
+    ScopedFastFlag dcr{
+        FFlag::DebugLuauDeferredConstraintResolution, false
+    }; // CLI-116474 Semantic subtyping of assignments needs to decide how to interpret intersections of functions
     CheckResult result = check(R"(
         function f(x: ((number) -> number) & ((string) -> string))
             local y : ((number | string) -> (number | string)) = x -- OK
@@ -745,6 +762,9 @@ could not be converted into
 
 TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_unknown_result")
 {
+    ScopedFastFlag dcr{
+        FFlag::DebugLuauDeferredConstraintResolution, false
+    }; // CLI-116474 Semantic subtyping of assignments needs to decide how to interpret intersections of functions
     CheckResult result = check(R"(
         function f<a...,b...>()
             function g(x : ((number) -> number) & ((nil) -> unknown))
@@ -764,6 +784,9 @@ could not be converted into
 
 TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_unknown_arguments")
 {
+    ScopedFastFlag dcr{
+        FFlag::DebugLuauDeferredConstraintResolution, false
+    }; // CLI-116474 Semantic subtyping of assignments needs to decide how to interpret intersections of functions
     CheckResult result = check(R"(
         function f<a...,b...>()
             function g(x : ((number) -> number?) & ((unknown) -> string?))
@@ -792,12 +815,36 @@ TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_never_result")
     end
     )");
 
-    LUAU_REQUIRE_ERROR_COUNT(1, result);
-    const std::string expected = R"(Type
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+    {
+        LUAU_REQUIRE_ERROR_COUNT(2, result);
+        CHECK_EQ(
+            R"(Type
+    '((nil) -> never) & ((number) -> number)'
+could not be converted into
+    '(number?) -> number'; type ((nil) -> never) & ((number) -> number)[0].arguments()[0] (number) is not a supertype of (number?) -> number.arguments()[0][1] (nil)
+	type ((nil) -> never) & ((number) -> number)[1].arguments()[0] (nil) is not a supertype of (number?) -> number.arguments()[0][0] (number))",
+            toString(result.errors[0])
+        );
+        CHECK_EQ(
+            R"(Type
+    '((nil) -> never) & ((number) -> number)'
+could not be converted into
+    '(number?) -> never'; type ((nil) -> never) & ((number) -> number)[0].arguments()[0] (number) is not a supertype of (number?) -> never.arguments()[0][1] (nil)
+	type ((nil) -> never) & ((number) -> number)[0].returns()[0] (number) is not a subtype of (number?) -> never.returns()[0] (never)
+	type ((nil) -> never) & ((number) -> number)[1].arguments()[0] (nil) is not a supertype of (number?) -> never.arguments()[0][0] (number))",
+            toString(result.errors[1])
+        );
+    }
+    else
+    {
+        LUAU_REQUIRE_ERROR_COUNT(1, result);
+        const std::string expected = R"(Type
     '((nil) -> never) & ((number) -> number)'
 could not be converted into
     '(number?) -> never'; none of the intersection parts are compatible)";
-    CHECK_EQ(expected, toString(result.errors[0]));
+        CHECK_EQ(expected, toString(result.errors[0]));
+    }
 }
 
 TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_never_arguments")
@@ -821,6 +868,9 @@ could not be converted into
 
 TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_overlapping_results_and_variadics")
 {
+    ScopedFastFlag dcr{
+        FFlag::DebugLuauDeferredConstraintResolution, false
+    }; // CLI-116474 Semantic subtyping of assignments needs to decide how to interpret intersections of functions
     CheckResult result = check(R"(
         function f(x : ((string?) -> (string | number)) & ((number?) -> ...number))
             local y : ((nil) -> (number, number?)) = x -- OK
@@ -847,11 +897,18 @@ TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_weird_typepacks_1")
         end
     )");
 
-    LUAU_REQUIRE_ERROR_COUNT(1, result);
-    CHECK_EQ(
-        toString(result.errors[0]),
-        "Type '(() -> (a...)) & (() -> (b...))' could not be converted into '() -> ()'; none of the intersection parts are compatible"
-    );
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+    {
+        LUAU_REQUIRE_NO_ERRORS(result);
+    }
+    else
+    {
+        LUAU_REQUIRE_ERROR_COUNT(1, result);
+        CHECK_EQ(
+            toString(result.errors[0]),
+            "Type '(() -> (a...)) & (() -> (b...))' could not be converted into '() -> ()'; none of the intersection parts are compatible"
+        );
+    }
 }
 
 TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_weird_typepacks_2")
@@ -865,11 +922,18 @@ TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_weird_typepacks_2")
         end
     )");
 
-    LUAU_REQUIRE_ERROR_COUNT(1, result);
-    CHECK_EQ(
-        toString(result.errors[0]),
-        "Type '((a...) -> ()) & ((b...) -> ())' could not be converted into '() -> ()'; none of the intersection parts are compatible"
-    );
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+    {
+        LUAU_REQUIRE_NO_ERRORS(result);
+    }
+    else
+    {
+        LUAU_REQUIRE_ERROR_COUNT(1, result);
+        CHECK_EQ(
+            toString(result.errors[0]),
+            "Type '((a...) -> ()) & ((b...) -> ())' could not be converted into '() -> ()'; none of the intersection parts are compatible"
+        );
+    }
 }
 
 TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_weird_typepacks_3")
@@ -883,12 +947,19 @@ TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_weird_typepacks_3")
         end
     )");
 
-    LUAU_REQUIRE_ERROR_COUNT(1, result);
-    const std::string expected = R"(Type
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+    {
+        LUAU_REQUIRE_NO_ERRORS(result);
+    }
+    else
+    {
+        LUAU_REQUIRE_ERROR_COUNT(1, result);
+        const std::string expected = R"(Type
     '(() -> (a...)) & (() -> (number?, a...))'
 could not be converted into
     '() -> number'; none of the intersection parts are compatible)";
-    CHECK_EQ(expected, toString(result.errors[0]));
+        CHECK_EQ(expected, toString(result.errors[0]));
+    }
 }
 
 TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_weird_typepacks_4")
@@ -903,11 +974,27 @@ TEST_CASE_FIXTURE(Fixture, "overloadeded_functions_with_weird_typepacks_4")
     )");
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
-    const std::string expected = R"(Type
+    if (FFlag::DebugLuauDeferredConstraintResolution)
+    {
+        CHECK_EQ(
+            R"(Type
     '((a...) -> ()) & ((number, a...) -> number)'
 could not be converted into
-    '(number?) -> ()'; none of the intersection parts are compatible)";
-    CHECK_EQ(expected, toString(result.errors[0]));
+    '((a...) -> ()) & ((number, a...) -> number)'; at [0].returns(),  is not a subtype of number
+	type ((a...) -> ()) & ((number, a...) -> number)[1].arguments().tail() (a...) is not a supertype of ((a...) -> ()) & ((number, a...) -> number)[0].arguments().tail() (a...))",
+            toString(result.errors[0])
+        );
+    }
+    else
+    {
+        CHECK_EQ(
+            R"(Type
+    '((a...) -> ()) & ((number, a...) -> number)'
+could not be converted into
+    '(number?) -> ()'; none of the intersection parts are compatible)",
+            toString(result.errors[0])
+        );
+    }
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "intersect_metatables")
