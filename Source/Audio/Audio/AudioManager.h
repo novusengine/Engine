@@ -13,17 +13,13 @@ public:
 
     bool Init();
     void Cleanup();
-    void LoadSoundFile();
-    void PlaySoundFile(const std::string& filepath, float volume);
+    void PlaySoundFile(const std::string& filepath, f32 volume, bool isFromAssetBrowser = false);
     void PauseSoundFile();
     void ResumeSoundFile();
     void RestartSoundFile();
-    //void PauseAllAudio();
-    //void ResumeAllAudio();
-    void SetVolume(float volume);
+    void SetVolume(f32 volume);
 
 private:
     ma_engine* _audioEngine = nullptr;
     ma_sound* _sound = nullptr;
-    //std::vector<ma_sound*> _sounds = {};
 };

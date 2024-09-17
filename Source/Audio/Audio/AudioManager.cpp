@@ -34,15 +34,13 @@ void AudioManager::Cleanup()
     _audioEngine = nullptr;
 }
 
-void AudioManager::LoadSoundFile()
-{
-
-}
-
-void AudioManager::PlaySoundFile(const std::string& filepath, float volume)
+void AudioManager::PlaySoundFile(const std::string& filepath, f32 volume, bool isFromAssetBrowser)
 {
     if (_audioEngine == nullptr)
         return;
+
+    if (isFromAssetBrowser && ma_sound_is_playing(_sound))
+        ma_sound_uninit(_sound);
 
     ma_result result;
     _sound = new ma_sound();
@@ -72,17 +70,7 @@ void AudioManager::RestartSoundFile()
     ma_sound_start(_sound);
 }
 
-//void AudioManager::PauseAllAudio()
-//{
-//
-//}
-//
-//void AudioManager::ResumeAllAudio()
-//{
-//
-//}
-
-void AudioManager::SetVolume(float volume)
+void AudioManager::SetVolume(f32 volume)
 {
     ma_sound_set_volume(_sound, volume);
 }
