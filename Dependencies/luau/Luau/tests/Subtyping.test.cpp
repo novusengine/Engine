@@ -15,7 +15,7 @@
 
 #include <initializer_list>
 
-LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
+LUAU_FASTFLAG(LuauSolverV2);
 
 using namespace Luau;
 
@@ -67,17 +67,17 @@ struct SubtypeFixture : Fixture
     UnifierSharedState sharedState{&ice};
     Normalizer normalizer{&arena, builtinTypes, NotNull{&sharedState}};
 
-    ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
 
     ScopePtr rootScope{new Scope(builtinTypes->emptyTypePack)};
     ScopePtr moduleScope{new Scope(rootScope)};
 
-    Subtyping subtyping = mkSubtyping(rootScope);
+    Subtyping subtyping = mkSubtyping();
     BuiltinTypeFunctions builtinTypeFunctions{};
 
-    Subtyping mkSubtyping(const ScopePtr& scope)
+    Subtyping mkSubtyping()
     {
-        return Subtyping{builtinTypes, NotNull{&arena}, NotNull{&normalizer}, NotNull{&iceReporter}, NotNull{scope.get()}};
+        return Subtyping{builtinTypes, NotNull{&arena}, NotNull{&normalizer}, NotNull{&iceReporter}};
     }
 
     TypePackId pack(std::initializer_list<TypeId> tys)
@@ -184,7 +184,7 @@ struct SubtypeFixture : Fixture
 
     SubtypingResult isSubtype(TypeId subTy, TypeId superTy)
     {
-        return subtyping.isSubtype(subTy, superTy);
+        return subtyping.isSubtype(subTy, superTy, NotNull{rootScope.get()});
     }
 
     TypeId helloType = arena.addType(SingletonType{StringSingleton{"hello"}});
@@ -837,28 +837,28 @@ TEST_CASE_FIXTURE(SubtypeFixture, "{x: <T>(T) -> ()} <: {x: <U>(U) -> ()}")
 
 TEST_CASE_FIXTURE(SubtypeFixture, "{ x: number } <: { read x: number }")
 {
-    ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
 
     CHECK_IS_SUBTYPE(tbl({{"x", builtinTypes->numberType}}), tbl({{"x", Property::readonly(builtinTypes->numberType)}}));
 }
 
 TEST_CASE_FIXTURE(SubtypeFixture, "{ x: number } <: { write x: number }")
 {
-    ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
 
     CHECK_IS_SUBTYPE(tbl({{"x", builtinTypes->numberType}}), tbl({{"x", Property::writeonly(builtinTypes->numberType)}}));
 }
 
 TEST_CASE_FIXTURE(SubtypeFixture, "{ x: \"hello\" } <: { read x: string }")
 {
-    ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
 
     CHECK_IS_SUBTYPE(tbl({{"x", helloType}}), tbl({{"x", Property::readonly(builtinTypes->stringType)}}));
 }
 
 TEST_CASE_FIXTURE(SubtypeFixture, "{ x: string } <: { write x: string }")
 {
-    ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
 
     CHECK_IS_SUBTYPE(tbl({{"x", builtinTypes->stringType}}), tbl({{"x", Property::writeonly(builtinTypes->stringType)}}));
 }
@@ -1210,7 +1210,7 @@ TEST_CASE_FIXTURE(SubtypeFixture, "(...any) -> () <: <T>(T...) -> ()")
     TypeId anysToNothing = arena.addType(FunctionType{builtinTypes->anyTypePack, builtinTypes->emptyTypePack});
     TypeId genericTToAnys = arena.addType(FunctionType{genericAs, builtinTypes->emptyTypePack});
 
-    CHECK_MESSAGE(subtyping.isSubtype(anysToNothing, genericTToAnys).isSubtype, "(...any) -> () <: <T>(T...) -> ()");
+    CHECK_MESSAGE(isSubtype(anysToNothing, genericTToAnys).isSubtype, "(...any) -> () <: <T>(T...) -> ()");
 }
 
 // See https://github.com/luau-lang/luau/issues/767
@@ -1220,7 +1220,7 @@ TEST_CASE_FIXTURE(SubtypeFixture, "(...unknown) -> () <: <T>(T...) -> ()")
         arena.addType(FunctionType{arena.addTypePack(VariadicTypePack{builtinTypes->unknownType}), builtinTypes->emptyTypePack});
     TypeId genericTToAnys = arena.addType(FunctionType{genericAs, builtinTypes->emptyTypePack});
 
-    CHECK_MESSAGE(subtyping.isSubtype(unknownsToNothing, genericTToAnys).isSubtype, "(...unknown) -> () <: <T>(T...) -> ()");
+    CHECK_MESSAGE(isSubtype(unknownsToNothing, genericTToAnys).isSubtype, "(...unknown) -> () <: <T>(T...) -> ()");
 }
 
 TEST_CASE_FIXTURE(SubtypeFixture, "bill")
@@ -1233,8 +1233,8 @@ TEST_CASE_FIXTURE(SubtypeFixture, "bill")
         {{"a", builtinTypes->stringType}}, TableIndexer{builtinTypes->stringType, builtinTypes->numberType}, TypeLevel{}, nullptr, TableState::Sealed
     });
 
-    CHECK(subtyping.isSubtype(a, b).isSubtype);
-    CHECK(subtyping.isSubtype(b, a).isSubtype);
+    CHECK(isSubtype(a, b).isSubtype);
+    CHECK(isSubtype(b, a).isSubtype);
 }
 
 // TEST_CASE_FIXTURE(SubtypeFixture, "({[string]: number, a: string}) -> () <: ({[string]: number, a: string}) -> ()")
@@ -1256,7 +1256,7 @@ TEST_CASE_FIXTURE(SubtypeFixture, "fred")
     TypeId a = makeTheType();
     TypeId b = makeTheType();
 
-    CHECK_MESSAGE(subtyping.isSubtype(a, b).isSubtype, "({[string]: number, a: string}) -> () <: ({[string]: number, a: string}) -> ()");
+    CHECK_MESSAGE(isSubtype(a, b).isSubtype, "({[string]: number, a: string}) -> () <: ({[string]: number, a: string}) -> ()");
 }
 
 /*
@@ -1273,17 +1273,17 @@ TEST_CASE_FIXTURE(SubtypeFixture, "unknown <: X")
 
     TypeId genericX = arena.addType(GenericType(childScope.get(), "X"));
 
-    SubtypingResult usingGlobalScope = subtyping.isSubtype(builtinTypes->unknownType, genericX);
+    SubtypingResult usingGlobalScope = isSubtype(builtinTypes->unknownType, genericX);
     CHECK_MESSAGE(!usingGlobalScope.isSubtype, "Expected " << builtinTypes->unknownType << " </: " << genericX);
 
-    Subtyping childSubtyping{mkSubtyping(childScope)};
+    Subtyping childSubtyping{mkSubtyping()};
 
-    SubtypingResult usingChildScope = childSubtyping.isSubtype(builtinTypes->unknownType, genericX);
+    SubtypingResult usingChildScope = childSubtyping.isSubtype(builtinTypes->unknownType, genericX, NotNull{childScope.get()});
     CHECK_MESSAGE(usingChildScope.isSubtype, "Expected " << builtinTypes->unknownType << " <: " << genericX);
 
-    Subtyping grandChildSubtyping{mkSubtyping(grandChildScope)};
+    Subtyping grandChildSubtyping{mkSubtyping()};
 
-    SubtypingResult usingGrandChildScope = grandChildSubtyping.isSubtype(builtinTypes->unknownType, genericX);
+    SubtypingResult usingGrandChildScope = grandChildSubtyping.isSubtype(builtinTypes->unknownType, genericX, NotNull{grandChildScope.get()});
     CHECK_MESSAGE(usingGrandChildScope.isSubtype, "Expected " << builtinTypes->unknownType << " <: " << genericX);
 }
 

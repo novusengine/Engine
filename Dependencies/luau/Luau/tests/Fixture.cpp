@@ -3,6 +3,7 @@
 
 #include "Luau/AstQuery.h"
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/Common.h"
 #include "Luau/Constraint.h"
 #include "Luau/ModuleResolver.h"
 #include "Luau/NotNull.h"
@@ -22,9 +23,10 @@
 
 static const char* mainModuleName = "MainModule";
 
-LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
+LUAU_FASTFLAG(LuauSolverV2);
 LUAU_FASTFLAG(DebugLuauFreezeArena);
 LUAU_FASTFLAG(DebugLuauLogSolverToJsonFile)
+LUAU_FASTFLAG(LuauDCRMagicFunctionTypeChecker);
 
 extern std::optional<unsigned> randomSeed; // tests/main.cpp
 
@@ -150,6 +152,8 @@ const Config& TestConfigResolver::getConfig(const ModuleName& name) const
 
 Fixture::Fixture(bool freeze, bool prepareAutocomplete)
     : sff_DebugLuauFreezeArena(FFlag::DebugLuauFreezeArena, freeze)
+    // In tests, we *always* want to register the extra magic functions for typechecking `string.format`.
+    , sff_LuauDCRMagicFunctionTypeChecker(FFlag::LuauDCRMagicFunctionTypeChecker, true)
     , frontend(
           &fileResolver,
           &configResolver,
@@ -204,7 +208,7 @@ AstStatBlock* Fixture::parse(const std::string& source, const ParseOptions& pars
         // if AST is available, check how lint and typecheck handle error nodes
         if (result.root)
         {
-            if (FFlag::DebugLuauDeferredConstraintResolution)
+            if (FFlag::LuauSolverV2)
             {
                 Mode mode = sourceModule->mode ? *sourceModule->mode : Mode::Strict;
                 ModulePtr module = Luau::check(
@@ -371,7 +375,7 @@ std::optional<TypeId> Fixture::getType(const std::string& name)
     if (!module->hasModuleScope())
         return std::nullopt;
 
-    if (FFlag::DebugLuauDeferredConstraintResolution)
+    if (FFlag::LuauSolverV2)
         return linearSearchForBinding(module->getModuleScope().get(), name.c_str());
     else
         return lookupName(module->getModuleScope(), name);
