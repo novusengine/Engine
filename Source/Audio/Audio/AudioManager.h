@@ -4,7 +4,11 @@
 #include <Base/Util/StringUtils.h>
 #include <Base/Util/DebugHandler.h>
 
+#include <filesystem>
+
 #include <miniaudio/miniaudio.h>
+
+namespace fs = std::filesystem;
 
 class AudioManager
 {
@@ -13,14 +17,19 @@ public:
 
     bool Init();
     void Cleanup();
-    void PlaySoundFile(const std::string& filepath, f32 volume, bool isLooping = false, bool isFromAssetBrowser = false);
+    void PlaySoundFile(f32 volume, bool isLooping = false, bool isFromAssetBrowser = false);
     void PauseSoundFile();
     void ResumeSoundFile();
     void RestartSoundFile();
     void EndLooping();
     void SetVolume(f32 volume);
 
+    void SetAudioFile(const fs::path& filePath);
+    const std::string& GetFileName() { return _fileName; }
+
 private:
     ma_engine* _audioEngine = nullptr;
     ma_sound* _sound = nullptr;
+    std::string _audioFile;
+    std::string _fileName;
 };
