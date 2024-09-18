@@ -34,7 +34,7 @@ void AudioManager::Cleanup()
     _audioEngine = nullptr;
 }
 
-void AudioManager::PlaySoundFile(const std::string& filepath, f32 volume, bool isFromAssetBrowser)
+void AudioManager::PlaySoundFile(const std::string& filepath, f32 volume, bool isLooping, bool isFromAssetBrowser)
 {
     if (_audioEngine == nullptr)
         return;
@@ -50,6 +50,7 @@ void AudioManager::PlaySoundFile(const std::string& filepath, f32 volume, bool i
         return;
 
     ma_sound_set_volume(_sound, volume);
+    ma_sound_set_looping(_sound, isLooping);
     ma_sound_start(_sound);
 }
 
@@ -68,6 +69,11 @@ void AudioManager::RestartSoundFile()
     ma_sound_seek_to_pcm_frame(_sound, 0);
 
     ma_sound_start(_sound);
+}
+
+void AudioManager::EndLooping()
+{
+    ma_sound_set_looping(_sound, false);
 }
 
 void AudioManager::SetVolume(f32 volume)

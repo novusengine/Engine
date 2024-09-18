@@ -13,10 +13,11 @@ public:
 
     bool Init();
     void Cleanup();
-    void PlaySoundFile(const std::string& filepath, f32 volume, bool isFromAssetBrowser = false);
+    void PlaySoundFile(const std::string& filepath, f32 volume, bool isLooping = false, bool isFromAssetBrowser = false);
     void PauseSoundFile();
     void ResumeSoundFile();
     void RestartSoundFile();
+    void EndLooping();
     void SetVolume(f32 volume);
 
 private:
