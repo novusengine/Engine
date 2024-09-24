@@ -344,8 +344,7 @@ namespace Model
                 u32 CylindricialBillboardLockX : 1;
                 u32 CylindricialBillboardLockY : 1;
                 u32 CylindricialBillboardLockZ : 1;
-                u32 Unk0x80 : 1;
-                u32 : 1;
+                u32 : 2;
                 u32 Transformed : 1;
                 u32 KinematicBone : 1; // MOP+ Allow physics to influence this bone
                 u32 : 1;

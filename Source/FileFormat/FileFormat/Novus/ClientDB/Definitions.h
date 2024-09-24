@@ -545,10 +545,46 @@ namespace ClientDB::Definitions
     struct AnimationData : public Base
     {
     public:
+        struct Flags
+        {
+            u32 UsedForEmote            : 1 = 0;
+            u32 UsedForSpell            : 1 = 0;
+            u32 IsPierceAnim            : 1 = 0;
+            u32 HideWeapons             : 1 = 0;
+            u32 FallbackPlaysReverse    : 1 = 0;
+            u32 FallbackHoldsEnd        : 1 = 0;
+            u32 Unused0x40              : 1 = 0;
+            u32 FallbackToVariationZero : 1 = 0;
+            u32 Unused0x100             : 1 = 0;
+            u32 Unused0x200             : 1 = 0;
+            u32 Unused0x400             : 1 = 0;
+            u32 MoveWeaponsToSheath     : 1 = 0;
+            u32 MoveMeleeWeaponsToHand  : 1 = 0;
+            u32 ScaleToGround           : 1 = 0;
+            u32 ScaleToGroundRev        : 1 = 0;
+            u32 ScaleToGroundAlways     : 1 = 0;
+            u32 IsSplitBodyBehavior     : 1 = 0;
+            u32 IsBowWeaponBehavior     : 1 = 0;
+            u32 IsRifleWeaponBehavior   : 1 = 0;
+            u32 IsThrownWeaponBehavior  : 1 = 0;
+            u32 IsDeathBehavior         : 1 = 0;
+            u32 IsMeleeCombatBehavior   : 1 = 0;
+            u32 IsSpecialCombatBehavior : 1 = 0;
+            u32 IsWoundBehavior         : 1 = 0;
+            u32 IsUnarmedBehavior       : 1 = 0;
+            u32 UseMountedNameplatePos  : 1 = 0;
+            u32 FlipSpearWeapons180Deg  : 1 = 0;
+            u32 Unused0x8000000         : 1 = 0;
+            u32 Unused0x10000000        : 1 = 0;
+            u32 IsSpellCombatBehavior   : 1 = 0;
+            u32 BrewmasterSheathe       : 1 = 0;
+            u32 Unused0x80000000        : 1 = 0;
+        };
+
         u16 fallback;
         u8 behaviorTier;
         u32 behaviorID;
-        u32 flags[2];
+        Flags flags[2];
 
     public:
         bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
