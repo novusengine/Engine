@@ -18,7 +18,8 @@ public:
     bool Init();
     void Cleanup();
     void PlaySoundFile(f32 volume, bool isLooping = false, bool endAllOtherAudio = false);
-    void PlaySoundFileCommand(const std::string& fileName, f32 volume, bool isLooping = false, bool endAllOtherAudio = false);
+    void PlaySoundCommand(const std::string& fileName, f32 volume, bool isLooping = false, bool endAllOtherAudio = false);
+    void StopAudioCommand();
     void PauseSoundFile();
     void ResumeSoundFile();
     void RestartSoundFile();
@@ -29,8 +30,12 @@ public:
     const std::string& GetFileName() { return _fileName; }
 
 private:
+    void SoundListCleanup(std::vector<ma_sound*>& list);
+
+private:
     ma_engine* _audioEngine = nullptr;
-    ma_sound* _sound = nullptr;
+    ma_sound* _assetBrowserSound = nullptr;
+    std::vector<ma_sound*> _consoleSounds = {};
     std::string _audioFile;
     std::string _fileName;
 };
