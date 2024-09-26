@@ -75,7 +75,7 @@ void AudioManager::PlaySoundCommand(const std::string& fileName, f32 volume, boo
     ma_sound_start(sound);
 }
 
-void AudioManager::StopAudioCommand()
+void AudioManager::StopSoundCommand()
 {
     SoundListCleanup(_consoleSounds);
 }

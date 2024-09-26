@@ -19,7 +19,7 @@ public:
     void Cleanup();
     void PlaySoundFile(f32 volume, bool isLooping = false, bool endAllOtherAudio = false);
     void PlaySoundCommand(const std::string& fileName, f32 volume, bool isLooping = false, bool endAllOtherAudio = false);
-    void StopAudioCommand();
+    void StopSoundCommand();
     void PauseSoundFile();
     void ResumeSoundFile();
     void RestartSoundFile();
