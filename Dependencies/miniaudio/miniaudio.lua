@@ -10,7 +10,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     local includeDirs = { dep.Path, sourceDir }
     local files =
     {
-	    sourceDir .. "/miniaudio.h",
+        sourceDir .. "/miniaudio.h",
         sourceDir .. "/miniaudio.c"
     }
     Solution.Util.SetFiles(files)
