@@ -44,8 +44,7 @@ void AudioManager::PlaySoundFile(f32 volume, bool isLooping, bool endAllOtherAud
 
     _assetBrowserSound = new ma_sound();
 
-    ma_result result;
-    result = ma_sound_init_from_file(_audioEngine, _audioFile.c_str(), 0, NULL, NULL, _assetBrowserSound);
+    ma_result result =ma_sound_init_from_file(_audioEngine, _audioFile.c_str(), 0, NULL, NULL, _assetBrowserSound);
     if (result != MA_SUCCESS)
         return;
 
@@ -65,8 +64,7 @@ void AudioManager::PlaySoundCommand(const std::string& fileName, f32 volume, boo
     ma_sound* sound = new ma_sound();
     _consoleSounds.push_back(sound);
 
-    ma_result result;
-    result = ma_sound_init_from_file(_audioEngine, fileName.c_str(), 0, NULL, NULL, sound);
+    ma_result result = ma_sound_init_from_file(_audioEngine, fileName.c_str(), 0, NULL, NULL, sound);
     if (result != MA_SUCCESS)
         return;
 
