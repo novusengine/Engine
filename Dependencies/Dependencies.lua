@@ -24,7 +24,9 @@ local dependencies =
     "luau/luau.lua",
     "quill/quill.lua",
     "asio/asio.lua",
-    "hwloc/hwloc.lua"
+    "hwloc/hwloc.lua",
+    "stb_vorbis/stb_vorbis.lua",
+    "miniaudio/miniaudio.lua"
 }
 
 for k,v in pairs(dependencies) do
