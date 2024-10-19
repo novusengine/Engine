@@ -24,7 +24,10 @@ local dependencies =
     "luau/luau.lua",
     "quill/quill.lua",
     "asio/asio.lua",
-    "hwloc/hwloc.lua"
+    "hwloc/hwloc.lua",
+    "freetype/freetype.lua",
+    "msdfgen/msdfgen.lua",
+    "msdf-atlas-gen/msdf-atlas-gen.lua",
 }
 
 for k,v in pairs(dependencies) do
