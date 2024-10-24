@@ -226,7 +226,7 @@ namespace Renderer
                 planeTop *= fontSize;
 
                 f32 height = static_cast<f32>(planeTop - planeBottom);
-                height += metrics.descenderY * fontSize + borderSize;
+                height += static_cast<f32>(metrics.descenderY) * fontSize + borderSize;
                 size.y = height;
             }
 

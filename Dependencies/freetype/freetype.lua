@@ -6,7 +6,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
 
     local rootDir = dep.Path .. "/freetype"
     local sourceDir = rootDir .. "/src"
-    local buildsDir = rootDir .. "/builds"
+    local platformDir = rootDir .. "/platform"
     local includeDir = rootDir .. "/include"
     
     local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "FT2_BUILD_LIBRARY" }
@@ -60,7 +60,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     if os.target() == "windows" then
         local platformFiles =
         {
-            buildsDir .. "/windows/ftdebug.c", -- TODO: Windows only
+            platformDir .. "/windows/ftdebug.c", -- TODO: Windows only
         }
         Solution.Util.MergeIntoTable(files, platformFiles)
         Solution.Util.MergeIntoTable(defines, { "WIN32", "WIN32_LEAN_AND_MEAN", "VC_EXTRALEAN" } )
