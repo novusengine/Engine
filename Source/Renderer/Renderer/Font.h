@@ -1,58 +1,63 @@
 #pragma once
 #include "Descriptors/FontDesc.h"
-#include "Descriptors/TextureArrayDesc.h"
+#include "Descriptors/TextureDesc.h"
 
 #include <Base/Types.h>
 
 #include <robinhood/robinhood.h>
+#include <msdf-atlas-gen/GlyphGeometry.h>
+#include <msdf-atlas-gen/FontGeometry.h>
 
 struct stbtt_fontinfo;
 
+namespace msdfgen
+{
+    class FreetypeHandle;
+}
+
 namespace Renderer
 {
+    using Glyph = msdf_atlas::GlyphGeometry;
+    using FontMetrics = msdfgen::FontMetrics;
+
     class Renderer;
-
-    struct FontChar
-    {
-        f32 advance;
-        i32 xOffset;
-        i32 yOffset;
-        i32 width = 0;
-        i32 height = 0;
-        u8* data;
-
-        u32 textureIndex;
-    };
 
     struct Font
     {
-        static constexpr char* FALLBACK_FONT_PATH = (char*)"Data/fonts/Ubuntu/Ubuntu-Regular.ttf";
+        static constexpr char* FALLBACK_FONT_PATH = (char*)"Data/Fonts/Ubuntu-Regular.ttf";
 
         FontDesc desc;
+        FontMetrics metrics;
+        
+        f32 width;
+        f32 height;
+        f32 lowerPixelRange;
+        f32 upperPixelRange;
 
-        stbtt_fontinfo* fontInfo;
-        float scale;
+        const Glyph& GetGlyph(u32 codepoint);
+        TextureID GetTextureID();
 
-        FontChar& GetChar(u32 character);
-        TextureArrayID GetTextureArray();
+        vec2 CalculateTextSize(const std::string& text, f32 fontSize, f32 borderSize);
 
-        static Font* GetDefaultFont(Renderer* renderer, f32 fontSize);
-        static Font* GetFont(Renderer* renderer, const std::string& fontPath, f32 fontSize);
+        static Font* GetDefaultFont(Renderer* renderer);
+        static Font* GetFont(Renderer* renderer, const std::string& fontPath);
         
     private:
         Font() = default;
 
-        bool InitChar(u32 character, FontChar& fontChar);
-
-        static Font* CreateFont(Renderer* renderer, const u8* data, f32 fontSize);
+        static Font* InitFont(Renderer* renderer, std::string_view debugName, const u8* data, size_t dataSize);
 
     private:
+        static msdfgen::FreetypeHandle* _ftHandle;
         static robin_hood::unordered_map<u64, Font*> _fonts;
-        robin_hood::unordered_map<u32, FontChar> _chars;
 
-        TextureArrayID _textureArray = TextureArrayID::Invalid();
+        std::vector<Glyph> _glyphs;
+        robin_hood::unordered_map<u32, u32> _codepointToGlyphIndex;
+
+        TextureID _texture = TextureID::Invalid();
 
         Renderer* _renderer;
+        
 
         friend class Renderer;
     };

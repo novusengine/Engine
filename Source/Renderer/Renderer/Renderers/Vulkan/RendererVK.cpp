@@ -1152,12 +1152,12 @@ namespace Renderer
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         tracy::VkCtxManualScope*& tracyScope = _commandListHandler->GetTracyScope(commandListID);
-        
+
         if (tracyScope != nullptr)
         {
             NC_LOG_CRITICAL("Tried to begin GPU trace on a commandlist that already had a begun GPU trace");
         }
-        
+
         tracyScope = new tracy::VkCtxManualScope(_device->_tracyContext, sourceLocation, true);
         tracyScope->Start(commandBuffer);
 #endif
@@ -1171,12 +1171,12 @@ namespace Renderer
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         tracy::VkCtxManualScope*& tracyScope = _commandListHandler->GetTracyScope(commandListID);
-        
+
         if (tracyScope == nullptr)
         {
             NC_LOG_CRITICAL("Tried to end GPU trace on a commandlist that didn't have a running trace");
         }
-        
+
         tracyScope->End();
         delete tracyScope;
         tracyScope = nullptr;

@@ -6,8 +6,6 @@
 #include "doctest.h"
 #include "Fixture.h"
 
-LUAU_FASTFLAG(LuauFixBindingForGlobalPos);
-
 using namespace Luau;
 
 struct DocumentationSymbolFixture : BuiltinsFixture
@@ -171,6 +169,8 @@ TEST_SUITE_BEGIN("AstQuery");
 
 TEST_CASE_FIXTURE(Fixture, "last_argument_function_call_type")
 {
+    ScopedFastFlag sff{FFlag::LuauSolverV2, false};
+
     check(R"(
 local function foo() return 2 end
 local function bar(a: number) return -a end
@@ -351,7 +351,7 @@ TEST_CASE_FIXTURE(Fixture, "find_expr_ancestry")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "find_binding_at_position_global_start_of_file")
 {
-    ScopedFastFlag sff{FFlag::LuauFixBindingForGlobalPos, true};
+
     check("local x = string.char(1)");
     const Position pos(0, 12);
 

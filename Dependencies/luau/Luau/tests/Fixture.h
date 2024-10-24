@@ -13,6 +13,7 @@
 #include "Luau/Scope.h"
 #include "Luau/ToString.h"
 #include "Luau/Type.h"
+#include "Luau/TypeFunction.h"
 
 #include "IostreamOptional.h"
 #include "ScopedFlags.h"
@@ -98,6 +99,7 @@ struct Fixture
     TypeId requireExportedType(const ModuleName& moduleName, const std::string& name);
 
     ScopedFastFlag sff_DebugLuauFreezeArena;
+    ScopedFastFlag sff_LuauDCRMagicFunctionTypeChecker;
 
     TestFileResolver fileResolver;
     TestConfigResolver configResolver;

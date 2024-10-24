@@ -7,7 +7,7 @@
 
 #include "doctest.h"
 
-LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
+LUAU_FASTFLAG(LuauSolverV2);
 LUAU_FASTFLAG(LuauNativeAttribute);
 LUAU_FASTFLAG(LintRedundantNativeAttribute);
 
@@ -1265,7 +1265,7 @@ _ = {
 
 TEST_CASE_FIXTURE(Fixture, "read_write_table_props")
 {
-    ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
 
     LintResult result = lint(R"(-- line 1
         type A = {x: number}
@@ -1658,6 +1658,10 @@ table.create(42, {} :: {})
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "TableOperationsIndexer")
 {
+    // CLI-116824 Linter incorrectly issues false positive when taking the length of a unannotated string function argument
+    if (FFlag::LuauSolverV2)
+        return;
+
     LintResult result = lint(R"(
 local t1 = {} -- ok: empty
 local t2 = {1, 2} -- ok: array

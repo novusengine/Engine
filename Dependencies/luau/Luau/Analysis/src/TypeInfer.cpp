@@ -34,8 +34,7 @@ LUAU_FASTFLAGVARIABLE(DebugLuauFreezeDuringUnification, false)
 LUAU_FASTFLAG(LuauInstantiateInSubtyping)
 LUAU_FASTFLAGVARIABLE(LuauRemoveBadRelationalOperatorWarning, false)
 LUAU_FASTFLAGVARIABLE(LuauOkWithIteratingOverTableProperties, false)
-LUAU_FASTFLAGVARIABLE(LuauReusableSubstitutions, false)
-LUAU_FASTFLAG(LuauDeclarationExtraPropData)
+LUAU_FASTFLAGVARIABLE(LuauAcceptIndexingTableUnionsIntersections, false)
 
 namespace Luau
 {
@@ -1756,28 +1755,22 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatDeclareClass&
                 ftv->argTypes = addTypePack(TypePack{{classTy}, ftv->argTypes});
                 ftv->hasSelf = true;
 
-                if (FFlag::LuauDeclarationExtraPropData)
-                {
-                    FunctionDefinition defn;
+                FunctionDefinition defn;
 
-                    defn.definitionModuleName = currentModule->name;
-                    defn.definitionLocation = prop.location;
-                    // No data is preserved for varargLocation
-                    defn.originalNameLocation = prop.nameLocation;
+                defn.definitionModuleName = currentModule->name;
+                defn.definitionLocation = prop.location;
+                // No data is preserved for varargLocation
+                defn.originalNameLocation = prop.nameLocation;
 
-                    ftv->definition = defn;
-                }
+                ftv->definition = defn;
             }
         }
 
         if (assignTo.count(propName) == 0)
         {
-            if (FFlag::LuauDeclarationExtraPropData)
-                assignTo[propName] = {propTy, /*deprecated*/ false, /*deprecatedSuggestion*/ "", prop.location};
-            else
-                assignTo[propName] = {propTy};
+            assignTo[propName] = {propTy, /*deprecated*/ false, /*deprecatedSuggestion*/ "", prop.location};
         }
-        else if (FFlag::LuauDeclarationExtraPropData)
+        else
         {
             Luau::Property& prop = assignTo[propName];
             TypeId currentTy = prop.type();
@@ -1799,31 +1792,6 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatDeclareClass&
 
                 prop.readTy = intersection;
                 prop.writeTy = intersection;
-            }
-            else
-            {
-                reportError(declaredClass.location, GenericError{format("Cannot overload non-function class member '%s'", propName.c_str())});
-            }
-        }
-        else
-        {
-            TypeId currentTy = assignTo[propName].type();
-
-            // We special-case this logic to keep the intersection flat; otherwise we
-            // would create a ton of nested intersection types.
-            if (const IntersectionType* itv = get<IntersectionType>(currentTy))
-            {
-                std::vector<TypeId> options = itv->parts;
-                options.push_back(propTy);
-                TypeId newItv = addType(IntersectionType{std::move(options)});
-
-                assignTo[propName] = {newItv};
-            }
-            else if (get<FunctionType>(currentTy))
-            {
-                TypeId intersection = addType(IntersectionType{{currentTy, propTy}});
-
-                assignTo[propName] = {intersection};
             }
             else
             {
@@ -1870,13 +1838,10 @@ ControlFlow TypeChecker::check(const ScopePtr& scope, const AstStatDeclareFuncti
 
     FunctionDefinition defn;
 
-    if (FFlag::LuauDeclarationExtraPropData)
-    {
-        defn.definitionModuleName = currentModule->name;
-        defn.definitionLocation = global.location;
-        defn.varargLocation = global.vararg ? std::make_optional(global.varargLocation) : std::nullopt;
-        defn.originalNameLocation = global.nameLocation;
-    }
+    defn.definitionModuleName = currentModule->name;
+    defn.definitionLocation = global.location;
+    defn.varargLocation = global.vararg ? std::make_optional(global.varargLocation) : std::nullopt;
+    defn.originalNameLocation = global.nameLocation;
 
     TypeId fnType = addType(FunctionType{funScope->level, std::move(genericTys), std::move(genericTps), argPack, retPack, defn});
     FunctionType* ftv = getMutable<FunctionType>(fnType);
@@ -2786,7 +2751,7 @@ TypeId TypeChecker::checkRelationalOperation(
         if (lhsIsAny || rhsIsAny)
             return booleanType;
 
-        // Fallthrough here is intentional
+        [[fallthrough]];
     }
     case AstExprBinary::CompareLt:
     case AstExprBinary::CompareGt:
@@ -3542,54 +3507,207 @@ TypeId TypeChecker::checkLValueBinding(const ScopePtr& scope, const AstExprIndex
         }
     }
 
-    TableType* exprTable = getMutableTableType(exprType);
-
-    if (!exprTable)
+    if (FFlag::LuauAcceptIndexingTableUnionsIntersections)
     {
-        reportError(TypeError{expr.expr->location, NotATable{exprType}});
-        return errorRecoveryType(scope);
-    }
+        // We're going to have a whole vector.
+        std::vector<TableType*> tableTypes{};
+        bool isUnion = true;
 
-    if (value)
-    {
-        const auto& it = exprTable->props.find(value->value.data);
-        if (it != exprTable->props.end())
+        // We'd like for normalization eventually to deal with this sort of thing, but as a tactical affordance, we will
+        // attempt to deal with _one_ level of unions or intersections.
+        if (auto exprUnion = get<UnionType>(exprType))
         {
-            return it->second.type();
+            tableTypes.reserve(exprUnion->options.size());
+
+            for (auto option : exprUnion)
+            {
+                TableType* optionTable = getMutableTableType(option);
+
+                if (!optionTable)
+                {
+                    // TODO: we could do better here and report `option` is not a table as reasoning for the error
+                    reportError(TypeError{expr.expr->location, NotATable{exprType}});
+                    return errorRecoveryType(scope);
+                }
+
+                tableTypes.push_back(optionTable);
+            }
         }
-        else if ((ctx == ValueContext::LValue && exprTable->state == TableState::Unsealed) || exprTable->state == TableState::Free)
+        else if (auto exprIntersection = get<IntersectionType>(exprType))
         {
-            TypeId resultType = freshType(scope);
-            Property& property = exprTable->props[value->value.data];
-            property.setType(resultType);
-            property.location = expr.index->location;
-            return resultType;
+            tableTypes.reserve(exprIntersection->parts.size());
+            isUnion = false;
+
+            for (auto part : exprIntersection)
+            {
+                TableType* partTable = getMutableTableType(part);
+
+                if (!partTable)
+                {
+                    // TODO: we could do better here and report `part` is not a table as reasoning for the error
+                    reportError(TypeError{expr.expr->location, NotATable{exprType}});
+                    return errorRecoveryType(scope);
+                }
+
+                tableTypes.push_back(partTable);
+            }
         }
-    }
+        else if (auto exprTable = getMutableTableType(exprType))
+        {
+            tableTypes.push_back(exprTable);
+        }
+        else
+        {
+            reportError(TypeError{expr.expr->location, NotATable{exprType}});
+            return errorRecoveryType(scope);
+        }
 
-    if (exprTable->indexer)
-    {
-        const TableIndexer& indexer = *exprTable->indexer;
-        unify(indexType, indexer.indexType, scope, expr.index->location);
-        return indexer.indexResultType;
-    }
-    else if ((ctx == ValueContext::LValue && exprTable->state == TableState::Unsealed) || exprTable->state == TableState::Free)
-    {
-        TypeId indexerType = freshType(exprTable->level);
-        unify(indexType, indexerType, scope, expr.location);
-        TypeId indexResultType = freshType(exprTable->level);
+        if (value)
+        {
+            DenseHashSet<TypeId> propTypes{{}};
 
-        exprTable->indexer = TableIndexer{anyIfNonstrict(indexerType), anyIfNonstrict(indexResultType)};
-        return indexResultType;
+            for (auto table : tableTypes)
+            {
+                const auto& it = table->props.find(value->value.data);
+                if (it != table->props.end())
+                {
+                    propTypes.insert(it->second.type());
+                }
+                else if ((ctx == ValueContext::LValue && table->state == TableState::Unsealed) || table->state == TableState::Free)
+                {
+                    TypeId resultType = freshType(scope);
+                    Property& property = table->props[value->value.data];
+                    property.setType(resultType);
+                    property.location = expr.index->location;
+                    propTypes.insert(resultType);
+                }
+            }
+
+            if (propTypes.size() == 1)
+                return *propTypes.begin();
+
+            if (!propTypes.empty())
+            {
+                if (isUnion)
+                {
+                    std::vector<TypeId> options = reduceUnion({propTypes.begin(), propTypes.end()});
+
+                    if (options.empty())
+                        return neverType;
+
+                    if (options.size() == 1)
+                        return options[0];
+
+                    return addType(UnionType{options});
+                }
+
+                return addType(IntersectionType{{propTypes.begin(), propTypes.end()}});
+            }
+        }
+
+        DenseHashSet<TypeId> resultTypes{{}};
+
+        for (auto table : tableTypes)
+        {
+            if (table->indexer)
+            {
+                const TableIndexer& indexer = *table->indexer;
+                unify(indexType, indexer.indexType, scope, expr.index->location);
+                resultTypes.insert(indexer.indexResultType);
+            }
+            else if ((ctx == ValueContext::LValue && table->state == TableState::Unsealed) || table->state == TableState::Free)
+            {
+                TypeId indexerType = freshType(table->level);
+                unify(indexType, indexerType, scope, expr.location);
+                TypeId indexResultType = freshType(table->level);
+
+                table->indexer = TableIndexer{anyIfNonstrict(indexerType), anyIfNonstrict(indexResultType)};
+                resultTypes.insert(indexResultType);
+            }
+            else
+            {
+                /*
+                 * If we use [] indexing to fetch a property from a sealed table that
+                 * has no indexer, we have no idea if it will work so we just return any
+                 * and hope for the best.
+                 */
+
+                // if this is a union, it's going to be equivalent to `any` no matter what at this point, so we'll just call it done.
+                if (isUnion)
+                    return anyType;
+
+                resultTypes.insert(anyType);
+            }
+        }
+
+        if (resultTypes.size() == 1)
+            return *resultTypes.begin();
+
+        if (isUnion)
+        {
+            std::vector<TypeId> options = reduceUnion({resultTypes.begin(), resultTypes.end()});
+
+            if (options.empty())
+                return neverType;
+
+            if (options.size() == 1)
+                return options[0];
+
+            return addType(UnionType{options});
+        }
+
+        return addType(IntersectionType{{resultTypes.begin(), resultTypes.end()}});
     }
     else
     {
-        /*
-         * If we use [] indexing to fetch a property from a sealed table that
-         * has no indexer, we have no idea if it will work so we just return any
-         * and hope for the best.
-         */
-        return anyType;
+        TableType* exprTable = getMutableTableType(exprType);
+        if (!exprTable)
+        {
+            reportError(TypeError{expr.expr->location, NotATable{exprType}});
+            return errorRecoveryType(scope);
+        }
+
+        if (value)
+        {
+            const auto& it = exprTable->props.find(value->value.data);
+            if (it != exprTable->props.end())
+            {
+                return it->second.type();
+            }
+            else if ((ctx == ValueContext::LValue && exprTable->state == TableState::Unsealed) || exprTable->state == TableState::Free)
+            {
+                TypeId resultType = freshType(scope);
+                Property& property = exprTable->props[value->value.data];
+                property.setType(resultType);
+                property.location = expr.index->location;
+                return resultType;
+            }
+        }
+
+        if (exprTable->indexer)
+        {
+            const TableIndexer& indexer = *exprTable->indexer;
+            unify(indexType, indexer.indexType, scope, expr.index->location);
+            return indexer.indexResultType;
+        }
+        else if ((ctx == ValueContext::LValue && exprTable->state == TableState::Unsealed) || exprTable->state == TableState::Free)
+        {
+            TypeId indexerType = freshType(exprTable->level);
+            unify(indexType, indexerType, scope, expr.location);
+            TypeId indexResultType = freshType(exprTable->level);
+
+            exprTable->indexer = TableIndexer{anyIfNonstrict(indexerType), anyIfNonstrict(indexResultType)};
+            return indexResultType;
+        }
+        else
+        {
+            /*
+             * If we use [] indexing to fetch a property from a sealed table that
+             * has no indexer, we have no idea if it will work so we just return any
+             * and hope for the best.
+             */
+            return anyType;
+        }
     }
 }
 
@@ -4991,24 +5109,12 @@ TypeId TypeChecker::instantiate(const ScopePtr& scope, TypeId ty, Location locat
 
     std::optional<TypeId> instantiated;
 
-    if (FFlag::LuauReusableSubstitutions)
-    {
-        reusableInstantiation.resetState(log, &currentModule->internalTypes, builtinTypes, scope->level, /*scope*/ nullptr);
+    reusableInstantiation.resetState(log, &currentModule->internalTypes, builtinTypes, scope->level, /*scope*/ nullptr);
 
-        if (instantiationChildLimit)
-            reusableInstantiation.childLimit = *instantiationChildLimit;
+    if (instantiationChildLimit)
+        reusableInstantiation.childLimit = *instantiationChildLimit;
 
-        instantiated = reusableInstantiation.substitute(ty);
-    }
-    else
-    {
-        Instantiation instantiation{log, &currentModule->internalTypes, builtinTypes, scope->level, /*scope*/ nullptr};
-
-        if (instantiationChildLimit)
-            instantiation.childLimit = *instantiationChildLimit;
-
-        instantiated = instantiation.substitute(ty);
-    }
+    instantiated = reusableInstantiation.substitute(ty);
 
     if (instantiated.has_value())
         return *instantiated;

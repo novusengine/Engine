@@ -9,7 +9,7 @@
 
 using namespace Luau;
 
-LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
+LUAU_FASTFLAG(LuauSolverV2);
 
 struct ToDotClassFixture : Fixture
 {
@@ -145,7 +145,7 @@ local function f(a, ...: string) return a end
     ToDotOptions opts;
     opts.showPointers = false;
 
-    if (FFlag::DebugLuauDeferredConstraintResolution)
+    if (FFlag::LuauSolverV2)
     {
         CHECK_EQ(
             R"(digraph graphname {
@@ -159,8 +159,10 @@ n4 [label="VariadicTypePack 4"];
 n4 -> n5;
 n5 [label="string"];
 n1 -> n6 [label="ret"];
-n6 [label="TypePack 6"];
-n6 -> n3;
+n6 [label="BoundTypePack 6"];
+n6 -> n7;
+n7 [label="TypePack 7"];
+n7 -> n3;
 })",
             toDot(requireType("f"), opts)
         );
@@ -240,7 +242,7 @@ local a: A<number, ...string>
 
     ToDotOptions opts;
     opts.showPointers = false;
-    if (FFlag::DebugLuauDeferredConstraintResolution)
+    if (FFlag::LuauSolverV2)
     {
         CHECK_EQ(
             R"(digraph graphname {
@@ -321,7 +323,7 @@ n3 [label="TableType 3"];
 TEST_CASE_FIXTURE(Fixture, "free")
 {
     ScopedFastFlag sff[] = {
-        {FFlag::DebugLuauDeferredConstraintResolution, false},
+        {FFlag::LuauSolverV2, false},
     };
 
     Type type{TypeVariant{FreeType{TypeLevel{0, 0}}}};
@@ -339,7 +341,7 @@ n1 [label="FreeType 1"];
 TEST_CASE_FIXTURE(Fixture, "free_with_constraints")
 {
     ScopedFastFlag sff[] = {
-        {FFlag::DebugLuauDeferredConstraintResolution, true},
+        {FFlag::LuauSolverV2, true},
     };
 
     Type type{TypeVariant{FreeType{nullptr, builtinTypes->numberType, builtinTypes->optionalNumberType}}};
