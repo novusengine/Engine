@@ -60,12 +60,16 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
     if os.target() == "windows" then
         local platformFiles =
         {
-            platformDir .. "/windows/ftdebug.c", -- TODO: Windows only
+            platformDir .. "/windows/ftdebug.c",
         }
         Solution.Util.MergeIntoTable(files, platformFiles)
         Solution.Util.MergeIntoTable(defines, { "WIN32", "WIN32_LEAN_AND_MEAN", "VC_EXTRALEAN" } )
     else
-       -- TODO Linux
+        local platformFiles =
+        {
+            sourceDir .. "/base/ftdebug.c",
+        }
+        Solution.Util.MergeIntoTable(files, platformFiles)
     end
 
     warnings "Off"
