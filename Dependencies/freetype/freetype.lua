@@ -46,7 +46,6 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
         sourceDir .. "/sdf/ftbsdf.c",
         sourceDir .. "/sdf/ftsdf.c",
         sourceDir .. "/sdf/ftsdfcommon.c",
-        sourceDir .. "/sdf/ftsdfrend.c",
         sourceDir .. "/sdf/sdf.c",
         sourceDir .. "/sfnt/sfnt.c",
         sourceDir .. "/svg/ftsvg.c",

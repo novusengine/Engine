@@ -30,7 +30,8 @@
 *.out
 *.app
 
-build*/ 
+build*/
+Build*/
 .vs/
 .vscode/
 out/
