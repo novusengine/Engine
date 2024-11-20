@@ -25,6 +25,9 @@ local dependencies =
     "quill/quill.lua",
     "asio/asio.lua",
     "hwloc/hwloc.lua",
+    "freetype/freetype.lua",
+    "msdfgen/msdfgen.lua",
+    "msdf-atlas-gen/msdf-atlas-gen.lua",
     "stb_vorbis/stb_vorbis.lua",
     "miniaudio/miniaudio.lua"
 }
