@@ -14,8 +14,7 @@
 
 #include <algorithm>
 
-LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution);
-LUAU_FASTFLAGVARIABLE(LuauSkipEmptyInstantiations, false);
+LUAU_FASTFLAG(LuauSolverV2);
 
 namespace Luau
 {
@@ -122,7 +121,7 @@ struct ClonePublicInterface : Substitution
 
         if (FunctionType* ftv = getMutable<FunctionType>(result))
         {
-            if (FFlag::LuauSkipEmptyInstantiations && ftv->generics.empty() && ftv->genericPacks.empty())
+            if (ftv->generics.empty() && ftv->genericPacks.empty())
             {
                 GenericTypeFinder marker;
                 marker.traverse(result);
@@ -220,7 +219,7 @@ void Module::clonePublicInterface(NotNull<BuiltinTypes> builtinTypes, InternalEr
     ScopePtr moduleScope = getModuleScope();
 
     TypePackId returnType = moduleScope->returnType;
-    std::optional<TypePackId> varargPack = FFlag::DebugLuauDeferredConstraintResolution ? std::nullopt : moduleScope->varargPack;
+    std::optional<TypePackId> varargPack = FFlag::LuauSolverV2 ? std::nullopt : moduleScope->varargPack;
 
     TxnLog log;
     ClonePublicInterface clonePublicInterface{&log, builtinTypes, this};

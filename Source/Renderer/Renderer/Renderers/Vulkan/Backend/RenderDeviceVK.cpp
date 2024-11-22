@@ -608,9 +608,9 @@ namespace Renderer
         {
             SwapChainSupportDetails swapChainSupport = swapChain->QuerySwapChainSupport(_physicalDevice);
 
-            if (SwapChainVK::FRAME_BUFFER_COUNT < swapChainSupport.capabilities.minImageCount || SwapChainVK::FRAME_BUFFER_COUNT > swapChainSupport.capabilities.maxImageCount)
+            if (FRAME_BUFFER_COUNT < swapChainSupport.capabilities.minImageCount || FRAME_BUFFER_COUNT > swapChainSupport.capabilities.maxImageCount)
             {
-                NC_LOG_CRITICAL("Physical device does not support the requested number of swapchain images, you requested {0}, and it supports between {1} and {2}", SwapChainVK::FRAME_BUFFER_COUNT, swapChainSupport.capabilities.minImageCount, swapChainSupport.capabilities.maxImageCount);
+                NC_LOG_CRITICAL("Physical device does not support the requested number of swapchain images, you requested {0}, and it supports between {1} and {2}", FRAME_BUFFER_COUNT, swapChainSupport.capabilities.minImageCount, swapChainSupport.capabilities.maxImageCount);
             }
 
             VkSurfaceFormatKHR surfaceFormat = swapChain->ChooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -623,7 +623,7 @@ namespace Renderer
             createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
             createInfo.surface = swapChain->surface;
 
-            createInfo.minImageCount = SwapChainVK::FRAME_BUFFER_COUNT;
+            createInfo.minImageCount = FRAME_BUFFER_COUNT;
             createInfo.imageFormat = surfaceFormat.format;
             createInfo.imageColorSpace = surfaceFormat.colorSpace;
             createInfo.imageExtent = extent;
@@ -670,7 +670,7 @@ namespace Renderer
 
         void RenderDeviceVK::CreateSemaphores(SwapChainVK* swapChain, SemaphoreHandlerVK* semaphoreHandler)
         {
-            for (u32 i = 0; i < SwapChainVK::FRAME_BUFFER_COUNT; i++)
+            for (u32 i = 0; i < FRAME_BUFFER_COUNT; i++)
             {
                 swapChain->imageAvailableSemaphores.Get(i) = semaphoreHandler->CreateNSemaphore();
                 swapChain->blitFinishedSemaphores.Get(i) = semaphoreHandler->CreateNSemaphore();
@@ -679,7 +679,7 @@ namespace Renderer
 
         void RenderDeviceVK::CreateImages(SwapChainVK* swapChain, ImageHandlerVK* imageHandler, VkFormat format)
         {
-            u32 imageCount = SwapChainVK::FRAME_BUFFER_COUNT;
+            u32 imageCount = FRAME_BUFFER_COUNT;
             vkGetSwapchainImagesKHR(_device, swapChain->swapChain, &imageCount, nullptr);
 
             for (u32 i = 0; i < imageCount; i++)

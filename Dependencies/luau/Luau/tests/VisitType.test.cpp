@@ -9,21 +9,34 @@
 using namespace Luau;
 
 LUAU_FASTINT(LuauVisitRecursionLimit);
-LUAU_FASTFLAG(DebugLuauDeferredConstraintResolution)
+LUAU_FASTFLAG(LuauSolverV2)
 
 TEST_SUITE_BEGIN("VisitType");
 
 TEST_CASE_FIXTURE(Fixture, "throw_when_limit_is_exceeded")
 {
-    ScopedFastInt sfi{FInt::LuauVisitRecursionLimit, 3};
+    if (FFlag::LuauSolverV2)
+    {
+        CheckResult result = check(R"(
+            local t : {a: {b: {c: {d: {e: boolean}}}}}
+        )");
+        ScopedFastInt sfi{FInt::LuauVisitRecursionLimit, 3};
+        TypeId tType = requireType("t");
 
-    CheckResult result = check(R"(
-        local t : {a: {b: {c: {d: {e: boolean}}}}}
-    )");
+        CHECK_THROWS_AS(toString(tType), RecursionLimitException);
+    }
+    else
+    {
+        ScopedFastInt sfi{FInt::LuauVisitRecursionLimit, 3};
 
-    TypeId tType = requireType("t");
+        CheckResult result = check(R"(
+            local t : {a: {b: {c: {d: {e: boolean}}}}}
+        )");
 
-    CHECK_THROWS_AS(toString(tType), RecursionLimitException);
+        TypeId tType = requireType("t");
+
+        CHECK_THROWS_AS(toString(tType), RecursionLimitException);
+    }
 }
 
 TEST_CASE_FIXTURE(Fixture, "dont_throw_when_limit_is_high_enough")
@@ -48,7 +61,7 @@ TEST_CASE_FIXTURE(Fixture, "some_free_types_do_not_have_bounds")
 
 TEST_CASE_FIXTURE(Fixture, "some_free_types_have_bounds")
 {
-    ScopedFastFlag sff{FFlag::DebugLuauDeferredConstraintResolution, true};
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
 
     Scope scope{builtinTypes->anyTypePack};
     Type t{FreeType{&scope, builtinTypes->neverType, builtinTypes->numberType}};

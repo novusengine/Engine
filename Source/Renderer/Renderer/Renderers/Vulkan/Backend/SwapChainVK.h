@@ -25,6 +25,8 @@ namespace Renderer
             std::vector<VkPresentModeKHR> presentModes;
         };
 
+        static const u32 FRAME_BUFFER_COUNT = 2;
+
         struct SwapChainVK : public SwapChain
         {
             SwapChainVK(RenderDeviceVK* inDevice) 
@@ -126,7 +128,6 @@ namespace Renderer
             VkSurfaceKHR surface;
             VkSwapchainKHR swapChain;
 
-            inline static const u32 FRAME_BUFFER_COUNT = 2;
             FrameResource<ImageID, FRAME_BUFFER_COUNT> imageIDs;
             FrameResource<SemaphoreID, FRAME_BUFFER_COUNT> imageAvailableSemaphores;
             FrameResource<SemaphoreID, FRAME_BUFFER_COUNT> blitFinishedSemaphores;

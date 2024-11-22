@@ -38,7 +38,7 @@
 
 #include <stdio.h>
 
-LUAU_FASTFLAGVARIABLE(StudioReportLuauAny, false);
+LUAU_FASTFLAGVARIABLE(StudioReportLuauAny2, false);
 LUAU_FASTINTVARIABLE(LuauAnySummaryRecursionLimit, 300);
 
 LUAU_FASTFLAG(DebugLuauMagicTypes);
@@ -136,6 +136,7 @@ void AnyTypeSummary::visit(const Scope* scope, AstStatReturn* ret, const Module*
     const Scope* retScope = findInnerMostScope(ret->location, module);
 
     auto ctxNode = getNode(rootSrc, ret);
+    bool seenTP = false;
 
     for (auto val : ret->list)
     {
@@ -160,7 +161,23 @@ void AnyTypeSummary::visit(const Scope* scope, AstStatReturn* ret, const Module*
                 typeInfo.push_back(ti);
             }
         }
+        
+        if (ret->list.size > 1 && !seenTP)
+        {
+            if (containsAny(retScope->returnType))
+            {
+                seenTP = true;
+
+                TelemetryTypePair types;
+
+                types.inferredType = toString(retScope->returnType);
+
+                TypeInfo ti{Pattern::TypePk, toString(ctxNode), types};
+                typeInfo.push_back(ti);
+            }
+        }
     }
+
 }
 
 void AnyTypeSummary::visit(const Scope* scope, AstStatLocal* local, const Module* module, NotNull<BuiltinTypes> builtinTypes)
@@ -189,19 +206,22 @@ void AnyTypeSummary::visit(const Scope* scope, AstStatLocal* local, const Module
                     typeInfo.push_back(ti);
                 }
             }
-            
+
             const AstExprTypeAssertion* maybeRequire = local->values.data[posn]->as<AstExprTypeAssertion>();
             if (!maybeRequire)
                 continue;
 
-            if (isAnyCast(scope, local->values.data[posn], module, builtinTypes))
+            if (std::min(local->values.size - 1, posn) < head.size())
             {
-                TelemetryTypePair types;
+                if (isAnyCast(scope, local->values.data[posn], module, builtinTypes))
+                {
+                    TelemetryTypePair types;
 
-                types.inferredType = toString(head[std::min(local->values.size - 1, posn)]);
+                    types.inferredType = toString(head[std::min(local->values.size - 1, posn)]);
 
-                TypeInfo ti{Pattern::Casts, toString(ctxNode), types};
-                typeInfo.push_back(ti);
+                    TypeInfo ti{Pattern::Casts, toString(ctxNode), types};
+                    typeInfo.push_back(ti);
+                }
             }
         }
         else
@@ -275,7 +295,7 @@ void AnyTypeSummary::visit(const Scope* scope, AstStatAssign* assign, const Modu
             types.annotatedType = toString(tp);
 
             auto loc = std::min(assign->vars.size - 1, posn);
-            if (head.size() >= assign->vars.size)
+            if (head.size() >= assign->vars.size && posn < head.size())
             {
                 types.inferredType = toString(head[posn]);
             }
@@ -672,7 +692,7 @@ bool AnyTypeSummary::containsAny(TypeId typ)
     {
         for (auto& [_name, prop] : ty->props)
         {
-            if (FFlag::DebugLuauDeferredConstraintResolution)
+            if (FFlag::LuauSolverV2)
             {
                 if (auto newT = follow(prop.readTy))
                 {
