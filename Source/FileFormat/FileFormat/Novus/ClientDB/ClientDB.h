@@ -108,17 +108,18 @@ namespace ClientDB
         void AddRow(T& row)
         {
             u32 originalSize = Count();
+            bool isEmpty = originalSize == 0;
             u32 originalMinID = _minID;
-            u32 originalMaxID = originalSize == 0 ? 0 : (originalSize + originalMinID) - 1;
+            u32 originalMaxID = isEmpty ? 0 : (originalSize + originalMinID) - 1;
 
             // auto assign id if id is u32 max
             if (row.id == std::numeric_limits<u32>().max())
             {
-                row.id = originalMaxID + 1;
+                row.id = (originalMaxID + 1) * !isEmpty;
             }
 
             bool hasNewMin = row.id < originalMinID;
-            bool hasNewMax = row.id > originalMaxID || originalSize == 0;
+            bool hasNewMax = row.id > originalMaxID || isEmpty;
             if (hasNewMin || hasNewMax)
             {
                 u32 newMinID = glm::min(originalMinID, row.id);
@@ -197,8 +198,9 @@ namespace ClientDB
 
             result += sizeof(FileHeader);
             result += sizeof(Flags);
-            result += sizeof(u32); // numRows
             result += sizeof(u32); // minID
+            result += sizeof(u32); // maxID
+            result += sizeof(u32); // numRows
             result += sizeof(u32) + stringTable.GetNumBytes();
             result += sizeof(T) * Count(); // Rows
 
@@ -225,6 +227,7 @@ namespace ClientDB
             }
 
             u32 maxID = 0;
+            u32 numRows = 0;
 
             if (!buffer->GetU32(_minID))
                 return false;
@@ -232,7 +235,9 @@ namespace ClientDB
             if (!buffer->GetU32(maxID))
                 return false;
 
-            u32 numRows = maxID - _minID + 1;
+            if (!buffer->GetU32(numRows))
+                return false;
+
             _rows.resize(numRows);
 
             Novus::Container::StringTableUnsafe stringTable;
@@ -275,6 +280,7 @@ namespace ClientDB
 
             u32 minID = std::numeric_limits<u32>().max();
             u32 maxID = 0;
+            u32 numRows = Count();
 
             for (T* row : _rows)
             {
@@ -292,6 +298,9 @@ namespace ClientDB
                 return false;
 
             if (!buffer->PutU32(maxID))
+                return false;
+
+            if (!buffer->PutU32(numRows))
                 return false;
 
             stringTable.Serialize(buffer.get());
