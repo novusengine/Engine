@@ -397,6 +397,7 @@ Solution.Util.GetFilesForCpp = function(basePath)
         (basePath .. "/**.hpp"),
         (basePath .. "/**.c"),
         (basePath .. "/**.cpp"),
+        (basePath .. "/**.natvis"),
     }
 
     return files

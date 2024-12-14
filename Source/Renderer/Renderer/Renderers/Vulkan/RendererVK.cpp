@@ -65,7 +65,7 @@ namespace Renderer
         _imageHandler->PostInit();
         _textureHandler->InitDebugTexture();
 
-        CreateDummyPipeline();
+        //CreateDummyPipeline();
     }
 
     void RendererVK::InitWindow(Novus::Window* window)
@@ -102,7 +102,7 @@ namespace Renderer
         _shaderHandler->ReloadShaders(forceRecompileAll);
         _pipelineHandler->DiscardPipelines();
 
-        CreateDummyPipeline();
+        //CreateDummyPipeline();
     }
 
     void RendererVK::ClearUploadBuffers()
@@ -297,7 +297,7 @@ namespace Renderer
             _device->SetRenderSize(_renderSize);
 
             _pipelineHandler->DiscardPipelines();
-            CreateDummyPipeline();
+            //CreateDummyPipeline();
 
             _imageHandler->OnResize(false);
 
@@ -1042,7 +1042,7 @@ namespace Renderer
         _device->RecreateSwapChain(_imageHandler, _semaphoreHandler, swapChain);
         
         _pipelineHandler->DiscardPipelines();
-        CreateDummyPipeline();
+        //CreateDummyPipeline();
         
         _imageHandler->OnResize(true);
     }
