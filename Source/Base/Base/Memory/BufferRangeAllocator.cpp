@@ -1,18 +1,23 @@
 #include "BufferRangeAllocator.h"
 #include "Base/Util/DebugHandler.h"
 
-void BufferRangeAllocator::Init(size_t bufferOffset, size_t bufferSize)
+void BufferRangeAllocator::Init(size_t bufferOffset, size_t bufferSize, size_t freeSize)
 {
     _freeFrames.reserve(64);
     _freeFrames.clear();
 
+    if (freeSize == std::numeric_limits<size_t>::max())
+    {
+        freeSize = bufferSize;
+    }
+
     BufferRangeFrame& frame = _freeFrames.emplace_back();
     frame.offset = bufferOffset;
-    frame.size = bufferSize;
+    frame.size = freeSize;
 
     _currentOffset = bufferOffset;
     _currentSize = bufferSize;
-    _allocatedBytes = 0;
+    _allocatedBytes = bufferOffset;
 }
 
 void BufferRangeAllocator::Reset()
@@ -144,7 +149,7 @@ bool BufferRangeAllocator::Free(const BufferRangeFrame& frame)
 
     // Reclaim alignment as well
 
-    _allocatedBytes -= frame.size;
+    //_allocatedBytes -= frame.size; // This looks very sus to me so I disabled it for now... If we're using this to for example loop over data it would be bad
 
     return true;
 }
@@ -183,4 +188,7 @@ void BufferRangeAllocator::TryMergeFrames()
             _freeFrames.erase(_freeFrames.begin() + i + 1);
         }
     }
+
+    // Sort the free frames by offset
+    std::sort(_freeFrames.begin(), _freeFrames.end(), [](const BufferRangeFrame& a, const BufferRangeFrame& b) { return a.offset < b.offset; });
 }

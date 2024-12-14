@@ -1,0 +1,177 @@
+#include <catch2/catch2.hpp>
+
+#include <Renderer/Renderer.h>
+#include <Renderer/Renderers/Vulkan/RendererVK.h>
+#include <Renderer/GPUVector.h>
+#include <Renderer/Window.h>
+#include <imgui/imgui.h>
+#include <imgui/backends/imgui_impl_glfw.h>
+
+#include <filesystem>
+namespace fs = std::filesystem;
+
+void VerifyU32Vector(Renderer::GPUVector<u32>& vector, u32 expectedCount, u32 expectedCapacity)
+{
+    bool expectedIsEmpty = expectedCount == 0;
+
+    REQUIRE(vector.IsEmpty() == expectedIsEmpty);
+    REQUIRE(vector.Count() == expectedCount);
+    REQUIRE(vector.Capacity() == expectedCapacity);
+    REQUIRE(vector.CountByteSize() == expectedCount * vector.ELEMENT_SIZE);
+    REQUIRE(vector.CapacityByteSize() == expectedCapacity * vector.ELEMENT_SIZE);
+}
+
+TEST_CASE("GPU Vector", "[Renderer]")
+{
+    // Set up logger
+    quill::Backend::start();
+
+    auto console_sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("console_sink_1");
+    quill::Logger* logger = quill::Frontend::create_or_get_logger("root", std::move(console_sink), "%(time:<16) LOG_%(log_level:<11) %(message)", "%H:%M:%S.%Qms", quill::Timezone::LocalTime, quill::ClockSourceType::System);
+
+    // Create window
+    Novus::Window* window = new Novus::Window();
+    window->Init(800, 600);
+
+    // Create and init renderer
+    Renderer::Renderer* renderer = new Renderer::RendererVK(window);
+
+    fs::path absoluteShaderSourcePath = fs::absolute("Data/ShaderSrc/");
+    renderer->SetShaderSourceDirectory(absoluteShaderSourcePath.string());
+
+    ImGui::CreateContext(); // TODO: Make it optional to have ImGui enabled
+    ImGui_ImplGlfw_InitForVulkan(window->GetWindow(), true);
+    renderer->InitImgui();
+
+    renderer->InitDebug();
+    renderer->InitWindow(window);
+
+    // Create rendertarget
+    Renderer::ImageDesc finalColorDesc;
+    finalColorDesc.debugName = "FinalColor";
+    finalColorDesc.dimensions = vec2(1.0f, 1.0f);
+    finalColorDesc.dimensionType = Renderer::ImageDimensionType::DIMENSION_SCALE_WINDOW;
+    finalColorDesc.format = Renderer::ImageFormat::R16G16B16A16_FLOAT;
+    finalColorDesc.sampleCount = Renderer::SampleCount::SAMPLE_COUNT_1;
+    finalColorDesc.clearColor = Color(0.43f, 0.50f, 0.56f, 1.0f); // Slate gray
+
+    Renderer::ImageID finalColor = renderer->CreateImage(finalColorDesc);
+
+    // Create a GPU Vector
+    Renderer::GPUVector<u32> u32Vector;
+
+    // Add elements to the vector using default initialization
+    for (i32 i = 0; i < 10; i++)
+    {
+        u32Vector.Add();
+    }
+    VerifyU32Vector(u32Vector, 10, 16);
+
+    // Verify contents of the vector
+    for (i32 i = 0; i < 10; i++)
+    {
+        REQUIRE(u32Vector[i] == 0);
+    }
+
+    // And again using the iterator loop
+    {
+        i32 i = 0;
+        for (u32 val : u32Vector)
+        {
+            REQUIRE(val == 0);
+            i++;
+        }
+        REQUIRE(i == 10);
+    }
+
+    // Clear the vector
+    u32Vector.Clear();
+
+    // Verify that the vector is empty but has capacity
+    VerifyU32Vector(u32Vector, 0, 16);
+
+    // Make sure the iterator loop doesn't hit
+    for (u32 val : u32Vector)
+    {
+        REQUIRE(false);
+    }
+
+    // Re-add elements to the vector, this time using values
+    for (i32 i = 0; i < 10; i++)
+    {
+        u32Vector.Add(i);
+    }
+    VerifyU32Vector(u32Vector, 10, 16);
+
+    // Grow the vector again
+    for (i32 i = 0; i < 10; i++)
+    {
+        u32Vector.Add(10+i);
+    }
+    VerifyU32Vector(u32Vector, 20, 24);
+
+    // Verify contents of the vector
+    for (i32 i = 0; i < 20; i++)
+    {
+        REQUIRE(u32Vector[i] == i);
+    }
+
+    // Create a couple of gap in the vector by removing some elements
+    for (i32 i = 5; i < 8; i++)
+    {
+        u32Vector.Remove(i);
+    }
+    u32Vector.Remove(15, 3);
+    VerifyU32Vector(u32Vector, 20, 24); // Removing does not change size or capacity until .Compress()
+
+    // Compress the vector
+    u32Vector.Compress();
+
+    // Verify the vector is now smaller
+    VerifyU32Vector(u32Vector, 14, 24);
+
+    // Verify the contents of the vector
+    i32 index = 0;
+    for (i32 i = 0; i < 20; i++)
+    {
+        if (i >= 5 && i < 8)
+        {
+            continue; // Skip the first gap
+        }
+
+        if (i >= 15 && i < 18)
+        {
+            continue; // Skip the second gap
+        }
+
+        REQUIRE(u32Vector[index++] == i);
+    }
+
+    /*
+    // Create a GPU Vector
+    Renderer::GPUVector<u32> u32Vector;
+    
+    // Get underlying vector
+    std::vector<u32>& vector = u32Vector.Get();
+    
+    // Push values into it
+    for (i32 i = 0; i < 10; i++)
+    {
+        vector.Add(i);
+    }
+
+    // Sync to GPU
+    u32Vector.SyncToGPU(renderer);
+
+    u32 frameIndex = 0;
+    f32 timeWaited = renderer->FlipFrame(frameIndex);
+
+    Renderer::SemaphoreID uploadFinishedSemaphore = renderer->GetUploadFinishedSemaphore();
+
+    renderer->Present(window, finalColor, uploadFinishedSemaphore);
+
+    vector[0] = 100;
+
+    // Validate
+    REQUIRE(u32Vector.Validate());*/
+}
