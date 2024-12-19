@@ -7,6 +7,7 @@ struct BufferRangeFrame
 {
     size_t offset = 0;
     size_t size = 0;
+    bool wasHole = false;
 };
 
 class BufferRangeAllocator
@@ -14,7 +15,7 @@ class BufferRangeAllocator
 public:
     BufferRangeAllocator() { }
 
-    void Init(size_t bufferOffset, size_t bufferSize);
+    void Init(size_t bufferOffset, size_t bufferSize, size_t freeSize = std::numeric_limits<size_t>::max());
     void Reset();
 
     bool Allocate(size_t size, BufferRangeFrame& frame);
@@ -22,12 +23,13 @@ public:
     bool Free(const BufferRangeFrame& frame);
     bool Grow(size_t newSize);
 
-    size_t Offset() { return _currentOffset; }
-    size_t Size() { return _currentSize; }
-    size_t AllocatedBytes() { return _allocatedBytes; }
-private:
+    inline size_t Offset() const { return _currentOffset; }
+    inline size_t Size() const { return _currentSize; }
+    inline size_t AllocatedBytes() const { return _allocatedBytes; }
+
     void TryMergeFrames();
-    
+    std::vector<BufferRangeFrame>& GetFreeFrames() { return _freeFrames; }
+
 private:
     size_t _currentOffset = 0;
     size_t _currentSize = 0;

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="Renderer::GPUVector&lt;*,*&gt;">
+    <Expand>
+      <Item Name="_gpuInitialized">_gpuInitialized</Item>
+      <Item Name="_validateTransfers">_validateTransfers</Item>
+      <Item Name="_isCompressed">_isCompressed</Item>
+      <Item Name="_renderer">_renderer</Item>
+      <Item Name="_allocator">_allocator</Item>
+      <Item Name="Count">_allocator._allocatedBytes / ELEMENT_SIZE</Item>
+      <Item Name="Used Bytes">_allocator._allocatedBytes</Item>
+      <Item Name="Capacity">_allocator._currentSize / ELEMENT_SIZE</Item>
+      <Item Name="Total Bytes">_allocator._currentSize</Item>
+      <Synthetic Name="_data">
+        <Expand>
+          <ArrayItems>
+            <Size>_allocator._allocatedBytes / ELEMENT_SIZE</Size>
+            <ValuePointer>(($T1*)_data)</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Item Name="_dirtyRegions">_dirtyRegions</Item>
+      <Item Name="_usage">_usage</Item>
+      <Item Name="_gpuBufferUsedBytes">_gpuBufferUsedBytes</Item>
+      <Item Name="_gpuBufferTotalBytes">_gpuBufferTotalBytes</Item>
+      <Item Name="_gpuBuffer">_gpuBuffer</Item>
+      <Item Name="_validationBuffer">_validationBuffer</Item>
+    </Expand>
+  </Type>
+</AutoVisualizer>
