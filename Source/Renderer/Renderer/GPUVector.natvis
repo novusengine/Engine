@@ -8,9 +8,9 @@
       <Item Name="_renderer">_renderer</Item>
       <Item Name="_allocator">_allocator</Item>
       <Item Name="Count">_allocator._allocatedBytes / ELEMENT_SIZE</Item>
-      <Item Name="Byte Size (Count)">_allocator._allocatedBytes</Item>
+      <Item Name="Used Bytes">_allocator._allocatedBytes</Item>
       <Item Name="Capacity">_allocator._currentSize / ELEMENT_SIZE</Item>
-      <Item Name="Byte Size (Capacity)">_allocator._currentSize</Item>
+      <Item Name="Total Bytes">_allocator._currentSize</Item>
       <Synthetic Name="_data">
         <Expand>
           <ArrayItems>
@@ -19,6 +19,12 @@
           </ArrayItems>
         </Expand>
       </Synthetic>
+      <Item Name="_dirtyRegions">_dirtyRegions</Item>
+      <Item Name="_usage">_usage</Item>
+      <Item Name="_gpuBufferUsedBytes">_gpuBufferUsedBytes</Item>
+      <Item Name="_gpuBufferTotalBytes">_gpuBufferTotalBytes</Item>
+      <Item Name="_gpuBuffer">_gpuBuffer</Item>
+      <Item Name="_validationBuffer">_validationBuffer</Item>
     </Expand>
   </Type>
 </AutoVisualizer>

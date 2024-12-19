@@ -7,6 +7,7 @@ struct BufferRangeFrame
 {
     size_t offset = 0;
     size_t size = 0;
+    bool wasHole = false;
 };
 
 class BufferRangeAllocator

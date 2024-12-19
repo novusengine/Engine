@@ -10,6 +10,59 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
+class QuillReporter : public Catch::EventListenerBase
+{
+public:
+    using Catch::EventListenerBase::EventListenerBase;
+
+    virtual void testCaseStarting(Catch::TestCaseInfo const& testInfo) override 
+    {
+        NC_LOG_INFO("Starting test: {}", testInfo.name);
+    }
+
+    virtual void testCaseEnded(Catch::TestCaseStats const& testCaseStats) override 
+    {
+        if (testCaseStats.totals.testCases.failed > 0) 
+        {
+            NC_LOG_ERROR("Test failed: {}", testCaseStats.testInfo->name);
+        }
+        else 
+        {
+            NC_LOG_INFO("Test passed: {}", testCaseStats.testInfo->name);
+        }
+    }
+
+    virtual void sectionStarting(Catch::SectionInfo const& sectionInfo) override 
+    {
+        NC_LOG_INFO("Entering section: {}", sectionInfo.name);
+    }
+
+    virtual void sectionEnded(Catch::SectionStats const& sectionStats) override 
+    {
+        NC_LOG_INFO("Finished section: {}, Duration: {}ns",
+            sectionStats.sectionInfo.name,
+            sectionStats.durationInSeconds * 1'000'000'000);
+    }
+
+    virtual void assertionEnded(Catch::AssertionStats const& assertionStats) override 
+    {
+        const auto& result = assertionStats.assertionResult;
+        if (!result.isOk()) 
+        {
+            NC_LOG_ERROR("Assertion failed in {}:{}: {}",
+                result.getSourceInfo().file,
+                result.getSourceInfo().line,
+                result.getExpression());
+        }
+        else 
+        {
+            NC_LOG_INFO("Assertion passed: {}", result.getExpression());
+        }
+    }
+};
+
+//CATCH_REGISTER_LISTENER(QuillReporter) // TODO: Enable this when we have a custom main function where we can start quill backend
+
 void VerifyU32Vector(Renderer::GPUVector<u32>& vector, u32 expectedCount, u32 expectedCapacity)
 {
     bool expectedIsEmpty = expectedCount == 0;
@@ -17,8 +70,18 @@ void VerifyU32Vector(Renderer::GPUVector<u32>& vector, u32 expectedCount, u32 ex
     REQUIRE(vector.IsEmpty() == expectedIsEmpty);
     REQUIRE(vector.Count() == expectedCount);
     REQUIRE(vector.Capacity() == expectedCapacity);
-    REQUIRE(vector.CountByteSize() == expectedCount * vector.ELEMENT_SIZE);
-    REQUIRE(vector.CapacityByteSize() == expectedCapacity * vector.ELEMENT_SIZE);
+    REQUIRE(vector.UsedBytes() == expectedCount * vector.ELEMENT_SIZE);
+    REQUIRE(vector.TotalBytes() == expectedCapacity * vector.ELEMENT_SIZE);
+}
+
+void WaitForUpload(Renderer::Renderer* renderer, Novus::Window* window, Renderer::ImageID rt)
+{
+    // Flip the frame and present to execute the upload
+    u32 frameIndex = 0;
+    f32 timeWaited = renderer->FlipFrame(frameIndex);
+
+    Renderer::SemaphoreID uploadFinishedSemaphore = renderer->GetUploadFinishedSemaphore();
+    renderer->Present(window, rt, uploadFinishedSemaphore);
 }
 
 TEST_CASE("GPU Vector", "[Renderer]")
@@ -59,6 +122,7 @@ TEST_CASE("GPU Vector", "[Renderer]")
 
     // Create a GPU Vector
     Renderer::GPUVector<u32> u32Vector;
+    u32Vector.SetDebugName("u32Vector");
 
     // Add elements to the vector using default initialization
     for (i32 i = 0; i < 10; i++)
@@ -73,28 +137,11 @@ TEST_CASE("GPU Vector", "[Renderer]")
         REQUIRE(u32Vector[i] == 0);
     }
 
-    // And again using the iterator loop
-    {
-        i32 i = 0;
-        for (u32 val : u32Vector)
-        {
-            REQUIRE(val == 0);
-            i++;
-        }
-        REQUIRE(i == 10);
-    }
-
     // Clear the vector
     u32Vector.Clear();
 
     // Verify that the vector is empty but has capacity
     VerifyU32Vector(u32Vector, 0, 16);
-
-    // Make sure the iterator loop doesn't hit
-    for (u32 val : u32Vector)
-    {
-        REQUIRE(false);
-    }
 
     // Re-add elements to the vector, this time using values
     for (i32 i = 0; i < 10; i++)
@@ -116,7 +163,7 @@ TEST_CASE("GPU Vector", "[Renderer]")
         REQUIRE(u32Vector[i] == i);
     }
 
-    // Create a couple of gap in the vector by removing some elements
+    // Create a couple of gaps in the vector by removing some elements
     for (i32 i = 5; i < 8; i++)
     {
         u32Vector.Remove(i);
@@ -131,47 +178,182 @@ TEST_CASE("GPU Vector", "[Renderer]")
     VerifyU32Vector(u32Vector, 14, 24);
 
     // Verify the contents of the vector
-    i32 index = 0;
-    for (i32 i = 0; i < 20; i++)
     {
-        if (i >= 5 && i < 8)
+        i32 index = 0;
+        for (i32 i = 0; i < 20; i++)
         {
-            continue; // Skip the first gap
-        }
+            if (i >= 5 && i < 8)
+            {
+                continue; // Skip the first gap
+            }
 
-        if (i >= 15 && i < 18)
-        {
-            continue; // Skip the second gap
-        }
+            if (i >= 15 && i < 18)
+            {
+                continue; // Skip the second gap
+            }
 
-        REQUIRE(u32Vector[index++] == i);
+            REQUIRE(u32Vector[index++] == i);
+        }
     }
 
-    /*
-    // Create a GPU Vector
-    Renderer::GPUVector<u32> u32Vector;
-    
-    // Get underlying vector
-    std::vector<u32>& vector = u32Vector.Get();
-    
-    // Push values into it
-    for (i32 i = 0; i < 10; i++)
+    // Correct the elements in the vector
+    for (i32 i = 0; i < 14; i++)
     {
-        vector.Add(i);
+        u32Vector[i] = i;
     }
 
-    // Sync to GPU
-    u32Vector.SyncToGPU(renderer);
+    // Create a new gap in the vector
+    u32Vector.Remove(5, 3);
 
-    u32 frameIndex = 0;
-    f32 timeWaited = renderer->FlipFrame(frameIndex);
+    // Verify the vector is the same size
+    VerifyU32Vector(u32Vector, 14, 24);
 
-    Renderer::SemaphoreID uploadFinishedSemaphore = renderer->GetUploadFinishedSemaphore();
+    // Add 3 elements which will fill gap
+    for (i32 i = 0; i < 3; i++)
+    {
+        u32Vector.Add(i);
+    }
 
-    renderer->Present(window, finalColor, uploadFinishedSemaphore);
+    // Verify the vector is the same size
+    VerifyU32Vector(u32Vector, 14, 24);
 
-    vector[0] = 100;
+    // Verify the contents of the vector
+    {
+        for (i32 i = 0; i < 14; i++)
+        {
+            if (i >= 5 && i < 8)
+            {
+                REQUIRE(u32Vector[i] == i - 5);
+            }
+            else
+            {
+                REQUIRE(u32Vector[i] == i);
+            }
+        }
+    }
 
-    // Validate
-    REQUIRE(u32Vector.Validate());*/
+    // Test GPU upload
+    {
+        REQUIRE(u32Vector.SyncToGPU(renderer)); // Require ensures that it grew
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+    }
+
+    // Test GPU upload with dirty element
+    {
+        u32Vector[5] = 100;
+        u32Vector.SetDirtyElement(5);
+
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+    }
+    
+    // Test GPU upload with dirty elements
+    {
+        u32Vector[8] = 100;
+        u32Vector[9] = 101;
+        u32Vector[10] = 102;
+        u32Vector.SetDirtyElements(8, 3);
+
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+    }
+
+    // Test GPU upload with whole buffer dirty
+    {
+        for (i32 i = 0; i < 14; i++)
+        {
+            u32Vector[i] = 100 + i;
+        }
+        u32Vector.SetDirty();
+
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+    }
+
+    // Test GPU upload with hole
+    {
+        u32Vector.Remove(5, 3);
+
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+
+        // Now fill the hole
+        u32Vector.Add(200);
+        u32Vector.Add(201);
+        u32Vector.Add(202);
+
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+    }
+
+    // Test GPU upload with compressed hole
+    {
+        u32Vector.Remove(5, 3);
+        u32Vector.Compress();
+
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+
+        // Now add to the end
+        u32Vector.Add(300);
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+    }
+
+    // Grow two frames in a row
+    {
+        for (u32 i = 0; i < 13; i++)
+        {
+            u32Vector.Add(400 + i);
+        }
+
+        REQUIRE(u32Vector.SyncToGPU(renderer)); // Require ensures that it grew
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+
+        for (u32 i = 0; i < 8; i++)
+        {
+            u32Vector.Add(500 + i);
+        }
+
+        REQUIRE(u32Vector.SyncToGPU(renderer)); // Require ensures that it grew
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+    }
+
+    // Test GPU upload with several dirty frames
+    {
+        for (i32 i = 0; i < 3; i++)
+        {
+            u32Vector[i] = 600 + i;
+        }
+        u32Vector.SetDirtyElements(0, 3);
+
+        for (i32 i = 7; i < 10; i++)
+        {
+            u32Vector[i] = 607 + i;
+        }
+        u32Vector.SetDirtyElements(7, 3);
+
+        for (i32 i = 30; i < 33; i++)
+        {
+            u32Vector[i] = 630 + i;
+        }
+        u32Vector.SetDirtyElements(30, 3);
+
+        REQUIRE(!u32Vector.SyncToGPU(renderer)); // Require ensures that it DIDN'T grow
+        WaitForUpload(renderer, window, finalColor);
+        REQUIRE(u32Vector.Validate());
+
+        // Wait one last frame
+        WaitForUpload(renderer, window, finalColor);
+    }
 }

@@ -48,27 +48,6 @@ namespace Renderer
             return *reinterpret_cast<T*>(&_data[offset]);
         }
 
-        // Iterator support
-        T* begin()
-        {
-            return reinterpret_cast<T*>(_data);
-        }
-
-        T* end()
-        {
-            return reinterpret_cast<T*>(_data) + Count();
-        }
-
-        const T* begin() const
-        {
-            return reinterpret_cast<const T*>(_data);
-        }
-
-        const T* end() const
-        {
-            return reinterpret_cast<const T*>(_data) + Count();
-        }
-
         // Adds a default initialized element
         // Returns the index of the added element
         inline u32 Add()
@@ -105,7 +84,13 @@ namespace Renderer
             }
 
             memcpy(&_data[frame.offset], &element, frame.size);
-            return frame.offset / ELEMENT_SIZE;
+
+            if (frame.wasHole)
+            {
+                SetDirtyRegion(frame.offset, frame.size);
+            }
+
+            return static_cast<u32>(frame.offset) / ELEMENT_SIZE;
         }
 
         // Removes an element at the specified index
@@ -161,15 +146,21 @@ namespace Renderer
         }
 
         // Returns the count size in bytes
-        inline u32 CountByteSize() const
+        inline u32 UsedBytes() const
         {
             return static_cast<u32>(_allocator.AllocatedBytes());
         }
 
         // Returns the capacity size in bytes
-        inline u32 CapacityByteSize() const
+        inline u32 TotalBytes() const
         {
             return static_cast<u32>(_allocator.Size());
+        }
+
+        // Returns if the vector is compressed so it has no gaps
+        inline bool IsCompressed() const
+        {
+            return _isCompressed;
         }
 
         // This compresses the vector so there are no free spaces between elements
@@ -190,8 +181,11 @@ namespace Renderer
                 return;
             }
 
-            u32 lastDataOffset = _allocator.AllocatedBytes();
+            u32 lastDataOffset = static_cast<u32>(_allocator.AllocatedBytes());
             u32 dataMovedSize = 0;
+
+            // Flag everything behind the first free frame as dirty
+            SetDirtyRegion(freeFrames[0].offset, lastDataOffset - freeFrames[0].offset);
 
             for (BufferRangeFrame& frame : freeFrames)
             {
@@ -201,15 +195,15 @@ namespace Renderer
                     break;
                 }
 
-                u32 freeRegionStart = frame.offset - dataMovedSize;
-                u32 freeRegionEnd = freeRegionStart + frame.size;
+                u32 freeRegionStart = static_cast<u32>(frame.offset) - dataMovedSize;
+                u32 freeRegionEnd = freeRegionStart + static_cast<u32>(frame.size);
 
                 u32 sizeOfDataBehindFrame = lastDataOffset - freeRegionEnd;
 
                 // memmove all data right of this frame left to fill the free region
                 memmove(&_data[freeRegionStart], &_data[freeRegionEnd], sizeOfDataBehindFrame);
 
-                dataMovedSize += frame.size;
+                dataMovedSize += static_cast<u32>(frame.size);
             }
 
             // Clear the free frames
@@ -222,6 +216,7 @@ namespace Renderer
 
             // Reinitialize the allocator
             _allocator.Init(newLastDataOffset, allocatorSize, freeSize);
+            _gpuBufferUsedBytes = std::min(_gpuBufferUsedBytes, static_cast<u32>(newLastDataOffset));
 
 #if NC_DEBUG
             // Memset the free region to 0xFF to mark the uninitialized memory
@@ -232,8 +227,216 @@ namespace Renderer
             _isCompressed = true;
         }
 
-    private:
+        inline bool IsDirty() const { return _dirtyRegions.size() > 0; }
 
+        void SetDirtyRegion(size_t offset, size_t size)
+        {
+            if (size == 0)
+            {
+                NC_LOG_CRITICAL("GPUVector::SetDirtyRegion: Size is 0, this is not allowed!");
+                return;
+            }
+
+            size_t allocatedBytes = _allocator.AllocatedBytes();
+            if (offset >= allocatedBytes)
+                return;
+
+            Region& dirtyRegion = _dirtyRegions.emplace_back();
+
+            dirtyRegion.offset = offset;
+            dirtyRegion.size = size;
+        }
+
+        void SetDirtyElement(size_t elementIndex)
+        {
+            SetDirtyRegion(elementIndex * ELEMENT_SIZE, ELEMENT_SIZE);
+        }
+
+        void SetDirtyElements(size_t startIndex, size_t count)
+        {
+            SetDirtyRegion(startIndex * ELEMENT_SIZE, count * ELEMENT_SIZE);
+        }
+
+        void SetDirty()
+        {
+            size_t size = _allocator.AllocatedBytes();
+            if (size == 0)
+                return;
+
+            SetDirtyRegion(0, size);
+        }
+
+        // Sets the debug name used for GPU debugging
+        void SetDebugName(const std::string& debugName)
+        {
+            _debugName = debugName;
+        }
+
+        // Sets the GPU usage
+        void SetUsage(u8 usage)
+        {
+            _usage = usage;
+        }
+        // Returns if the gpu buffer is valid
+        bool IsValid() { return _gpuBuffer != BufferID::Invalid(); }
+        // Returns the gpu buffer
+        BufferID GetBuffer() { return _gpuBuffer; }
+
+        // Returns true if we had to resize the GPU buffer
+        bool SyncToGPU(Renderer* renderer)
+        {
+            u32 cpuUsedBytes = UsedBytes();
+            u32 cpuTotalBytes = TotalBytes();
+
+            bool needsResize = cpuUsedBytes > _gpuBufferTotalBytes;
+            if (needsResize)
+            {
+                // Resize the buffer, this will copy what existed in the old buffer to the new buffer
+                ResizeBuffer(renderer, cpuTotalBytes, true);
+            }
+
+            bool needsNewUpload = cpuUsedBytes > _gpuBufferUsedBytes;
+            if (needsNewUpload)
+            {
+                // Create a dirty region for the new data
+                Region dirtyRegion;
+                dirtyRegion.offset = _gpuBufferUsedBytes;
+                dirtyRegion.size = cpuUsedBytes - _gpuBufferUsedBytes;
+                _dirtyRegions.push_back(dirtyRegion);
+                
+                _gpuBufferUsedBytes = cpuUsedBytes;
+            }
+
+            bool needsDirtyUpload = _dirtyRegions.size() > 0;
+            if (needsDirtyUpload)
+            {
+                UploadDirtyRegions(renderer);
+            }
+
+            return needsResize;
+        }
+
+        bool Validate()
+        {
+            // Create (or update) the buffer
+            BufferDesc validationDesc;
+            validationDesc.name = _debugName + " Validation Buffer";
+            validationDesc.size = UsedBytes();
+            validationDesc.usage = BufferUsage::TRANSFER_DESTINATION;
+            validationDesc.cpuAccess = BufferCPUAccess::ReadOnly;
+            _validationBuffer = _renderer->CreateBuffer(_validationBuffer, validationDesc);
+
+            NC_LOG_WARNING("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), Count(), validationDesc.size);
+
+            // Immediately copy from the GPU buffer to the validation buffer
+            _renderer->CopyBufferImmediate(_validationBuffer, 0, _gpuBuffer, 0, validationDesc.size);
+
+            // Map the validation buffer and check for differences
+            const T* validationData = reinterpret_cast<const T*>(_renderer->MapBuffer(_validationBuffer));
+
+            int result = memcmp(_data, validationData, validationDesc.size);
+            if (result != 0)
+            {
+                NC_LOG_ERROR("Validation failed for buffer {} ({} items, {} bytes)", _debugName.c_str(), Count(), validationDesc.size);
+                _renderer->UnmapBuffer(_validationBuffer);
+                return false;
+            }
+            _renderer->UnmapBuffer(_validationBuffer);
+
+            return true;
+        }
+    private:
+        void ResizeBuffer(Renderer* renderer, size_t newSize, bool copyOld)
+        {
+            BufferDesc desc;
+            desc.name = _debugName;
+            desc.size = newSize;
+            desc.usage = _usage | BufferUsage::TRANSFER_SOURCE | BufferUsage::TRANSFER_DESTINATION;
+
+            BufferID newBuffer = renderer->CreateBuffer(desc);
+
+            if (_gpuBuffer != BufferID::Invalid())
+            {
+                if (copyOld)
+                {
+                    if (_gpuBufferTotalBytes > 0)
+                    {
+                        renderer->CopyBuffer(newBuffer, 0, _gpuBuffer, 0, _gpuBufferTotalBytes);
+                    }
+                }
+                renderer->QueueDestroyBuffer(_gpuBuffer);
+            }
+
+            _gpuBufferTotalBytes = static_cast<u32>(newSize);
+            _gpuBuffer = newBuffer;
+            _renderer = renderer;
+        }
+
+        bool UploadDirtyRegions(Renderer* renderer)
+        {
+            if (_dirtyRegions.size() == 0)
+                return false;
+
+            // Sort dirtyRegions by offset
+            std::sort(_dirtyRegions.begin(), _dirtyRegions.end(), [](const Region& a, const Region& b)
+            {
+                return a.offset < b.offset;
+            });
+
+            u32 numDirtyRegions = static_cast<u32>(_dirtyRegions.size());
+
+            std::vector<u32> regionIndexToRemove;
+            regionIndexToRemove.reserve(numDirtyRegions);
+
+            i64 lastRegionEnd = -1;
+            u32 lastRegionIndex = 0;
+
+            for (u32 i = 0; i < numDirtyRegions; i++)
+            {
+                Region& curRegion = _dirtyRegions[i];
+                i64 curRegionEnd = static_cast<i64>(curRegion.offset + curRegion.size);
+
+                // curRegionEnd exists completely inside of lastRegionEnd
+                if (lastRegionEnd >= curRegionEnd)
+                {
+                    regionIndexToRemove.push_back(i);
+                }
+                // Partial Overlap / Merge detected
+                else if (lastRegionEnd >= static_cast<i64>(curRegion.offset))
+                {
+                    Region& prevRegion = _dirtyRegions[lastRegionIndex];
+
+                    i64 sizeDiff = curRegionEnd - lastRegionEnd;
+                    prevRegion.size += sizeDiff;
+
+                    regionIndexToRemove.push_back(i);
+                }
+                else
+                {
+                    lastRegionIndex = i;
+                }
+
+                lastRegionEnd = glm::max(lastRegionEnd, curRegionEnd);
+            }
+
+            i32 numDirtyRegionsToRemove = static_cast<i32>(regionIndexToRemove.size());
+            for (i32 i = numDirtyRegionsToRemove - 1; i >= 0; i--)
+            {
+                u32 index = regionIndexToRemove[i];
+                _dirtyRegions.erase(_dirtyRegions.begin() + index);
+            }
+
+            // Upload for all remaining dirtyRegions
+            for (const Region& dirtyRegion : _dirtyRegions)
+            {
+                renderer->UploadToBuffer(_gpuBuffer, dirtyRegion.offset, _data, dirtyRegion.offset, dirtyRegion.size);
+            }
+            _dirtyRegions.clear();
+
+            return true;
+        }
+
+    private:
         bool _gpuInitialized = false;
         bool _validateTransfers = false;
         bool _isCompressed = true;
@@ -241,7 +444,14 @@ namespace Renderer
         Renderer* _renderer = nullptr;
 
         BufferRangeAllocator _allocator;
-
         u8* _data = nullptr;
+
+        std::string _debugName = "";
+        u8 _usage = 0;
+        u32 _gpuBufferUsedBytes = 0;
+        u32 _gpuBufferTotalBytes = 0;
+        BufferID _gpuBuffer;
+        BufferID _validationBuffer;
+        std::vector<Region> _dirtyRegions;
     };
 }
