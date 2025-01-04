@@ -13,33 +13,235 @@
 namespace Renderer
 {
     // This is a combined Vector<T> with a backing GPU Buffer and BufferRangeAllocator keeping track of the offsets of the GPU Buffer
-    template <typename T>
+    // T is the type of the elements in the vector
+    // ELEMENTS_PER_BLOCK is the number of elements per block in the allocator, defaults to 8
+    template <typename T, u32 ELEMENTS_PER_BLOCK = 8>
     class GPUVector
     {
-        struct DirtyRegion
+        struct Region
         {
             size_t offset;
             size_t size;
         };
 
     public:
+        static const u32 ELEMENT_SIZE = sizeof(T);
+
+        // Constructor, pass true if you want to validate transfers to the GPU (SLOW, ONLY FOR DEBUGGING)
         GPUVector(bool validateTransfers = false)
             : _validateTransfers(validateTransfers)
         {
+            _allocator.Init(0, 0);
         }
+
+        // Non-const [] operator (allows modification)
+        T& operator[](u32 index)
+        {
+            u32 offset = index * ELEMENT_SIZE;
+            return *reinterpret_cast<T*>(&_data[offset]);
+        }
+
+        // Const [] operator (prevents modification)
+        const T& operator[](u32 index) const
+        {
+            u32 offset = index * ELEMENT_SIZE;
+            return *reinterpret_cast<T*>(&_data[offset]);
+        }
+
+        // Adds a default initialized element
+        // Returns the index of the added element
+        inline u32 Add()
+        {
+            return Add(T());
+        }
+
+        // Adds an element
+        // Returns the index of the added element
+        inline u32 Add(const T& element)
+        {
+            BufferRangeFrame frame;
+            if (!_allocator.Allocate(ELEMENT_SIZE, frame))
+            {
+                // Did not have room, so lets grow
+                size_t newSize = _allocator.Size() + (ELEMENT_SIZE * ELEMENTS_PER_BLOCK);
+                _allocator.Grow(newSize);
+
+                // Try again
+                if (!_allocator.Allocate(ELEMENT_SIZE, frame))
+                {
+                    NC_LOG_ERROR("Failed to allocate memory for GPUVector");
+                    return -1;
+                }
+
+                // Had to grow, so lets reallocate our data
+                u8* oldData = _data;
+                _data = new u8[_allocator.Size()];
+                if (oldData)
+                {
+                    memcpy(_data, oldData, frame.offset);
+                    delete[] oldData;
+                }
+            }
+
+            memcpy(&_data[frame.offset], &element, frame.size);
+
+            if (frame.wasHole)
+            {
+                SetDirtyRegion(frame.offset, frame.size);
+            }
+
+            return static_cast<u32>(frame.offset) / ELEMENT_SIZE;
+        }
+
+        // Removes an element at the specified index
+        // Leaves a hole in the data, you need to .Compress() the data to remove the hole
+        // Also doesn't decrease .Count() until compressed
+        inline void Remove(u32 index)
+        {
+            BufferRangeFrame frame;
+            frame.offset = index * ELEMENT_SIZE;
+            frame.size = ELEMENT_SIZE;
+            _allocator.Free(frame);
+
+            _isCompressed = false;
+        }
+
+        // Removes elements at the specified index and count
+        // Leaves a hole in the data, you need to .Compress() the data to remove the hole
+        // Also doesn't decrease .Count() until compressed
+        inline void Remove(u32 index, u32 count)
+        {
+            BufferRangeFrame frame;
+            frame.offset = index * ELEMENT_SIZE;
+            frame.size = count * ELEMENT_SIZE;
+            _allocator.Free(frame);
+
+            _isCompressed = false;
+        }
+
+        // Clears the vector
+        inline void Clear()
+        {
+            size_t size = _allocator.Size();
+            _allocator.Reset();
+            _allocator.Grow(size);
+        }
+
+        // Returns the count
+        inline u32 Count() const
+        {
+            return static_cast<u32>(_allocator.AllocatedBytes() / ELEMENT_SIZE);
+        }
+
+        // Returns true if the vector is empty
+        inline bool IsEmpty() const
+        {
+            return Count() == 0;
+        }
+
+        // Returns the capacity
+        inline u32 Capacity() const
+        {
+            return static_cast<u32>(_allocator.Size() / ELEMENT_SIZE);
+        }
+
+        // Returns the count size in bytes
+        inline u32 UsedBytes() const
+        {
+            return static_cast<u32>(_allocator.AllocatedBytes());
+        }
+
+        // Returns the capacity size in bytes
+        inline u32 TotalBytes() const
+        {
+            return static_cast<u32>(_allocator.Size());
+        }
+
+        // Returns if the vector is compressed so it has no gaps
+        inline bool IsCompressed() const
+        {
+            return _isCompressed;
+        }
+
+        // This compresses the vector so there are no free spaces between elements
+        void Compress()
+        {
+            // If we are already compressed, there is nothing to do
+            if (_isCompressed)
+            {
+                return;
+            }
+
+            // Merge the free frames
+            _allocator.TryMergeFrames();
+
+            std::vector<BufferRangeFrame>& freeFrames = _allocator.GetFreeFrames();
+            if (freeFrames.empty())
+            {
+                return;
+            }
+
+            u32 lastDataOffset = static_cast<u32>(_allocator.AllocatedBytes());
+            u32 dataMovedSize = 0;
+
+            // Flag everything behind the first free frame as dirty
+            SetDirtyRegion(freeFrames[0].offset, lastDataOffset - freeFrames[0].offset);
+
+            for (BufferRangeFrame& frame : freeFrames)
+            {
+                // If we are past the last data offset, we are done
+                if (frame.offset >= lastDataOffset)
+                {
+                    break;
+                }
+
+                u32 freeRegionStart = static_cast<u32>(frame.offset) - dataMovedSize;
+                u32 freeRegionEnd = freeRegionStart + static_cast<u32>(frame.size);
+
+                u32 sizeOfDataBehindFrame = lastDataOffset - freeRegionEnd;
+
+                // memmove all data right of this frame left to fill the free region
+                memmove(&_data[freeRegionStart], &_data[freeRegionEnd], sizeOfDataBehindFrame);
+
+                dataMovedSize += static_cast<u32>(frame.size);
+            }
+
+            // Clear the free frames
+            freeFrames.clear();
+
+            size_t newLastDataOffset = lastDataOffset - dataMovedSize;
+
+            size_t allocatorSize = _allocator.Size();
+            size_t freeSize = allocatorSize - newLastDataOffset;
+
+            // Reinitialize the allocator
+            _allocator.Init(newLastDataOffset, allocatorSize, freeSize);
+            _gpuBufferUsedBytes = std::min(_gpuBufferUsedBytes, static_cast<u32>(newLastDataOffset));
+
+#if NC_DEBUG
+            // Memset the free region to 0xFF to mark the uninitialized memory
+            memset(&_data[newLastDataOffset], 0xFF, freeSize);
+#endif
+
+            // Set the compressed flag
+            _isCompressed = true;
+        }
+
+        inline bool IsDirty() const { return _dirtyRegions.size() > 0; }
 
         void SetDirtyRegion(size_t offset, size_t size)
         {
             if (size == 0)
             {
                 NC_LOG_CRITICAL("GPUVector::SetDirtyRegion: Size is 0, this is not allowed!");
+                return;
             }
 
             size_t allocatedBytes = _allocator.AllocatedBytes();
             if (offset >= allocatedBytes)
                 return;
 
-            DirtyRegion& dirtyRegion = _dirtyRegions.emplace_back();
+            Region& dirtyRegion = _dirtyRegions.emplace_back();
 
             dirtyRegion.offset = offset;
             dirtyRegion.size = size;
@@ -47,224 +249,102 @@ namespace Renderer
 
         void SetDirtyElement(size_t elementIndex)
         {
-            SetDirtyRegion(elementIndex * sizeof(T), sizeof(T));
+            SetDirtyRegion(elementIndex * ELEMENT_SIZE, ELEMENT_SIZE);
         }
-        
+
         void SetDirtyElements(size_t startIndex, size_t count)
         {
-            SetDirtyRegion(startIndex * sizeof(T), count * sizeof(T));
+            SetDirtyRegion(startIndex * ELEMENT_SIZE, count * ELEMENT_SIZE);
         }
 
         void SetDirty()
         {
-            size_t size = _vector.size();
+            size_t size = _allocator.AllocatedBytes();
             if (size == 0)
                 return;
 
-            SetDirtyElements(0, size);
+            SetDirtyRegion(0, size);
         }
 
-        // Returns true if we had to resize the buffer
-        bool SyncToGPU(Renderer* renderer)
-        {
-            size_t vectorByteSize = _vector.size() * sizeof(T);
-
-            if (!_initialized)
-            {
-                _renderer = renderer;
-                _allocator.Init(0, 0);
-                _initialized = true;
-
-                if (vectorByteSize == 0) // Not sure about this
-                {
-                    ResizeBuffer(renderer, 1, false);
-                    return true;
-                }
-            }
-
-            if (vectorByteSize == 0) // Not sure about this
-            {
-                return false;
-            }
-
-            size_t allocatedBytes = _allocator.AllocatedBytes();
-            if (vectorByteSize == allocatedBytes)
-            {
-                // We don't need to resize the buffer, but we might have dirty regions that we need to update
-                bool hadDirtyRegions = UpdateDirtyRegions(renderer);
-
-                // We can only validate if we didn't have to resize the buffer and if it didn't have dirty regions
-                // That way we know the CPU side should match the GPU side, if the upload worked
-                if (hadDirtyRegions)
-                {
-                    _wantsValidation = _validateTransfers;
-                }
-                else if (_wantsValidation)
-                {
-                    Validate();
-                }
-
-                return false; 
-            }
-            size_t bufferByteSize = _allocator.Size();
-
-            bool didResize = false;
-            if (vectorByteSize > bufferByteSize)
-            {
-                ResizeBuffer(renderer, vectorByteSize, true); // This copies everything that was allocated in the old buffer to the new buffer
-                bufferByteSize = _allocator.Size();
-                didResize = true;
-
-                _wantsValidation = _validateTransfers;
-            }
-            
-            // Allocate and upload anything that has been added since last sync
-            size_t bytesToAllocate = bufferByteSize - allocatedBytes;
-
-            if (bytesToAllocate > 0)
-            {
-                BufferRangeFrame bufferRangeFrame;
-                if (!_allocator.Allocate(bytesToAllocate, bufferRangeFrame))
-                {
-                    NC_LOG_CRITICAL("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
-                }
-                
-                _wantsValidation = _validateTransfers;
-            }
-
-#ifdef NC_Debug
-            for (u32 i = 0; i < _dirtyRegions.size(); i++)
-            {
-                if (_dirtyRegions[i].offset >= allocatedBytes)
-                {
-                    NC_LOG_CRITICAL("[GPUVector] : UploadToBuffer will attempt to update a region in the buffer that ALSO exists in UpdateDirtyRegions, this will cause data corruption.");
-                }
-            }
-#endif
-
-            // Upload everything between allocatedBytes and allocatedBytes+bytesToAllocate
-            renderer->UploadToBuffer(_buffer, allocatedBytes, _vector.data(), allocatedBytes, bytesToAllocate);
-
-            UpdateDirtyRegions(renderer);
-
-            return didResize;
-        }
-
-        // Returns true if we had to resize the buffer
-        bool ForceSyncToGPU(Renderer* renderer)
-        {
-            size_t vectorByteSize = _vector.size() * sizeof(T);
-
-            if (!_initialized)
-            {
-                _renderer = renderer;
-                _allocator.Init(0, 0);
-                _initialized = true;
-
-                if (vectorByteSize == 0) // Not sure about this
-                {
-                    ResizeBuffer(renderer, 1, false);
-                    return true;
-                }
-            }
-
-            if (vectorByteSize == 0) // Not sure about this
-                return false;
-
-            size_t allocatedBytes = _allocator.AllocatedBytes();
-            size_t bufferByteSize = _allocator.Size();
-
-            bool didResize = false;
-            if (vectorByteSize > bufferByteSize)
-            {
-                ResizeBuffer(renderer, vectorByteSize, false);
-                bufferByteSize = _allocator.Size();
-                didResize = true;
-
-                _wantsValidation = _validateTransfers;
-            }
-
-            // Allocate the part of the buffer that wasn't allocated before
-            size_t bytesToAllocate = bufferByteSize - allocatedBytes;
-
-            if (bytesToAllocate > 0)
-            {
-                BufferRangeFrame bufferRangeFrame;
-                if (!_allocator.Allocate(bytesToAllocate, bufferRangeFrame))
-                {
-                    NC_LOG_CRITICAL("[GPUVector] : Failed to allocate GPU Vector {0}", _debugName);
-                }
-
-                _wantsValidation = _validateTransfers;
-            }
-
-            // Then upload the whole buffer
-            renderer->UploadToBuffer(_buffer, 0, _vector.data(), 0, vectorByteSize);
-
-            return didResize;
-        }
-
+        // Sets the debug name used for GPU debugging
         void SetDebugName(const std::string& debugName)
         {
             _debugName = debugName;
         }
 
+        // Sets the GPU usage
         void SetUsage(u8 usage)
         {
             _usage = usage;
         }
+        // Returns if the gpu buffer is valid
+        bool IsValid() { return _gpuBuffer != BufferID::Invalid(); }
+        // Returns the gpu buffer
+        BufferID GetBuffer() { return _gpuBuffer; }
 
-        size_t Size() const
+        // Returns true if we had to resize the GPU buffer
+        bool SyncToGPU(Renderer* renderer)
         {
-            return _vector.size();
-        }
+            u32 cpuUsedBytes = UsedBytes();
+            u32 cpuTotalBytes = TotalBytes();
 
-        void Resize(size_t newSize)
-        {
-            _vector.resize(newSize);
-        }
-
-        void Grow(size_t growthSize)
-        {
-            size_t size = _vector.size();
-            _vector.resize(size + growthSize);
-        }
-
-        void Reserve(size_t reserveSize)
-        {
-            _vector.reserve(reserveSize);
-        }
-
-        void Clear(bool shouldSync = true)
-        {
-            _vector.clear();
-
-            if (shouldSync && _renderer != nullptr && _buffer != BufferID::Invalid())
+            bool needsResize = cpuUsedBytes > _gpuBufferTotalBytes;
+            if (needsResize)
             {
-                _allocator.Init(0, 0);
-                _renderer->QueueDestroyBuffer(_buffer);
-                _buffer = BufferID::Invalid();
-                _initialized = false;
-            }
-            else
-            {
-                size_t size = _allocator.Size();
-                _allocator.Init(0, size);
+                // Resize the buffer, this will copy what existed in the old buffer to the new buffer
+                ResizeBuffer(renderer, cpuTotalBytes, true);
             }
 
-            _dirtyRegions.clear();
+            bool needsNewUpload = cpuUsedBytes > _gpuBufferUsedBytes;
+            if (needsNewUpload)
+            {
+                // Create a dirty region for the new data
+                Region dirtyRegion;
+                dirtyRegion.offset = _gpuBufferUsedBytes;
+                dirtyRegion.size = cpuUsedBytes - _gpuBufferUsedBytes;
+                _dirtyRegions.push_back(dirtyRegion);
+                
+                _gpuBufferUsedBytes = cpuUsedBytes;
+            }
+
+            bool needsDirtyUpload = _dirtyRegions.size() > 0;
+            if (needsDirtyUpload)
+            {
+                UploadDirtyRegions(renderer);
+            }
+
+            return needsResize;
         }
 
-        std::vector<T>& Get() { return _vector; }
-        const std::vector<T>& Get() const { return _vector; }
+        bool Validate()
+        {
+            // Create (or update) the buffer
+            BufferDesc validationDesc;
+            validationDesc.name = _debugName + " Validation Buffer";
+            validationDesc.size = UsedBytes();
+            validationDesc.usage = BufferUsage::TRANSFER_DESTINATION;
+            validationDesc.cpuAccess = BufferCPUAccess::ReadOnly;
+            _validationBuffer = _renderer->CreateBuffer(_validationBuffer, validationDesc);
 
-        bool HasDirtyRegions() { return _dirtyRegions.Size() > 0; }
-        bool IsValid() { return _buffer != BufferID::Invalid(); }
+            NC_LOG_WARNING("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), Count(), validationDesc.size);
 
-        BufferID GetBuffer() { return _buffer; }
+            // Immediately copy from the GPU buffer to the validation buffer
+            _renderer->CopyBufferImmediate(_validationBuffer, 0, _gpuBuffer, 0, validationDesc.size);
 
-        void SetValidation(bool shouldValidate) { _validateTransfers = shouldValidate; }
+            // Map the validation buffer and check for differences
+            const T* validationData = reinterpret_cast<const T*>(_renderer->MapBuffer(_validationBuffer));
 
+            int result = memcmp(_data, validationData, validationDesc.size);
+            if (result != 0)
+            {
+                NC_LOG_ERROR("Validation failed for buffer {} ({} items, {} bytes)", _debugName.c_str(), Count(), validationDesc.size);
+                _renderer->UnmapBuffer(_validationBuffer);
+                return false;
+            }
+            _renderer->UnmapBuffer(_validationBuffer);
+
+            return true;
+        }
     private:
         void ResizeBuffer(Renderer* renderer, size_t newSize, bool copyOld)
         {
@@ -275,30 +355,30 @@ namespace Renderer
 
             BufferID newBuffer = renderer->CreateBuffer(desc);
 
-            if (_buffer != BufferID::Invalid())
+            if (_gpuBuffer != BufferID::Invalid())
             {
                 if (copyOld)
                 {
-                    size_t oldSize = _allocator.AllocatedBytes();
-                    if (oldSize > 0)
+                    if (_gpuBufferTotalBytes > 0)
                     {
-                        renderer->CopyBuffer(newBuffer, 0, _buffer, 0, oldSize);
+                        renderer->CopyBuffer(newBuffer, 0, _gpuBuffer, 0, _gpuBufferTotalBytes);
                     }
                 }
-                renderer->QueueDestroyBuffer(_buffer);
+                renderer->QueueDestroyBuffer(_gpuBuffer);
             }
 
-            _allocator.Grow(newSize);
-            _buffer = newBuffer;
+            _gpuBufferTotalBytes = static_cast<u32>(newSize);
+            _gpuBuffer = newBuffer;
+            _renderer = renderer;
         }
 
-        bool UpdateDirtyRegions(Renderer* renderer)
+        bool UploadDirtyRegions(Renderer* renderer)
         {
             if (_dirtyRegions.size() == 0)
                 return false;
 
             // Sort dirtyRegions by offset
-            std::sort(_dirtyRegions.begin(), _dirtyRegions.end(), [](const DirtyRegion& a, const DirtyRegion& b)
+            std::sort(_dirtyRegions.begin(), _dirtyRegions.end(), [](const Region& a, const Region& b)
             {
                 return a.offset < b.offset;
             });
@@ -313,7 +393,7 @@ namespace Renderer
 
             for (u32 i = 0; i < numDirtyRegions; i++)
             {
-                DirtyRegion& curRegion = _dirtyRegions[i];
+                Region& curRegion = _dirtyRegions[i];
                 i64 curRegionEnd = static_cast<i64>(curRegion.offset + curRegion.size);
 
                 // curRegionEnd exists completely inside of lastRegionEnd
@@ -324,7 +404,7 @@ namespace Renderer
                 // Partial Overlap / Merge detected
                 else if (lastRegionEnd >= static_cast<i64>(curRegion.offset))
                 {
-                    DirtyRegion& prevRegion = _dirtyRegions[lastRegionIndex];
+                    Region& prevRegion = _dirtyRegions[lastRegionIndex];
 
                     i64 sizeDiff = curRegionEnd - lastRegionEnd;
                     prevRegion.size += sizeDiff;
@@ -338,65 +418,40 @@ namespace Renderer
 
                 lastRegionEnd = glm::max(lastRegionEnd, curRegionEnd);
             }
-            
+
             i32 numDirtyRegionsToRemove = static_cast<i32>(regionIndexToRemove.size());
             for (i32 i = numDirtyRegionsToRemove - 1; i >= 0; i--)
             {
                 u32 index = regionIndexToRemove[i];
                 _dirtyRegions.erase(_dirtyRegions.begin() + index);
             }
-            
-            // Upload for all remaining dirtyRegions
-            for (const DirtyRegion& dirtyRegion : _dirtyRegions)
-            {
-                renderer->UploadToBuffer(_buffer, dirtyRegion.offset, _vector.data(), dirtyRegion.offset, dirtyRegion.size);
-            }
 
+            // Upload for all remaining dirtyRegions
+            for (const Region& dirtyRegion : _dirtyRegions)
+            {
+                renderer->UploadToBuffer(_gpuBuffer, dirtyRegion.offset, _data, dirtyRegion.offset, dirtyRegion.size);
+            }
             _dirtyRegions.clear();
 
             return true;
         }
 
-        void Validate()
-        {
-            _wantsValidation = false;
+    private:
+        bool _gpuInitialized = false;
+        bool _validateTransfers = false;
+        bool _isCompressed = true;
 
-            // Create (or update) the buffer
-            BufferDesc validationDesc;
-            validationDesc.name = _debugName + " Validation Buffer";
-            validationDesc.size = _vector.size() * sizeof(T);
-            validationDesc.usage = BufferUsage::TRANSFER_DESTINATION;
-            validationDesc.cpuAccess = BufferCPUAccess::ReadOnly;
-            _validationBuffer = _renderer->CreateBuffer(_validationBuffer, validationDesc);
-
-            NC_LOG_WARNING("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
-
-            // Immediately copy from the GPU buffer to the validation buffer
-            _renderer->CopyBufferImmediate(_validationBuffer, 0, _buffer, 0, validationDesc.size);
-
-            // Map the validation buffer and check for differences
-            const T* validationData = reinterpret_cast<const T*>(_renderer->MapBuffer(_validationBuffer));
-
-            int result = memcmp(_vector.data(), validationData, validationDesc.size);
-            if (result != 0)
-            {
-                NC_LOG_CRITICAL("Validation failed for buffer {} ({} items, {} bytes)", _debugName.c_str(), _vector.size(), validationDesc.size);
-            }
-            _renderer->UnmapBuffer(_validationBuffer);
-        }
-
-        bool _initialized = false;
         Renderer* _renderer = nullptr;
-        BufferID _buffer;
+
         BufferRangeAllocator _allocator;
+        u8* _data = nullptr;
 
         std::string _debugName = "";
-        bool _validateTransfers = false;
-        bool _wantsValidation = false;
-        BufferID _validationBuffer;
         u8 _usage = 0;
-
-        std::vector<DirtyRegion> _dirtyRegions;
-        std::vector<T> _vector;
+        u32 _gpuBufferUsedBytes = 0;
+        u32 _gpuBufferTotalBytes = 0;
+        BufferID _gpuBuffer;
+        BufferID _validationBuffer;
+        std::vector<Region> _dirtyRegions;
     };
 }

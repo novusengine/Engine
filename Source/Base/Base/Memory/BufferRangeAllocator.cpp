@@ -1,18 +1,23 @@
 #include "BufferRangeAllocator.h"
 #include "Base/Util/DebugHandler.h"
 
-void BufferRangeAllocator::Init(size_t bufferOffset, size_t bufferSize)
+void BufferRangeAllocator::Init(size_t bufferOffset, size_t bufferSize, size_t freeSize)
 {
     _freeFrames.reserve(64);
     _freeFrames.clear();
 
+    if (freeSize == std::numeric_limits<size_t>::max())
+    {
+        freeSize = bufferSize;
+    }
+
     BufferRangeFrame& frame = _freeFrames.emplace_back();
     frame.offset = bufferOffset;
-    frame.size = bufferSize;
+    frame.size = freeSize;
 
     _currentOffset = bufferOffset;
     _currentSize = bufferSize;
-    _allocatedBytes = 0;
+    _allocatedBytes = bufferOffset;
 }
 
 void BufferRangeAllocator::Reset()
@@ -32,7 +37,7 @@ bool BufferRangeAllocator::Allocate(size_t size, BufferRangeFrame& frame)
         return false;
 
     size_t index = std::numeric_limits<size_t>().max();
-    //size_t spaceLeft = std::numeric_limits<size_t>().max();
+    bool wasLastFrame = false;
 
     for (size_t i = 0; i < _freeFrames.size(); i++)
     {
@@ -41,15 +46,8 @@ bool BufferRangeAllocator::Allocate(size_t size, BufferRangeFrame& frame)
         if (size <= freeFrame.size)
         {
             index = i;
+            wasLastFrame = i == _freeFrames.size() - 1;
             break;
-
-            // Best Fit (Use later when we know implementation works
-            /*size_t space = freeFrame.size - size;
-            if (space < spaceLeft)
-            {
-                spaceLeft = space;
-                index = i;
-            }*/
         }
     }
 
@@ -59,6 +57,7 @@ bool BufferRangeAllocator::Allocate(size_t size, BufferRangeFrame& frame)
 
         frame.offset = freeFrame.offset;
         frame.size = size;
+        frame.wasHole = !wasLastFrame;
 
         freeFrame.offset += size;
         freeFrame.size -= size;
@@ -66,7 +65,10 @@ bool BufferRangeAllocator::Allocate(size_t size, BufferRangeFrame& frame)
         if (freeFrame.size == 0)
             _freeFrames.erase(_freeFrames.begin() + index);
 
-        _allocatedBytes += size;
+        if (wasLastFrame)
+        {
+            _allocatedBytes += size;
+        }
 
         return true;
     }
@@ -80,7 +82,7 @@ bool BufferRangeAllocator::Allocate(size_t size, size_t alignment, BufferRangeFr
         return false;
 
     size_t index = std::numeric_limits<size_t>().max();
-    //size_t spaceLeft = std::numeric_limits<size_t>().max();
+    bool wasLastFrame = false;
 
     for (size_t i = 0; i < _freeFrames.size(); i++)
     {
@@ -92,15 +94,8 @@ bool BufferRangeAllocator::Allocate(size_t size, size_t alignment, BufferRangeFr
         if (alignedSize <= freeFrame.size)
         {
             index = i;
+            wasLastFrame = i == _freeFrames.size() - 1;
             break;
-
-            // Best Fit (Use later when we know implementation works
-            /*size_t space = freeFrame.size - size;
-            if (space < spaceLeft)
-            {
-                spaceLeft = space;
-                index = i;
-            }*/
         }
     }
 
@@ -125,7 +120,10 @@ bool BufferRangeAllocator::Allocate(size_t size, size_t alignment, BufferRangeFr
             //NC_LOG_CRITICAL("Did not allocate aligned");
         }
 
-        _allocatedBytes += size;
+        if (wasLastFrame)
+        {
+            _allocatedBytes += size;
+        }
 
         return true;
     }
@@ -138,13 +136,9 @@ bool BufferRangeAllocator::Free(const BufferRangeFrame& frame)
     BufferRangeFrame& newFreeFrame = _freeFrames.emplace_back();
     newFreeFrame = frame;
 
-    // Validate if 'frame' overlaps with any free frame
+    TryMergeFrames();
 
-    // Check if we can merge 'frame' with any free frame
-
-    // Reclaim alignment as well
-
-    _allocatedBytes -= frame.size;
+    //_allocatedBytes -= frame.size; // This looks very sus to me so I disabled it for now... If we're using this to for example loop over data it would be bad
 
     return true;
 }
@@ -183,4 +177,7 @@ void BufferRangeAllocator::TryMergeFrames()
             _freeFrames.erase(_freeFrames.begin() + i + 1);
         }
     }
+
+    // Sort the free frames by offset
+    std::sort(_freeFrames.begin(), _freeFrames.end(), [](const BufferRangeFrame& a, const BufferRangeFrame& b) { return a.offset < b.offset; });
 }
