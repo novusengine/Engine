@@ -182,15 +182,19 @@ namespace Model
                         const AnimationTrack<T>& track = tracks[i];
 
                         u32 numTimestamps = static_cast<u32>(track.timestamps.size());
+                        stream.write(reinterpret_cast<char const*>(&numTimestamps), sizeof(u32));
+
+                        if (numTimestamps)
                         {
-                            stream.write(reinterpret_cast<char const*>(&numTimestamps), sizeof(u32));
                             stream.write(reinterpret_cast<char const*>(track.timestamps.data()), numTimestamps * sizeof(u32));
                         }
 
                         u32 numValues = static_cast<u32>(track.values.size());
+                        stream.write(reinterpret_cast<char const*>(&numValues), sizeof(u32));
+
+                        if (numValues)
                         {
-                            stream.write(reinterpret_cast<char const*>(&numValues), sizeof(u32));
-                            stream.write(reinterpret_cast<char const*>(track.values.data()), numTimestamps * sizeof(T));
+                            stream.write(reinterpret_cast<char const*>(track.values.data()), numValues * sizeof(T));
                         }
                     }
                 }
@@ -217,17 +221,23 @@ namespace Model
                     if (!buffer->GetU32(numTimestamps))
                         return false;
 
-                    track.timestamps.resize(numTimestamps);
-                    if (!buffer->GetBytes(reinterpret_cast<u8*>(track.timestamps.data()), numTimestamps * sizeof(u32)))
-                        return false;
+                    if (numTimestamps)
+                    {
+                        track.timestamps.resize(numTimestamps);
+                        if (!buffer->GetBytes(reinterpret_cast<u8*>(track.timestamps.data()), numTimestamps * sizeof(u32)))
+                            return false;
+                    }
 
                     u32 numValues = 0;
                     if (!buffer->GetU32(numValues))
                         return false;
 
-                    track.values.resize(numValues);
-                    if (!buffer->GetBytes(reinterpret_cast<u8*>(track.values.data()), numValues * sizeof(T)))
-                        return false;
+                    if (numValues)
+                    {
+                        track.values.resize(numValues);
+                        if (!buffer->GetBytes(reinterpret_cast<u8*>(track.values.data()), numValues * sizeof(T)))
+                            return false;
+                    }
                 }
 
                 return true;
@@ -344,7 +354,8 @@ namespace Model
                 u32 CylindricialBillboardLockX : 1;
                 u32 CylindricialBillboardLockY : 1;
                 u32 CylindricialBillboardLockZ : 1;
-                u32 : 2;
+                u32 Unk0x80 : 1;
+                u32 : 1;
                 u32 Transformed : 1;
                 u32 KinematicBone : 1; // MOP+ Allow physics to influence this bone
                 u32 : 1;
@@ -391,6 +402,35 @@ namespace Model
             {}
             Bone& operator=(const Bone& other) = default;
         };
+
+        struct Attachment
+        {
+        public:
+            u32 id = 0;
+            u16 bone = 0;
+            vec3 position = { };
+
+            AnimationData<u8> isAnimated = { };
+
+        public:
+            Attachment() { }
+            Attachment(Attachment& other)
+            {
+                id = other.id;
+                bone = other.bone;
+                position = other.position;
+
+                isAnimated = other.isAnimated;
+            }
+            Attachment(Attachment&& other) noexcept
+                : id(other.id),
+                bone(other.bone),
+                position(other.position),
+                isAnimated(std::move(other.isAnimated))
+            {}
+            Attachment& operator=(const Attachment& other) = default;
+        };
+
         struct AnimationSequence
         {
         public:
@@ -522,6 +562,7 @@ namespace Model
 
             u32 numSequences;
             u32 numBones;
+            u32 numAttachments;
             u32 numCameras;
 
             u32 numDecorationSets;
@@ -537,7 +578,11 @@ namespace Model
         std::vector<u32> globalLoops;
         std::vector<AnimationSequence> sequences;
         std::vector<Bone> bones;
-        robin_hood::unordered_map<u16, i16> keyBoneIDToBoneIndex;
+        std::vector<Attachment> attachments;
+        robin_hood::unordered_map<i16, i16> animationIDToFirstSequenceID;
+        robin_hood::unordered_map<i16, i16> keyBoneIDToBoneIndex;
+        robin_hood::unordered_map<u16, std::vector<u16>> boneIndexToChildren;
+        robin_hood::unordered_map<i16, i16> attachmentIDToIndex;
 
         std::vector<Vertex> vertices;
         std::vector<Texture> textures;

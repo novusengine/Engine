@@ -18,7 +18,7 @@ public:
         std::ofstream output(_path, std::ofstream::out | std::ofstream::binary);
         if (!output)
         {
-            //NC_LOG_ERROR("[FileWriter] Failed to create file ({0}). Check admin permissions", _path.string().c_str());
+            NC_LOG_ERROR("[FileWriter] Failed to create file ({0}). Check admin permissions", _path.string());
             return false;
         }
 

@@ -225,9 +225,12 @@ namespace Renderer
                 planeBottom *= fontSize;
                 planeTop *= fontSize;
 
+                planeBottom += borderSize;
+                planeTop += borderSize;
+
                 f32 height = static_cast<f32>(planeTop - planeBottom);
                 height += static_cast<f32>(metrics.descenderY) * fontSize + borderSize;
-                size.y = height;
+                size.y = glm::max(size.y, height);
             }
 
             f32 advance = static_cast<f32>(glyph.getAdvance());

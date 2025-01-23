@@ -9,613 +9,141 @@
 
 namespace ClientDB::Definitions
 {
-    struct Base
+    struct Map
     {
     public:
-        virtual bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) = 0;
-
-        virtual bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) = 0;
-        virtual bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) = 0;
-
-    public:
-        u32 id = std::numeric_limits<u32>().max();
-    };
-
-    struct Empty : public Base
-    {
-    public:
-        u32 dummy;
-
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
-    };
-
-    struct Map : public Base
-    {
-    public:
-        std::string name;
-        std::string internalName;
+        u32 name;
+        u32 internalName;
         u32 instanceType;
         u32 flags;
         u32 expansion;
         u32 maxPlayers;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            u32 nameIndex = 0;
-            u32 internalNameIndex = 0;
-
-            if (!buffer->GetU32(nameIndex))
-                return false;
-
-            if (!buffer->GetU32(internalNameIndex))
-                return false;
-
-            name = stringTable.GetString(nameIndex);
-            internalName = stringTable.GetString(internalNameIndex);
-
-            if (!buffer->GetU32(instanceType))
-                return false;
-
-            if (!buffer->GetU32(flags))
-                return false;
-
-            if (!buffer->GetU32(expansion))
-                return false;
-
-            if (!buffer->GetU32(maxPlayers))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            u32 nameIndex = std::numeric_limits<u32>().max();
-            if (!stringTable.TryFindString(name, nameIndex))
-                return false;
-            
-            if (!buffer->PutU32(nameIndex))
-                return false;
-
-            u32 internalNameIndex = std::numeric_limits<u32>().max();
-            if (!stringTable.TryFindString(internalName, internalNameIndex))
-                return false;
-
-            if (!buffer->PutU32(internalNameIndex))
-                return false;
-
-            if (!buffer->PutU32(instanceType))
-                return false;
-
-            if (!buffer->PutU32(flags))
-                return false;
-
-            if (!buffer->PutU32(expansion))
-                return false;
-
-            if (!buffer->PutU32(maxPlayers))
-                return false;
-
-            return true;
-        }
-
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            stringTable.AddString(name);
-            stringTable.AddString(internalName);
-
-            return true;
-        }
     };
 
-    struct LiquidObject : public Base
+    struct LiquidObject
     {
     public:
         u16 liquidTypeID;
-        f32 flowDirection;
-        f32 flowSpeed;
         u8 fishable;
         u8 reflection;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            if (!buffer->GetU16(liquidTypeID))
-                return false;
-
-            if (!buffer->GetF32(flowDirection))
-                return false;
-
-            if (!buffer->GetF32(flowSpeed))
-                return false;
-
-            if (!buffer->GetU8(fishable))
-                return false;
-
-            if (!buffer->GetU8(reflection))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            if (!buffer->PutU16(liquidTypeID))
-                return false;
-
-            if (!buffer->PutF32(flowDirection))
-                return false;
-
-            if (!buffer->PutF32(flowSpeed))
-                return false;
-
-            if (!buffer->PutU8(fishable))
-                return false;
-
-            if (!buffer->PutU8(reflection))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
+        f32 flowDirection;
+        f32 flowSpeed;
     };
 
-    struct LiquidType : public Base
+    struct LiquidType
     {
     public:
-        std::string name;
-        std::string textures[6];
+        u32 name;
+        u32 textures[6];
         u16 flags;
-        u8 soundBank;
+        u16 lightID;
         u32 soundID;
         u32 spellID;
         f32 maxDarkenDepth;
         f32 fogDarkenIntensity;
         f32 ambDarkenIntensity;
         f32 dirDarkenIntensity;
-        u16 lightID;
         f32 particleScale;
+        u8 materialID;
+        u8 soundBank;
         u8 particleMovement;
         u8 particleTexSlots;
-        u8 materialID;
         u32 minimapStaticCol;
         u32 frameCountTextures[6];
         u32 colors[2];
         f32 unkFloats[16];
         u32 unkInts[4];
         u32 coefficients[4];
-
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            u32 nameIndex = 0;
-            if (!buffer->GetU32(nameIndex))
-                return false;
-
-            name = stringTable.GetString(nameIndex);
-
-            for (u32 i = 0; i < 6; i++)
-            {
-                u32 textureIndex = 0;
-                if (!buffer->GetU32(textureIndex))
-                    return false;
-
-                textures[i] = stringTable.GetString(textureIndex);
-            }
-
-            if (!buffer->GetU16(flags))
-                return false;
-
-            if (!buffer->GetU8(soundBank))
-                return false;
-
-            if (!buffer->GetU32(soundID))
-                return false;
-
-            if (!buffer->GetF32(maxDarkenDepth))
-                return false;
-
-            if (!buffer->GetF32(fogDarkenIntensity))
-                return false;
-
-            if (!buffer->GetF32(ambDarkenIntensity))
-                return false;
-
-            if (!buffer->GetF32(dirDarkenIntensity))
-                return false;
-
-            if (!buffer->GetU16(lightID))
-                return false;
-
-            if (!buffer->GetF32(particleScale))
-                return false;
-
-            if (!buffer->GetU8(particleMovement))
-                return false;
-
-            if (!buffer->GetU8(particleTexSlots))
-                return false;
-
-            if (!buffer->GetU8(materialID))
-                return false;
-
-            if (!buffer->GetU32(minimapStaticCol))
-                return false;
-
-            for (u32 i = 0; i < 6; i++)
-            {
-                if (!buffer->GetU32(frameCountTextures[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 2; i++)
-            {
-                if (!buffer->GetU32(colors[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 16; i++)
-            {
-                if (!buffer->GetF32(unkFloats[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 4; i++)
-            {
-                if (!buffer->GetU32(unkInts[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 4; i++)
-            {
-                if (!buffer->GetU32(coefficients[i]))
-                    return false;
-            }
-
-            return true;
-        }
-
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            u32 nameIndex = std::numeric_limits<u32>().max();
-            if (!stringTable.TryFindString(name, nameIndex))
-                return false;
-            
-            if (!buffer->PutU32(nameIndex))
-                return false;
-
-            for (u32 i = 0; i < 6; i++)
-            {
-                u32 textureIndex = std::numeric_limits<u32>().max();
-                if (!stringTable.TryFindString(textures[i], textureIndex))
-                    return false;
-                
-                if (!buffer->PutU32(textureIndex))
-                    return false;
-            }
-
-            if (!buffer->PutU16(flags))
-                return false;
-
-            if (!buffer->PutU8(soundBank))
-                return false;
-
-            if (!buffer->PutU32(soundID))
-                return false;
-
-            if (!buffer->PutF32(maxDarkenDepth))
-                return false;
-
-            if (!buffer->PutF32(fogDarkenIntensity))
-                return false;
-
-            if (!buffer->PutF32(ambDarkenIntensity))
-                return false;
-
-            if (!buffer->PutF32(dirDarkenIntensity))
-                return false;
-
-            if (!buffer->PutU16(lightID))
-                return false;
-
-            if (!buffer->PutF32(particleScale))
-                return false;
-
-            if (!buffer->PutU8(particleMovement))
-                return false;
-
-            if (!buffer->PutU8(particleTexSlots))
-                return false;
-
-            if (!buffer->PutU8(materialID))
-                return false;
-
-            if (!buffer->PutU32(minimapStaticCol))
-                return false;
-
-            for (u32 i = 0; i < 6; i++)
-            {
-                if (!buffer->PutU32(frameCountTextures[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 2; i++)
-            {
-                if (!buffer->PutU32(colors[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 16; i++)
-            {
-                if (!buffer->PutF32(unkFloats[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 4; i++)
-            {
-                if (!buffer->PutU32(unkInts[i]))
-                    return false;
-            }
-
-            for (u32 i = 0; i < 4; i++)
-            {
-                if (!buffer->PutU32(coefficients[i]))
-                    return false;
-            }
-
-            return true;
-        }
-
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            stringTable.AddString(name);
-
-            for (u32 i = 0; i < 6; i++)
-            {
-                stringTable.AddString(textures[i]);
-            }
-
-            return true;
-        }
     };
 
-    struct LiquidMaterial : public Base
+    struct LiquidMaterial
     {
     public:
         u8 flags;
         u8 liquidVertexFormat;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            if (!buffer->GetU8(flags))
-                return false;
-
-            if (!buffer->GetU8(liquidVertexFormat))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            if (!buffer->PutU8(flags))
-                return false;
-
-            if (!buffer->PutU8(liquidVertexFormat))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
-    struct CinematicCamera : public Base
+    struct CinematicCamera
     {
     public:
         vec3 endPosition;
         u32 soundID;
         f32 rotation;
         u32 cameraPath;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            if (!buffer->Get(endPosition))
-                return false;
-
-            if (!buffer->GetU32(soundID))
-                return false;
-
-            if (!buffer->GetU32(cameraPath))
-                return false;
-
-            return true;
-        }
-
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            if (!buffer->Put(endPosition))
-                return false;
-
-            if (!buffer->PutU32(soundID))
-                return false;
-
-            if (!buffer->PutU32(cameraPath))
-                return false;
-
-            return true;
-        }
-
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
-    struct CinematicSequence : public Base
+    struct CinematicSequence
     {
     public:
         u32 soundID;
-        u32 cameraIDs[8];
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            if (!buffer->GetU32(soundID))
-                return false;
-
-            for (u32 i = 0; i < 8; i++)
-            {
-                if (!buffer->GetU32(cameraIDs[i]))
-                    return false;
-            }
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            if (!buffer->PutU32(soundID))
-                return false;
-
-            for (u32 i = 0; i < 8; i++)
-            {
-                if (!buffer->PutU32(cameraIDs[i]))
-                    return false;
-            }
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
+        u16 cameraIDs[8];
     };
 
-    struct AnimationData : public Base
+    struct AnimationData
     {
     public:
         struct Flags
         {
-            u32 UsedForEmote            : 1 = 0;
-            u32 UsedForSpell            : 1 = 0;
-            u32 IsPierceAnim            : 1 = 0;
-            u32 HideWeapons             : 1 = 0;
-            u32 FallbackPlaysReverse    : 1 = 0;
-            u32 FallbackHoldsEnd        : 1 = 0;
-            u32 Unused0x40              : 1 = 0;
+            u32 UsedForEmote : 1 = 0;
+            u32 UsedForSpell : 1 = 0;
+            u32 IsPierceAnim : 1 = 0;
+            u32 HideWeapons : 1 = 0;
+            u32 FallbackPlaysReverse : 1 = 0;
+            u32 FallbackHoldsEnd : 1 = 0;
+            u32 Unused0x40 : 1 = 0;
             u32 FallbackToVariationZero : 1 = 0;
-            u32 Unused0x100             : 1 = 0;
-            u32 Unused0x200             : 1 = 0;
-            u32 Unused0x400             : 1 = 0;
-            u32 MoveWeaponsToSheath     : 1 = 0;
-            u32 MoveMeleeWeaponsToHand  : 1 = 0;
-            u32 ScaleToGround           : 1 = 0;
-            u32 ScaleToGroundRev        : 1 = 0;
-            u32 ScaleToGroundAlways     : 1 = 0;
-            u32 IsSplitBodyBehavior     : 1 = 0;
-            u32 IsBowWeaponBehavior     : 1 = 0;
-            u32 IsRifleWeaponBehavior   : 1 = 0;
-            u32 IsThrownWeaponBehavior  : 1 = 0;
-            u32 IsDeathBehavior         : 1 = 0;
-            u32 IsMeleeCombatBehavior   : 1 = 0;
+            u32 Unused0x100 : 1 = 0;
+            u32 Unused0x200 : 1 = 0;
+            u32 Unused0x400 : 1 = 0;
+            u32 MoveWeaponsToSheath : 1 = 0;
+            u32 MoveMeleeWeaponsToHand : 1 = 0;
+            u32 ScaleToGround : 1 = 0;
+            u32 ScaleToGroundRev : 1 = 0;
+            u32 ScaleToGroundAlways : 1 = 0;
+            u32 IsSplitBodyBehavior : 1 = 0;
+            u32 IsBowWeaponBehavior : 1 = 0;
+            u32 IsRifleWeaponBehavior : 1 = 0;
+            u32 IsThrownWeaponBehavior : 1 = 0;
+            u32 IsDeathBehavior : 1 = 0;
+            u32 IsMeleeCombatBehavior : 1 = 0;
             u32 IsSpecialCombatBehavior : 1 = 0;
-            u32 IsWoundBehavior         : 1 = 0;
-            u32 IsUnarmedBehavior       : 1 = 0;
-            u32 UseMountedNameplatePos  : 1 = 0;
-            u32 FlipSpearWeapons180Deg  : 1 = 0;
-            u32 Unused0x8000000         : 1 = 0;
-            u32 Unused0x10000000        : 1 = 0;
-            u32 IsSpellCombatBehavior   : 1 = 0;
-            u32 BrewmasterSheathe       : 1 = 0;
-            u32 Unused0x80000000        : 1 = 0;
+            u32 IsWoundBehavior : 1 = 0;
+            u32 IsUnarmedBehavior : 1 = 0;
+            u32 UseMountedNameplatePos : 1 = 0;
+            u32 FlipSpearWeapons180Deg : 1 = 0;
+            u32 Unused0x8000000 : 1 = 0;
+            u32 Unused0x10000000 : 1 = 0;
+            u32 IsSpellCombatBehavior : 1 = 0;
+            u32 BrewmasterSheathe : 1 = 0;
+            u32 Unused0x80000000 : 1 = 0;
         };
 
+    public:
         u16 fallback;
         u8 behaviorTier;
         u32 behaviorID;
         Flags flags[2];
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
-    struct CreatureDisplayInfo : public Base
+    enum class DisplayInfoType
+    {
+        Creature = 0,
+        GameObject = 1,
+        Item = 2
+    };
+
+    struct CreatureDisplayInfo
     {
     public:
         u16 modelID;
         u16 soundID;
+        u8 flags;
+        i8 gender;
         i8 sizeClass;
-        f32 creatureModelScale;
-        u8 creatureModelAlpha;
         u8 bloodID;
+        i8 unarmedWeaponType;
+        u8 creatureModelAlpha;
+        f32 creatureModelScale;
         i32 extendedDisplayInfoID;
         u16 npcSoundID;
         u16 particleColorID;
@@ -623,40 +151,16 @@ namespace ClientDB::Definitions
         i32 portraitTextureFileDataID;
         u16 objectEffectPackageID;
         u16 animReplacementSetID;
-        u8 flags;
         i32 stateSpellVisualKitID;
         f32 playerOverrideScale;
         f32 petInstanceScale;
-        i8 unarmedWeaponType;
         i32 mountPoofSpellVisualKitID;
         i32 dissolveEffectID;
-        i8 gender;
         i32 dissolveOutEffectID;
-        i8 creatureModelMinLod;
         u32 textureVariations[4];
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
-    struct CreatureDisplayInfoExtra : public Base
+    struct CreatureDisplayInfoExtra
     {
     public:
         i8 displayRaceID;
@@ -668,31 +172,11 @@ namespace ClientDB::Definitions
         i8 hairColorID;
         i8 facialHairID;
         i8 flags;
-        u32 bakedTextureHash;
         u8 customDisplayOptions[3];
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
+        u32 bakedTextureHash;
     };
 
-    struct CreatureModelData : public Base
+    struct CreatureModelData
     {
     public:
         Geometry::AABoundingBox boundingBox;
@@ -723,118 +207,72 @@ namespace ClientDB::Definitions
         f32 overrideNameScale;
         f32 overrideSelectionRadius;
         f32 tamedPetBaseScale;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
-    struct TextureFileData : public Base
+    struct ItemDisplayMaterialResources
     {
     public:
-        u32 textureHash;
-        u8 usage;
+        u8 componentSection;
+        u32 displayID;
+        u32 textureHash[3];
+    };
+
+    struct ItemDisplayModelMaterialResources
+    {
+    public:
+        u8 modelIndex;
+        u8 textureType;
+        u32 displayID;
         u32 materialResourcesID;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
+        u32 textureHash[3];
     };
 
-    struct CharSection : public Base
+    struct ItemDisplayInfo
     {
     public:
-        u8 raceID;
-        u8 sexID;
-        u8 baseSection;
-        u8 varationIndex;
-        u8 colorIndex;
-        u16 flags;
-        u32 textureHashes[3];
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
+        u32 itemVisual;
+        u32 particleColorID;
+        u32 itemRangedDisplayInfoID;
+        u32 overrideSwooshSoundKitID;
+        u32 sheatheTransformMatrixID;
+        u32 stateSpellVisualKitID;
+        u32 sheathedSpellVisualKitID;
+        u32 unsheathedSpellVisualKitID;
+        u32 flags;
+        u32 modelResourcesID[2];
+        u32 materialResourcesID[2];
+        u32 modelType[2];
+        u32 goesetGroup[6];
+        u32 geosetAttachmentGroup[6];
+        u32 geosetHelmetVis[2];
     };
 
-    struct Light : public Base
+    struct ModelFileData
+    {
+    public:
+        u8 flags;
+        u32 modelHash;
+        u32 modelResourcesID;
+    };
+
+    struct TextureFileData
+    {
+    public:
+        u8 usage;
+        u32 textureHash;
+        u32 materialResourcesID;
+    };
+
+    struct Light
     {
     public:
         u16 mapID;
         vec3 position;
         vec2 fallOff;
         u16 lightParamsID[8];
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
-    struct LightParam : public Base
+    struct LightParam
     {
     public:
         struct Flags
@@ -851,29 +289,9 @@ namespace ClientDB::Definitions
         f32 waterDeepAlpha;
         f32 oceanShallowAlpha;
         f32 oceanDeepAlpha;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
-    struct LightData : public Base
+    struct LightData
     {
     public:
         u16 lightParamID;
@@ -904,169 +322,27 @@ namespace ClientDB::Definitions
         f32 sunFogAngle;
         f32 cloudDensity;
         u32 fogHeightColor;
-        u32 endFogColor;
-        u32 endFogHeightColor;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
+        u32 fogEndColor;
+        u32 fogEndHeightColor;
     };
 
-    struct LightSkybox : public Base
+    struct LightSkybox
     {
     public:
         u32 modelHash;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Get(*this))
-                return false;
-
-            return true;
-        }
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->Put(*this))
-                return false;
-
-            return true;
-        }
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            return true;
-        }
     };
 
     // Custom
-    struct CameraSave : public Base
+    struct CameraSave
     {
     public:
-        std::string name;
-        std::string code;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            u32 nameIndex = 0;
-            u32 codeIndex = 0;
-
-            if (!buffer->GetU32(nameIndex))
-                return false;
-
-            if (!buffer->GetU32(codeIndex))
-                return false;
-
-            name = stringTable.GetString(nameIndex);
-            code = stringTable.GetString(codeIndex);
-
-            return true;
-        }
-
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            u32 nameIndex = std::numeric_limits<u32>().max();
-            if (!stringTable.TryFindString(name, nameIndex))
-                return false;
-
-            if (!buffer->PutU32(nameIndex))
-                return false;
-
-            u32 codeIndex = std::numeric_limits<u32>().max();
-            if (!stringTable.TryFindString(code, codeIndex))
-                return false;
-
-            if (!buffer->PutU32(codeIndex))
-                return false;
-
-            return true;
-        }
-
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            stringTable.AddString(name);
-            stringTable.AddString(code);
-
-            return true;
-        }
+        u32 name;
+        u32 code;
     };
-    struct Cursor : public Base
+    struct Cursor
     {
     public:
-        std::string name;
-        std::string texturePath;
-
-    public:
-        bool Read(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->GetU32(id))
-                return false;
-
-            u32 nameIndex = 0;
-            u32 texturePathIndex = 0;
-
-            if (!buffer->GetU32(nameIndex))
-                return false;
-
-            if (!buffer->GetU32(texturePathIndex))
-                return false;
-
-            name = stringTable.GetString(nameIndex);
-            texturePath = stringTable.GetString(texturePathIndex);
-
-            return true;
-        }
-
-        bool Write(std::shared_ptr<Bytebuffer>& buffer, const Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            if (!buffer->PutU32(id))
-                return false;
-
-            u32 nameIndex = std::numeric_limits<u32>().max();
-            if (!stringTable.TryFindString(name, nameIndex))
-                return false;
-
-            if (!buffer->PutU32(nameIndex))
-                return false;
-
-            u32 texturePathIndex = std::numeric_limits<u32>().max();
-            if (!stringTable.TryFindString(texturePath, texturePathIndex))
-                return false;
-
-            if (!buffer->PutU32(texturePathIndex))
-                return false;
-
-            return true;
-        }
-
-        bool WriteStringTable(Novus::Container::StringTableUnsafe& stringTable) override
-        {
-            stringTable.AddString(name);
-            stringTable.AddString(texturePath);
-
-            return true;
-        }
+        u32 name;
+        u32 texturePath;
     };
 }

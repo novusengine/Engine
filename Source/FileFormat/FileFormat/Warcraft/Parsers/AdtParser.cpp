@@ -266,24 +266,25 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
                 else
                 {
                     i16 liquidTypeID = -1;
-                    i32 materialID = -1;
 
-                    if (ClientDB::Definitions::LiquidObject* liquidObject = context.liquidObjects->GetRow(liquidVertexFormat))
+                    if (context.liquidObjects->Has(liquidVertexFormat))
                     {
-                        liquidTypeID = liquidObject->liquidTypeID;
+                        auto& liquidObject = context.liquidObjects->Get<ClientDB::Definitions::LiquidObject>(liquidVertexFormat);
+                        liquidTypeID = liquidObject.liquidTypeID;
                     }
                     else
                     {
                         liquidTypeID = liquidInstance.liquidType;
                     }
-
-                    if (ClientDB::Definitions::LiquidType* liquidType = context.liquidTypes->GetRow(liquidTypeID))
+                    
+                    if (context.liquidTypes->Has(liquidTypeID))
                     {
-                        materialID = liquidType->materialID;
-
-                        if (ClientDB::Definitions::LiquidMaterial* liquidMaterial = context.liquidMaterials->GetRow(materialID))
+                        auto& liquidType = context.liquidTypes->Get<ClientDB::Definitions::LiquidType>(liquidTypeID);
+                    
+                        if (context.liquidMaterials->Has(liquidType.materialID))
                         {
-                            liquidVertexFormat = liquidMaterial->liquidVertexFormat;
+                            auto& liquidMaterial = context.liquidMaterials->Get<ClientDB::Definitions::LiquidMaterial>(liquidType.materialID);
+                            liquidVertexFormat = liquidMaterial.liquidVertexFormat;
                         }
                     }
                 }

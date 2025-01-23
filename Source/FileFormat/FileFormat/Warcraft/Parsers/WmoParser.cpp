@@ -11,6 +11,7 @@ robin_hood::unordered_map<u32, std::function<bool(const Parser::ParseType parseT
     // WMO Root Chunks
     { FileChunkToken("MVER"), Parser::ReadMVER },
     { FileChunkToken("MOHD"), Parser::ReadMOHD },
+    { FileChunkToken("MOTX"), nullptr },
     { FileChunkToken("MOMT"), Parser::ReadMOMT },
     { FileChunkToken("MOUV"), nullptr },
     { FileChunkToken("MOGN"), Parser::ReadMOGN },
