@@ -72,6 +72,7 @@ void VerifyU32Vector(Renderer::GPUVector<u32>& vector, u32 expectedCount, u32 ex
     REQUIRE(vector.Capacity() == expectedCapacity);
     REQUIRE(vector.UsedBytes() == expectedCount * vector.ELEMENT_SIZE);
     REQUIRE(vector.TotalBytes() == expectedCapacity * vector.ELEMENT_SIZE);
+    REQUIRE(vector.UsedBytes() <= vector.TotalBytes());
 }
 
 void WaitForUpload(Renderer::Renderer* renderer, Novus::Window* window, Renderer::ImageID rt)
@@ -124,10 +125,11 @@ TEST_CASE("GPU Vector", "[Renderer]")
     Renderer::GPUVector<u32> u32Vector;
     u32Vector.SetDebugName("u32Vector");
 
-    // Add elements to the vector using default initialization
+    // Add elements to the vector and set them to 0
     for (i32 i = 0; i < 10; i++)
     {
         u32Vector.Add();
+        u32Vector[i] = 0;
     }
     VerifyU32Vector(u32Vector, 10, 16);
 
