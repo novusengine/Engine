@@ -540,6 +540,14 @@ namespace Renderer
         ReadOnly,
     };
 
+    constexpr u8 DefaultWhiteTextureRGBA8Unorm[8] = {
+        0xFF, 0xFF, 0xFF, 0xFF,  0xFF, 0xFF, 0xFF, 0xFF
+    };
+
+    constexpr u8 DefaultBlackTextureRGBA8Unorm[8] = {
+        0x00, 0x00, 0x00, 0x00,  0xFF, 0xFF, 0xFF, 0xFF
+    };
+
     inline ImageComponentType ToImageComponentType(ImageFormat imageFormat)
     {
         switch (imageFormat)

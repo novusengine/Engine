@@ -2,7 +2,6 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   <Type Name="Renderer::GPUVector&lt;*,*&gt;">
     <Expand>
-      <Item Name="_gpuInitialized">_gpuInitialized</Item>
       <Item Name="_validateTransfers">_validateTransfers</Item>
       <Item Name="_isCompressed">_isCompressed</Item>
       <Item Name="_renderer">_renderer</Item>
