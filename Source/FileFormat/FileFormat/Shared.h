@@ -269,6 +269,11 @@ namespace CoordinateSpaces
         return vec3(pos.y, pos.z, -pos.x);
     }
 
+    inline vec3 ModelScaleToNovus(const vec3& scale)
+    {
+        return vec3(scale.y, scale.z, scale.x);
+    }
+
     // Model Coordinate space (M2 and WMO)
     // RIGHT HANDED
     // X = South

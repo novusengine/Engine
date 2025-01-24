@@ -15,7 +15,8 @@ namespace Renderer
     // This is a combined Vector<T> with a backing GPU Buffer and BufferRangeAllocator keeping track of the offsets of the GPU Buffer
     // T is the type of the elements in the vector
     // ELEMENTS_PER_BLOCK is the number of elements per block in the allocator, defaults to 8
-    template <typename T, u32 ELEMENTS_PER_BLOCK = 8>
+    // SORT_STRATEGY is the strategy to sort the free frames in the GPU buffer, defaults to SizeAscending
+    template <typename T, u32 ELEMENTS_PER_BLOCK = 8, BufferRangeSortStrategy SORT_STRATEGY = BufferRangeSortStrategy::SizeAscending, BufferRangeAllocationStrategy ALLOCATION_STRATEGY = BufferRangeAllocationStrategy::ReuseFirst>
     class GPUVector
     {
         struct Region
@@ -35,14 +36,7 @@ namespace Renderer
         }
 
         // Non-const [] operator (allows modification)
-        T& operator[](u32 index)
-        {
-            u32 offset = index * ELEMENT_SIZE;
-            return *reinterpret_cast<T*>(&_data[offset]);
-        }
-
-        // Const [] operator (prevents modification)
-        const T& operator[](u32 index) const
+        T& operator[](u32 index) const
         {
             u32 offset = index * ELEMENT_SIZE;
             return *reinterpret_cast<T*>(&_data[offset]);
@@ -51,13 +45,6 @@ namespace Renderer
         // Adds a default initialized element
         // Returns the index of the added element
         inline u32 Add()
-        {
-            return Add(T());
-        }
-
-        // Adds an element
-        // Returns the index of the added element
-        inline u32 Add(const T& element)
         {
             BufferRangeFrame frame;
             if (!_allocator.Allocate(ELEMENT_SIZE, frame))
@@ -83,8 +70,69 @@ namespace Renderer
                 }
             }
 
-            memcpy(&_data[frame.offset], &element, frame.size);
+            // Default initialize the new element
+            new (_data + frame.offset) T();
 
+            // We only want to add dirty regions on Add() if we're not adding to the end of the vector
+            // Otherwise we get tons of these and it's gonna be slow
+            if (frame.wasHole)
+            {
+                SetDirtyRegion(frame.offset, frame.size);
+            }
+
+            return static_cast<u32>(frame.offset) / ELEMENT_SIZE;
+        }
+
+        // Adds an element
+        // Returns the index of the added element
+        inline u32 Add(const T& element)
+        {
+            u32 index = Add();
+
+            (*this)[index] = element;
+            return index;
+        }
+
+        // Adds a count of default initialized elements
+        inline u32 AddCount(u32 count)
+        {
+            if (count == 0)
+                return static_cast<u32>(_allocator.Size()) / ELEMENT_SIZE;
+
+            BufferRangeFrame frame;
+            if (!_allocator.Allocate(count * ELEMENT_SIZE, frame))
+            {
+                // Did not have room, so lets grow
+                size_t requiredBytes = count * ELEMENT_SIZE;
+                size_t blockBytes = ELEMENTS_PER_BLOCK * ELEMENT_SIZE;
+                size_t growBytes = ((requiredBytes + blockBytes - 1) / blockBytes) * blockBytes;
+                size_t newSize = _allocator.Size() + growBytes;
+                _allocator.Grow(newSize);
+
+                // Try again
+                if (!_allocator.Allocate(count * ELEMENT_SIZE, frame))
+                {
+                    NC_LOG_ERROR("Failed to allocate memory for GPUVector");
+                    return -1;
+                }
+
+                // Had to grow, so lets reallocate our data
+                u8* oldData = _data;
+                _data = new u8[_allocator.Size()];
+                if (oldData)
+                {
+                    memcpy(_data, oldData, frame.offset);
+                    delete[] oldData;
+                }
+            }
+
+            for (u32 i = 0; i < count; i++)
+            {
+                new (_data + frame.offset + (i * ELEMENT_SIZE)) T();
+            }
+
+            // We only want to add dirty regions on Add() if we're not adding to the end of the vector
+            // Otherwise we get tons of these and it's gonna be slow
             if (frame.wasHole)
             {
                 SetDirtyRegion(frame.offset, frame.size);
@@ -119,12 +167,39 @@ namespace Renderer
             _isCompressed = false;
         }
 
+        // Increases capacity but not size
+        inline void Reserve(u32 count)
+        {
+            size_t allocated = _allocator.AllocatedBytes();
+            size_t requestedSize = allocated + (count * ELEMENT_SIZE);
+
+            if (_allocator.Size() > requestedSize)
+                return;
+
+            size_t requiredBytes = count * ELEMENT_SIZE;
+            size_t blockBytes = ELEMENTS_PER_BLOCK * ELEMENT_SIZE;
+            size_t growBytes = ((requiredBytes + blockBytes - 1) / blockBytes) * blockBytes;
+            size_t newSize = _allocator.Size() + growBytes;
+            _allocator.Grow(newSize);
+
+            // Had to grow, so lets reallocate our data
+            u8* oldData = _data;
+            _data = new u8[_allocator.Size()];
+            if (oldData)
+            {
+                memcpy(_data, oldData, allocated);
+                delete[] oldData;
+            }
+        }
+
         // Clears the vector
         inline void Clear()
         {
             size_t size = _allocator.Size();
             _allocator.Reset();
             _allocator.Grow(size);
+
+            _gpuBufferUsedBytes = 0;
         }
 
         // Returns the count
@@ -215,7 +290,7 @@ namespace Renderer
             size_t freeSize = allocatorSize - newLastDataOffset;
 
             // Reinitialize the allocator
-            _allocator.Init(newLastDataOffset, allocatorSize, freeSize);
+            _allocator.Init(newLastDataOffset, allocatorSize);
             _gpuBufferUsedBytes = std::min(_gpuBufferUsedBytes, static_cast<u32>(newLastDataOffset));
 
 #if NC_DEBUG
@@ -278,9 +353,9 @@ namespace Renderer
             _usage = usage;
         }
         // Returns if the gpu buffer is valid
-        bool IsValid() { return _gpuBuffer != BufferID::Invalid(); }
+        bool IsValid() const { return _gpuBuffer != BufferID::Invalid(); }
         // Returns the gpu buffer
-        BufferID GetBuffer() { return _gpuBuffer; }
+        BufferID GetBuffer() const { return _gpuBuffer; }
 
         // Returns true if we had to resize the GPU buffer
         bool SyncToGPU(Renderer* renderer)
@@ -293,6 +368,7 @@ namespace Renderer
             {
                 // Resize the buffer, this will copy what existed in the old buffer to the new buffer
                 ResizeBuffer(renderer, cpuTotalBytes, true);
+                _queuedValidation = _validateTransfers;
             }
 
             bool needsNewUpload = cpuUsedBytes > _gpuBufferUsedBytes;
@@ -305,16 +381,35 @@ namespace Renderer
                 _dirtyRegions.push_back(dirtyRegion);
                 
                 _gpuBufferUsedBytes = cpuUsedBytes;
+                _queuedValidation = _validateTransfers;
             }
 
             bool needsDirtyUpload = _dirtyRegions.size() > 0;
             if (needsDirtyUpload)
             {
                 UploadDirtyRegions(renderer);
+                _queuedValidation = _validateTransfers;
             }
 
-            return needsResize;
+            bool needsDefaultInit = _gpuBuffer == BufferID::Invalid();
+            if (needsDefaultInit)
+            {
+                // Create the buffer if it doesn't exist
+                ResizeBuffer(renderer, 1, false);
+            }
+
+            // If nothing changed in the buffer this frame we can validate it
+            bool canValidate = !needsResize && !needsNewUpload && !needsDirtyUpload && !needsDefaultInit;
+            if (_queuedValidation && canValidate)
+            {
+                Validate();
+                _queuedValidation = false;
+            }
+
+            return needsResize || needsDefaultInit;
         }
+
+        void SetValidation(bool shouldValidate) { _validateTransfers = shouldValidate; }
 
         bool Validate()
         {
@@ -437,13 +532,13 @@ namespace Renderer
         }
 
     private:
-        bool _gpuInitialized = false;
         bool _validateTransfers = false;
+        bool _queuedValidation = false;
         bool _isCompressed = true;
 
         Renderer* _renderer = nullptr;
 
-        BufferRangeAllocator _allocator;
+        BufferRangeAllocator<SORT_STRATEGY, ALLOCATION_STRATEGY> _allocator;
         u8* _data = nullptr;
 
         std::string _debugName = "";

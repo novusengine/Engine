@@ -57,6 +57,7 @@ namespace Model
 
             modelHeader.numSequences = static_cast<u32>(sequences.size());
             modelHeader.numBones = static_cast<u32>(bones.size());
+            modelHeader.numAttachments = static_cast<u32>(attachments.size());
             modelHeader.numCameras = static_cast<u32>(cameras.size());
             modelHeader.numDecorationSets = static_cast<u32>(decorationSets.size());
             modelHeader.numDecorations = static_cast<u32>(decorations.size());
@@ -114,6 +115,41 @@ namespace Model
             }
         }
 
+        // Write Attachments
+        {
+            u32 numElements = modelHeader.numAttachments;
+
+            if (numElements > 0)
+            {
+                for (u32 i = 0; i < numElements; i++)
+                {
+                    const ComplexModel::Attachment& attachment = attachments[i];
+
+                    output.write(reinterpret_cast<const char*>(&attachment.id), sizeof(u32));
+                    output.write(reinterpret_cast<const char*>(&attachment.bone), sizeof(u16));
+
+                    output.write(reinterpret_cast<const char*>(&attachment.position), sizeof(vec3));
+
+                    attachment.isAnimated.Serialize(output);
+                }
+            }
+        }
+
+        // Write Animation ID to First Sequence ID
+        {
+            u32 numElements = static_cast<u32>(animationIDToFirstSequenceID.size());
+            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+
+            if (numElements > 0)
+            {
+                for (auto pair : animationIDToFirstSequenceID)
+                {
+                    output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
+                    output.write(reinterpret_cast<const char*>(&pair.second), sizeof(i16));
+                }
+            }
+        }
+
         // Write Bone Key ID to Bone Index
         {
             u32 numElements = static_cast<u32>(keyBoneIDToBoneIndex.size());
@@ -123,8 +159,42 @@ namespace Model
             {
                 for (auto pair : keyBoneIDToBoneIndex)
                 {
-                    output.write(reinterpret_cast<const char*>(&pair.first), sizeof(u16));
-                    output.write(reinterpret_cast<const char*>(&pair.second), sizeof(u16));
+                    output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
+                    output.write(reinterpret_cast<const char*>(&pair.second), sizeof(i16));
+                }
+            }
+        }
+
+        // Write Bone Index to Children
+        {
+            u32 numElements = static_cast<u32>(boneIndexToChildren.size());
+            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+
+            for (auto pair : boneIndexToChildren)
+            {
+                output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
+
+                u16 numChildren = static_cast<u16>(pair.second.size());
+                output.write(reinterpret_cast<const char*>(&numChildren), sizeof(u16));
+
+                for (u16 child : pair.second)
+                {
+                    output.write(reinterpret_cast<const char*>(&child), sizeof(u16));
+                }
+            }
+        }
+
+        // Write Animation ID to First Sequence ID
+        {
+            u32 numElements = static_cast<u32>(attachmentIDToIndex.size());
+            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+
+            if (numElements > 0)
+            {
+                for (auto pair : attachmentIDToIndex)
+                {
+                    output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
+                    output.write(reinterpret_cast<const char*>(&pair.second), sizeof(i16));
                 }
             }
         }
@@ -406,6 +476,7 @@ namespace Model
         out.flags = { };
         out.sequences.clear();
         out.bones.clear();
+        out.attachments.clear();
         out.vertices.clear();
         out.textures.clear();
         out.materials.clear();
@@ -495,9 +566,86 @@ namespace Model
             }
         }
 
-        // Read Bone Key ID to Bone Index
+        // Read Attachments
         {
-            if (!ReadUnorderedMapFromBuffer<u16, i16>(buffer, out.keyBoneIDToBoneIndex))
+            u32 numElements = out.modelHeader.numAttachments;
+
+            if (numElements)
+            {
+                out.attachments.resize(numElements);
+
+                for (u32 i = 0; i < numElements; i++)
+                {
+                    ComplexModel::Attachment& attachment = out.attachments[i];
+
+                    if (!buffer->GetU32(attachment.id))
+                        return false;
+
+                    if (!buffer->GetU16(attachment.bone))
+                        return false;
+
+                    if (!buffer->Get(attachment.position))
+                        return false;
+
+                    if (!attachment.isAnimated.Deserialize(buffer.get()))
+                        return false;
+                }
+            }
+        }
+
+        // Read Animation ID to First Sequence ID
+        {
+            if (!ReadUnorderedMapFromBuffer<i16, i16>(buffer, out.animationIDToFirstSequenceID))
+                return false;
+        }
+
+        // Read Bone Key ID to Index
+        {
+            if (!ReadUnorderedMapFromBuffer<i16, i16>(buffer, out.keyBoneIDToBoneIndex))
+                return false;
+        }
+
+        // Read Bone Index to Children
+        {
+            u32 numElements = 0;
+            if (!buffer->GetU32(numElements))
+                return false;
+
+            if (numElements > 0)
+            {
+                out.boneIndexToChildren.reserve(numElements);
+
+                for (u32 i = 0; i < numElements; i++)
+                {
+                    i16 key = 0;
+                    if (!buffer->GetI16(key))
+                        return false;
+
+                    u16 numValues = 0;
+                    if (!buffer->GetU16(numValues))
+                        return false;
+
+                    if (numValues == 0)
+                        continue;
+
+                    auto& children = out.boneIndexToChildren[key];
+                    children.resize(numValues);
+
+                    for (u32 j = 0; j < numValues; j++)
+                    {
+                        i16 childValue = 0;
+                        if (!buffer->GetI16(childValue))
+                            return false;
+
+                        children[j] = childValue;
+                    }
+                }
+            }
+        }
+
+        // Read Attachment ID to Index
+        {
+            if (!ReadUnorderedMapFromBuffer<i16, i16>(buffer, out.attachmentIDToIndex))
                 return false;
         }
 
@@ -897,7 +1045,7 @@ namespace Model
 
                     for (u32 j = 0; j < numValues; j++)
                     {
-                        quat rotQuat = srcTrack.values[j].ToQuat();
+                        quat rotQuat = glm::normalize(srcTrack.values[j].ToQuat());
                         destTrack.values[j] = CoordinateSpaces::ModelRotToNovus(rotQuat);
                     }
                 }
@@ -926,6 +1074,7 @@ namespace Model
         // Read Sequences
         {
             out.sequences.resize(numSequences);
+            out.animationIDToFirstSequenceID.reserve(numSequences);
 
             for (u32 i = 0; i < layout.md21.sequences.size; i++)
             {
@@ -956,6 +1105,11 @@ namespace Model
 
                 sequence.nextVariationID = m2Sequence->nextVariationID;
                 sequence.nextAliasID = m2Sequence->nextAliasID;
+
+                if (sequence.subID == 0)
+                {
+                    out.animationIDToFirstSequenceID[sequence.id] = i;
+                }
             }
         }
 
@@ -964,6 +1118,8 @@ namespace Model
             u32 numBones = layout.md21.bones.size;
 
             out.bones.resize(numBones);
+            out.boneIndexToChildren.reserve(numBones);
+
             for (u32 i = 0; i < numBones; i++)
             {
                 ComplexModel::Bone& bone = out.bones[i];
@@ -1003,21 +1159,48 @@ namespace Model
                     {
                         for (vec3& value : track.values)
                         {
-                            value = CoordinateSpaces::ModelPosToNovus(value);
+                            value = CoordinateSpaces::ModelScaleToNovus(value);
                         }
                     }
                 }
 
                 bone.pivot = CoordinateSpaces::ModelPosToNovus(m2Bone->pivot);
+
+                out.boneIndexToChildren.insert({ static_cast<u16>(i), {} });
+
+                if (bone.parentBoneID != -1)
+                    out.boneIndexToChildren[bone.parentBoneID].push_back(i);
             }
 
             u32 numKeyBones = layout.md21.keyBoneToBoneIndexList.size;
-
             out.keyBoneIDToBoneIndex.reserve(numKeyBones);
+
             for (u32 i = 0; i < numKeyBones; i++)
             {
                 u16* boneIndex = layout.md21.keyBoneToBoneIndexList.GetElement(rootBuffer, i);
                 out.keyBoneIDToBoneIndex[i] = *boneIndex;
+            }
+        }
+
+        // Read Attachments
+        {
+            u32 numAttachments = layout.md21.attachments.size;
+
+            out.attachments.resize(numAttachments);
+            out.attachmentIDToIndex.reserve(numAttachments);
+
+            for (u32 i = 0; i < numAttachments; i++)
+            {
+                ComplexModel::Attachment& attachment = out.attachments[i];
+                M2Attachment* m2Attachment = layout.md21.attachments.GetElement(rootBuffer, i);
+
+                attachment.id = m2Attachment->id;
+                attachment.bone = m2Attachment->bone;
+                attachment.position = CoordinateSpaces::ModelPosToNovus(m2Attachment->position);
+
+                GetAnimationTrack(rootBuffer, layout, attachment.isAnimated, m2Attachment->isAnimated);
+
+                out.attachmentIDToIndex[attachment.id] = i;
             }
         }
 

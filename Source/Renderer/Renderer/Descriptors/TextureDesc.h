@@ -20,7 +20,7 @@ namespace Renderer
 
         ImageFormat format;
         
-        u8* data = nullptr;
+        const u8* data = nullptr;
         std::string debugName = "";
     };
 

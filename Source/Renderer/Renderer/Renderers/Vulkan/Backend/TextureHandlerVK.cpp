@@ -404,8 +404,8 @@ namespace Renderer
 
             if (data.textureArrays.Size() <= arrayID)
             {
-				NC_LOG_CRITICAL("Tried to add TextureID: {0} to invalid array {1}", id, arrayID);
-			}
+                NC_LOG_CRITICAL("Tried to add TextureID: {0} to invalid array {1}", id, arrayID);
+            }
 
             return AddTextureToArrayInternal(textureID, textureArrayID, data.textures.ReadGet(id)->hash);
         }
@@ -861,14 +861,14 @@ namespace Renderer
                     TextureID::type textureIDTyped = static_cast<TextureID::type>(textureID);
                     if (textureArray.textureIDToArrayIndex->find(textureIDTyped) != textureArray.textureIDToArrayIndex->end())
                     {
-						arrayIndex = (*textureArray.textureIDToArrayIndex)[textureIDTyped];
-						return;
-					}
+                        arrayIndex = (*textureArray.textureIDToArrayIndex)[textureIDTyped];
+                        return;
+                    }
 
                     arrayIndex = static_cast<u32>(textureArray.textures->Size());
                     textureArray.textures->PushBack(textureID);
                     textureArray.textureHashes->PushBack(hash);
-					(*textureArray.textureIDToArrayIndex)[textureIDTyped] = arrayIndex;
+                    (*textureArray.textureIDToArrayIndex)[textureIDTyped] = arrayIndex;
                 });
 
             return arrayIndex;
