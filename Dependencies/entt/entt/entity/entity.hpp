@@ -33,10 +33,10 @@ struct entt_traits<std::uint32_t> {
     using value_type = std::uint32_t;
 
     using entity_type = std::uint32_t;
-    using version_type = std::uint8_t;
+    using version_type = std::uint16_t;
 
-    static constexpr entity_type entity_mask = 0xFFFFFF;
-    static constexpr entity_type version_mask = 0xFF;
+    static constexpr entity_type entity_mask = 0xFFFFF;
+    static constexpr entity_type version_mask = 0xFFF;
 };
 
 template<>
