@@ -410,7 +410,7 @@ namespace Renderer
             validationDesc.cpuAccess = BufferCPUAccess::ReadOnly;
             _validationBuffer = _renderer->CreateBuffer(_validationBuffer, validationDesc);
 
-            //NC_LOG_WARNING("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), Count(), validationDesc.size);
+            NC_LOG_WARNING("Validating buffer {} ({} items, {} bytes)", _debugName.c_str(), Count(), validationDesc.size);
 
             // Immediately copy from the GPU buffer to the validation buffer
             _renderer->CopyBufferImmediate(_validationBuffer, 0, _gpuBuffer, 0, validationDesc.size);
