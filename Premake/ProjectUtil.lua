@@ -296,7 +296,7 @@ Solution.Util.CreateStaticLib = function(name, binDir, dependencies, callback)
 end
 
 Solution.Util.CreateDynamicLib = function(name, binDir, dependencies, callback)
-    Solution.Util.CreateProject(name, "DynamicLib", binDir, dependencies, callback)
+    Solution.Util.CreateProject(name, "SharedLib", binDir, dependencies, callback)
 end
 
 Solution.Util.CreateConsoleApp = function(name, binDir, dependencies, callback)

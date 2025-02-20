@@ -8,6 +8,7 @@
 #include <Base/Memory/BufferRangeAllocator.h>
 #include <Base/Util/DebugHandler.h>
 
+#include <mutex>
 #include <shared_mutex>
 
 namespace Renderer
@@ -88,8 +89,8 @@ namespace Renderer
         inline u32 Add(const T& element)
         {
             u32 index = Add();
-
             (*this)[index] = element;
+
             return index;
         }
 
@@ -198,45 +199,28 @@ namespace Renderer
             size_t size = _allocator.Size();
             _allocator.Reset();
             _allocator.Grow(size);
+            _dirtyRegions.clear();
 
             _gpuBufferUsedBytes = 0;
         }
 
         // Returns the count
-        inline u32 Count() const
-        {
-            return static_cast<u32>(_allocator.AllocatedBytes() / ELEMENT_SIZE);
-        }
+        inline u32 Count() const { return static_cast<u32>(_allocator.AllocatedBytes() / ELEMENT_SIZE); }
 
         // Returns true if the vector is empty
-        inline bool IsEmpty() const
-        {
-            return Count() == 0;
-        }
+        inline bool IsEmpty() const { return Count() == 0; }
 
         // Returns the capacity
-        inline u32 Capacity() const
-        {
-            return static_cast<u32>(_allocator.Size() / ELEMENT_SIZE);
-        }
+        inline u32 Capacity() const { return static_cast<u32>(_allocator.Size() / ELEMENT_SIZE); }
 
         // Returns the count size in bytes
-        inline u32 UsedBytes() const
-        {
-            return static_cast<u32>(_allocator.AllocatedBytes());
-        }
+        inline u32 UsedBytes() const { return static_cast<u32>(_allocator.AllocatedBytes()); }
 
         // Returns the capacity size in bytes
-        inline u32 TotalBytes() const
-        {
-            return static_cast<u32>(_allocator.Size());
-        }
+        inline u32 TotalBytes() const { return static_cast<u32>(_allocator.Size()); }
 
         // Returns if the vector is compressed so it has no gaps
-        inline bool IsCompressed() const
-        {
-            return _isCompressed;
-        }
+        inline bool IsCompressed() const { return _isCompressed; }
 
         // This compresses the vector so there are no free spaces between elements
         void Compress()
@@ -316,6 +300,7 @@ namespace Renderer
             if (offset >= allocatedBytes)
                 return;
 
+            std::scoped_lock lock(_dirtyRegionMutex);
             Region& dirtyRegion = _dirtyRegions.emplace_back();
 
             dirtyRegion.offset = offset;
@@ -379,7 +364,7 @@ namespace Renderer
                 dirtyRegion.offset = _gpuBufferUsedBytes;
                 dirtyRegion.size = cpuUsedBytes - _gpuBufferUsedBytes;
                 _dirtyRegions.push_back(dirtyRegion);
-                
+
                 _gpuBufferUsedBytes = cpuUsedBytes;
                 _queuedValidation = _validateTransfers;
             }
@@ -413,10 +398,14 @@ namespace Renderer
 
         bool Validate()
         {
+            u32 usedBytes = UsedBytes();
+            if (usedBytes == 0)
+                return true;
+
             // Create (or update) the buffer
             BufferDesc validationDesc;
             validationDesc.name = _debugName + " Validation Buffer";
-            validationDesc.size = UsedBytes();
+            validationDesc.size = usedBytes;
             validationDesc.usage = BufferUsage::TRANSFER_DESTINATION;
             validationDesc.cpuAccess = BufferCPUAccess::ReadOnly;
             _validationBuffer = _renderer->CreateBuffer(_validationBuffer, validationDesc);
@@ -547,6 +536,8 @@ namespace Renderer
         u32 _gpuBufferTotalBytes = 0;
         BufferID _gpuBuffer;
         BufferID _validationBuffer;
+
+        std::mutex _dirtyRegionMutex;
         std::vector<Region> _dirtyRegions;
     };
 }
