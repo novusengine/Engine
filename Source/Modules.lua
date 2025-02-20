@@ -17,6 +17,7 @@ local modules =
     "Gameplay/Gameplay.lua",
     "ShaderCooker/ShaderCooker.lua",
     "Renderer/Renderer.lua",
+    "Audio/Audio.lua"
 }
 
 for _, v in pairs(modules) do

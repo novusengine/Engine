@@ -28,6 +28,8 @@ local dependencies =
     "freetype/freetype.lua",
     "msdfgen/msdfgen.lua",
     "msdf-atlas-gen/msdf-atlas-gen.lua",
+    "stb_vorbis/stb_vorbis.lua",
+    "miniaudio/miniaudio.lua"
 }
 
 for k,v in pairs(dependencies) do
