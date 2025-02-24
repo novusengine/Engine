@@ -47,6 +47,29 @@ namespace Wmo
         std::vector<IntColor> data;
     };
 
+    struct MOBR
+    {
+    public:
+        std::vector<u16> data;
+    };
+
+    struct MOBN
+    {
+    public:
+        struct BspNode
+        {
+        public:
+            u16 flags;
+            i16 negChild;
+            i16 posChild;
+            u16 nFaces;
+            u32 faceStart;
+            f32 planeDist;
+        };
+
+        std::vector<BspNode> data;
+    };
+
     struct MOBA
     {
     public:
@@ -410,6 +433,8 @@ namespace Wmo
         MONR monr = { };
         std::vector<MOTV> motvs = { };
         MOBA moba = { };
+        MOBN mobn = { };
+        MOBR mobr = { };
         std::vector<MOCV> mocvs = { };
     };
 

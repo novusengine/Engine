@@ -1127,6 +1127,9 @@ namespace Model
 
                 bone.keyBoneID = m2Bone->keyBoneID;
                 bone.flags = *reinterpret_cast<ComplexModel::Bone::Flags*>(&m2Bone->flags);
+                bool hasCylindricialBillboardLockZ = bone.flags.CylindricialBillboardLockY;
+                bone.flags.CylindricialBillboardLockY = bone.flags.CylindricialBillboardLockZ;
+                bone.flags.CylindricialBillboardLockZ = hasCylindricialBillboardLockZ;
                 bone.parentBoneID = m2Bone->parentBone;
                 bone.submeshID = m2Bone->submeshID;
 
@@ -1525,6 +1528,32 @@ namespace Model
         return true;
     }
 
+    void TraverseBSP(const std::vector<Model::MapObjectGroup::BspNode>& bspNodes, const std::vector<u16>& bspFaces, i32 nodeIndex, std::vector<u16>& bspFaceIndices)
+    {
+        if (nodeIndex == -1)
+        {
+            return; // No child node
+        }
+
+        const Model::MapObjectGroup::BspNode& currentNode = bspNodes[nodeIndex];
+
+        if (currentNode.flags & Model::MapObjectGroup::BspNode::Flag_Leaf)
+        {
+            // Leaf node: extract triangle indices
+            for (u32 i = 0; i < currentNode.nFaces; ++i)
+            {
+                u32 faceIndexStart = currentNode.faceStart + i;
+                bspFaceIndices.push_back(bspFaces[faceIndexStart]);
+            }
+        }
+        else
+        {
+            // Not a leaf node: traverse child nodes recursively
+            TraverseBSP(bspNodes, bspFaces, currentNode.negChild, bspFaceIndices);
+            TraverseBSP(bspNodes, bspFaces, currentNode.posChild, bspFaceIndices);
+        }
+    }
+
     bool ComplexModel::FromMapObject(const MapObject& mapObject, ComplexModel& out)
     {
         out.flags.IsConvertedMapObject = true;
@@ -1536,6 +1565,8 @@ namespace Model
             u32 materialOffset = 0;
             u32 renderBatchOffset = 0;
 
+            robin_hood::unordered_map<u32, u32> vertexIndexToRemappedIndex;
+
             for (u32 i = 0; i < mapObject.groups.size(); i++)
             {
                 const MapObjectGroup& group = mapObject.groups[i];
@@ -1543,6 +1574,8 @@ namespace Model
                 u32 numVertices = static_cast<u32>(group.vertices.size());
                 if (numVertices > 0)
                 {
+                    vertexIndexToRemappedIndex.reserve(vertexIndexToRemappedIndex.size());
+
                     out.vertices.resize(vertexOffset + numVertices);
                     out.modelData.vertexLookupIDs.resize(out.vertices.size());
 
@@ -1565,6 +1598,8 @@ namespace Model
 
                         out.modelData.vertexLookupIDs[vertexOffset + i] = vertexOffset + i;
                     }
+
+                    out.collisionVertexPositions.reserve(out.collisionVertexPositions.size() + numVertices);
                 }
 
                 u32 numIndicies = static_cast<u32>(group.indices.size());
@@ -1572,6 +1607,8 @@ namespace Model
                 {
                     out.modelData.indices.resize(indexOffset + numIndicies);
                     memcpy(&out.modelData.indices[indexOffset], &group.indices[0], numIndicies * sizeof(u16));
+                    
+                    out.collisionIndices.reserve(out.collisionIndices.size() + numVertices);
                 }
 
                 u32 numMaterials = static_cast<u32>(mapObject.materials.size());
@@ -1709,10 +1746,73 @@ namespace Model
                     }
                 }
 
+                u32 numBspNodes = static_cast<u32>(group.bspNodes.size());
+                if (numBspNodes > 0)
+                {
+                    std::vector<u16> bspTriangleIndices = { };
+                    bspTriangleIndices.reserve(group.bspIndices.size());
+
+                    TraverseBSP(group.bspNodes, group.bspIndices, 0, bspTriangleIndices);
+
+                    u32 numTriangleMaterialInfos = static_cast<u32>(group.triangleMaterialInfo.size());
+                    u32 numBspTriangles = static_cast<u32>(bspTriangleIndices.size());
+                    for (u32 j = 0; j < numBspTriangles; j++)
+                    {
+                        u32 triangleIndex = bspTriangleIndices[j];
+                        if (triangleIndex >= numTriangleMaterialInfos)
+                            continue;
+
+                        auto& triangleMaterialInfo = group.triangleMaterialInfo[triangleIndex];
+                        if (triangleMaterialInfo.flags.Detail)
+                            continue;
+
+                        u16 index1 = group.indices[(triangleIndex * 3) + 0];
+                        u16 index2 = group.indices[(triangleIndex * 3) + 1];
+                        u16 index3 = group.indices[(triangleIndex * 3) + 2];
+
+                        const auto& vertex1 = group.vertices[index1];
+                        const auto& vertex2 = group.vertices[index2];
+                        const auto& vertex3 = group.vertices[index3];
+
+                        u32 numPushedVertices = 0;
+
+                        if (!vertexIndexToRemappedIndex.contains(index1))
+                        {
+                            vertexIndexToRemappedIndex[index1] = static_cast<u32>(out.collisionVertexPositions.size());
+                            out.collisionVertexPositions.push_back(vec3(vertex1.position));
+                            numPushedVertices++;
+                        }
+
+                        if (!vertexIndexToRemappedIndex.contains(index2))
+                        {
+                            vertexIndexToRemappedIndex[index2] = static_cast<u32>(out.collisionVertexPositions.size());
+                            out.collisionVertexPositions.push_back(vec3(vertex2.position));
+                            numPushedVertices++;
+                        }
+
+                        if (!vertexIndexToRemappedIndex.contains(index3))
+                        {
+                            vertexIndexToRemappedIndex[index3] = static_cast<u32>(out.collisionVertexPositions.size());
+                            out.collisionVertexPositions.push_back(vec3(vertex3.position));
+                            numPushedVertices++;
+                        }
+
+                        u32 vertexIndex1 = vertexIndexToRemappedIndex[index1];
+                        u32 vertexIndex2 = vertexIndexToRemappedIndex[index2];
+                        u32 vertexIndex3 = vertexIndexToRemappedIndex[index3];
+
+                        out.collisionIndices.push_back(vertexIndex1);
+                        out.collisionIndices.push_back(vertexIndex2);
+                        out.collisionIndices.push_back(vertexIndex3);
+                    }
+                }
+
                 vertexOffset += numVertices;
                 indexOffset += numIndicies;
                 materialOffset += numMaterials;
                 renderBatchOffset += numRenderBatches;
+
+                vertexIndexToRemappedIndex.clear();
             }
         }
 

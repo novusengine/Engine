@@ -55,6 +55,8 @@ namespace Wmo
         static bool ReadMONR(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Wmo::Layout& wmo);
         static bool ReadMOTV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Wmo::Layout& wmo);
         static bool ReadMOBA(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Wmo::Layout& wmo);
+        static bool ReadMOBN(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Wmo::Layout& wmo);
+        static bool ReadMOBR(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Wmo::Layout& wmo);
         static bool ReadMOCV(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Wmo::Layout& wmo);
 
     private:

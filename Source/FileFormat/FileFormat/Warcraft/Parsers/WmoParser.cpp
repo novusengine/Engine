@@ -53,8 +53,8 @@ robin_hood::unordered_map<u32, std::function<bool(const Parser::ParseType parseT
     { FileChunkToken("MOBA"), Parser::ReadMOBA },
     { FileChunkToken("MOLR"), nullptr },
     { FileChunkToken("MODR"), nullptr },
-    { FileChunkToken("MOBN"), nullptr },
-    { FileChunkToken("MOBR"), nullptr },
+    { FileChunkToken("MOBN"), Parser::ReadMOBN },
+    { FileChunkToken("MOBR"), Parser::ReadMOBR },
     { FileChunkToken("MOCV"), Parser::ReadMOCV },
     { FileChunkToken("MLIQ"), nullptr },
     { FileChunkToken("MORI"), nullptr },
@@ -318,6 +318,24 @@ bool Parser::ReadMOBA(const ParseType parseType, const FileChunkHeader& header, 
     WMOGroup& group = layout.groups.back();
 
     if (!LoadArrayOfStructs(buffer, header.size, group.moba.data))
+        return false;
+
+    return true;
+}
+bool Parser::ReadMOBN(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+{
+    WMOGroup& group = layout.groups.back();
+
+    if (!LoadArrayOfStructs(buffer, header.size, group.mobn.data))
+        return false;
+
+    return true;
+}
+bool Parser::ReadMOBR(const ParseType parseType, const FileChunkHeader& header, std::shared_ptr<Bytebuffer>& buffer, Layout& layout)
+{
+    WMOGroup& group = layout.groups.back();
+
+    if (!LoadArrayOfStructs(buffer, header.size, group.mobr.data))
         return false;
 
     return true;

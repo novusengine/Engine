@@ -56,6 +56,7 @@ namespace Model
 
         struct Vertex
         {
+        public:
             hvec3 position = hvec3(static_cast<f16>(0.0f));
             u8 octNormal[2] = { 0, 0 };
             hvec4 uv = hvec4(static_cast<f16>(0.0f));
@@ -63,11 +64,13 @@ namespace Model
 
         struct VertexColorSet
         {
+        public:
             std::vector<IntColor> colors = { };
         };
 
         struct TriangleMaterialInfo
         {
+        public:
             struct Flags
             {
                 u8 Unk0x1 : 1;
@@ -86,6 +89,7 @@ namespace Model
 
         struct RenderBatch
         {
+        public:
             u32 startVertex = 0;
             u16 vertexCount = 0;
             u32 startIndex = 0;
@@ -95,9 +99,31 @@ namespace Model
 
         struct CullingData
         {
+        public:
             hvec3 center = hvec3(static_cast<f16>(100000.0f));
             hvec3 extents = hvec3(static_cast<f16>(-100000.0f));
             f32 boundingSphereRadius = 0.0f;
+        };
+
+        struct BspNode
+        {
+        public:
+            enum Flags : u16
+            {
+                Flag_XAxis = 0x0,
+                Flag_YAxis = 0x1,
+                Flag_ZAxis = 0x2,
+                Flag_AxisMask = 0x3,
+                Flag_Leaf = 0x4,
+                Flag_NoChild = 0xFFFF,
+            };
+
+            Flags flags;
+            i16 negChild;
+            i16 posChild;
+            u16 nFaces;
+            u32 faceStart;
+            f32 planeDist;
         };
 
     public:
@@ -106,6 +132,8 @@ namespace Model
         Flags flags = { };
         std::vector<Vertex> vertices = { };
         std::vector<u16> indices = { };
+        std::vector<u16> bspIndices = { };
+        std::vector<BspNode> bspNodes = { };
         std::vector<VertexColorSet> vertexColorSets = { };
         std::vector<TriangleMaterialInfo> triangleMaterialInfo = { };
         std::vector<RenderBatch> renderBatches = { };
@@ -119,6 +147,7 @@ namespace Model
 
         struct Material
         {
+        public:
             struct Flags
             {
                 u32 NoLighting : 1;
@@ -140,6 +169,7 @@ namespace Model
 
         struct Decoration
         {
+        public:
             u32 nameID = 0;
             vec3 position = vec3(0.0f, 0.0f, 0.0f);
             quat rotation = quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -149,6 +179,7 @@ namespace Model
 
         struct DecorationSet
         {
+        public:
             char name[20] = { 0 };
             u16 index = 0;
             u32 count = 0;

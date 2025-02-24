@@ -520,14 +520,21 @@ namespace Model
                     {
                         u32 numIndices = static_cast<u32>(wmoGroup.movi.data.size());
                         mapObjectGroup.indices.resize(numIndices);
-                        memcpy(mapObjectGroup.indices.data(), wmoGroup.movi.data.data(), wmoGroup.movi.data.size() * sizeof(u16));
+                        memcpy(mapObjectGroup.indices.data(), wmoGroup.movi.data.data(), numIndices * sizeof(u16));
+                    }
+
+                    // Copy Bsp Indices
+                    {
+                        u32 numBspIndices = static_cast<u32>(wmoGroup.mobr.data.size());
+                        mapObjectGroup.bspIndices.resize(numBspIndices);
+                        memcpy(mapObjectGroup.bspIndices.data(), wmoGroup.mobr.data.data(), numBspIndices * sizeof(u16));
                     }
 
                     // Copy Triangle Material Info
                     {
                         u32 numTriangleMaterialInfo = static_cast<u32>(wmoGroup.mopy.data.size());
                         mapObjectGroup.triangleMaterialInfo.resize(numTriangleMaterialInfo);
-                        memcpy(mapObjectGroup.triangleMaterialInfo.data(), wmoGroup.mopy.data.data(), wmoGroup.mopy.data.size() * sizeof(MOPY::TriangleMaterialInfo));
+                        memcpy(mapObjectGroup.triangleMaterialInfo.data(), wmoGroup.mopy.data.data(), numTriangleMaterialInfo * sizeof(MOPY::TriangleMaterialInfo));
                     }
 
                     mapObjectGroup.vertices.resize(numVertices);
@@ -562,6 +569,13 @@ namespace Model
                             vertex.uv.w = uv.y;
                         }
                     }
+                }
+
+                // Copy BSP Data
+                {
+                    u32 numBspNodes = static_cast<u32>(wmoGroup.mobn.data.size());
+                    mapObjectGroup.bspNodes.resize(numBspNodes);
+                    memcpy(mapObjectGroup.bspNodes.data(), wmoGroup.mobn.data.data(), numBspNodes * sizeof(Model::MapObjectGroup::BspNode));
                 }
             }
         }
