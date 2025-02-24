@@ -1,6 +1,8 @@
 #pragma once
 #include "Base/Types.h"
 
+#include <memory>
+
 class Bytebuffer;
 
 namespace GameDefine
