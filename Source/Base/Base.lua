@@ -1,4 +1,4 @@
-local mod = Solution.Util.CreateModuleTable("Base", { "glm", "robinhood", "json", "refl-cpp", "quill", "hwloc" })
+local mod = Solution.Util.CreateModuleTable("Base", { "glm", "robinhood", "json", "refl-cpp", "quill", "hwloc", "rtree" })
 
 Solution.Util.CreateStaticLib(mod.Name, Solution.Projects.Current.BinDir, mod.Dependencies, function()
     local defines = { "_CRT_SECURE_NO_WARNINGS", "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }

@@ -1,4 +1,5 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
+#include "Luau/Config.h"
 #include "Luau/ModuleResolver.h"
 #include "Luau/TypeInfer.h"
 #include "Luau/BuiltinDefinitions.h"
@@ -6,8 +7,9 @@
 #include "Luau/TypeAttach.h"
 #include "Luau/Transpiler.h"
 
-#include "FileUtils.h"
-#include "Flags.h"
+#include "Luau/FileUtils.h"
+#include "Luau/Flags.h"
+#include "Luau/Require.h"
 
 #include <condition_variable>
 #include <functional>
@@ -169,14 +171,17 @@ struct CliFileResolver : Luau::FileResolver
     {
         if (Luau::AstExprConstantString* expr = node->as<Luau::AstExprConstantString>())
         {
-            Luau::ModuleName name = std::string(expr->value.data, expr->value.size) + ".luau";
-            if (!readFile(name))
-            {
-                // fall back to .lua if a module with .luau doesn't exist
-                name = std::string(expr->value.data, expr->value.size) + ".lua";
-            }
+            std::string path{expr->value.data, expr->value.size};
 
-            return {{name}};
+            AnalysisRequireContext requireContext{context->name};
+            AnalysisCacheManager cacheManager;
+            AnalysisErrorHandler errorHandler;
+
+            RequireResolver resolver(path, requireContext, cacheManager, errorHandler);
+            RequireResolver::ResolvedRequire resolvedRequire = resolver.resolveRequire();
+
+            if (resolvedRequire.status == RequireResolver::ModuleStatus::FileRead)
+                return {{resolvedRequire.identifier}};
         }
 
         return std::nullopt;
@@ -188,6 +193,48 @@ struct CliFileResolver : Luau::FileResolver
             return "stdin";
         return name;
     }
+
+private:
+    struct AnalysisRequireContext : RequireResolver::RequireContext
+    {
+        explicit AnalysisRequireContext(std::string path)
+            : path(std::move(path))
+        {
+        }
+
+        std::string getPath() override
+        {
+            return path;
+        }
+
+        bool isRequireAllowed() override
+        {
+            return true;
+        }
+
+        bool isStdin() override
+        {
+            return path == "-";
+        }
+
+        std::string createNewIdentifer(const std::string& path) override
+        {
+            return path;
+        }
+
+    private:
+        std::string path;
+    };
+
+    struct AnalysisCacheManager : public RequireResolver::CacheManager
+    {
+        AnalysisCacheManager() = default;
+    };
+
+    struct AnalysisErrorHandler : RequireResolver::ErrorHandler
+    {
+        AnalysisErrorHandler() = default;
+    };
 };
 
 struct CliConfigResolver : Luau::ConfigResolver
@@ -224,7 +271,14 @@ struct CliConfigResolver : Luau::ConfigResolver
 
         if (std::optional<std::string> contents = readFile(configPath))
         {
-            std::optional<std::string> error = Luau::parseConfig(*contents, result);
+            Luau::ConfigOptions::AliasOptions aliasOpts;
+            aliasOpts.configLocation = configPath;
+            aliasOpts.overwriteAliases = true;
+
+            Luau::ConfigOptions opts;
+            opts.aliasOptions = std::move(aliasOpts);
+
+            std::optional<std::string> error = Luau::parseConfig(*contents, result, opts);
             if (error)
                 configErrors.push_back({configPath, *error});
         }

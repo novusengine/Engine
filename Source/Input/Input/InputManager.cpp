@@ -107,7 +107,15 @@ void InputManager::CharInputHandler(u32 unicode)
 }
 void InputManager::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMask)
 {
-    _mouseState = actionMask == GLFW_RELEASE ? 0 : 1;
+    u32 buttonMask = 1 << button;
+    if (actionMask == GLFW_RELEASE)
+    {
+        _cursorState.buttonPressed &= ~buttonMask;
+    }
+    else
+    {
+        _cursorState.buttonPressed |= buttonMask;
+    }
 
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
     bool wasConsumed = false;
@@ -133,8 +141,14 @@ void InputManager::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMas
 }
 void InputManager::MousePositionHandler(f32 x, f32 y)
 {
-    _mousePositionX = x;
-    _mousePositionY = y;
+    if (!IsCursorVirtual())
+    {
+        _cursorPosition = vec2(x, y);
+    }
+    else
+    {
+        _cursorVirtualPosition = vec2(x, y);
+    }
 
     bool wasConsumed = false;
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
@@ -188,5 +202,39 @@ void InputManager::MouseScrollHandler(f32 x, f32 y)
                 }
             }
         }
+    }
+}
+
+bool InputManager::IsMouseButtonDown(i32 button)
+{
+    u32 buttonMask = 1 << button;
+    bool isPressed = (_cursorState.buttonPressed & buttonMask) != 0;
+    return isPressed;
+}
+
+bool InputManager::IsCursorVirtual()
+{
+    return _cursorState.isVirtual;
+}
+
+void InputManager::SetCursorVirtual(bool isVirtual)
+{
+    _cursorState.isVirtual = isVirtual;
+}
+
+vec2 InputManager::GetMousePosition()
+{
+    return _cursorState.isVirtual ? _cursorVirtualPosition : _cursorPosition;
+}
+
+void InputManager::SetMousePosition(f32 x, f32 y)
+{
+    if (_cursorState.isVirtual)
+    {
+        _cursorVirtualPosition = vec2(x, y);
+    }
+    else
+    {
+        _cursorPosition = vec2(x, y);
     }
 }

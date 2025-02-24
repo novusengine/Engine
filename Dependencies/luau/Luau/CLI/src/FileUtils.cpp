@@ -1,5 +1,5 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
-#include "FileUtils.h"
+#include "Luau/FileUtils.h"
 
 #include "Luau/Common.h"
 
@@ -20,6 +20,7 @@
 #endif
 
 #include <string.h>
+#include <string_view>
 
 #ifdef _WIN32
 static std::wstring fromUtf8(const std::string& path)
@@ -57,12 +58,6 @@ bool isAbsolutePath(std::string_view path)
 #endif
 }
 
-bool isExplicitlyRelative(std::string_view path)
-{
-    return (path == ".") || (path == "..") || (path.size() >= 2 && path[0] == '.' && path[1] == '/') ||
-           (path.size() >= 3 && path[0] == '.' && path[1] == '.' && path[2] == '/');
-}
-
 std::optional<std::string> getCurrentWorkingDirectory()
 {
     // 2^17 - derived from the Windows path length limit
@@ -96,95 +91,86 @@ std::optional<std::string> getCurrentWorkingDirectory()
     return std::nullopt;
 }
 
-// Returns the normal/canonical form of a path (e.g. "../subfolder/../module.luau" -> "../module.luau")
 std::string normalizePath(std::string_view path)
 {
-    return resolvePath(path, "");
-}
+    const std::vector<std::string_view> components = splitPath(path);
+    std::vector<std::string_view> normalizedComponents;
 
-// Takes a path that is relative to the file at baseFilePath and returns the path explicitly rebased onto baseFilePath.
-// For absolute paths, baseFilePath will be ignored, and this function will resolve the path to a canonical path:
-// (e.g. "/Users/.././Users/johndoe" -> "/Users/johndoe").
-std::string resolvePath(std::string_view path, std::string_view baseFilePath)
-{
-    std::vector<std::string_view> pathComponents;
-    std::vector<std::string_view> baseFilePathComponents;
+    const bool isAbsolute = isAbsolutePath(path);
 
-    // Dependent on whether the final resolved path is absolute or relative
-    // - if relative (when path and baseFilePath are both relative), resolvedPathPrefix remains empty
-    // - if absolute (if either path or baseFilePath are absolute), resolvedPathPrefix is "C:\", "/", etc.
-    std::string resolvedPathPrefix;
-
-    if (isAbsolutePath(path))
+    // 1. Normalize path components
+    const size_t startIndex = isAbsolute ? 1 : 0;
+    for (size_t i = startIndex; i < components.size(); i++)
     {
-        // path is absolute, we use path's prefix and ignore baseFilePath
-        size_t afterPrefix = path.find_first_of("\\/") + 1;
-        resolvedPathPrefix = path.substr(0, afterPrefix);
-        pathComponents = splitPath(path.substr(afterPrefix));
-    }
-    else
-    {
-        pathComponents = splitPath(path);
-        if (isAbsolutePath(baseFilePath))
-        {
-            // path is relative and baseFilePath is absolute, we use baseFilePath's prefix
-            size_t afterPrefix = baseFilePath.find_first_of("\\/") + 1;
-            resolvedPathPrefix = baseFilePath.substr(0, afterPrefix);
-            baseFilePathComponents = splitPath(baseFilePath.substr(afterPrefix));
-        }
-        else
-        {
-            // path and baseFilePath are both relative, we do not set a prefix (resolved path will be relative)
-            baseFilePathComponents = splitPath(baseFilePath);
-        }
-    }
-
-    // Remove filename from components
-    if (!baseFilePathComponents.empty())
-        baseFilePathComponents.pop_back();
-
-    // Resolve the path by applying pathComponents to baseFilePathComponents
-    int numPrependedParents = 0;
-    for (std::string_view component : pathComponents)
-    {
+        std::string_view component = components[i];
         if (component == "..")
         {
-            if (baseFilePathComponents.empty())
+            if (normalizedComponents.empty())
             {
-                if (resolvedPathPrefix.empty()) // only when final resolved path will be relative
-                    numPrependedParents++;      // "../" will later be added to the beginning of the resolved path
+                if (!isAbsolute)
+                {
+                    normalizedComponents.emplace_back("..");
+                }
             }
-            else if (baseFilePathComponents.back() != "..")
+            else if (normalizedComponents.back() == "..")
             {
-                baseFilePathComponents.pop_back(); // Resolve cases like "folder/subfolder/../../file" to "file"
+                normalizedComponents.emplace_back("..");
+            }
+            else
+            {
+                normalizedComponents.pop_back();
             }
         }
-        else if (component != "." && !component.empty())
+        else if (!component.empty() && component != ".")
         {
-            baseFilePathComponents.push_back(component);
+            normalizedComponents.emplace_back(component);
         }
     }
 
-    // Join baseFilePathComponents to form the resolved path
-    std::string resolvedPath = resolvedPathPrefix;
-    // Only when resolvedPath will be relative
-    for (int i = 0; i < numPrependedParents; i++)
-    {
-        resolvedPath += "../";
-    }
-    for (auto iter = baseFilePathComponents.begin(); iter != baseFilePathComponents.end(); ++iter)
-    {
-        if (iter != baseFilePathComponents.begin())
-            resolvedPath += "/";
+    std::string normalizedPath;
 
-        resolvedPath += *iter;
-    }
-    if (resolvedPath.size() > resolvedPathPrefix.size() && resolvedPath.back() == '/')
+    // 2. Add correct prefix to formatted path
+    if (isAbsolute)
     {
-        // Remove trailing '/' if present
-        resolvedPath.pop_back();
+        normalizedPath += components[0];
+        normalizedPath += "/";
     }
-    return resolvedPath;
+    else if (normalizedComponents.empty() || normalizedComponents[0] != "..")
+    {
+        normalizedPath += "./";
+    }
+
+    // 3. Join path components to form the normalized path
+    for (auto iter = normalizedComponents.begin(); iter != normalizedComponents.end(); ++iter)
+    {
+        if (iter != normalizedComponents.begin())
+            normalizedPath += "/";
+
+        normalizedPath += *iter;
+    }
+    if (normalizedPath.size() >= 2 && normalizedPath[normalizedPath.size() - 1] == '.' && normalizedPath[normalizedPath.size() - 2] == '.')
+        normalizedPath += "/";
+
+    return normalizedPath;
+}
+
+std::optional<std::string> resolvePath(std::string_view path, std::string_view baseFilePath)
+{
+    std::optional<std::string> baseFilePathParent = getParentPath(baseFilePath);
+    if (!baseFilePathParent)
+        return std::nullopt;
+
+    return normalizePath(joinPaths(*baseFilePathParent, path));
+}
+
+bool hasFileExtension(std::string_view name, const std::vector<std::string>& extensions)
+{
+    for (const std::string& extension : extensions)
+    {
+        if (name.size() >= extension.size() && name.substr(name.size() - extension.size()) == extension)
+            return true;
+    }
+    return false;
 }
 
 std::optional<std::string> readFile(const std::string& name)
@@ -353,6 +339,20 @@ bool traverseDirectory(const std::string& path, const std::function<void(const s
 }
 #endif
 
+bool isFile(const std::string& path)
+{
+#ifdef _WIN32
+    DWORD fileAttributes = GetFileAttributesW(fromUtf8(path).c_str());
+    if (fileAttributes == INVALID_FILE_ATTRIBUTES)
+        return false;
+    return (fileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+#else
+    struct stat st = {};
+    lstat(path.c_str(), &st);
+    return (st.st_mode & S_IFMT) == S_IFREG;
+#endif
+}
+
 bool isDirectory(const std::string& path)
 {
 #ifdef _WIN32
@@ -385,16 +385,16 @@ std::vector<std::string_view> splitPath(std::string_view path)
     return components;
 }
 
-std::string joinPaths(const std::string& lhs, const std::string& rhs)
+std::string joinPaths(std::string_view lhs, std::string_view rhs)
 {
-    std::string result = lhs;
+    std::string result = std::string(lhs);
     if (!result.empty() && result.back() != '/' && result.back() != '\\')
         result += '/';
     result += rhs;
     return result;
 }
 
-std::optional<std::string> getParentPath(const std::string& path)
+std::optional<std::string> getParentPath(std::string_view path)
 {
     if (path == "" || path == "." || path == "/")
         return std::nullopt;
@@ -410,7 +410,7 @@ std::optional<std::string> getParentPath(const std::string& path)
         return "/";
 
     if (slash != std::string::npos)
-        return path.substr(0, slash);
+        return std::string(path.substr(0, slash));
 
     return "";
 }
@@ -440,10 +440,12 @@ std::vector<std::string> getSourceFiles(int argc, char** argv)
         if (argv[i][0] == '-' && argv[i][1] != '\0')
             continue;
 
-        if (isDirectory(argv[i]))
+        std::string normalized = normalizePath(argv[i]);
+
+        if (isDirectory(normalized))
         {
             traverseDirectory(
-                argv[i],
+                normalized,
                 [&](const std::string& name)
                 {
                     std::string ext = getExtension(name);
@@ -455,7 +457,7 @@ std::vector<std::string> getSourceFiles(int argc, char** argv)
         }
         else
         {
-            files.push_back(argv[i]);
+            files.push_back(normalized);
         }
     }
 

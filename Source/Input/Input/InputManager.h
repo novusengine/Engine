@@ -8,6 +8,12 @@
 
 #include <memory>
 
+struct CursorState
+{
+    u32 buttonPressed : 31 = 0;
+    u32 isVirtual : 1 = 0;
+};
+
 class InputManager
 {
 public:
@@ -23,9 +29,13 @@ public:
     void MousePositionHandler(f32 x, f32 y);
     void MouseScrollHandler(f32 x, f32 y);
 
-    vec2 GetMousePosition() { return vec2(_mousePositionX, _mousePositionY); }
-    f32 GetMousePositionX() { return _mousePositionX; }
-    f32 GetMousePositionY() { return _mousePositionY; }
+    bool IsMouseButtonDown(i32 button);
+
+    bool IsCursorVirtual();
+    void SetCursorVirtual(bool isVirtual);
+
+    vec2 GetMousePosition();
+    void SetMousePosition(f32 x, f32 y);
 
     const KeybindGroup::InputConsumedInfo& GetMouseInputConsumeInfo() { return _mouseInputConsumeInfo; }
     const KeybindGroup::InputConsumedInfo& GetMousePositionConsumeInfo() { return _mousePositionConsumeInfo; }
@@ -46,7 +56,7 @@ private:
     const u32 consumerInfoNameHashImGui = "ImGui"_h;
 
     std::vector<KeybindGroup*> _keybindGroups;
-    f32 _mousePositionX = 0;
-    f32 _mousePositionY = 0;
-    bool _mouseState = false;
+    CursorState _cursorState = { 0 };
+    vec2 _cursorPosition = vec2(0.0f);
+    vec2 _cursorVirtualPosition = vec2(0.0f);
 };

@@ -30,8 +30,9 @@ enum class CVarCategory : u8
     Rendering = 1 << 2,
     Physics = 1 << 3,
     Network = 1 << 4,
+    Database = 1 << 5,
 
-    COUNT = 5, // Keep this updated!
+    COUNT = 6, // Keep this updated!
 };
 DECLARE_GENERIC_BITWISE_OPERATORS(CVarCategory);
 
@@ -42,6 +43,7 @@ static const char* CVarCategoryToString[u8(CVarCategory::COUNT)] =
     "Rendering",
     "Physics",
     "Network",
+    "Database"
 };
 
 static const char* CVarCategoryToPrefix[u8(CVarCategory::COUNT)] =
@@ -51,6 +53,7 @@ static const char* CVarCategoryToPrefix[u8(CVarCategory::COUNT)] =
     "r_",
     "phys_",
     "net_",
+    "db_"
 };
 
 class CVarParameter;

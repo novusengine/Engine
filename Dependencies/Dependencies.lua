@@ -28,6 +28,7 @@ local dependencies =
     "freetype/freetype.lua",
     "msdfgen/msdfgen.lua",
     "msdf-atlas-gen/msdf-atlas-gen.lua",
+    "rtree/rtree.lua",
 }
 
 for k,v in pairs(dependencies) do

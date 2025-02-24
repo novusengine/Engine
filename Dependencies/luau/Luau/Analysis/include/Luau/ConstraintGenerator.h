@@ -5,6 +5,7 @@
 #include "Luau/Constraint.h"
 #include "Luau/ControlFlow.h"
 #include "Luau/DataFlowGraph.h"
+#include "Luau/EqSatSimplification.h"
 #include "Luau/InsertionOrderedMap.h"
 #include "Luau/Module.h"
 #include "Luau/ModuleResolver.h"
@@ -15,7 +16,6 @@
 #include "Luau/TypeFwd.h"
 #include "Luau/TypeUtils.h"
 #include "Luau/Variant.h"
-#include "Luau/Normalize.h"
 
 #include <memory>
 #include <vector>
@@ -28,6 +28,7 @@ struct Scope;
 using ScopePtr = std::shared_ptr<Scope>;
 
 struct DcrLogger;
+struct TypeFunctionRuntime;
 
 struct Inference
 {
@@ -108,6 +109,11 @@ struct ConstraintGenerator
 
     // Needed to be able to enable error-suppression preservation for immediate refinements.
     NotNull<Normalizer> normalizer;
+
+    NotNull<Simplifier> simplifier;
+
+    // Needed to register all available type functions for execution at later stages.
+    NotNull<TypeFunctionRuntime> typeFunctionRuntime;
     // Needed to resolve modules to make 'require' import types properly.
     NotNull<ModuleResolver> moduleResolver;
     // Occasionally constraint generation needs to produce an ICE.
@@ -125,6 +131,8 @@ struct ConstraintGenerator
     ConstraintGenerator(
         ModulePtr module,
         NotNull<Normalizer> normalizer,
+        NotNull<Simplifier> simplifier,
+        NotNull<TypeFunctionRuntime> typeFunctionRuntime,
         NotNull<ModuleResolver> moduleResolver,
         NotNull<BuiltinTypes> builtinTypes,
         NotNull<InternalErrorReporter> ice,
@@ -141,6 +149,8 @@ struct ConstraintGenerator
      * @param block the root block to generate constraints for.
      */
     void visitModuleRoot(AstStatBlock* block);
+
+    void visitFragmentRoot(const ScopePtr& resumeScope, AstStatBlock* block);
 
 private:
     std::vector<std::vector<TypeId>> interiorTypes;
@@ -223,7 +233,10 @@ private:
     );
     void applyRefinements(const ScopePtr& scope, Location location, RefinementId refinement);
 
+    LUAU_NOINLINE void checkAliases(const ScopePtr& scope, AstStatBlock* block);
+
     ControlFlow visitBlockWithoutChildScope(const ScopePtr& scope, AstStatBlock* block);
+    ControlFlow visitBlockWithoutChildScope_DEPRECATED(const ScopePtr& scope, AstStatBlock* block);
 
     ControlFlow visit(const ScopePtr& scope, AstStat* stat);
     ControlFlow visit(const ScopePtr& scope, AstStatBlock* block);
@@ -282,11 +295,25 @@ private:
     Inference check(const ScopePtr& scope, AstExprFunction* func, std::optional<TypeId> expectedType, bool generalize);
     Inference check(const ScopePtr& scope, AstExprUnary* unary);
     Inference check(const ScopePtr& scope, AstExprBinary* binary, std::optional<TypeId> expectedType);
+    Inference checkAstExprBinary(
+        const ScopePtr& scope,
+        const Location& location,
+        AstExprBinary::Op op,
+        AstExpr* left,
+        AstExpr* right,
+        std::optional<TypeId> expectedType
+    );
     Inference check(const ScopePtr& scope, AstExprIfElse* ifElse, std::optional<TypeId> expectedType);
     Inference check(const ScopePtr& scope, AstExprTypeAssertion* typeAssert);
     Inference check(const ScopePtr& scope, AstExprInterpString* interpString);
     Inference check(const ScopePtr& scope, AstExprTable* expr, std::optional<TypeId> expectedType);
-    std::tuple<TypeId, TypeId, RefinementId> checkBinary(const ScopePtr& scope, AstExprBinary* binary, std::optional<TypeId> expectedType);
+    std::tuple<TypeId, TypeId, RefinementId> checkBinary(
+        const ScopePtr& scope,
+        AstExprBinary::Op op,
+        AstExpr* left,
+        AstExpr* right,
+        std::optional<TypeId> expectedType
+    );
 
     void visitLValue(const ScopePtr& scope, AstExpr* expr, TypeId rhsType);
     void visitLValue(const ScopePtr& scope, AstExprLocal* local, TypeId rhsType);
@@ -320,6 +347,11 @@ private:
      * @param fn the function expression to check.
      */
     void checkFunctionBody(const ScopePtr& scope, AstExprFunction* fn);
+
+    // Specializations of 'resolveType' below
+    TypeId resolveReferenceType(const ScopePtr& scope, AstType* ty, AstTypeReference* ref, bool inTypeArguments, bool replaceErrorWithFresh);
+    TypeId resolveTableType(const ScopePtr& scope, AstType* ty, AstTypeTable* tab, bool inTypeArguments, bool replaceErrorWithFresh);
+    TypeId resolveFunctionType(const ScopePtr& scope, AstType* ty, AstTypeFunction* fn, bool inTypeArguments, bool replaceErrorWithFresh);
 
     /**
      * Resolves a type from its AST annotation.
@@ -360,7 +392,7 @@ private:
      **/
     std::vector<std::pair<Name, GenericTypeDefinition>> createGenerics(
         const ScopePtr& scope,
-        AstArray<AstGenericType> generics,
+        AstArray<AstGenericType*> generics,
         bool useCache = false,
         bool addTypes = true
     );
@@ -377,7 +409,7 @@ private:
      **/
     std::vector<std::pair<Name, GenericTypePackDefinition>> createGenericPacks(
         const ScopePtr& scope,
-        AstArray<AstGenericTypePack> packs,
+        AstArray<AstGenericTypePack*> packs,
         bool useCache = false,
         bool addTypes = true
     );
@@ -391,6 +423,7 @@ private:
     TypeId makeUnion(const ScopePtr& scope, Location location, TypeId lhs, TypeId rhs);
     // make an intersect type function of these two types
     TypeId makeIntersect(const ScopePtr& scope, Location location, TypeId lhs, TypeId rhs);
+    void prepopulateGlobalScopeForFragmentTypecheck(const ScopePtr& globalScope, const ScopePtr& resumeScope, AstStatBlock* program);
 
     /** Scan the program for global definitions.
      *
@@ -421,6 +454,8 @@ private:
         const ScopePtr& scope,
         Location location
     );
+
+    TypeId simplifyUnion(const ScopePtr& scope, Location location, TypeId left, TypeId right);
 };
 
 /** Borrow a vector of pointers from a vector of owning pointers to constraints.

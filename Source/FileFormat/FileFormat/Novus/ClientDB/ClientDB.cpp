@@ -128,6 +128,22 @@ namespace ClientDB
         return true;
     }
 
+    bool Data::HasString(u32 stringHash)
+    {
+        NC_ASSERT(_header.Flags.IsInitialized, "ClientDB::Data - Storage must be initialized before calling HasString");
+
+        u32 index = 0;
+        return _stringTable.TryFindHashedString(stringHash, index);
+    }
+
+    bool Data::HasString(const std::string& string)
+    {
+        NC_ASSERT(_header.Flags.IsInitialized, "ClientDB::Data - Storage must be initialized before calling HasString");
+
+        u32 index = 0;
+        return _stringTable.TryFindString(string, index);
+    }
+
     u32 Data::AddString(const std::string& string)
     {
         NC_ASSERT(_header.Flags.IsInitialized, "ClientDB::Data - Storage must be initialized before calling AddString");
@@ -148,9 +164,9 @@ namespace ClientDB
     void Data::Sort()
     {
         std::sort(_idList.begin(), _idList.end(), [](const IDListEntry& a, const IDListEntry& b)
-            {
-                return a.id < b.id;
-            });
+        {
+            return a.id < b.id;
+        });
     }
 
     void Data::Compact()
@@ -164,6 +180,7 @@ namespace ClientDB
         memset(&_data[0], 0, _data.size());
 
         _idToIndex.clear();
+        _header.maxID = 0;
 
         u32 nextIndex = 0;
         for (auto& idEntry : _idList)
@@ -175,6 +192,8 @@ namespace ClientDB
             Link(idEntry.id, idEntry.index);
 
             SetData(idEntry.index, &oldData[oldIndex]);
+
+            _header.maxID = glm::max(_header.maxID, idEntry.id);
         }
 
         u32 numBytesUsed = nextIndex * _header.numBytesPerRow;
@@ -473,7 +492,26 @@ namespace ClientDB
         index = _idToIndex[id];
         return true;
     }
+    
+    u32 Data::GetSizeForField(const FieldInfo& fieldInfo)
+    {
+        switch (fieldInfo.type)
+        {
+            case FieldType::I8:         return 1;
+            case FieldType::I16:        return 2;
 
+            case FieldType::I32:
+            case FieldType::F32:
+            case FieldType::StringRef:  return 4;
+
+            case FieldType::I64:
+            case FieldType::F64:        return 8;
+
+            default: break;
+        }
+
+        return 0;
+    }
 
     u32 Data::GetTotalSizeForFields(const std::vector<FieldInfo>& fieldInfos)
     {
@@ -495,26 +533,6 @@ namespace ClientDB
         }
 
         return totalSize;
-    }
-
-    u32 Data::GetSizeForField(const FieldInfo& fieldInfo)
-    {
-        switch (fieldInfo.type)
-        {
-        case FieldType::I8:         return 1;
-        case FieldType::I16:        return 2;
-
-        case FieldType::I32:
-        case FieldType::F32:
-        case FieldType::StringRef:  return 4;
-
-        case FieldType::I64:
-        case FieldType::F64:        return 8;
-
-        default: break;
-        }
-
-        return 0;
     }
 
     void Data::CalculateFieldOffsets()

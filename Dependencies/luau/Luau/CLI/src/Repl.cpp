@@ -1,5 +1,5 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
-#include "Repl.h"
+#include "Luau/Repl.h"
 
 #include "Luau/Common.h"
 #include "lua.h"
@@ -10,15 +10,17 @@
 #include "Luau/Parser.h"
 #include "Luau/TimeTrace.h"
 
-#include "Coverage.h"
-#include "FileUtils.h"
-#include "Flags.h"
-#include "Profiler.h"
-#include "Require.h"
+#include "Luau/Coverage.h"
+#include "Luau/FileUtils.h"
+#include "Luau/Flags.h"
+#include "Luau/Profiler.h"
+#include "Luau/Require.h"
 
 #include "isocline.h"
 
 #include <memory>
+#include <string>
+#include <string_view>
 
 #ifdef _WIN32
 #include <io.h>
@@ -119,16 +121,113 @@ static int finishrequire(lua_State* L)
     return 1;
 }
 
+struct RuntimeRequireContext : public RequireResolver::RequireContext
+{
+    // In the context of the REPL, source is the calling context's chunkname.
+    //
+    // These chunknames have certain prefixes that indicate context. These
+    // are used when displaying debug information (see luaO_chunkid).
+    //
+    // Generally, the '@' prefix is used for filepaths, and the '=' prefix is
+    // used for custom chunknames, such as =stdin.
+    explicit RuntimeRequireContext(std::string source)
+        : source(std::move(source))
+    {
+    }
+
+    std::string getPath() override
+    {
+        return source.substr(1);
+    }
+
+    bool isRequireAllowed() override
+    {
+        return isStdin() || (!source.empty() && source[0] == '@');
+    }
+
+    bool isStdin() override
+    {
+        return source == "=stdin";
+    }
+
+    std::string createNewIdentifer(const std::string& path) override
+    {
+        return "@" + path;
+    }
+
+private:
+    std::string source;
+};
+
+struct RuntimeCacheManager : public RequireResolver::CacheManager
+{
+    explicit RuntimeCacheManager(lua_State* L)
+        : L(L)
+    {
+    }
+
+    bool isCached(const std::string& path) override
+    {
+        luaL_findtable(L, LUA_REGISTRYINDEX, "_MODULES", 1);
+        lua_getfield(L, -1, path.c_str());
+        bool cached = !lua_isnil(L, -1);
+        lua_pop(L, 2);
+
+        if (cached)
+            cacheKey = path;
+
+        return cached;
+    }
+
+    std::string cacheKey;
+
+private:
+    lua_State* L;
+};
+
+struct RuntimeErrorHandler : RequireResolver::ErrorHandler
+{
+    explicit RuntimeErrorHandler(lua_State* L)
+        : L(L)
+    {
+    }
+
+    void reportError(const std::string message) override
+    {
+        luaL_errorL(L, "%s", message.c_str());
+    }
+
+private:
+    lua_State* L;
+};
+
 static int lua_require(lua_State* L)
 {
     std::string name = luaL_checkstring(L, 1);
 
-    RequireResolver::ResolvedRequire resolvedRequire = RequireResolver::resolveRequire(L, std::move(name));
+    RequireResolver::ResolvedRequire resolvedRequire;
+    {
+        lua_Debug ar;
+        lua_getinfo(L, 1, "s", &ar);
+
+        RuntimeRequireContext requireContext{ar.source};
+        RuntimeCacheManager cacheManager{L};
+        RuntimeErrorHandler errorHandler{L};
+
+        RequireResolver resolver(std::move(name), requireContext, cacheManager, errorHandler);
+
+        resolvedRequire = resolver.resolveRequire(
+            [L, &cacheKey = cacheManager.cacheKey](const RequireResolver::ModuleStatus status)
+            {
+                lua_getfield(L, LUA_REGISTRYINDEX, "_MODULES");
+                if (status == RequireResolver::ModuleStatus::Cached)
+                    lua_getfield(L, -1, cacheKey.c_str());
+            }
+        );
+    }
 
     if (resolvedRequire.status == RequireResolver::ModuleStatus::Cached)
         return finishrequire(L);
-    else if (resolvedRequire.status == RequireResolver::ModuleStatus::NotFound)
-        luaL_errorL(L, "error requiring module");
 
     // module needs to run in a new thread, isolated from the rest
     // note: we create ML on main thread so that it doesn't inherit environment of L
@@ -141,7 +240,7 @@ static int lua_require(lua_State* L)
 
     // now we can compile & run module on the new thread
     std::string bytecode = Luau::compile(resolvedRequire.sourceCode, copts());
-    if (luau_load(ML, resolvedRequire.chunkName.c_str(), bytecode.data(), bytecode.size(), 0) == 0)
+    if (luau_load(ML, resolvedRequire.identifier.c_str(), bytecode.data(), bytecode.size(), 0) == 0)
     {
         if (codegen)
         {
@@ -613,7 +712,7 @@ static bool runFile(const char* name, lua_State* GL, bool repl)
     // new thread needs to have the globals sandboxed
     luaL_sandboxthread(L);
 
-    std::string chunkname = "=" + std::string(name);
+    std::string chunkname = "@" + std::string(name);
 
     std::string bytecode = Luau::compile(*source, copts());
     int status = 0;

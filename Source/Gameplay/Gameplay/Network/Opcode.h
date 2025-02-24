@@ -26,6 +26,14 @@ namespace Network
         Shared_EntityTargetUpdate,
         Server_EntityCastSpell,
 
+        Server_ItemCreate,
+        Server_ContainerCreate,
+
+        Client_ContainerSwapSlots,
+        Server_ContainerAddToSlot,
+        Server_ContainerRemoveFromSlot,
+        Server_ContainerSwapSlots,
+
         Client_LocalRequestSpellCast,
         Server_SendSpellCastResult,
 

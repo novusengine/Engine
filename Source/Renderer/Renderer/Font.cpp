@@ -190,12 +190,67 @@ namespace Renderer
         return _texture;
     }
 
+    f32 Font::CalculateCharWidth(const char c, f32 fontSize, f32 borderSize)
+    {
+        f32 width = borderSize;
+
+        if (c != '\r' && c != '\n')
+        {
+            const Glyph& glyph = GetGlyph(c);
+
+            f32 advance = static_cast<f32>(glyph.getAdvance());
+            width += (fontSize * advance);
+        }
+
+        return width;
+    }
+
+    f32 Font::CalculateCharHeight(const char c, f32 fontSize, f32 borderSize)
+    {
+        f32 height = 0.0f;
+
+        const Glyph& glyph = GetGlyph(c);
+        if (!glyph.isWhitespace())
+        {
+            f64 planeLeft, planeBottom, planeRight, planeTop;
+
+            // Get the glyph's quad bounds in plane space (vertex positions)
+            glyph.getQuadPlaneBounds(planeLeft, planeBottom, planeRight, planeTop);
+
+            // Scale the plane coordinates by the font scale
+            planeBottom *= fontSize;
+            planeTop *= fontSize;
+
+            planeBottom += borderSize;
+            planeTop += borderSize;
+
+            height = static_cast<f32>(planeTop - planeBottom);
+            height += static_cast<f32>(metrics.descenderY) * fontSize + borderSize;
+        }
+
+        return height;
+    }
+
+    vec2 Font::CalculateCharSize(const char c, f32 fontSize, f32 borderSize)
+    {
+        f32 width = 0.0f;
+        f32 height = 0.0f;
+
+        height = CalculateCharHeight(c, fontSize, borderSize);
+        width = CalculateCharWidth(c, fontSize, borderSize);
+
+        return vec2(width, height);
+    }
+
     vec2 Font::CalculateTextSize(const std::string& text, f32 fontSize, f32 borderSize)
     {
         utf8::iterator it(text.begin(), text.begin(), text.end());
         utf8::iterator endIt(text.end(), text.begin(), text.end());
 
-        vec2 size = vec2(borderSize * 2.0f, 0);
+        f32 currentLineWidth = borderSize * 2.0f;
+        f32 maxLineWidth = currentLineWidth;
+        f32 totalHeight = 0.0f;
+
         for (; it != endIt; it++)
         {
             u32 c = *it;
@@ -209,36 +264,25 @@ namespace Renderer
             // Handle newline characters
             if (c == '\n')
             {
-                size.y += fontSize * static_cast<f32>(metrics.lineHeight);
+                totalHeight += fontSize * static_cast<f32>(metrics.lineHeight);
+                maxLineWidth = std::max(maxLineWidth, currentLineWidth);
+                currentLineWidth = borderSize * 2.0f;
                 continue;
             }
 
-            const Glyph& glyph = GetGlyph(c);
-            if (!glyph.isWhitespace())
-            {
-                f64 planeLeft, planeBottom, planeRight, planeTop;
-
-                // Get the glyph's quad bounds in plane space (vertex positions)
-                glyph.getQuadPlaneBounds(planeLeft, planeBottom, planeRight, planeTop);
-
-                // Scale the plane coordinates by the font scale
-                planeBottom *= fontSize;
-                planeTop *= fontSize;
-
-                planeBottom += borderSize;
-                planeTop += borderSize;
-
-                f32 height = static_cast<f32>(planeTop - planeBottom);
-                height += static_cast<f32>(metrics.descenderY) * fontSize + borderSize;
-                size.y = glm::max(size.y, height);
-            }
-
-            f32 advance = static_cast<f32>(glyph.getAdvance());
-            //advance = font->GetFontAdvance(advance, c, *(it+1)); // TODO: Kerning
-
-            size.x += (fontSize * advance) + borderSize;
+            vec2 charSize = CalculateCharSize(c, fontSize, borderSize);
+            currentLineWidth += charSize.x;
+            totalHeight = glm::max(totalHeight, charSize.y);
         }
 
-        return size;
+        maxLineWidth = std::max(maxLineWidth, currentLineWidth);
+
+        // Add last line height if there was no trailing newline
+        if (totalHeight == 0.0f)
+        {
+            totalHeight = fontSize * static_cast<f32>(metrics.lineHeight);
+        }
+
+        return vec2(maxLineWidth, totalHeight);
     }
 }

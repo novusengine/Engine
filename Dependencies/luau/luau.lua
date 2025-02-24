@@ -3,7 +3,7 @@ local basePath = path.getabsolute("luau/Luau", Solution.Projects.Current.Depende
 
 local Luau = { }
 Luau.SetupCommon = function()
-    local dep = Solution.Util.CreateDepTable("luau-common", {})
+    local dep = Solution.Util.CreateDepTable("Luau-Common", {})
 
     Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
         Solution.Util.SetIncludes(basePath .. "/Common/include")
@@ -18,7 +18,7 @@ Luau.SetupAst = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
@@ -45,7 +45,7 @@ Luau.SetupCompiler = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
@@ -72,7 +72,7 @@ Luau.SetupConfig = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
@@ -90,16 +90,16 @@ Luau.SetupConfig = function()
         Solution.Util.SetLinks(dep.Name)
     end)
 end
-Luau.SetupAnalysis = function()
-    local dep = Solution.Util.CreateDepTable("Luau-Analysis", { "luau-ast", "luau-config" })
-    local sourceDir = basePath .. "/Analysis/src"
-    local includeDir = basePath .. "/Analysis/include"
+Luau.SetupEqSat = function()
+    local dep = Solution.Util.CreateDepTable("Luau-EqSat", { "luau-common" })
+    local sourceDir = basePath .. "/EqSat/src"
+    local includeDir = basePath .. "/EqSat/include"
 
     Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
@@ -125,6 +125,37 @@ Luau.SetupVM = function()
     local dep = Solution.Util.CreateDepTable("Luau-VM", { "luau-common" })
     local sourceDir = basePath .. "/VM/src"
     local includeDir = basePath .. "/VM/include"
+
+    Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+
+        Solution.Util.SetLanguage("C++")
+        Solution.Util.SetCppDialect(17)
+
+        local files =
+        {
+            includeDir .. "/**.h",
+            sourceDir .. "/**.c",
+            sourceDir .. "/**.cpp"
+        }
+        Solution.Util.SetFiles(files)
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetDefines(defines)
+
+        Solution.Util.SetFilter("platforms:Win64", function()
+            Solution.Util.SetDefines({ "_CRT_SECURE_NO_WARNINGS" })
+        end)
+    end)
+
+    Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
+        Solution.Util.SetIncludes(includeDir)
+        Solution.Util.SetLinks(dep.Name)
+    end)
+end
+Luau.SetupAnalysis = function()
+    local dep = Solution.Util.CreateDepTable("Luau-Analysis", { "luau-eqsat", "luau-ast", "luau-config", "luau-compiler", "luau-vm" })
+    local sourceDir = basePath .. "/Analysis/src"
+    local includeDir = basePath .. "/Analysis/include"
 
     Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
@@ -162,7 +193,7 @@ Luau.SetupCodeGen = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
@@ -189,7 +220,7 @@ Luau.SetupIsocline = function()
         local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
 
         Solution.Util.SetLanguage("C++")
-        Solution.Util.SetCppDialect(20)
+        Solution.Util.SetCppDialect(17)
 
         local files =
         {
@@ -212,8 +243,9 @@ Luau.SetupCommon()
 Luau.SetupAst()
 Luau.SetupCompiler()
 Luau.SetupConfig()
-Luau.SetupAnalysis()
+Luau.SetupEqSat()
 Luau.SetupVM()
+Luau.SetupAnalysis()
 Luau.SetupCodeGen()
 Luau.SetupIsocline()
 Solution.Util.SetGroup(Solution.DependencyGroup)

@@ -328,7 +328,7 @@ namespace Model
 
                 if (numCollisionIndices > 0)
                 {
-                    output.write(reinterpret_cast<const char*>(&collisionIndices[0]), numCollisionIndices * sizeof(u16));
+                    output.write(reinterpret_cast<const char*>(&collisionIndices[0]), numCollisionIndices * sizeof(u32));
                 }
             }
 

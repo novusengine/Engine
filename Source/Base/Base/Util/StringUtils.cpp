@@ -194,13 +194,43 @@ namespace StringUtils
 
     bool StringIsNumeric(const std::string& input)
     {
-        for (char c : input)
+        if (input.empty())
         {
-            if (!std::isdigit(static_cast<unsigned char>(c)))
-                return false;
+            return false;
         }
 
-        return true;
+        size_t startIndex = 0;
+        bool decimalPointEncountered = false;
+        bool digitEncountered = false; // To handle cases like "+.", "-." and "." which should be non-numeric
+
+        // Handle optional sign at the beginning
+        if (input[0] == '+' || input[0] == '-')
+            startIndex = 1;
+
+        for (size_t i = startIndex; i < input.length(); ++i)
+        {
+            char c = input[i];
+            if (std::isdigit(static_cast<u8>(c)))
+            {
+                digitEncountered = true;
+                continue;
+            }
+            else if (c == '.')
+            {
+                // More than one decimal point
+                if (decimalPointEncountered)
+                    return false;
+
+                decimalPointEncountered = true;
+            }
+            else
+            {
+                // Not a digit or a decimal point
+                return false;
+            }
+        }
+
+        return digitEncountered; // Must contain at least one digit to be considered numeric
     }
 
     std::wstring StringToWString(const std::string& s)

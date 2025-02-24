@@ -37,6 +37,9 @@ namespace Renderer
         const Glyph& GetGlyph(u32 codepoint);
         TextureID GetTextureID();
 
+        f32 CalculateCharWidth(const char c, f32 fontSize, f32 borderSize);
+        f32 CalculateCharHeight(const char c, f32 fontSize, f32 borderSize);
+        vec2 CalculateCharSize(const char c, f32 fontSize, f32 borderSize);
         vec2 CalculateTextSize(const std::string& text, f32 fontSize, f32 borderSize);
 
         static Font* GetDefaultFont(Renderer* renderer);

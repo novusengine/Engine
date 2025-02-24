@@ -85,6 +85,8 @@ namespace ClientDB
         const std::vector<IDListEntry>& GetIDList() { return _idList; }
         std::vector<u8>& GetData() { return _data; }
 
+        Novus::Container::StringTableSafe& GetStringTable() { return _stringTable; }
+
         bool Copy(u32 oldID, u32& newID);
 
         template <typename T>
@@ -171,6 +173,39 @@ namespace ClientDB
             return true;
         }
 
+        bool Clone(u32 oldID, u32 newID, bool& didOverride)
+        {
+            NC_ASSERT(_header.Flags.IsInitialized, "ClientDB::Data - Storage must be initialized before calling Clone");
+            didOverride = false;
+
+            u32 oldIndex = 0;
+            if (!GetLink(oldID, oldIndex))
+                return false;
+
+            if (oldID == newID)
+                return true;
+
+            u32 newIndex = 0;
+            didOverride = GetLink(newID, newIndex);
+            if (!didOverride)
+            {
+                newIndex = static_cast<u32>(_data.size());
+
+                Grow(1);
+
+                auto& idEntry = _idList.back();
+                idEntry.id = newID;
+                idEntry.index = newIndex;
+
+                Link(idEntry.id, idEntry.index);
+            }
+
+            SetData(newIndex, &_data[oldIndex]);
+            return true;
+        }
+
+        bool HasString(u32 stringHash);
+        bool HasString(const std::string& string);
         u32 AddString(const std::string& string);
         const std::string& GetString(u32 index);
 
@@ -212,11 +247,16 @@ namespace ClientDB
             Assure<T>();
 
             u32 numRows = GetNumRows();
-            if (startIndex + count >= numRows)
+            if (startIndex >= numRows)
                 return true;
 
+            u32 maxIndex = startIndex + count;
+            maxIndex = glm::min(maxIndex, numRows);
+
+            u32 elementsToProcess = maxIndex - startIndex;
+
             bool wasInterrupted = false;
-            for (u32 i = 0; i <= count; i++)
+            for (u32 i = 0; i < elementsToProcess; i++)
             {
                 const auto& idEntry = _idList[startIndex + i];
                 T* element = reinterpret_cast<T*>(&_data[idEntry.index]);
@@ -240,6 +280,20 @@ namespace ClientDB
             return *reinterpret_cast<T*>(&_data[dataIndex]);
         }
 
+        template <typename T>
+        T* TryGet(u32 id)
+        {
+            if (id == 0)
+                return nullptr;
+
+            Assure<T>();
+            u32 dataIndex = 0;
+            if (!GetLink(id, dataIndex))
+                return nullptr;
+
+            return reinterpret_cast<T*>(&_data[dataIndex]);
+        }
+
         bool Remove(u32 id)
         {
             if (!HasLink(id) || id == 0)
@@ -247,9 +301,9 @@ namespace ClientDB
 
             Unlink(id);
             std::erase_if(_idList, [id](const IDListEntry& idEntry)
-                {
-                    return idEntry.id == id;
-                });
+            {
+                return idEntry.id == id;
+            });
 
             return true;
         }
@@ -270,6 +324,8 @@ namespace ClientDB
         void MarkDirty();
         void ClearDirty();
 
+        static u32 GetSizeForField(const FieldInfo& fieldInfo);
+        static u32 GetTotalSizeForFields(const std::vector<FieldInfo>& fieldInfos);
     private:
         template <typename T>
         u32 Assure()
@@ -290,9 +346,6 @@ namespace ClientDB
         bool HasLink(u32 id);
         bool GetLink(u32 id, u32& index);
         void CalculateFieldOffsets();
-
-        static u32 GetTotalSizeForFields(const std::vector<FieldInfo>& fieldInfos);
-        static u32 GetSizeForField(const FieldInfo& fieldInfo);
 
     private:
         FileHeader _fileHeader = FileHeader(FileHeader::Type::ClientDB, CURRENT_VERSION);

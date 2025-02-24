@@ -32,5 +32,12 @@ namespace Network
         SetGender,
         SetClass,
         SetLevel,
+        SetItemTemplate,
+        SetItemStatTemplate,
+        SetItemArmorTemplate,
+        SetItemWeaponTemplate,
+        SetItemShieldTemplate,
+        AddItem,
+        RemoveItem
     };
 }

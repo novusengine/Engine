@@ -596,7 +596,7 @@ namespace Model
         std::vector<u16> textureCombinerCombos;
 
         std::vector<vec3> collisionVertexPositions;
-        std::vector<u16> collisionIndices;
+        std::vector<u32> collisionIndices;
         std::vector<std::array<u8, 2>> collisionNormals;
 
         std::vector<Camera> cameras;

@@ -504,12 +504,13 @@ public:
         return offset + inSize <= size;
     }
 
-    // Special functions, can be used on types with a "Serialize" or "Deserialize" function to write them or read them from the buffer
+    // Special function, can be used on types with a "Serialize" function to write them to the buffer
     template <typename T>
-    inline bool Serialize(T& input)
+    inline bool Serialize(const T& input)
     {
         return input.Serialize(this);
     }
+    // Special function, can be used on types with a "Deserialize" function to read them from the buffer
     template <typename T>
     inline bool Deserialize(T& input)
     {
