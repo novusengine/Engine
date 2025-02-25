@@ -2,6 +2,7 @@
 #include "Renderer/Descriptors/SamplerDesc.h"
 #include "Renderer/Descriptors/TextureDesc.h"
 #include "Renderer/Descriptors/TextureArrayDesc.h"
+#include "Renderer/RenderStates.h"
 
 #include <Base/Types.h>
 
@@ -47,8 +48,8 @@ namespace Renderer
             void TransitionImageLayout(VkCommandBuffer commandBuffer, TextureID textureID, VkImageAspectFlags aspects, VkImageLayout oldLayout, VkImageLayout newLayout);
 
             TextureID GetTextureIDInArray(const TextureArrayID textureArrayID, u32 index);
-            i32 GetTextureHeight(TextureID textureID);
-            i32 GetTextureWidth(TextureID textureID);
+            TextureBaseDesc GetTextureDesc(const TextureID textureID);
+
             const SafeVector<TextureID>& GetTextureIDsInArray(const TextureArrayID textureArrayID);
 
             bool IsOnionTexture(const TextureID textureID);
@@ -58,7 +59,7 @@ namespace Renderer
             VkImageView GetDebugTextureImageView();
             VkImageView GetDebugOnionTextureImageView();
 
-            VkDescriptorSet GetImguiImageHandle(const TextureID textureID);
+            VkDescriptorSet GetImguiTextureID(const TextureID textureID);
 
             size_t GetTextureUploadSize(const TextureID textureID);
             size_t GetTextureTotalSize(const TextureID textureID);

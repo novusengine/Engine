@@ -5,6 +5,7 @@
 #include "ImageHandlerVK.h"
 #include "SemaphoreHandlerVK.h"
 #include "SwapChainVK.h"
+#include "FormatConverterVK.h"
 #include "vk_format_utils.h"
 #include "Renderer/Descriptors/VertexShaderDesc.h"
 #include "Renderer/Descriptors/PixelShaderDesc.h"
@@ -113,6 +114,7 @@ namespace Renderer
 
             VkFormat format;
             CreateSwapChain(size, swapChain, format);
+            _swapChainFormats.push_back(FormatConverterVK::ToImageFormat(format));
 
             CreateImages(swapChain, imageHandler, format);
             CreateSemaphores(swapChain, semaphoreHandler);
@@ -179,60 +181,6 @@ namespace Renderer
                 _imguiContext = new ImguiContext();
             }
 
-            // Create the Render Pass
-            {
-                std::vector<VkSubpassDependency> dependencies;
-
-                VkSubpassDependency& dependency = dependencies.emplace_back();
-                dependency.srcSubpass = 0;
-                dependency.dstSubpass = VK_SUBPASS_EXTERNAL;
-                dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                dependency.dependencyFlags = 0;
-
-                VkSubpassDependency& dependency2 = dependencies.emplace_back();
-                dependency2.srcSubpass = VK_SUBPASS_EXTERNAL;
-                dependency2.dstSubpass = 0;
-                dependency2.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                dependency2.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                dependency2.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                dependency2.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                dependency2.dependencyFlags = 0;
-
-                VkAttachmentDescription attachment = {};
-                attachment.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-                attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-                attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-                attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-                attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-                attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-                attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-                VkAttachmentReference color_attachment = {};
-                color_attachment.attachment = 0;
-                color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                VkSubpassDescription subpass = {};
-                subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-                subpass.colorAttachmentCount = 1;
-                subpass.pColorAttachments = &color_attachment;
-
-                VkRenderPassCreateInfo info = {};
-                info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-                info.attachmentCount = 1;
-                info.pAttachments = &attachment;
-                info.subpassCount = 1;
-                info.pSubpasses = &subpass;
-                info.dependencyCount = static_cast<u32>(dependencies.size());
-                info.pDependencies = dependencies.data();
-                vkCreateRenderPass(_device, &info, nullptr, &_imguiContext->imguiPass);
-            }
-
             VkDescriptorPoolSize pool_sizes[] =
             {
                 { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
@@ -251,8 +199,8 @@ namespace Renderer
             VkDescriptorPoolCreateInfo pool_info = {};
             pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
             pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            pool_info.maxSets = 1000 * ARRAYSIZE(pool_sizes);
-            pool_info.poolSizeCount = (uint32_t)ARRAYSIZE(pool_sizes);
+            pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
+            pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
             pool_info.pPoolSizes = pool_sizes;
             vkCreateDescriptorPool(_device, &pool_info, nullptr, &_imguiContext->imguiPool);
 
@@ -260,40 +208,32 @@ namespace Renderer
             init_info.Instance = _instance;
             init_info.PhysicalDevice = _physicalDevice;
             init_info.Device = _device;
+            init_info.QueueFamily = _graphicsQueueFamily;
             init_info.Queue = _graphicsQueue;
             init_info.DescriptorPool = _imguiContext->imguiPool;
             init_info.MinImageCount = 3;
             init_info.ImageCount = 3;
+            init_info.UseDynamicRendering = true;
 
-            ImGui_ImplVulkan_Init(&init_info, _imguiContext->imguiPass);
+            // Fix the imguiPass null handle assignment (remove asterisks)
+            _imguiContext->imguiPass = VK_NULL_HANDLE;
 
-            VkCommandBufferAllocateInfo allocInfo = {};
-            allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            allocInfo.commandPool = _graphicsCommandPool;
-            allocInfo.commandBufferCount = 1;
+            // Configure multi-format support for dynamic rendering
+            init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT; // Set appropriate sample count
 
-            VkCommandBuffer command_buffer;
-            vkAllocateCommandBuffers(_device, &allocInfo, &command_buffer);
+            VkPipelineRenderingCreateInfoKHR renderingInfo = {};
+            renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+            VkFormat* format = new VkFormat(FormatConverterVK::ToVkFormat(_swapChainFormats[0])); // TODO: Don't leak this
+            renderingInfo.pColorAttachmentFormats = format;
+            renderingInfo.colorAttachmentCount = 1;
+            init_info.PipelineRenderingCreateInfo = renderingInfo;
 
-            VkCommandBufferBeginInfo begin_info = {};
-            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-            vkBeginCommandBuffer(command_buffer, &begin_info);
+            // Initialize ImGui with dynamic rendering
+            ImGui_ImplVulkan_Init(&init_info);
 
-            ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
-
-            VkSubmitInfo end_info = {};
-            end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            end_info.commandBufferCount = 1;
-            end_info.pCommandBuffers = &command_buffer;
-            vkEndCommandBuffer(command_buffer);
-
-            vkQueueSubmit(_graphicsQueue, 1, &end_info, VK_NULL_HANDLE);
-            vkQueueWaitIdle(_graphicsQueue);
-
-            ImGui_ImplVulkan_DestroyFontUploadObjects();
-            vkFreeCommandBuffers(_device, _graphicsCommandPool, 1, &command_buffer);
+            // Create font textures - note we're no longer passing a command buffer
+            // Let ImGui create a command buffer internally
+            ImGui_ImplVulkan_CreateFontsTexture();
         }
 
         void RenderDeviceVK::InitVulkan()
@@ -310,7 +250,7 @@ namespace Renderer
             appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
             appInfo.pEngineName = "NovusCore";
             appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-            appInfo.apiVersion = VK_API_VERSION_1_1;
+            appInfo.apiVersion = VK_API_VERSION_1_3;
 
             VkInstanceCreateInfo createInfo = {};
             createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -478,6 +418,11 @@ namespace Renderer
             float16Int8Features.shaderFloat16 = VK_TRUE;
             float16Int8Features.pNext = &atomicInt64Features;
 
+            VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures = {};
+            dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+            dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+            dynamicRenderingFeatures.pNext = &float16Int8Features;
+
             VkPhysicalDeviceFeatures2 deviceFeatures = {};
             deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             deviceFeatures.features.samplerAnisotropy = VK_TRUE;
@@ -493,7 +438,7 @@ namespace Renderer
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
             deviceFeatures.features.shaderImageGatherExtended = VK_TRUE;
 
-            deviceFeatures.pNext = &float16Int8Features;
+            deviceFeatures.pNext = &dynamicRenderingFeatures;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
 
@@ -533,7 +478,8 @@ namespace Renderer
                 NC_LOG_CRITICAL("Failed to create logical device!");
             }
 
-            vkGetDeviceQueue(_device, indices.graphicsFamily.value(), 0, &_graphicsQueue);
+            _graphicsQueueFamily = indices.graphicsFamily.value();
+            vkGetDeviceQueue(_device, _graphicsQueueFamily, 0, &_graphicsQueue);
             vkGetDeviceQueue(_device, indices.transferFamily.value(), 0, &_transferQueue);
             vkGetDeviceQueue(_device, indices.presentFamily.value(), 0, &_presentQueue);
         }

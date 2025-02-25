@@ -54,7 +54,6 @@ namespace Renderer
             VkPipeline GetPipeline(GraphicsPipelineID id);
             VkPipeline GetPipeline(ComputePipelineID id);
 
-            VkRenderPass GetRenderPass(GraphicsPipelineID id);
             uvec2 GetRenderPassResolution(GraphicsPipelineID id);
 
             VkFramebuffer GetFramebuffer(GraphicsPipelineID id);
@@ -86,8 +85,6 @@ namespace Renderer
             bool TryFindExistingGPipeline(u64 descHash, size_t& id);
             bool TryFindExistingCPipeline(u64 descHash, size_t& id);
             DescriptorSetLayoutData& GetDescriptorSet(i32 setNumber, std::vector<DescriptorSetLayoutData>& sets);
-            
-            void CreateFramebuffer(GraphicsPipeline& pipeline, const std::string& debugName);
 
         private:
             Memory::Allocator* _allocator;

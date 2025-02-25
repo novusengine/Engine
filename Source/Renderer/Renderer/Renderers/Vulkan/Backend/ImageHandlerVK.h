@@ -47,7 +47,7 @@ namespace Renderer
             VkImage GetImage(const DepthImageID id);
             VkImageView GetDepthView(const DepthImageID id);
 
-            VkDescriptorSet GetImguiImageHandle(const ImageID id);
+            VkDescriptorSet GetImguiTextureID(const ImageID id);
 
             bool IsSwapChainImage(const ImageID id);
 

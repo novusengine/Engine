@@ -12,16 +12,20 @@ namespace Renderer
         std::string path = "";
     };
 
-    struct DataTextureDesc
+    struct TextureBaseDesc
     {
         i32 width = 0;
         i32 height = 0;
         i32 layers = 1;
+        i32 mipLevels = 1;
 
         ImageFormat format;
-        
-        const u8* data = nullptr;
         std::string debugName = "";
+    };
+
+    struct DataTextureDesc : TextureBaseDesc
+    {
+        const u8* data = nullptr;
     };
 
     // Lets strong-typedef an ID type with the underlying type of u16

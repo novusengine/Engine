@@ -46,6 +46,7 @@ namespace Renderer
         vec2 GetRenderSize() override;
 
         vec2 GetWindowSize() override;
+        ImageFormat GetSwapChainImageFormat() override;
 
         // Creation
         [[nodiscard]] BufferID CreateBuffer(BufferDesc& desc) override;
@@ -105,6 +106,9 @@ namespace Renderer
         void PopMarker(CommandListID commandListID) override;
         void PushMarker(CommandListID commandListID, Color color, std::string name) override;
 
+        void BeginRenderPass(CommandListID commandListID, const RenderPassDesc& desc) override;
+        void EndRenderPass(CommandListID commandListID, const RenderPassDesc& desc) override;
+
         void BeginPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) override;
         void EndPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) override;
         void BeginPipeline(CommandListID commandListID, ComputePipelineID pipeline) override;
@@ -131,6 +135,7 @@ namespace Renderer
 
         void CopyImage(CommandListID commandListID, ImageID dstImageID, uvec2 dstPos, u32 dstMipLevel, ImageID srcImageID, uvec2 srcPos, u32 srcMipLevel, uvec2 size) override;
         void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) override;
+        void CopyTexture(CommandListID commandListID, TextureID dstTextureID, TextureID srcTextureID) override;
         void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
 
         void ImageBarrier(CommandListID commandListID, ImageID imageID) override;
@@ -172,8 +177,7 @@ namespace Renderer
         void ResetTimeQueries(u32 frameIndex) override;
 
         [[nodiscard]] TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) override;
-        [[nodiscard]] i32 GetTextureHeight(TextureID textureID) override;
-        [[nodiscard]] i32 GetTextureWidth(TextureID textureID) override;
+        [[nodiscard]] TextureBaseDesc GetTextureDesc(TextureID textureID) override;
 
         [[nodiscard]] const ImageDesc& GetImageDesc(ImageID ID) override;
         [[nodiscard]] const DepthImageDesc& GetImageDesc(DepthImageID ID) override;
@@ -195,8 +199,8 @@ namespace Renderer
 
         void InitImgui() override;
         void DrawImgui(CommandListID commandListID) override;
-        void* GetImguiImageHandle(TextureID textureID) override;
-        void* GetImguiImageHandle(ImageID imageID) override;
+        u64 GetImguiTextureID(TextureID textureID) override;
+        u64 GetImguiTextureID(ImageID imageID) override;
 
         bool HasExtendedTextureSupport() override;
 

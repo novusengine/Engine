@@ -30,6 +30,7 @@ namespace Renderer
             ComputePipelineID boundComputePipeline = ComputePipelineID::Invalid();
 
             i8 renderPassOpenCount = 0;
+            i8 pipelineOpenCount = 0;
             QueueType queueType = QueueType::Graphics;
         };
 
@@ -300,6 +301,24 @@ namespace Renderer
             CommandList& commandList = data.commandLists[static_cast<CommandListID::type>(id)];
 
             commandList.renderPassOpenCount = count;
+        }
+
+        i8 CommandListHandlerVK::GetPipelineOpenCount(CommandListID id)
+        {
+            CommandListHandlerVKData& data = static_cast<CommandListHandlerVKData&>(*_data);
+
+            CommandList& commandList = data.commandLists[static_cast<CommandListID::type>(id)];
+
+            return commandList.pipelineOpenCount;
+        }
+
+        void CommandListHandlerVK::SetPipelineOpenCount(CommandListID id, i8 count)
+        {
+            CommandListHandlerVKData& data = static_cast<CommandListHandlerVKData&>(*_data);
+
+            CommandList& commandList = data.commandLists[static_cast<CommandListID::type>(id)];
+
+            commandList.pipelineOpenCount = count;
         }
 
         tracy::VkCtxManualScope*& CommandListHandlerVK::GetTracyScope(CommandListID id)

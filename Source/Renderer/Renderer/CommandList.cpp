@@ -29,6 +29,7 @@
 #include "Commands/PopMarker.h"
 #include "Commands/PushConstant.h"
 #include "Commands/PushMarker.h"
+#include "Commands/RenderPass.h"
 #include "Commands/SetBuffer.h"
 #include "Commands/SetDepthBias.h"
 #include "Commands/SetIndexBuffer.h"
@@ -167,6 +168,26 @@ namespace Renderer
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         Commands::PopMarker::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::BeginRenderPass(RenderPassDesc& desc)
+    {
+        Commands::BeginRenderPass* command = AddCommand<Commands::BeginRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BeginRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::EndRenderPass(RenderPassDesc& desc)
+    {
+        Commands::EndRenderPass* command = AddCommand<Commands::EndRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::EndRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
 

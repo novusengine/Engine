@@ -8,6 +8,7 @@
 #include "Descriptors/ComputePipelineDesc.h"
 #include "Descriptors/SemaphoreDesc.h"
 #include "Descriptors/TimeQueryDesc.h"
+#include "Descriptors/RenderPassDesc.h"
 #include "Renderer/DescriptorSetResource.h"
 
 #include <Base/Types.h>
@@ -66,6 +67,9 @@ namespace Renderer
 
         void PushMarker(std::string marker, Color color);
         void PopMarker();
+
+        void BeginRenderPass(RenderPassDesc& desc);
+        void EndRenderPass(RenderPassDesc& desc);
 
         void BeginPipeline(GraphicsPipelineID pipelineID);
         void EndPipeline(GraphicsPipelineID pipelineID);

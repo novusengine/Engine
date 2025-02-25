@@ -126,6 +126,11 @@ namespace Renderer
         return _device->GetMainWindowSize();
     }
 
+    ImageFormat RendererVK::GetSwapChainImageFormat()
+    {
+        return _device->GetSwapChainImageFormat();
+    }
+
     BufferID RendererVK::CreateBuffer(BufferDesc& desc)
     {
         return _bufferHandler->CreateBuffer(desc);
@@ -328,14 +333,9 @@ namespace Renderer
         return _textureHandler->GetTextureIDInArray(textureArrayID, index);
     }
 
-    i32 RendererVK::GetTextureHeight(TextureID textureID)
+    TextureBaseDesc RendererVK::GetTextureDesc(TextureID textureID)
     {
-        return _textureHandler->GetTextureHeight(textureID);
-    }
-
-    i32 RendererVK::GetTextureWidth(TextureID textureID)
-    {
-        return _textureHandler->GetTextureWidth(textureID);
+        return _textureHandler->GetTextureDesc(textureID);
     }
 
     const ImageDesc& RendererVK::GetImageDesc(ImageID ID)
@@ -603,48 +603,248 @@ namespace Renderer
         Backend::DebugMarkerUtilVK::PushMarker(commandBuffer, color, name);
     }
 
-    void RendererVK::BeginPipeline(CommandListID commandListID, GraphicsPipelineID pipelineID)
+    void RendererVK::BeginRenderPass(CommandListID commandListID, const RenderPassDesc& desc)
     {
-        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
-
-        const GraphicsPipelineDesc& pipelineDesc = _pipelineHandler->GetDescriptor(pipelineID);
-        VkPipeline pipeline = _pipelineHandler->GetPipeline(pipelineID);
-        VkRenderPass renderPass = _pipelineHandler->GetRenderPass(pipelineID);
-        VkFramebuffer frameBuffer = _pipelineHandler->GetFramebuffer(pipelineID);
-
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
         if (renderPassOpenCount != 0)
         {
-            NC_LOG_CRITICAL("You need to match your BeginPipeline calls with a EndPipeline call before beginning another pipeline!");
+            NC_LOG_CRITICAL("You need to match your BeginRenderPass calls with a EndRenderPass call before beginning another render pass!");
         }
         renderPassOpenCount++;
         _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
 
-        uvec2 renderSize = _pipelineHandler->GetRenderPassResolution(pipelineID);
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
 
-        // Transition depth stencil to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-        if (pipelineDesc.depthStencil != DepthImageMutableResource::Invalid())
+        // -- Get number of render targets and attachments --
+        u8 numAttachments = 0;
+        for (int i = 0; i < MAX_RENDER_TARGETS; i++)
         {
-            DepthImageID depthImageID = pipelineDesc.MutableResourceToDepthImageID(pipelineDesc.depthStencil);
-            const DepthImageDesc& depthImageDesc = _imageHandler->GetImageDesc(depthImageID);
-
-            u32 imageAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-            // TODO: If we add stencil support we need to selectively add VK_IMAGE_ASPECT_STENCIL_BIT to imageAspect if the depthStencil has a stencil
-
-            VkImage depthImage = _imageHandler->GetImage(depthImageID);
-            _device->TransitionImageLayout(commandBuffer, depthImage, imageAspect, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, 1);
+            if (desc.renderTargets[i] == ImageMutableResource::Invalid())
+                break;
+            numAttachments++;
         }
-        
-        // Set up renderpass
-        VkRenderPassBeginInfo renderPassInfo = {};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = frameBuffer;
-        renderPassInfo.renderArea.offset = { 0, 0 };
-        renderPassInfo.renderArea.extent = { renderSize.x, renderSize.y };
 
-        // Start renderpass
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        if (numAttachments > 0)
+        {
+            if (desc.ResourceToImageID == nullptr ||
+                desc.ResourceToDepthImageID == nullptr ||
+                desc.MutableResourceToImageID == nullptr ||
+                desc.MutableResourceToDepthImageID == nullptr)
+            {
+                NC_LOG_CRITICAL("Tried to start a renderpass with uninitialized RenderPassDesc, try using RenderGraphResources::InitializeRenderPassDesc!");
+            }
+        }
+
+        std::vector<VkRenderingAttachmentInfo> colorAttachmentInfos(numAttachments);
+        for (int i = 0; i < numAttachments; i++)
+        {
+            VkRenderingAttachmentInfo& attachmentInfo = colorAttachmentInfos[i];
+
+            ImageID imageID = desc.MutableResourceToImageID(desc.renderTargets[i]);
+            bool isSwapchain = _imageHandler->IsSwapChainImage(imageID);
+            attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            attachmentInfo.imageView = _imageHandler->GetColorView(imageID);
+            attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            attachmentInfo.resolveMode = VK_RESOLVE_MODE_NONE;
+            attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            // Clear values are not needed
+
+            // Manual transition for color attachment
+            VkImage image = _imageHandler->GetImage(imageID);
+            VkImageLayout oldLayout = isSwapchain ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_GENERAL;
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.pNext = nullptr;
+            // If the image is not a swapchain image, assume previous writes need to be finished.
+            barrier.srcAccessMask = isSwapchain ? 0 : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.oldLayout = oldLayout;
+            barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+        }
+
+        uvec2 extent = desc.extent;
+        if (extent == uvec2(0))
+        {
+            extent = _imageHandler->GetDimensions(desc.MutableResourceToImageID(desc.renderTargets[0]), 0);
+        }
+
+        VkRenderingInfo renderInfo = {};
+        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderInfo.pNext = nullptr;
+        renderInfo.renderArea = VkRect2D{ VkOffset2D{desc.offset.x, desc.offset.y}, VkExtent2D{extent.x, extent.y} };
+        renderInfo.pColorAttachments = colorAttachmentInfos.data();
+        renderInfo.colorAttachmentCount = numAttachments;
+        renderInfo.layerCount = 1;
+        renderInfo.flags = 0;
+        renderInfo.viewMask = 0;
+
+        VkRenderingAttachmentInfo depthAttachmentInfo = {};
+        if (desc.depthStencil != DepthImageMutableResource::Invalid())
+        {
+            DepthImageID depthImageID = desc.MutableResourceToDepthImageID(desc.depthStencil);
+            const DepthImageDesc& depthImageDesc = _imageHandler->GetImageDesc(depthImageID);
+            depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            depthAttachmentInfo.imageView = _imageHandler->GetDepthView(depthImageID);
+            depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+            depthAttachmentInfo.resolveMode = VK_RESOLVE_MODE_NONE;
+            depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            // Clear values are not needed
+
+            renderInfo.pDepthAttachment = &depthAttachmentInfo;
+            if (depthImageDesc.format == DepthImageFormat::D24_UNORM_S8_UINT || depthImageDesc.format == DepthImageFormat::D32_FLOAT_S8X24_UINT)
+            {
+                renderInfo.pStencilAttachment = &depthAttachmentInfo;
+            }
+
+            // Manual transition for depth attachment
+            VkImage depthImage = _imageHandler->GetImage(depthImageID);
+            VkImageMemoryBarrier depthBarrier = {};
+            depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            depthBarrier.pNext = nullptr;
+            // Wait for both read and write from previous usage.
+            depthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+            // Allow the upcoming depth attachment usage to read and write.
+            depthBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            depthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            depthBarrier.image = depthImage;
+            depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            depthBarrier.subresourceRange.baseMipLevel = 0;
+            depthBarrier.subresourceRange.levelCount = 1;
+            depthBarrier.subresourceRange.baseArrayLayer = 0;
+            depthBarrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &depthBarrier);
+        }
+
+        vkCmdBeginRendering(commandBuffer, &renderInfo);
+    }
+
+    void RendererVK::EndRenderPass(CommandListID commandListID, const RenderPassDesc& desc)
+    {
+        i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
+        if (renderPassOpenCount <= 0)
+        {
+            NC_LOG_CRITICAL("You tried to call EndRenderPass without first calling BeginRenderPass!");
+        }
+        renderPassOpenCount--;
+        _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
+
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        vkCmdEndRendering(commandBuffer);
+
+        for (int i = 0; i < MAX_RENDER_TARGETS; i++)
+        {
+            if (desc.renderTargets[i] == ImageMutableResource::Invalid())
+                break;
+
+            ImageID imageID = desc.MutableResourceToImageID(desc.renderTargets[i]);
+            bool isSwapchain = _imageHandler->IsSwapChainImage(imageID);
+
+            // Manual transition for color attachment back to original layout
+            VkImage image = _imageHandler->GetImage(imageID);
+            VkImageLayout newLayout = isSwapchain ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_GENERAL;
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.pNext = nullptr;
+            barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.newLayout = newLayout;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+        }
+
+        if (desc.depthStencil != DepthImageMutableResource::Invalid())
+        {
+            DepthImageID depthImageID = desc.MutableResourceToDepthImageID(desc.depthStencil);
+
+            // Manual transition for depth attachment back to read-only layout
+            VkImage depthImage = _imageHandler->GetImage(depthImageID);
+            VkImageMemoryBarrier depthBarrier = {};
+            depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            depthBarrier.pNext = nullptr;
+            depthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            depthBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            depthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            depthBarrier.image = depthImage;
+            depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            depthBarrier.subresourceRange.baseMipLevel = 0;
+            depthBarrier.subresourceRange.levelCount = 1;
+            depthBarrier.subresourceRange.baseArrayLayer = 0;
+            depthBarrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &depthBarrier);
+        }
+    }
+
+    void RendererVK::BeginPipeline(CommandListID commandListID, GraphicsPipelineID pipelineID)
+    {
+        i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
+        if (renderPassOpenCount != 1)
+        {
+            NC_LOG_CRITICAL("You tried to call BeginPipeline without first calling BeginRenderPass!");
+        }
+
+        i8 pipelineOpenCount = _commandListHandler->GetPipelineOpenCount(commandListID);
+        if (pipelineOpenCount != 0)
+        {
+            NC_LOG_CRITICAL("You need to match your BeginPipeline calls with a EndPipeline call before beginning another pipeline!");
+        }
+        pipelineOpenCount++;
+        _commandListHandler->SetPipelineOpenCount(commandListID, pipelineOpenCount);
+
+        VkPipeline pipeline = _pipelineHandler->GetPipeline(pipelineID);
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
 
         // Bind pipeline
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -654,48 +854,42 @@ namespace Renderer
 
     void RendererVK::EndPipeline(CommandListID commandListID, GraphicsPipelineID pipelineID)
     {
-        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
-
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
-        if (renderPassOpenCount <= 0)
+        if (renderPassOpenCount != 1)
+        {
+            NC_LOG_CRITICAL("You tried to call EndPipeline without first calling BeginRenderPass, or did you EndRenderPass before EndPipeline?");
+        }
+
+        i8 pipelineOpenCount = _commandListHandler->GetPipelineOpenCount(commandListID);
+        if (pipelineOpenCount <= 0)
         {
             NC_LOG_CRITICAL("You tried to call EndPipeline without first calling BeginPipeline!");
         }
-        renderPassOpenCount--;
-        _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
+        pipelineOpenCount--;
+        _commandListHandler->SetPipelineOpenCount(commandListID, pipelineOpenCount);
 
-        vkCmdEndRenderPass(commandBuffer);
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         _commandListHandler->SetBoundGraphicsPipeline(commandListID, GraphicsPipelineID::Invalid());
-
-        // Transition depth stencil to DEPTH_STENCIL_READ_ONLY_OPTIMAL
-        const GraphicsPipelineDesc& pipelineDesc = _pipelineHandler->GetDescriptor(pipelineID);
-        if (pipelineDesc.depthStencil != DepthImageMutableResource::Invalid())
-        {
-            DepthImageID depthImageID = pipelineDesc.MutableResourceToDepthImageID(pipelineDesc.depthStencil);
-            const DepthImageDesc& depthImageDesc = _imageHandler->GetImageDesc(depthImageID);
-
-            u32 imageAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-            // TODO: If we add stencil support we need to selectively add VK_IMAGE_ASPECT_STENCIL_BIT to imageAspect if the depthStencil has a stencil
-
-            VkImage depthImage = _imageHandler->GetImage(depthImageID);
-            _device->TransitionImageLayout(commandBuffer, depthImage, imageAspect, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, 1);
-        }
     }
 
     void RendererVK::BeginPipeline(CommandListID commandListID, ComputePipelineID pipelineID)
     {
-        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
-
-        VkPipeline pipeline = _pipelineHandler->GetPipeline(pipelineID);
-
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
         if (renderPassOpenCount != 0)
         {
+            NC_LOG_CRITICAL("You tried to call BeginPipeline for a ComputePipeline without first calling EndRenderPass");
+        }
+
+        i8 pipelineOpenCount = _commandListHandler->GetPipelineOpenCount(commandListID);
+        if (pipelineOpenCount != 0)
+        {
             NC_LOG_CRITICAL("You need to match your BeginPipeline calls with a EndPipeline call before beginning another pipeline!");
         }
-        renderPassOpenCount++;
-        _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
+        pipelineOpenCount++;
+        _commandListHandler->SetPipelineOpenCount(commandListID, pipelineOpenCount);
 
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        VkPipeline pipeline = _pipelineHandler->GetPipeline(pipelineID);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
         _commandListHandler->SetBoundComputePipeline(commandListID, pipelineID);
@@ -705,13 +899,13 @@ namespace Renderer
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
 
-        i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
-        if (renderPassOpenCount <= 0)
+        i8 pipelineOpenCount = _commandListHandler->GetPipelineOpenCount(commandListID);
+        if (pipelineOpenCount <= 0)
         {
             NC_LOG_CRITICAL("You tried to call EndPipeline without first calling BeginPipeline!");
         }
-        renderPassOpenCount--;
-        _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
+        pipelineOpenCount--;
+        _commandListHandler->SetPipelineOpenCount(commandListID, pipelineOpenCount);
 
         VkPipeline pipeline = _pipelineHandler->GetPipeline(pipelineID);
 
@@ -1481,6 +1675,33 @@ namespace Renderer
         {
             ZoneScopedNC("Present::Blit", tracy::Color::Red);
 
+            RenderPassDesc renderPassDesc;
+            // We define simple passthrough functions here because we don't have a rendergraph that keeps track of resources while presenting
+            renderPassDesc.ResourceToImageID = [](ImageResource resource)
+            {
+                return ImageID(static_cast<ImageResource::type>(resource));
+            };
+
+            renderPassDesc.ResourceToDepthImageID = [](DepthImageResource resource)
+            {
+                return DepthImageID(static_cast<DepthImageResource::type>(resource));
+            };
+
+            renderPassDesc.MutableResourceToImageID = [](ImageMutableResource resource)
+            {
+                return ImageID(static_cast<ImageMutableResource::type>(resource));
+            };
+
+            renderPassDesc.MutableResourceToDepthImageID = [](DepthImageMutableResource resource)
+            {
+                return DepthImageID(static_cast<DepthImageMutableResource::type>(resource));
+            };
+
+            // Render targets
+            renderPassDesc.renderTargets[0] = ImageMutableResource(static_cast<ImageID::type>(swapChain->imageIDs.Get(frameIndex)));
+            ImageBarrier(commandListID, imageID);
+            BeginRenderPass(commandListID, renderPassDesc);
+
             // Load shaders
             VertexShaderDesc vertexShaderDesc;
             vertexShaderDesc.path = "Blitting/blit.vs.hlsl";
@@ -1492,14 +1713,14 @@ namespace Renderer
             switch (componentType)
             {
                 case ImageComponentType::FLOAT:
+                case ImageComponentType::SNORM:
+                case ImageComponentType::UNORM:
                     componentTypeName = "float";
                     break;
                 case ImageComponentType::SINT:
-                case ImageComponentType::SNORM:
                     componentTypeName = "int";
                     break;
                 case ImageComponentType::UINT:
-                case ImageComponentType::UNORM:
                     componentTypeName = "uint";
                     break;
 
@@ -1551,8 +1772,7 @@ namespace Renderer
             GraphicsPipelineID pipelineID = _pipelineHandler->CreatePipeline(pipelineDesc);
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);
             Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(pipelineID);
-            
-            ImageBarrier(commandListID, imageID);
+
             BeginPipeline(commandListID, pipelineID);
 
             SetViewport(commandListID, _lastViewport);
@@ -1590,6 +1810,7 @@ namespace Renderer
             vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
             EndPipeline(commandListID, pipelineID);
+            EndRenderPass(commandListID, renderPassDesc);
 
 #if TRACY_ENABLE
             tracyScope->End();
@@ -1770,14 +1991,14 @@ namespace Renderer
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
     }
 
-    void* RendererVK::GetImguiImageHandle(TextureID textureID)
+    u64 RendererVK::GetImguiTextureID(TextureID textureID)
     {
-        return static_cast<void*>(_textureHandler->GetImguiImageHandle(textureID));
+        return reinterpret_cast<u64>(_textureHandler->GetImguiTextureID(textureID));
     }
 
-    void* RendererVK::GetImguiImageHandle(ImageID imageID)
+    u64 RendererVK::GetImguiTextureID(ImageID imageID)
     {
-        return static_cast<void*>(_imageHandler->GetImguiImageHandle(imageID));
+        return reinterpret_cast<u64>(_imageHandler->GetImguiTextureID(imageID));
     }
 
     u32 RendererVK::GetNumImages()

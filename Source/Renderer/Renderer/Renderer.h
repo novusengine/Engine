@@ -2,23 +2,25 @@
 #include <Base/Types.h>
 
 #include "DescriptorSet.h"
+#include "Renderer/RenderStates.h"
 
 // Descriptors
 #include "Descriptors/BufferDesc.h"
 #include "Descriptors/CommandListDesc.h"
-#include "Descriptors/VertexShaderDesc.h"
-#include "Descriptors/PixelShaderDesc.h"
-#include "Descriptors/ComputeShaderDesc.h"
-#include "Descriptors/GraphicsPipelineDesc.h"
 #include "Descriptors/ComputePipelineDesc.h"
-#include "Descriptors/ImageDesc.h"
+#include "Descriptors/ComputeShaderDesc.h"
 #include "Descriptors/DepthImageDesc.h"
-#include "Descriptors/TextureDesc.h"
-#include "Descriptors/TextureArrayDesc.h"
+#include "Descriptors/GraphicsPipelineDesc.h"
+#include "Descriptors/ImageDesc.h"
+#include "Descriptors/PixelShaderDesc.h"
+#include "Descriptors/RenderPassDesc.h"
 #include "Descriptors/SamplerDesc.h"
 #include "Descriptors/SemaphoreDesc.h"
-#include "Descriptors/UploadBuffer.h"
+#include "Descriptors/TextureArrayDesc.h"
+#include "Descriptors/TextureDesc.h"
 #include "Descriptors/TimeQueryDesc.h"
+#include "Descriptors/UploadBuffer.h"
+#include "Descriptors/VertexShaderDesc.h"
 
 namespace Novus
 {
@@ -59,6 +61,7 @@ namespace Renderer
         virtual vec2 GetRenderSize() = 0;
 
         virtual vec2 GetWindowSize() = 0;
+        virtual ImageFormat GetSwapChainImageFormat() = 0;
 
         virtual ~Renderer();
 
@@ -122,6 +125,9 @@ namespace Renderer
 
         virtual void PopMarker(CommandListID commandListID) = 0;
         virtual void PushMarker(CommandListID commandListID, Color color, std::string name) = 0;
+
+        virtual void BeginRenderPass(CommandListID commandListID, const RenderPassDesc& desc) = 0;
+        virtual void EndRenderPass(CommandListID commandListID, const RenderPassDesc& desc) = 0;
 
         virtual void BeginPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) = 0;
         virtual void EndPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) = 0;
@@ -198,8 +204,7 @@ namespace Renderer
         virtual void ResetTimeQueries(u32 frameIndex) = 0;
 
         virtual TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) = 0;
-        virtual i32 GetTextureHeight(TextureID textureID) = 0;
-        virtual i32 GetTextureWidth(TextureID textureID) = 0;
+        virtual TextureBaseDesc GetTextureDesc(TextureID textureID) = 0;
 
         virtual const ImageDesc& GetImageDesc(ImageID ID) = 0;
         virtual const DepthImageDesc& GetImageDesc(DepthImageID ID) = 0;
@@ -221,8 +226,8 @@ namespace Renderer
 
         virtual void InitImgui() = 0;
         virtual void DrawImgui(CommandListID commandListID) = 0;
-        virtual void* GetImguiImageHandle(TextureID textureID) = 0;
-        virtual void* GetImguiImageHandle(ImageID imageID) = 0;
+        virtual u64 GetImguiTextureID(TextureID textureID) = 0;
+        virtual u64 GetImguiTextureID(ImageID imageID) = 0;
 
         virtual bool HasExtendedTextureSupport() = 0;
 

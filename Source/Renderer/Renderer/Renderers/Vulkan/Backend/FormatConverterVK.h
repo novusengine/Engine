@@ -12,6 +12,7 @@ namespace Renderer
         class FormatConverterVK
         {
         public:
+            static ImageFormat ToImageFormat(const VkFormat format);
             static VkFormat ToVkFormat(const ImageFormat format);
             static VkSampleCountFlagBits ToVkSampleCount(const SampleCount sampleCount);
             static VkFormat ToVkFormat(const DepthImageFormat format);

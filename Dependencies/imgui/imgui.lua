@@ -1,7 +1,7 @@
 local dep = Solution.Util.CreateDepTable("Imgui", { "vulkan", "glfw", "glm"})
 
 Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
-    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+    local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "IMGUI_DEFINE_MATH_OPERATORS" }
 
     Solution.Util.SetLanguage("C++")
     Solution.Util.SetCppDialect(20)
@@ -47,6 +47,7 @@ Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.De
 end)
 
 Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
-    Solution.Util.SetIncludes(dep.Path)
+    local sourceDir = dep.Path .. "/imgui"
+    Solution.Util.SetIncludes({dep.Path, sourceDir})
     Solution.Util.SetLinks(dep.Name)
 end)

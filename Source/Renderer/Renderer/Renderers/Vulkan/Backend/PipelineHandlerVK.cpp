@@ -32,8 +32,6 @@ namespace Renderer
             GraphicsPipelineDesc desc;
             u64 cacheDescHash;
 
-            VkRenderPass renderPass;
-            
             VkPipelineLayout pipelineLayout;
             VkPipeline pipeline;
 
@@ -92,7 +90,6 @@ namespace Renderer
 
             for (GraphicsPipeline& pipeline : data.graphicsPipelines)
             {
-                vkDestroyRenderPass(_device->_device, pipeline.renderPass, nullptr);
                 vkDestroyPipeline(_device->_device, pipeline.pipeline, nullptr);
                 vkDestroyPipelineLayout(_device->_device, pipeline.pipelineLayout, nullptr);
                 vkDestroyFramebuffer(_device->_device, pipeline.framebuffer, nullptr);
@@ -172,120 +169,6 @@ namespace Renderer
             pipeline.desc = desc;
             pipeline.cacheDescHash = cacheDescHash;
             pipeline.numRenderTargets = numAttachments;
-
-            // -- Create Render Pass --
-            std::vector<VkAttachmentDescription> attachments(numAttachments);
-            std::vector< VkAttachmentReference> colorAttachmentRefs(numAttachments);
-            for (int i = 0; i < numAttachments; i++)
-            {
-                ImageID imageID = desc.MutableResourceToImageID(desc.renderTargets[i]);
-
-                const ImageDesc& imageDesc = _imageHandler->GetImageDesc(imageID);
-                uvec2 imageResolution = _imageHandler->GetDimensions(imageID, 0);
-
-                pipeline.resolution = glm::max(pipeline.resolution, imageResolution);
-
-                bool isSwapchain = _imageHandler->IsSwapChainImage(imageID);
-
-                attachments[i].format = FormatConverterVK::ToVkFormat(imageDesc.format);
-                attachments[i].samples = FormatConverterVK::ToVkSampleCount(imageDesc.sampleCount);
-                attachments[i].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-                attachments[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-                attachments[i].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-                attachments[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-                if (isSwapchain)
-                {
-                    attachments[i].initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-                    attachments[i].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-                }
-                else
-                {
-                    attachments[i].initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    attachments[i].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-                }
-                
-                colorAttachmentRefs[i].attachment = i;
-                colorAttachmentRefs[i].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            }
-
-            VkSubpassDescription subpass = {};
-            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-            subpass.colorAttachmentCount = numAttachments;
-            subpass.pColorAttachments = colorAttachmentRefs.data();
-
-            VkAttachmentReference depthDescriptionRef = {};
-
-            // If we have a depthstencil, add an attachment for that
-            if (desc.depthStencil != DepthImageMutableResource::Invalid())
-            {
-                DepthImageID depthImageID = desc.MutableResourceToDepthImageID(desc.depthStencil);
-                const DepthImageDesc& imageDesc = _imageHandler->GetImageDesc(depthImageID);
-
-                uvec2 imageResolution = _imageHandler->GetDimensions(depthImageID);
-
-                pipeline.resolution = glm::max(pipeline.resolution, imageResolution);
-
-                u32 attachmentSlot = numAttachments++;
-                
-                VkAttachmentDescription& depthDescription = attachments.emplace_back();
-                depthDescription = {};
-                depthDescription.format = FormatConverterVK::ToVkFormat(imageDesc.format);
-                depthDescription.samples = FormatConverterVK::ToVkSampleCount(imageDesc.sampleCount);
-                depthDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-                depthDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-                depthDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-                depthDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-                depthDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                depthDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-                depthDescriptionRef.attachment = attachmentSlot;
-                depthDescriptionRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-                subpass.pDepthStencilAttachment = &depthDescriptionRef;
-            }
-
-            std::vector<VkSubpassDependency> dependencies;
-
-            VkSubpassDependency& dependency = dependencies.emplace_back();
-            dependency.srcSubpass = 0;
-            dependency.dstSubpass = VK_SUBPASS_EXTERNAL;
-            dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            dependency.dependencyFlags = 0;
-
-            VkSubpassDependency& dependency2 = dependencies.emplace_back();
-            dependency2.srcSubpass = VK_SUBPASS_EXTERNAL;
-            dependency2.dstSubpass = 0;
-            dependency2.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            dependency2.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            dependency2.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            dependency2.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            dependency2.dependencyFlags = 0;
-
-            VkRenderPassCreateInfo renderPassInfo = {};
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-            renderPassInfo.attachmentCount = numAttachments;
-            renderPassInfo.pAttachments = attachments.data();
-            renderPassInfo.subpassCount = 1;
-            renderPassInfo.pSubpasses = &subpass;
-            renderPassInfo.dependencyCount = static_cast<u32>(dependencies.size());
-            renderPassInfo.pDependencies = dependencies.data();
-
-            if (vkCreateRenderPass(_device->_device, &renderPassInfo, nullptr, &pipeline.renderPass) != VK_SUCCESS)
-            {
-                NC_LOG_CRITICAL("Failed to create render pass!");
-            }
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.renderPass, VK_OBJECT_TYPE_RENDER_PASS, desc.debugName.c_str());
-
-            // -- Create Framebuffer --
-            CreateFramebuffer(pipeline, desc.debugName);
 
             // -- Get Reflection data from shader --
             std::vector<BindInfo> bindInfos;
@@ -595,6 +478,32 @@ namespace Renderer
             }
             DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.pipelineLayout, VK_OBJECT_TYPE_PIPELINE_LAYOUT, desc.debugName.c_str());
 
+            // Set up dynamic rendering
+            std::vector<VkFormat> colorAttachmentFormats;
+            for (int i = 0; i < numAttachments; i++)
+            {
+                ImageID imageID = desc.MutableResourceToImageID(desc.renderTargets[i]);
+                const ImageDesc& imageDesc = _imageHandler->GetImageDesc(imageID);
+                colorAttachmentFormats.push_back(FormatConverterVK::ToVkFormat(imageDesc.format));
+            }
+
+            VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+            VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
+            if (desc.depthStencil != DepthImageMutableResource::Invalid())
+            {
+                DepthImageID depthImageID = desc.MutableResourceToDepthImageID(desc.depthStencil);
+                const DepthImageDesc& depthDesc = _imageHandler->GetImageDesc(depthImageID);
+                depthFormat = FormatConverterVK::ToVkFormat(depthDesc.format);
+            }
+
+            // Prepare the dynamic rendering create info structure
+            VkPipelineRenderingCreateInfo pipelineRenderingInfo = {};
+            pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+            pipelineRenderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentFormats.size());
+            pipelineRenderingInfo.pColorAttachmentFormats = colorAttachmentFormats.data();
+            pipelineRenderingInfo.depthAttachmentFormat = depthFormat;
+            pipelineRenderingInfo.stencilAttachmentFormat = stencilFormat;
+
             // Set up dynamic viewport and scissor
             std::vector<VkDynamicState> dynamicStates;
             dynamicStates.reserve(3);
@@ -621,10 +530,11 @@ namespace Renderer
             pipelineInfo.pColorBlendState = &colorBlending;
             pipelineInfo.pDynamicState = &dynamicStateCreateInfo;
             pipelineInfo.layout = pipeline.pipelineLayout;
-            pipelineInfo.renderPass = pipeline.renderPass;
+            pipelineInfo.renderPass = VK_NULL_HANDLE;
             pipelineInfo.subpass = 0;
             pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
             pipelineInfo.basePipelineIndex = -1; // Optional
+            pipelineInfo.pNext = &pipelineRenderingInfo;
 
             if (vkCreateGraphicsPipelines(_device->_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline.pipeline) != VK_SUCCESS)
             {
@@ -774,12 +684,6 @@ namespace Renderer
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
             return data.computePipelines[static_cast<cIDType>(id)].pipeline;
-        }
-
-        VkRenderPass PipelineHandlerVK::GetRenderPass(GraphicsPipelineID id)
-        {
-            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            return data.graphicsPipelines[static_cast<gIDType>(id)].renderPass;
         }
 
         uvec2 PipelineHandlerVK::GetRenderPassResolution(GraphicsPipelineID id)
@@ -958,48 +862,6 @@ namespace Renderer
             }
 
             return sets[setNumber];
-        }
-
-        void PipelineHandlerVK::CreateFramebuffer(GraphicsPipeline& pipeline, const std::string& debugName)
-        {
-            u32 numAttachments = pipeline.numRenderTargets;
-            
-            if (pipeline.desc.depthStencil != DepthImageMutableResource::Invalid())
-            {
-                numAttachments += 1;
-            }
-
-            std::vector<VkImageView> attachmentViews(numAttachments);
-
-            // Add all color rendertargets as attachments
-            for (u32 i = 0; i < pipeline.numRenderTargets; i++)
-            {
-                ImageID imageID = pipeline.desc.MutableResourceToImageID(pipeline.desc.renderTargets[i]);
-                attachmentViews[i] = _imageHandler->GetColorView(imageID);
-            }
-            // Add depthstencil as attachment
-            if (pipeline.desc.depthStencil != DepthImageMutableResource::Invalid())
-            {
-                DepthImageID depthImageID = pipeline.desc.MutableResourceToDepthImageID(pipeline.desc.depthStencil);
-                attachmentViews[pipeline.numRenderTargets] = _imageHandler->GetDepthView(depthImageID);
-            }
-
-            uvec2 renderSize = pipeline.resolution;
-
-            VkFramebufferCreateInfo framebufferInfo = {};
-            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = pipeline.renderPass;
-            framebufferInfo.attachmentCount = static_cast<u32>(attachmentViews.size());
-            framebufferInfo.pAttachments = attachmentViews.data();
-            framebufferInfo.width = renderSize.x != 0 ? renderSize.x : 1;
-            framebufferInfo.height = renderSize.y != 0 ? renderSize.y : 1;
-            framebufferInfo.layers = 1;
-
-            if (vkCreateFramebuffer(_device->_device, &framebufferInfo, nullptr, &pipeline.framebuffer) != VK_SUCCESS)
-            {
-                NC_LOG_CRITICAL("Failed to create framebuffer!");
-            }
-            DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.framebuffer, VK_OBJECT_TYPE_FRAMEBUFFER, debugName.c_str());
         }
     }
 }

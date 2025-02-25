@@ -71,6 +71,7 @@ namespace Renderer
             void FlushGPU();
 
             const std::string& GetGPUName() { return _gpuName; }
+            ImageFormat GetSwapChainImageFormat() { return _swapChainFormats[0]; }
 
         private:
             void InitOnce();
@@ -140,6 +141,8 @@ namespace Renderer
             VkCommandPool _graphicsCommandPool = VK_NULL_HANDLE;
             VkCommandPool _transferCommandPool = VK_NULL_HANDLE;
 
+            // GraphicsQueueFamily
+            u32 _graphicsQueueFamily;
             VkQueue _graphicsQueue = VK_NULL_HANDLE;
             VkQueue _transferQueue = VK_NULL_HANDLE;
             VkQueue _presentQueue = VK_NULL_HANDLE;
@@ -150,6 +153,7 @@ namespace Renderer
             bool _hasExtendedTextureSupport = false;
 
             std::vector<SwapChainVK*> _swapChains;
+            std::vector<ImageFormat> _swapChainFormats;
 
             VmaAllocator _allocator;
 
