@@ -849,5 +849,64 @@ namespace Renderer
         NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating DepthImageFormat?");
         return 1;
     }
+
+    inline std::string GetTextureTypeName(ImageFormat format)
+    {
+        ImageComponentType componentType = ToImageComponentType(format);
+        std::string componentTypeName = "";
+
+        switch (componentType)
+        {
+        case ImageComponentType::FLOAT:
+        case ImageComponentType::SNORM:
+        case ImageComponentType::UNORM:
+            componentTypeName = "float";
+            break;
+        case ImageComponentType::SINT:
+            componentTypeName = "int";
+            break;
+        case ImageComponentType::UINT:
+            componentTypeName = "uint";
+            break;
+        }
+
+        u8 componentCount = ToImageComponentCount(format);
+        if (componentCount > 1)
+        {
+            componentTypeName += std::to_string(componentCount);
+        }
+
+        return componentTypeName;
+    }
+
+    inline std::string GetTextureTypeName(DepthImageFormat format)
+    {
+        ImageComponentType componentType = ToImageComponentType(format);
+        std::string componentTypeName = "";
+
+        switch (componentType)
+        {
+        case ImageComponentType::FLOAT:
+        case ImageComponentType::SNORM:
+        case ImageComponentType::UNORM:
+            componentTypeName = "float";
+            break;
+        case ImageComponentType::SINT:
+            componentTypeName = "int";
+            break;
+        case ImageComponentType::UINT:
+            componentTypeName = "uint";
+            break;
+        }
+
+        u8 componentCount = ToImageComponentCount(format);
+        if (componentCount > 1)
+        {
+            componentTypeName += std::to_string(componentCount);
+        }
+
+        return componentTypeName;
+    }
+
     PRAGMA_NO_PADDING_END;
 }

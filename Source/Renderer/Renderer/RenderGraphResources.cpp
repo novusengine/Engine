@@ -112,29 +112,6 @@ namespace Renderer
         };
     }
 
-    void RenderGraphResources::InitializePipelineDesc(GraphicsPipelineDesc& desc)
-    {
-        RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
-        desc.debugName = data->currentPassName;
-
-        desc.ResourceToImageID = [&](ImageResource resource)
-        {
-            return GetImage(resource);
-        };
-        desc.ResourceToDepthImageID = [&](DepthImageResource resource)
-        {
-            return GetImage(resource);
-        };
-        desc.MutableResourceToImageID = [&](ImageMutableResource resource)
-        {
-            return GetImage(resource);
-        };
-        desc.MutableResourceToDepthImageID = [&](DepthImageMutableResource resource)
-        {
-            return GetImage(resource);
-        };
-    }
-
     void RenderGraphResources::InitializePipelineDesc(ComputePipelineDesc& desc)
     {
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);

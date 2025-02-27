@@ -56,6 +56,7 @@ namespace Renderer
 
             VkImage GetImage(const TextureID textureID);
             VkImageView GetImageView(const TextureID textureID);
+            VkImageView GetImageView(const TextureID textureID, u32 mipLevel);
             VkImageView GetDebugTextureImageView();
             VkImageView GetDebugOnionTextureImageView();
 

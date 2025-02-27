@@ -20,5 +20,29 @@ namespace Renderer
 
             RenderPassDesc desc;
         };
+
+        struct BeginTextureRenderPass
+        {
+            static const BackendDispatchFunction DISPATCH_FUNCTION;
+            TextureRenderPassDesc desc;
+        };
+
+        struct EndTextureRenderPass
+        {
+            static const BackendDispatchFunction DISPATCH_FUNCTION;
+            TextureRenderPassDesc desc;
+        };
+
+        struct BeginTextureComputeWritePass
+        {
+            static const BackendDispatchFunction DISPATCH_FUNCTION;
+            TextureRenderPassDesc desc;
+        };
+
+        struct EndTextureComputeWritePass
+        {
+            static const BackendDispatchFunction DISPATCH_FUNCTION;
+            TextureRenderPassDesc desc;
+        };
     }
 }

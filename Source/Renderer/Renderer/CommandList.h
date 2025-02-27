@@ -71,6 +71,12 @@ namespace Renderer
         void BeginRenderPass(RenderPassDesc& desc);
         void EndRenderPass(RenderPassDesc& desc);
 
+        void BeginRenderPass(TextureRenderPassDesc& desc);
+        void EndRenderPass(TextureRenderPassDesc& desc);
+
+        void BeginTextureComputeWritePass(TextureRenderPassDesc& desc);
+        void EndTextureComputeWritePass(TextureRenderPassDesc& desc);
+
         void BeginPipeline(GraphicsPipelineID pipelineID);
         void EndPipeline(GraphicsPipelineID pipelineID);
 

@@ -174,25 +174,11 @@ namespace Renderer
 
     GraphicsPipelineID RendererVK::CreatePipeline(GraphicsPipelineDesc& desc)
     {
-#if _DEBUG
-        if (!_isExecutingCommandlist)
-        {
-            NC_LOG_CRITICAL("Please only create pipelines from inside a Commandlist");
-        }
-#endif // _DEBUG
-
         return _pipelineHandler->CreatePipeline(desc);
     }
 
     ComputePipelineID RendererVK::CreatePipeline(ComputePipelineDesc& desc)
     {
-#if _DEBUG
-        if (!_isExecutingCommandlist)
-        {
-            NC_LOG_CRITICAL("Please only create pipelines from inside a Commandlist");
-        }
-#endif // _DEBUG
-
         return _pipelineHandler->CreatePipeline(desc);
     }
 
@@ -301,7 +287,7 @@ namespace Renderer
 
             _device->SetRenderSize(_renderSize);
 
-            _pipelineHandler->DiscardPipelines();
+            //_pipelineHandler->DiscardPipelines();
             //CreateDummyPipeline();
 
             _imageHandler->OnResize(false);
@@ -827,6 +813,280 @@ namespace Renderer
         }
     }
 
+    void RendererVK::BeginRenderPass(CommandListID commandListID, const TextureRenderPassDesc& desc)
+    {
+        i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
+        if (renderPassOpenCount != 0)
+        {
+            NC_LOG_CRITICAL("You need to match your BeginRenderPass calls with a EndRenderPass call before beginning another render pass!");
+        }
+        renderPassOpenCount++;
+        _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
+
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+
+        std::vector<VkRenderingAttachmentInfo> colorAttachmentInfos;
+        colorAttachmentInfos.reserve(8);
+        for (int i = 0; i < MAX_RENDER_TARGETS; i++)
+        {
+            if (desc.renderTargets[i] == TextureID::Invalid())
+                break;
+
+            TextureBaseDesc textureDesc = _textureHandler->GetTextureDesc(desc.renderTargets[i]);
+
+            VkRenderingAttachmentInfo& attachmentInfo = colorAttachmentInfos.emplace_back();
+
+            attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            attachmentInfo.imageView = _textureHandler->GetImageView(desc.renderTargets[i]);
+            attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            attachmentInfo.resolveMode = VK_RESOLVE_MODE_NONE;
+            attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            // Manual transition for color attachment
+            VkImage image = _textureHandler->GetImage(desc.renderTargets[i]);
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.pNext = nullptr;
+
+            barrier.srcAccessMask =
+                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
+                VK_ACCESS_INDEX_READ_BIT |
+                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                VK_ACCESS_UNIFORM_READ_BIT |
+                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
+                VK_ACCESS_SHADER_READ_BIT |
+                VK_ACCESS_SHADER_WRITE_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_TRANSFER_READ_BIT |
+                VK_ACCESS_TRANSFER_WRITE_BIT |
+                VK_ACCESS_HOST_READ_BIT |
+                VK_ACCESS_HOST_WRITE_BIT;
+
+            barrier.dstAccessMask = barrier.srcAccessMask;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = textureDesc.mipLevels;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+        }
+
+        uvec2 extent = desc.extent;
+        if (extent == uvec2(0))
+        {
+            extent = _textureHandler->GetTextureDimensions(desc.renderTargets[0]);
+        }
+
+        VkRenderingInfo renderInfo = {};
+        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderInfo.pNext = nullptr;
+        renderInfo.renderArea = VkRect2D{ VkOffset2D{desc.offset.x, desc.offset.y}, VkExtent2D{extent.x, extent.y} };
+        renderInfo.pColorAttachments = colorAttachmentInfos.data();
+        renderInfo.colorAttachmentCount = static_cast<u32>(colorAttachmentInfos.size());
+        renderInfo.layerCount = 1;
+        renderInfo.flags = 0;
+        renderInfo.viewMask = 0;
+
+        vkCmdBeginRendering(commandBuffer, &renderInfo);
+    }
+
+    void RendererVK::EndRenderPass(CommandListID commandListID, const TextureRenderPassDesc& desc)
+    {
+        i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
+        if (renderPassOpenCount <= 0)
+        {
+            NC_LOG_CRITICAL("You tried to call EndRenderPass without first calling BeginRenderPass!");
+        }
+        renderPassOpenCount--;
+        _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
+
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        vkCmdEndRendering(commandBuffer);
+
+        for (int i = 0; i < MAX_RENDER_TARGETS; i++)
+        {
+            if (desc.renderTargets[i] == TextureID::Invalid())
+                break;
+
+            TextureBaseDesc textureDesc = _textureHandler->GetTextureDesc(desc.renderTargets[i]);
+
+            // Manual transition for color attachment back to original layout
+            VkImage image = _textureHandler->GetImage(desc.renderTargets[i]);
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.pNext = nullptr;
+            barrier.srcAccessMask =
+                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
+                VK_ACCESS_INDEX_READ_BIT |
+                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                VK_ACCESS_UNIFORM_READ_BIT |
+                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
+                VK_ACCESS_SHADER_READ_BIT |
+                VK_ACCESS_SHADER_WRITE_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_TRANSFER_READ_BIT |
+                VK_ACCESS_TRANSFER_WRITE_BIT |
+                VK_ACCESS_HOST_READ_BIT |
+                VK_ACCESS_HOST_WRITE_BIT;
+
+            barrier.dstAccessMask = barrier.srcAccessMask;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = textureDesc.mipLevels;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+        }
+    }
+
+    void RendererVK::BeginTextureComputeWritePass(CommandListID commandListID, const TextureRenderPassDesc& desc)
+    {
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+
+        for (int i = 0; i < MAX_RENDER_TARGETS; i++)
+        {
+            if (desc.renderTargets[i] == TextureID::Invalid())
+                break;
+
+            TextureBaseDesc textureDesc = _textureHandler->GetTextureDesc(desc.renderTargets[i]);
+            VkImage image = _textureHandler->GetImage(desc.renderTargets[i]);
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.pNext = nullptr;
+
+            // Transition from shader-read to general layout
+            barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = textureDesc.mipLevels;  // Transition all mip levels
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            // Correct the access mask to match prior usage (shader reads)
+            barrier.srcAccessMask =
+                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
+                VK_ACCESS_INDEX_READ_BIT |
+                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                VK_ACCESS_UNIFORM_READ_BIT |
+                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
+                VK_ACCESS_SHADER_READ_BIT |
+                VK_ACCESS_SHADER_WRITE_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_TRANSFER_READ_BIT |
+                VK_ACCESS_TRANSFER_WRITE_BIT |
+                VK_ACCESS_HOST_READ_BIT |
+                VK_ACCESS_HOST_WRITE_BIT;
+
+            barrier.dstAccessMask = barrier.srcAccessMask;
+
+            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                srcStage,
+                dstStage,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+        }
+    }
+
+    void RendererVK::EndTextureComputeWritePass(CommandListID commandListID, const TextureRenderPassDesc& desc)
+    {
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+
+        for (int i = 0; i < MAX_RENDER_TARGETS; i++)
+        {
+            if (desc.renderTargets[i] == TextureID::Invalid())
+                break;
+
+            // Retrieve texture description to get the number of mip levels.
+            TextureBaseDesc textureDesc = _textureHandler->GetTextureDesc(desc.renderTargets[i]);
+            VkImage image = _textureHandler->GetImage(desc.renderTargets[i]);
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.pNext = nullptr;
+
+            // Transition from general (compute writes) back to shader-read optimal
+            barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = textureDesc.mipLevels;  // Transition all mip levels
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            // Ensure compute writes are visible before subsequent shader reads.
+            barrier.srcAccessMask =
+                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
+                VK_ACCESS_INDEX_READ_BIT |
+                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                VK_ACCESS_UNIFORM_READ_BIT |
+                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
+                VK_ACCESS_SHADER_READ_BIT |
+                VK_ACCESS_SHADER_WRITE_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                VK_ACCESS_TRANSFER_READ_BIT |
+                VK_ACCESS_TRANSFER_WRITE_BIT |
+                VK_ACCESS_HOST_READ_BIT |
+                VK_ACCESS_HOST_WRITE_BIT;
+
+            barrier.dstAccessMask = barrier.srcAccessMask;
+
+            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                srcStage,
+                dstStage,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+        }
+    }
+
     void RendererVK::BeginPipeline(CommandListID commandListID, GraphicsPipelineID pipelineID)
     {
         i8 renderPassOpenCount = _commandListHandler->GetRenderPassOpenCount(commandListID);
@@ -956,7 +1216,7 @@ namespace Renderer
 
         VkViewport vkViewport = {};
         vkViewport.x = viewport.topLeftX;
-        vkViewport.y = viewport.height - viewport.topLeftY;
+        vkViewport.y = viewport.topLeftY + viewport.height;
         vkViewport.width = viewport.width;
         vkViewport.height = -viewport.height;
         vkViewport.minDepth = viewport.minDepth;
@@ -1130,6 +1390,37 @@ namespace Renderer
             }
             
             builder.BindImageArray(descriptor.nameHash, imageInfos, textureArraySize);
+        }
+        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE_WRITE)
+        {
+            ZoneScopedN("TextureWrite");
+            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, descriptor.count);
+            u32 numImageInfos = 0;
+
+            TextureBaseDesc textureDesc = _textureHandler->GetTextureDesc(descriptor.textureID);
+
+            for (u32 i = 0; i < descriptor.count; i++)
+            {
+                u32 mipLevel = descriptor.imageMipLevel + i;
+
+                if (mipLevel < textureDesc.mipLevels)
+                {
+                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
+                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID, mipLevel);
+                    imageInfo.sampler = VK_NULL_HANDLE;
+                }
+                else
+                {
+                    // Any imageInfos pointing to mips we don't have should point to the last mip
+                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
+                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID, textureDesc.mipLevels - 1);
+                    imageInfo.sampler = VK_NULL_HANDLE;
+                }
+            }
+
+            builder.BindStorageImage(descriptor.nameHash, imageInfos, static_cast<i32>(descriptor.count));
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_IMAGE)
         {
@@ -1739,35 +2030,13 @@ namespace Renderer
             pixelShaderDesc.AddPermutationField("TEX_TYPE", componentTypeName);
 
             GraphicsPipelineDesc pipelineDesc;
-
-            // We define simple passthrough functions here because we don't have a rendergraph that keeps track of resources while presenting
-            pipelineDesc.ResourceToImageID = [](ImageResource resource)
-            {
-                return ImageID(static_cast<ImageResource::type>(resource));
-            };
-
-            pipelineDesc.ResourceToDepthImageID = [](DepthImageResource resource)
-            {
-                return DepthImageID(static_cast<DepthImageResource::type>(resource));
-            };
-
-            pipelineDesc.MutableResourceToImageID = [](ImageMutableResource resource)
-            {
-                return ImageID(static_cast<ImageMutableResource::type>(resource));
-            };
-
-            pipelineDesc.MutableResourceToDepthImageID = [](DepthImageMutableResource resource)
-            {
-                return DepthImageID(static_cast<DepthImageMutableResource::type>(resource));
-            };
-
             pipelineDesc.states.vertexShader = _shaderHandler->LoadShader(vertexShaderDesc);
             pipelineDesc.states.pixelShader = _shaderHandler->LoadShader(pixelShaderDesc);
 
             pipelineDesc.states.rasterizerState.cullMode = CullMode::BACK;
             pipelineDesc.states.rasterizerState.frontFaceMode = FrontFaceState::COUNTERCLOCKWISE;
 
-            pipelineDesc.renderTargets[0] = ImageMutableResource(static_cast<ImageID::type>(swapChain->imageIDs.Get(frameIndex)));
+            pipelineDesc.states.renderTargetFormats[0] = _device->GetSwapChainImageFormat();//ImageMutableResource(static_cast<ImageID::type>(swapChain->imageIDs.Get(frameIndex)));
 
             GraphicsPipelineID pipelineID = _pipelineHandler->CreatePipeline(pipelineDesc);
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);
@@ -1796,10 +2065,12 @@ namespace Renderer
             {
                 vec4 colorMultiplier;
                 vec4 additiveColor;
+                vec4 uvOffsetAndExtent;
                 u32 channelRedirectors;
             } blitConstant;
             blitConstant.colorMultiplier = vec4(1, 1, 1, 1);
             blitConstant.additiveColor = vec4(0, 0, 0, 0);
+            blitConstant.uvOffsetAndExtent = vec4(0.0f, 0.0f, 1.0f, 1.0f);
             blitConstant.channelRedirectors = 0;
             blitConstant.channelRedirectors |= (1 << 8);
             blitConstant.channelRedirectors |= (2 << 16);

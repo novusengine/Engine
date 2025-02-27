@@ -71,7 +71,6 @@ namespace Renderer
     public:
         void InitializeRenderPassDesc(RenderPassDesc& desc);
 
-        void InitializePipelineDesc(GraphicsPipelineDesc& desc);
         void InitializePipelineDesc(ComputePipelineDesc& desc);
 
         template<typename T, typename... Args>

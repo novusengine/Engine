@@ -128,6 +128,11 @@ namespace Renderer
 
         virtual void BeginRenderPass(CommandListID commandListID, const RenderPassDesc& desc) = 0;
         virtual void EndRenderPass(CommandListID commandListID, const RenderPassDesc& desc) = 0;
+        virtual void BeginRenderPass(CommandListID commandListID, const TextureRenderPassDesc& desc) = 0;
+        virtual void EndRenderPass(CommandListID commandListID, const TextureRenderPassDesc& desc) = 0;
+
+        virtual void BeginTextureComputeWritePass(CommandListID commandListID, const TextureRenderPassDesc& desc) = 0;
+        virtual void EndTextureComputeWritePass(CommandListID commandListID, const TextureRenderPassDesc& desc) = 0;
 
         virtual void BeginPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) = 0;
         virtual void EndPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) = 0;

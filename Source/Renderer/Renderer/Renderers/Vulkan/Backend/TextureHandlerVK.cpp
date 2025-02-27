@@ -53,6 +53,8 @@ namespace Renderer
             VmaAllocation allocation;
             VkImage image;
             VkImageView imageView;
+            std::vector<VkImageView> mipViews;
+
             VkDescriptorSet imguiTextureHandle = 0;
 
             bool layoutUndefined = true;
@@ -259,6 +261,11 @@ namespace Renderer
                     vkDestroyImage(_device->_device, texture->image, nullptr);
                     vkDestroyImageView(_device->_device, texture->imageView, nullptr);
 
+                    for (u32 i = 0; i < texture->desc.mipLevels; i++)
+                    {
+                        vkDestroyImageView(_device->_device, texture->mipViews[i], nullptr);
+                    }
+
                     data.descriptorsToFree.push_back(texture->imguiTextureHandle);
                     texture->imguiTextureHandle = VK_NULL_HANDLE;
 
@@ -321,11 +328,6 @@ namespace Renderer
             if (desc.width == 0 || desc.height == 0 || desc.layers == 0)
             {
                 NC_LOG_CRITICAL("Invalid DataTexture dimensions! (width {0}, height {1}, layers {2}) ({3})", desc.width, desc.height, desc.layers, desc.debugName.c_str());
-            }
-
-            if (desc.data == nullptr)
-            {
-                NC_LOG_CRITICAL("Tried to create a DataTexture with the data being a nullptr! ({0})", desc.debugName.c_str());
             }
 
             size_t nextHandle;
@@ -545,6 +547,31 @@ namespace Renderer
             }
 
             return data.textures.ReadGet(id)->imageView;
+        }
+
+        VkImageView TextureHandlerVK::GetImageView(const TextureID textureID, u32 mipLevel)
+        {
+            if (mipLevel == 0)
+            {
+                return GetImageView(textureID);
+            }
+
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureID::type id = static_cast<TextureID::type>(textureID);
+
+            // Lets make sure this id exists
+            if (data.textures.Size() <= id)
+            {
+                NC_LOG_CRITICAL("Tried to access invalid TextureID: {0}", id);
+            }
+
+            Texture* texture = data.textures.ReadGet(id);
+            if (mipLevel >= texture->mipViews.size())
+            {
+                NC_LOG_CRITICAL("TextureHandlerVK: GetImageView tried to get a mipLevel that doesn't exist");
+            }
+
+            return texture->mipViews[mipLevel];
         }
 
         VkImageView TextureHandlerVK::GetDebugTextureImageView()
@@ -802,6 +829,12 @@ namespace Renderer
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+            if (texture.desc.renderable)
+            {
+                imageInfo.usage = imageInfo.usage | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+            }
+
             imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.flags = 0; // Optional
@@ -830,6 +863,24 @@ namespace Renderer
             viewInfo.subresourceRange.baseArrayLayer = 0;
             viewInfo.subresourceRange.layerCount = texture.desc.layers;
 
+            //we want a full mip chain of views
+            texture.mipViews.resize(texture.desc.mipLevels);
+
+            for (u32 i = 0; i < texture.desc.mipLevels; ++i)
+            {
+                VkImageViewCreateInfo pyramidLevelInfo = viewInfo;
+                pyramidLevelInfo.subresourceRange.baseMipLevel = i;
+                pyramidLevelInfo.subresourceRange.levelCount = 1;
+
+                if (vkCreateImageView(_device->_device, &pyramidLevelInfo, nullptr, &texture.mipViews[i]) != VK_SUCCESS)
+                {
+                    NC_LOG_CRITICAL("Failed to create color image view!");
+                }
+
+                std::string mipName = texture.desc.debugName + " mip " + std::to_string(i);
+                DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.mipViews[i], VK_OBJECT_TYPE_IMAGE_VIEW, mipName.c_str());
+            }
+
             if (vkCreateImageView(_device->_device, &viewInfo, nullptr, &texture.imageView) != VK_SUCCESS)
             {
                 NC_LOG_CRITICAL("Failed to create texture image view!");
@@ -837,7 +888,6 @@ namespace Renderer
 
             VkSampler imguiSampler = _samplerHandler->GetSampler(_imguiSampler);
 
-            
             static std::mutex imguiAddTextureLock;
             {
                 std::scoped_lock lock(imguiAddTextureLock);

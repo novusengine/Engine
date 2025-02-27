@@ -502,7 +502,7 @@ namespace ImGui
             // Remove toast if expired
             if (currentToast->getPhase() == ImGuiToastPhase::Expired)
             {
-                RemoveNotification(i);
+                RemoveNotification(static_cast<int>(i));
                 continue;
             }
 
@@ -620,7 +620,7 @@ namespace ImGui
                     // If the button is pressed, we want to remove the notification
                     if (Button(ICON_FA_XMARK))
                     {
-                        RemoveNotification(i);
+                        RemoveNotification(static_cast<int>(i));
                     }
                 }
 

@@ -36,6 +36,9 @@ namespace Renderer
             // Shaders
             VertexShaderID vertexShader = VertexShaderID::Invalid();
             PixelShaderID pixelShader = PixelShaderID::Invalid();
+
+            ImageFormat renderTargetFormats[MAX_RENDER_TARGETS] = { ImageFormat::UNKNOWN };
+            DepthImageFormat depthStencilFormat = DepthImageFormat::UNKNOWN;
         };
         PRAGMA_NO_PADDING_END;
         States states;
@@ -43,14 +46,14 @@ namespace Renderer
         // Everything below this isn't hashable in the PipelineHandler since it will depend on the RenderGraph (which gets recreated every frame)
         std::string debugName = "";
 
-        std::function<ImageID(ImageResource resource)> ResourceToImageID = nullptr;
-        std::function<DepthImageID(DepthImageResource resource)> ResourceToDepthImageID = nullptr;
-        std::function<ImageID(ImageMutableResource resource)> MutableResourceToImageID = nullptr;
-        std::function<DepthImageID(DepthImageMutableResource resource)> MutableResourceToDepthImageID = nullptr;
+        //std::function<ImageID(ImageResource resource)> ResourceToImageID = nullptr;
+        //std::function<DepthImageID(DepthImageResource resource)> ResourceToDepthImageID = nullptr;
+        //std::function<ImageID(ImageMutableResource resource)> MutableResourceToImageID = nullptr;
+        //std::function<DepthImageID(DepthImageMutableResource resource)> MutableResourceToDepthImageID = nullptr;
 
         // Rendertargets
-        ImageMutableResource renderTargets[MAX_RENDER_TARGETS];
-        DepthImageMutableResource depthStencil = DepthImageMutableResource::Invalid();
+        //ImageMutableResource renderTargets[MAX_RENDER_TARGETS];
+        //DepthImageMutableResource depthStencil = DepthImageMutableResource::Invalid();
     };
 
     // Lets strong-typedef an ID type with the underlying type of u16

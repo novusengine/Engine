@@ -108,6 +108,11 @@ namespace Renderer
 
         void BeginRenderPass(CommandListID commandListID, const RenderPassDesc& desc) override;
         void EndRenderPass(CommandListID commandListID, const RenderPassDesc& desc) override;
+        void BeginRenderPass(CommandListID commandListID, const TextureRenderPassDesc& desc) override;
+        void EndRenderPass(CommandListID commandListID, const TextureRenderPassDesc& desc) override;
+
+        void BeginTextureComputeWritePass(CommandListID commandListID, const TextureRenderPassDesc& desc) override;
+        void EndTextureComputeWritePass(CommandListID commandListID, const TextureRenderPassDesc& desc) override;
 
         void BeginPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) override;
         void EndPipeline(CommandListID commandListID, GraphicsPipelineID pipeline) override;
@@ -135,7 +140,6 @@ namespace Renderer
 
         void CopyImage(CommandListID commandListID, ImageID dstImageID, uvec2 dstPos, u32 dstMipLevel, ImageID srcImageID, uvec2 srcPos, u32 srcMipLevel, uvec2 size) override;
         void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) override;
-        void CopyTexture(CommandListID commandListID, TextureID dstTextureID, TextureID srcTextureID) override;
         void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
 
         void ImageBarrier(CommandListID commandListID, ImageID imageID) override;

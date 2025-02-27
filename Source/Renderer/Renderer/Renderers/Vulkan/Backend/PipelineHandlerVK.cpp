@@ -21,9 +21,6 @@ namespace Renderer
         struct GraphicsPipelineCacheDesc
         {
             GraphicsPipelineDesc::States states;
-
-            ImageID renderTargets[MAX_RENDER_TARGETS] = { ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid(), ImageID::Invalid() };
-            DepthImageID depthStencil = DepthImageID::Invalid();
         };
         PRAGMA_NO_PADDING_END;
 
@@ -36,7 +33,6 @@ namespace Renderer
             VkPipeline pipeline;
 
             u32 numRenderTargets = 0;
-            VkFramebuffer framebuffer;
             uvec2 resolution = uvec2(0,0);
 
             std::vector<DescriptorSetLayoutData> descriptorSetLayoutDatas;
@@ -92,7 +88,6 @@ namespace Renderer
             {
                 vkDestroyPipeline(_device->_device, pipeline.pipeline, nullptr);
                 vkDestroyPipelineLayout(_device->_device, pipeline.pipelineLayout, nullptr);
-                vkDestroyFramebuffer(_device->_device, pipeline.framebuffer, nullptr);
 
                 for (VkDescriptorSetLayout& layout : pipeline.descriptorSetLayouts)
                 {
@@ -133,21 +128,10 @@ namespace Renderer
             u8 numAttachments = 0;
             for (int i = 0; i < MAX_RENDER_TARGETS; i++)
             {
-                if (desc.renderTargets[i] == ImageMutableResource::Invalid())
+                if (desc.states.renderTargetFormats[i] == ImageFormat::UNKNOWN)
                     break;
 
                 numAttachments++;
-            }
-
-            if (numAttachments > 0)
-            {
-                if (desc.ResourceToImageID == nullptr ||
-                    desc.ResourceToDepthImageID == nullptr ||
-                    desc.MutableResourceToImageID == nullptr ||
-                    desc.MutableResourceToDepthImageID == nullptr)
-                {
-                    NC_LOG_CRITICAL("Tried to create a pipeline with uninitialized pipelineDesc, try using RenderGraphResources::InitializePipelineDesc!");
-                }
             }
             
             // Check the cache
@@ -416,9 +400,6 @@ namespace Renderer
             depthStencil.depthTestEnable = desc.states.depthStencilState.depthEnable;
             depthStencil.depthWriteEnable = desc.states.depthStencilState.depthWriteEnable;
             depthStencil.depthCompareOp = FormatConverterVK::ToVkCompareOp(desc.states.depthStencilState.depthFunc);
-            //depthStencil.depthBoundsTestEnable = desc.states.depthStencilState;
-            //depthStencil.minDepthBounds = 0.0f;
-            //depthStencil.maxDepthBounds = 1.0f;
             depthStencil.stencilTestEnable = desc.states.depthStencilState.stencilEnable;
 
             depthStencil.front = {};
@@ -426,18 +407,12 @@ namespace Renderer
             depthStencil.front.passOp = FormatConverterVK::ToVkStencilOp(desc.states.depthStencilState.frontFace.stencilPassOp);
             depthStencil.front.depthFailOp = FormatConverterVK::ToVkStencilOp(desc.states.depthStencilState.frontFace.stencilDepthFailOp);
             depthStencil.front.compareOp = FormatConverterVK::ToVkCompareOp(desc.states.depthStencilState.frontFace.stencilFunc);
-            //depthStencil.front.compareMask;
-            //depthStencil.front.writeMask;
-            //depthStencil.front.reference;
 
             depthStencil.back = {};
             depthStencil.back.failOp = FormatConverterVK::ToVkStencilOp(desc.states.depthStencilState.backFace.stencilFailOp);
             depthStencil.back.passOp = FormatConverterVK::ToVkStencilOp(desc.states.depthStencilState.backFace.stencilPassOp);
             depthStencil.back.depthFailOp = FormatConverterVK::ToVkStencilOp(desc.states.depthStencilState.backFace.stencilDepthFailOp);
             depthStencil.back.compareOp = FormatConverterVK::ToVkCompareOp(desc.states.depthStencilState.backFace.stencilFunc);
-            //depthStencil.back.compareMask;
-            //depthStencil.back.writeMask;
-            //depthStencil.back.reference;
 
             // -- Blenders --
             std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(pipeline.numRenderTargets);
@@ -482,18 +457,14 @@ namespace Renderer
             std::vector<VkFormat> colorAttachmentFormats;
             for (int i = 0; i < numAttachments; i++)
             {
-                ImageID imageID = desc.MutableResourceToImageID(desc.renderTargets[i]);
-                const ImageDesc& imageDesc = _imageHandler->GetImageDesc(imageID);
-                colorAttachmentFormats.push_back(FormatConverterVK::ToVkFormat(imageDesc.format));
+                colorAttachmentFormats.push_back(FormatConverterVK::ToVkFormat(desc.states.renderTargetFormats[i]));
             }
 
             VkFormat depthFormat = VK_FORMAT_UNDEFINED;
             VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
-            if (desc.depthStencil != DepthImageMutableResource::Invalid())
+            if (desc.states.depthStencilFormat != DepthImageFormat::UNKNOWN)
             {
-                DepthImageID depthImageID = desc.MutableResourceToDepthImageID(desc.depthStencil);
-                const DepthImageDesc& depthDesc = _imageHandler->GetImageDesc(depthImageID);
-                depthFormat = FormatConverterVK::ToVkFormat(depthDesc.format);
+                depthFormat = FormatConverterVK::ToVkFormat(desc.states.depthStencilFormat);
             }
 
             // Prepare the dynamic rendering create info structure
@@ -692,12 +663,6 @@ namespace Renderer
             return data.graphicsPipelines[static_cast<gIDType>(id)].resolution;
         }
 
-        VkFramebuffer PipelineHandlerVK::GetFramebuffer(GraphicsPipelineID id)
-        {
-            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            return data.graphicsPipelines[static_cast<gIDType>(id)].framebuffer;
-        }
-
         u32 PipelineHandlerVK::GetNumPushConstantRanges(GraphicsPipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
@@ -786,19 +751,6 @@ namespace Renderer
         {
             GraphicsPipelineCacheDesc cacheDesc = {};
             cacheDesc.states = desc.states;
-
-            for (int i = 0; i < MAX_RENDER_TARGETS; i++)
-            {
-                if (desc.renderTargets[i] == ImageMutableResource::Invalid())
-                    break;
-
-                cacheDesc.renderTargets[i] = desc.MutableResourceToImageID(desc.renderTargets[i]);
-            }
-
-            if (desc.depthStencil != DepthImageMutableResource::Invalid())
-            {
-                cacheDesc.depthStencil = desc.MutableResourceToDepthImageID(desc.depthStencil);
-            }
 
             u64 hash = XXHash64::hash(&cacheDesc, sizeof(GraphicsPipelineCacheDesc), 0);
 

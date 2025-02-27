@@ -56,8 +56,6 @@ namespace Renderer
 
             uvec2 GetRenderPassResolution(GraphicsPipelineID id);
 
-            VkFramebuffer GetFramebuffer(GraphicsPipelineID id);
-
             u32 GetNumPushConstantRanges(GraphicsPipelineID id);
             u32 GetNumPushConstantRanges(ComputePipelineID id);
 

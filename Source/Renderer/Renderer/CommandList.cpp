@@ -191,6 +191,46 @@ namespace Renderer
 #endif
     }
 
+    void CommandList::BeginRenderPass(TextureRenderPassDesc& desc)
+    {
+        Commands::BeginTextureRenderPass* command = AddCommand<Commands::BeginTextureRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BeginTextureRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::EndRenderPass(TextureRenderPassDesc& desc)
+    {
+        Commands::EndTextureRenderPass* command = AddCommand<Commands::EndTextureRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::EndTextureRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::BeginTextureComputeWritePass(TextureRenderPassDesc& desc)
+    {
+        Commands::BeginTextureComputeWritePass* command = AddCommand<Commands::BeginTextureComputeWritePass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BeginTextureComputeWritePass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::EndTextureComputeWritePass(TextureRenderPassDesc& desc)
+    {
+        Commands::EndTextureComputeWritePass* command = AddCommand<Commands::EndTextureComputeWritePass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::EndTextureComputeWritePass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
     void CommandList::BeginPipeline(GraphicsPipelineID pipelineID)
     {
         Commands::BeginGraphicsPipeline* command = AddCommand<Commands::BeginGraphicsPipeline>();

@@ -172,6 +172,34 @@ namespace Renderer
         renderer->EndRenderPass(commandList, actualData->desc);
     }
 
+    void BackendDispatch::BeginTextureRenderPass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginTextureRenderPass* actualData = static_cast<const Commands::BeginTextureRenderPass*>(data);
+        renderer->BeginRenderPass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::EndTextureRenderPass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginTextureRenderPass* actualData = static_cast<const Commands::BeginTextureRenderPass*>(data);
+        renderer->EndRenderPass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::BeginTextureComputeWritePass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginTextureComputeWritePass* actualData = static_cast<const Commands::BeginTextureComputeWritePass*>(data);
+        renderer->BeginTextureComputeWritePass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::EndTextureComputeWritePass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::EndTextureComputeWritePass* actualData = static_cast<const Commands::EndTextureComputeWritePass*>(data);
+        renderer->EndTextureComputeWritePass(commandList, actualData->desc);
+    }
+
     void BackendDispatch::BeginGraphicsPipeline(Renderer* renderer, CommandListID commandList, const void* data)
     {
         ZoneScopedC(tracy::Color::Red3);

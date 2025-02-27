@@ -21,6 +21,7 @@ namespace Renderer
 
         ImageFormat format;
         std::string debugName = "";
+        bool renderable = false;
     };
 
     struct DataTextureDesc : TextureBaseDesc

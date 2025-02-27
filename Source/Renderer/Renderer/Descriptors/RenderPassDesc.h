@@ -1,6 +1,7 @@
 #pragma once
 #include "ImageDesc.h"
 #include "DepthImageDesc.h"
+#include "TextureDesc.h"
 #include "Renderer/RenderStates.h"
 #include "Renderer/RenderPassResources.h"
 
@@ -22,5 +23,13 @@ namespace Renderer
         uvec2 extent = uvec2(0, 0);
         ImageMutableResource renderTargets[MAX_RENDER_TARGETS];
         DepthImageMutableResource depthStencil = DepthImageMutableResource::Invalid();
+    };
+
+    struct TextureRenderPassDesc
+    {
+        // Rendertargets
+        ivec2 offset = ivec2(0);
+        uvec2 extent = uvec2(0, 0);
+        TextureID renderTargets[MAX_RENDER_TARGETS];
     };
 }
