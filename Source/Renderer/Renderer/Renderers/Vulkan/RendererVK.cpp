@@ -1981,7 +1981,7 @@ namespace Renderer
             pipelineDesc.states.rasterizerState.cullMode = CullMode::BACK;
             pipelineDesc.states.rasterizerState.frontFaceMode = FrontFaceState::COUNTERCLOCKWISE;
 
-            pipelineDesc.states.renderTargetFormats[0] = _device->GetSwapChainImageFormat();//ImageMutableResource(static_cast<ImageID::type>(swapChain->imageIDs.Get(frameIndex)));
+            pipelineDesc.states.renderTargetFormats[0] = _device->GetSwapChainImageFormat();
 
             GraphicsPipelineID pipelineID = _pipelineHandler->CreatePipeline(pipelineDesc);
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);
