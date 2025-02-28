@@ -29,6 +29,7 @@
 #include "Commands/PopMarker.h"
 #include "Commands/PushConstant.h"
 #include "Commands/PushMarker.h"
+#include "Commands/RenderPass.h"
 #include "Commands/SetBuffer.h"
 #include "Commands/SetDepthBias.h"
 #include "Commands/SetIndexBuffer.h"
@@ -167,6 +168,66 @@ namespace Renderer
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         Commands::PopMarker::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::BeginRenderPass(RenderPassDesc& desc)
+    {
+        Commands::BeginRenderPass* command = AddCommand<Commands::BeginRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BeginRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::EndRenderPass(RenderPassDesc& desc)
+    {
+        Commands::EndRenderPass* command = AddCommand<Commands::EndRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::EndRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::BeginRenderPass(TextureRenderPassDesc& desc)
+    {
+        Commands::BeginTextureRenderPass* command = AddCommand<Commands::BeginTextureRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BeginTextureRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::EndRenderPass(TextureRenderPassDesc& desc)
+    {
+        Commands::EndTextureRenderPass* command = AddCommand<Commands::EndTextureRenderPass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::EndTextureRenderPass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::BeginTextureComputeWritePass(TextureRenderPassDesc& desc)
+    {
+        Commands::BeginTextureComputeWritePass* command = AddCommand<Commands::BeginTextureComputeWritePass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BeginTextureComputeWritePass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::EndTextureComputeWritePass(TextureRenderPassDesc& desc)
+    {
+        Commands::EndTextureComputeWritePass* command = AddCommand<Commands::EndTextureComputeWritePass>();
+        command->desc = desc;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::EndTextureComputeWritePass::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
 

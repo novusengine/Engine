@@ -81,8 +81,8 @@ namespace Renderer
     robin_hood::unordered_map<u32, u32> RenderGraphResourcesData::depthImageIDToResource;
     robin_hood::unordered_map<u32, u32> RenderGraphResourcesData::bufferIDToResource;
 
-	RenderGraphResources::RenderGraphResources(Memory::Allocator* allocator, Renderer* renderer, size_t numPasses, u32 numTotalBuffers)
-		: _allocator(allocator)
+    RenderGraphResources::RenderGraphResources(Memory::Allocator* allocator, Renderer* renderer, size_t numPasses, u32 numTotalBuffers)
+        : _allocator(allocator)
         , _renderer(renderer)
         , _data(Memory::Allocator::New<RenderGraphResourcesData>(allocator, allocator, numPasses, numTotalBuffers))
     {
@@ -90,13 +90,10 @@ namespace Renderer
         data->imageIDToResource.clear();
         data->depthImageIDToResource.clear();
         data->bufferIDToResource.clear();
-	}
+    }
 
-    void RenderGraphResources::InitializePipelineDesc(GraphicsPipelineDesc& desc)
+    void RenderGraphResources::InitializeRenderPassDesc(RenderPassDesc& desc)
     {
-        RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
-        desc.debugName = data->currentPassName;
-
         desc.ResourceToImageID = [&](ImageResource resource)
         {
             return GetImage(resource);

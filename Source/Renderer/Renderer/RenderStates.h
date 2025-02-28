@@ -465,8 +465,121 @@ namespace Renderer
         R8_UNORM,
         R8_UINT,
         R8_SNORM,
-        R8_SINT
+        R8_SINT,
+
+        BC1_RGB_UNORM,
+        BC1_RGB_SRGB,
+        BC1_RGBA_UNORM,
+        BC1_RGBA_SRGB,
+        BC2_UNORM,
+        BC2_SRGB,
+        BC3_UNORM,
+        BC3_SRGB,
+        BC4_UNORM,
+        BC4_SNORM,
+        BC5_UNORM,
+        BC5_SNORM,
+        BC6H_UFLOAT,
+        BC6H_SFLOAT,
+        BC7_UNORM,
+        BC7_SRGB,
     };
+
+    static ImageFormat ToRenderable(ImageFormat format)
+    {
+        switch (format)
+        {
+            case ImageFormat::UNKNOWN:
+            {
+                NC_LOG_CRITICAL("Unknown image format cannot be converted to a renderable format.");
+                return ImageFormat::UNKNOWN;
+            }
+
+            // Directly renderable non-sRGB formats.
+            case ImageFormat::R32G32B32A32_FLOAT:
+            case ImageFormat::R32G32B32A32_UINT:
+            case ImageFormat::R32G32B32A32_SINT:
+            case ImageFormat::R32G32B32_FLOAT:
+            case ImageFormat::R32G32B32_UINT:
+            case ImageFormat::R32G32B32_SINT:
+            case ImageFormat::R16G16B16A16_FLOAT:
+            case ImageFormat::R16G16B16A16_UNORM:
+            case ImageFormat::R16G16B16A16_UINT:
+            case ImageFormat::R16G16B16A16_SNORM:
+            case ImageFormat::R16G16B16A16_SINT:
+            case ImageFormat::R32G32_FLOAT:
+            case ImageFormat::R32G32_UINT:
+            case ImageFormat::R32G32_SINT:
+            case ImageFormat::R10G10B10A2_UNORM:
+            case ImageFormat::R10G10B10A2_UINT:
+            case ImageFormat::R11G11B10_UFLOAT:
+            case ImageFormat::R8G8B8A8_UNORM:
+            case ImageFormat::R8G8B8A8_UINT:
+            case ImageFormat::R8G8B8A8_SNORM:
+            case ImageFormat::R8G8B8A8_SINT:
+            case ImageFormat::B8G8R8A8_UNORM:
+            case ImageFormat::B8G8R8A8_SNORM:
+            case ImageFormat::B8G8R8A8_UINT:
+            case ImageFormat::B8G8R8A8_SINT:
+            case ImageFormat::R16G16_FLOAT:
+            case ImageFormat::R16G16_UNORM:
+            case ImageFormat::R16G16_UINT:
+            case ImageFormat::R16G16_SNORM:
+            case ImageFormat::R16G16_SINT:
+            case ImageFormat::R32_FLOAT:
+            case ImageFormat::R32_UINT:
+            case ImageFormat::R32_SINT:
+            case ImageFormat::R8G8_UNORM:
+            case ImageFormat::R8G8_UINT:
+            case ImageFormat::R8G8_SNORM:
+            case ImageFormat::R8G8_SINT:
+            case ImageFormat::R16_FLOAT:
+            case ImageFormat::R16_UNORM:
+            case ImageFormat::R16_UINT:
+            case ImageFormat::R16_SNORM:
+            case ImageFormat::R16_SINT:
+            case ImageFormat::R8_UNORM:
+            case ImageFormat::R8_UINT:
+            case ImageFormat::R8_SNORM:
+            case ImageFormat::R8_SINT:
+            case ImageFormat::D16_UNORM:
+                return format;
+
+            // sRGB formats: convert to their non-sRGB equivalents.
+            case ImageFormat::R8G8B8A8_UNORM_SRGB:
+                return ImageFormat::R8G8B8A8_UNORM;
+            case ImageFormat::B8G8R8A8_UNORM_SRGB:
+                return ImageFormat::B8G8R8A8_UNORM;
+
+            // Compressed formats: provide an uncompressed fallback.
+            case ImageFormat::BC1_RGB_UNORM:
+            case ImageFormat::BC1_RGB_SRGB:
+            case ImageFormat::BC1_RGBA_UNORM:
+            case ImageFormat::BC1_RGBA_SRGB:
+            case ImageFormat::BC2_UNORM:
+            case ImageFormat::BC2_SRGB:
+            case ImageFormat::BC3_UNORM:
+            case ImageFormat::BC3_SRGB:
+            case ImageFormat::BC7_UNORM:
+            case ImageFormat::BC7_SRGB:
+                return ImageFormat::R8G8B8A8_UNORM;
+            case ImageFormat::BC4_UNORM:
+                return ImageFormat::R8_UNORM;
+            case ImageFormat::BC4_SNORM:
+                return ImageFormat::R8_SNORM;
+            case ImageFormat::BC5_UNORM:
+                return ImageFormat::R8G8_UNORM;
+            case ImageFormat::BC5_SNORM:
+                return ImageFormat::R8G8_SNORM;
+            case ImageFormat::BC6H_UFLOAT:
+            case ImageFormat::BC6H_SFLOAT:
+                return ImageFormat::R16G16B16A16_FLOAT;
+
+            default:
+                NC_LOG_CRITICAL("Tried to ToRenderable an image format we haven't implemented yet.");
+                return ImageFormat::UNKNOWN;
+        }
+    }
 
     enum class IndexFormat
     {
@@ -736,5 +849,64 @@ namespace Renderer
         NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating DepthImageFormat?");
         return 1;
     }
+
+    inline std::string GetTextureTypeName(ImageFormat format)
+    {
+        ImageComponentType componentType = ToImageComponentType(format);
+        std::string componentTypeName = "";
+
+        switch (componentType)
+        {
+        case ImageComponentType::FLOAT:
+        case ImageComponentType::SNORM:
+        case ImageComponentType::UNORM:
+            componentTypeName = "float";
+            break;
+        case ImageComponentType::SINT:
+            componentTypeName = "int";
+            break;
+        case ImageComponentType::UINT:
+            componentTypeName = "uint";
+            break;
+        }
+
+        u8 componentCount = ToImageComponentCount(format);
+        if (componentCount > 1)
+        {
+            componentTypeName += std::to_string(componentCount);
+        }
+
+        return componentTypeName;
+    }
+
+    inline std::string GetTextureTypeName(DepthImageFormat format)
+    {
+        ImageComponentType componentType = ToImageComponentType(format);
+        std::string componentTypeName = "";
+
+        switch (componentType)
+        {
+        case ImageComponentType::FLOAT:
+        case ImageComponentType::SNORM:
+        case ImageComponentType::UNORM:
+            componentTypeName = "float";
+            break;
+        case ImageComponentType::SINT:
+            componentTypeName = "int";
+            break;
+        case ImageComponentType::UINT:
+            componentTypeName = "uint";
+            break;
+        }
+
+        u8 componentCount = ToImageComponentCount(format);
+        if (componentCount > 1)
+        {
+            componentTypeName += std::to_string(componentCount);
+        }
+
+        return componentTypeName;
+    }
+
     PRAGMA_NO_PADDING_END;
 }

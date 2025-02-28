@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Renderer/Descriptors/TextureDesc.h>
 #include <Renderer/RenderPassResources.h>
 
 #include <Base/Types.h>
@@ -41,6 +42,10 @@ namespace Renderer
         void Bind(StringUtils::StringHash nameHash, BufferMutableResource resource);
         void BindArray(StringUtils::StringHash nameHash, BufferMutableResource resource, u32 arrayIndex);
 
+        // Texture
+        void BindRead(StringUtils::StringHash nameHash, TextureID textureID);
+        void BindReadWrite(StringUtils::StringHash nameHash, TextureID textureID);
+        void BindWrite(StringUtils::StringHash nameHash, TextureID textureID, u32 mipLevel = 0, u32 mipCount = 1);
 
         DescriptorSetID GetID() { return _id; }
 

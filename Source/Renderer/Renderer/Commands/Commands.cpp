@@ -23,6 +23,7 @@
 #include "PopMarker.h"
 #include "PushConstant.h"
 #include "PushMarker.h"
+#include "RenderPass.h"
 #include "SetBuffer.h"
 #include "SetDepthBias.h"
 #include "SetIndexBuffer.h"
@@ -42,6 +43,9 @@ namespace Renderer
     {
         const BackendDispatchFunction AddSignalSemaphore::DISPATCH_FUNCTION = &BackendDispatch::AddSignalSemaphore;
         const BackendDispatchFunction AddWaitSemaphore::DISPATCH_FUNCTION = &BackendDispatch::AddWaitSemaphore;
+        const BackendDispatchFunction BeginRenderPass::DISPATCH_FUNCTION = &BackendDispatch::BeginRenderPass;
+        const BackendDispatchFunction BeginTextureRenderPass::DISPATCH_FUNCTION = &BackendDispatch::BeginTextureRenderPass;
+        const BackendDispatchFunction BeginTextureComputeWritePass::DISPATCH_FUNCTION = &BackendDispatch::BeginTextureComputeWritePass;
         const BackendDispatchFunction BeginComputePipeline::DISPATCH_FUNCTION = &BackendDispatch::BeginComputePipeline;
         const BackendDispatchFunction BeginGraphicsPipeline::DISPATCH_FUNCTION = &BackendDispatch::BeginGraphicsPipeline;
         const BackendDispatchFunction BeginTimeQuery::DISPATCH_FUNCTION = &BackendDispatch::BeginTimeQuery;
@@ -65,6 +69,9 @@ namespace Renderer
         const BackendDispatchFunction DrawIndexedIndirectCount::DISPATCH_FUNCTION = &BackendDispatch::DrawIndexedIndirectCount;
         const BackendDispatchFunction DrawIndirect::DISPATCH_FUNCTION = &BackendDispatch::DrawIndirect;
         const BackendDispatchFunction DrawIndirectCount::DISPATCH_FUNCTION = &BackendDispatch::DrawIndirectCount;
+        const BackendDispatchFunction EndRenderPass::DISPATCH_FUNCTION = &BackendDispatch::EndRenderPass;
+        const BackendDispatchFunction EndTextureRenderPass::DISPATCH_FUNCTION = &BackendDispatch::EndTextureRenderPass;
+        const BackendDispatchFunction EndTextureComputeWritePass::DISPATCH_FUNCTION = &BackendDispatch::EndTextureComputeWritePass;
         const BackendDispatchFunction EndComputePipeline::DISPATCH_FUNCTION = &BackendDispatch::EndComputePipeline;
         const BackendDispatchFunction EndGraphicsPipeline::DISPATCH_FUNCTION = &BackendDispatch::EndGraphicsPipeline;
         const BackendDispatchFunction EndTimeQuery::DISPATCH_FUNCTION = &BackendDispatch::EndTimeQuery;

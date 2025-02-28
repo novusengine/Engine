@@ -53,6 +53,9 @@ namespace Renderer
             i8 GetRenderPassOpenCount(CommandListID id);
             void SetRenderPassOpenCount(CommandListID id, i8 count);
 
+            i8 GetPipelineOpenCount(CommandListID id);
+            void SetPipelineOpenCount(CommandListID id, i8 count);
+
             tracy::VkCtxManualScope*& GetTracyScope(CommandListID id);
 
             VkFence GetCurrentFence();

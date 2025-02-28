@@ -1,40 +1,41 @@
 #include "BackendDispatch.h"
 #include "Renderer.h"
 
+#include "Commands/AddSignalSemaphore.h"
+#include "Commands/AddWaitSemaphore.h"
+#include "Commands/BeginTrace.h"
+#include "Commands/BindDescriptorSet.h"
+#include "Commands/BufferBarrier.h"
 #include "Commands/Clear.h"
+#include "Commands/CopyBuffer.h"
+#include "Commands/CopyImage.h"
+#include "Commands/DepthImageBarrier.h"
+#include "Commands/Dispatch.h"
+#include "Commands/DispatchIndirect.h"
 #include "Commands/Draw.h"
-#include "Commands/DrawIndirect.h"
-#include "Commands/DrawIndirectCount.h"
+#include "Commands/DrawImgui.h"
 #include "Commands/DrawIndexed.h"
 #include "Commands/DrawIndexedIndirect.h"
 #include "Commands/DrawIndexedIndirectCount.h"
-#include "Commands/Dispatch.h"
-#include "Commands/DispatchIndirect.h"
-#include "Commands/PopMarker.h"
-#include "Commands/PushMarker.h"
-#include "Commands/SetPipeline.h"
-#include "Commands/SetDepthBias.h"
-#include "Commands/SetScissorRect.h"
-#include "Commands/SetViewport.h"
-#include "Commands/SetVertexBuffer.h"
-#include "Commands/SetIndexBuffer.h"
-#include "Commands/SetBuffer.h"
-#include "Commands/BindDescriptorSet.h"
-#include "Commands/MarkFrameStart.h"
-#include "Commands/BeginTrace.h"
+#include "Commands/DrawIndirect.h"
+#include "Commands/DrawIndirectCount.h"
 #include "Commands/EndTrace.h"
-#include "Commands/AddSignalSemaphore.h"
-#include "Commands/AddWaitSemaphore.h"
-#include "Commands/CopyImage.h"
-#include "Commands/CopyBuffer.h"
 #include "Commands/FillBuffer.h"
-#include "Commands/UpdateBuffer.h"
 #include "Commands/ImageBarrier.h"
-#include "Commands/DepthImageBarrier.h"
-#include "Commands/BufferBarrier.h"
-#include "Commands/DrawImgui.h"
+#include "Commands/MarkFrameStart.h"
+#include "Commands/PopMarker.h"
 #include "Commands/PushConstant.h"
+#include "Commands/PushMarker.h"
+#include "Commands/RenderPass.h"
+#include "Commands/SetBuffer.h"
+#include "Commands/SetDepthBias.h"
+#include "Commands/SetIndexBuffer.h"
+#include "Commands/SetPipeline.h"
+#include "Commands/SetScissorRect.h"
+#include "Commands/SetVertexBuffer.h"
+#include "Commands/SetViewport.h"
 #include "Commands/TimeQuery.h"
+#include "Commands/UpdateBuffer.h"
 
 #include <tracy/Tracy.hpp>
 
@@ -155,6 +156,48 @@ namespace Renderer
         ZoneScopedC(tracy::Color::Red3);
         const Commands::PushMarker* actualData = static_cast<const Commands::PushMarker*>(data);
         renderer->PushMarker(commandList, actualData->color, actualData->marker);
+    }
+
+    void BackendDispatch::BeginRenderPass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginRenderPass* actualData = static_cast<const Commands::BeginRenderPass*>(data);
+        renderer->BeginRenderPass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::EndRenderPass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::EndRenderPass* actualData = static_cast<const Commands::EndRenderPass*>(data);
+        renderer->EndRenderPass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::BeginTextureRenderPass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginTextureRenderPass* actualData = static_cast<const Commands::BeginTextureRenderPass*>(data);
+        renderer->BeginRenderPass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::EndTextureRenderPass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginTextureRenderPass* actualData = static_cast<const Commands::BeginTextureRenderPass*>(data);
+        renderer->EndRenderPass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::BeginTextureComputeWritePass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::BeginTextureComputeWritePass* actualData = static_cast<const Commands::BeginTextureComputeWritePass*>(data);
+        renderer->BeginTextureComputeWritePass(commandList, actualData->desc);
+    }
+
+    void BackendDispatch::EndTextureComputeWritePass(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::EndTextureComputeWritePass* actualData = static_cast<const Commands::EndTextureComputeWritePass*>(data);
+        renderer->EndTextureComputeWritePass(commandList, actualData->desc);
     }
 
     void BackendDispatch::BeginGraphicsPipeline(Renderer* renderer, CommandListID commandList, const void* data)

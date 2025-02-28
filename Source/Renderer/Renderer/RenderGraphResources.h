@@ -2,10 +2,14 @@
 #include "RenderPassResources.h"
 #include "TrackedBufferBitSets.h"
 #include "DescriptorSetResource.h"
-#include "Descriptors/TextureDesc.h"
-#include "Descriptors/ImageDesc.h"
-#include "Descriptors/DepthImageDesc.h"
 #include "Descriptors/BufferDesc.h"
+#include "Descriptors/DepthImageDesc.h"
+#include "Descriptors/ImageDesc.h"
+#include "Descriptors/RenderPassDesc.h"
+#include "Descriptors/TextureDesc.h"
+
+
+
 
 #include <Base/Types.h>
 #include <Base/Memory/Allocator.h>
@@ -65,7 +69,8 @@ namespace Renderer
     class RenderGraphResources
     {
     public:
-        void InitializePipelineDesc(GraphicsPipelineDesc& desc);
+        void InitializeRenderPassDesc(RenderPassDesc& desc);
+
         void InitializePipelineDesc(ComputePipelineDesc& desc);
 
         template<typename T, typename... Args>

@@ -543,7 +543,7 @@ namespace Renderer
             return data.depthImages[static_cast<DepthImageID::type>(id)].depthView;
         }
 
-        VkDescriptorSet ImageHandlerVK::GetImguiImageHandle(const ImageID id)
+        VkDescriptorSet ImageHandlerVK::GetImguiTextureID(const ImageID id)
         {
             ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
 

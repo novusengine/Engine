@@ -115,7 +115,7 @@ TEST_CASE("GPU Vector", "[Renderer]")
     finalColorDesc.debugName = "FinalColor";
     finalColorDesc.dimensions = vec2(1.0f, 1.0f);
     finalColorDesc.dimensionType = Renderer::ImageDimensionType::DIMENSION_SCALE_WINDOW;
-    finalColorDesc.format = Renderer::ImageFormat::R16G16B16A16_FLOAT;
+    finalColorDesc.format = renderer->GetSwapChainImageFormat();
     finalColorDesc.sampleCount = Renderer::SampleCount::SAMPLE_COUNT_1;
     finalColorDesc.clearColor = Color(0.43f, 0.50f, 0.56f, 1.0f); // Slate gray
 

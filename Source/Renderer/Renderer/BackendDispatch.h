@@ -29,6 +29,14 @@ namespace Renderer
         static void PopMarker(Renderer* renderer, CommandListID commandList, const void* data);
         static void PushMarker(Renderer* renderer, CommandListID commandList, const void* data);
 
+        static void BeginRenderPass(Renderer* renderer, CommandListID commandList, const void* data);
+        static void EndRenderPass(Renderer* renderer, CommandListID commandList, const void* data);
+        static void BeginTextureRenderPass(Renderer* renderer, CommandListID commandList, const void* data);
+        static void EndTextureRenderPass(Renderer* renderer, CommandListID commandList, const void* data);
+
+        static void BeginTextureComputeWritePass(Renderer* renderer, CommandListID commandList, const void* data);
+        static void EndTextureComputeWritePass(Renderer* renderer, CommandListID commandList, const void* data);
+
         static void BeginGraphicsPipeline(Renderer* renderer, CommandListID commandList, const void* data);
         static void EndGraphicsPipeline(Renderer* renderer, CommandListID commandList, const void* data);
         static void BeginComputePipeline(Renderer* renderer, CommandListID commandList, const void* data);
