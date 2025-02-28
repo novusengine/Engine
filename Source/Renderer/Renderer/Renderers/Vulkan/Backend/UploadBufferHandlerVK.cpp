@@ -568,8 +568,6 @@ namespace Renderer
                     {
                         CopyBufferToBufferTask* copyBufferToBufferTask = reinterpret_cast<CopyBufferToBufferTask*>(task);
                         HandleCopyBufferToBufferTask(commandBuffer, copyBufferToBufferTask);
-
-                        
                     }
                     else if (uploadType == UploadTaskType::QueueDestroyBuffer)
                     {

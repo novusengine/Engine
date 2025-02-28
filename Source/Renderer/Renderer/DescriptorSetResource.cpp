@@ -397,6 +397,28 @@ namespace Renderer
         boundDescriptor.textureID = textureID;
     }
 
+    void DescriptorSetResource::BindReadWrite(StringUtils::StringHash nameHash, TextureID textureID)
+    {
+        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
+
+        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
+
+        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        {
+            if (nameHash == boundDescriptors[i].nameHash)
+            {
+                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_TEXTURE_READ_WRITE;
+                boundDescriptors[i].textureID = textureID;
+                return;
+            }
+        }
+
+        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
+        boundDescriptor.nameHash = nameHash;
+        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_TEXTURE_READ_WRITE;
+        boundDescriptor.textureID = textureID;
+    }
+
     void DescriptorSetResource::BindWrite(StringUtils::StringHash nameHash, TextureID textureID, u32 mipLevel, u32 mipCount)
     {
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);

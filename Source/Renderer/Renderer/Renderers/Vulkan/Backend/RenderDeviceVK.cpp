@@ -65,7 +65,8 @@ namespace Renderer
             "VK_EXT_sampler_filter_minmax",
             "VK_EXT_host_query_reset",
             "VK_KHR_shader_float16_int8",
-            "VK_KHR_shader_atomic_int64"
+            "VK_KHR_shader_atomic_int64",
+            "VK_KHR_synchronization2"
         };
 
         RenderDeviceVK::RenderDeviceVK(Novus::Window* window)
@@ -423,6 +424,11 @@ namespace Renderer
             dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
             dynamicRenderingFeatures.pNext = &float16Int8Features;
 
+            VkPhysicalDeviceSynchronization2Features synchronization2Features = {};
+            synchronization2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+            synchronization2Features.synchronization2 = VK_TRUE;
+            synchronization2Features.pNext = &dynamicRenderingFeatures;
+
             VkPhysicalDeviceFeatures2 deviceFeatures = {};
             deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             deviceFeatures.features.samplerAnisotropy = VK_TRUE;
@@ -438,7 +444,7 @@ namespace Renderer
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
             deviceFeatures.features.shaderImageGatherExtended = VK_TRUE;
 
-            deviceFeatures.pNext = &dynamicRenderingFeatures;
+            deviceFeatures.pNext = &synchronization2Features;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
 

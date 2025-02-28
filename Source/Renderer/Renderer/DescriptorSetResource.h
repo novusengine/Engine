@@ -44,6 +44,7 @@ namespace Renderer
 
         // Texture
         void BindRead(StringUtils::StringHash nameHash, TextureID textureID);
+        void BindReadWrite(StringUtils::StringHash nameHash, TextureID textureID);
         void BindWrite(StringUtils::StringHash nameHash, TextureID textureID, u32 mipLevel = 0, u32 mipCount = 1);
 
         DescriptorSetID GetID() { return _id; }

@@ -849,26 +849,10 @@ namespace Renderer
             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             barrier.pNext = nullptr;
 
-            barrier.srcAccessMask =
-                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
-                VK_ACCESS_INDEX_READ_BIT |
-                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                VK_ACCESS_UNIFORM_READ_BIT |
-                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
-                VK_ACCESS_SHADER_READ_BIT |
-                VK_ACCESS_SHADER_WRITE_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_TRANSFER_READ_BIT |
-                VK_ACCESS_TRANSFER_WRITE_BIT |
-                VK_ACCESS_HOST_READ_BIT |
-                VK_ACCESS_HOST_WRITE_BIT;
-
-            barrier.dstAccessMask = barrier.srcAccessMask;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 
             barrier.image = image;
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -877,9 +861,8 @@ namespace Renderer
             barrier.subresourceRange.baseArrayLayer = 0;
             barrier.subresourceRange.layerCount = 1;
 
-            vkCmdPipelineBarrier(commandBuffer,
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                 0,
                 0, nullptr,
                 0, nullptr,
@@ -930,26 +913,10 @@ namespace Renderer
             VkImageMemoryBarrier barrier = {};
             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             barrier.pNext = nullptr;
-            barrier.srcAccessMask =
-                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
-                VK_ACCESS_INDEX_READ_BIT |
-                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                VK_ACCESS_UNIFORM_READ_BIT |
-                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
-                VK_ACCESS_SHADER_READ_BIT |
-                VK_ACCESS_SHADER_WRITE_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_TRANSFER_READ_BIT |
-                VK_ACCESS_TRANSFER_WRITE_BIT |
-                VK_ACCESS_HOST_READ_BIT |
-                VK_ACCESS_HOST_WRITE_BIT;
-
-            barrier.dstAccessMask = barrier.srcAccessMask;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 
             barrier.image = image;
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -959,8 +926,8 @@ namespace Renderer
             barrier.subresourceRange.layerCount = 1;
 
             vkCmdPipelineBarrier(commandBuffer,
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 0,
                 0, nullptr,
                 0, nullptr,
@@ -984,7 +951,7 @@ namespace Renderer
             barrier.pNext = nullptr;
 
             // Transition from shader-read to general layout
-            barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
             barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 
             barrier.image = image;
@@ -994,28 +961,13 @@ namespace Renderer
             barrier.subresourceRange.baseArrayLayer = 0;
             barrier.subresourceRange.layerCount = 1;
 
-            // Correct the access mask to match prior usage (shader reads)
-            barrier.srcAccessMask =
-                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
-                VK_ACCESS_INDEX_READ_BIT |
-                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                VK_ACCESS_UNIFORM_READ_BIT |
-                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
-                VK_ACCESS_SHADER_READ_BIT |
-                VK_ACCESS_SHADER_WRITE_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_TRANSFER_READ_BIT |
-                VK_ACCESS_TRANSFER_WRITE_BIT |
-                VK_ACCESS_HOST_READ_BIT |
-                VK_ACCESS_HOST_WRITE_BIT;
+            // Ensure that any prior color attachment writes are finished
+            barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            // Allow compute shader writes to follow.
+            barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
-            barrier.dstAccessMask = barrier.srcAccessMask;
-
-            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-            VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
             vkCmdPipelineBarrier(commandBuffer,
                 srcStage,
@@ -1045,7 +997,7 @@ namespace Renderer
 
             // Transition from general (compute writes) back to shader-read optimal
             barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 
             barrier.image = image;
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1055,27 +1007,11 @@ namespace Renderer
             barrier.subresourceRange.layerCount = 1;
 
             // Ensure compute writes are visible before subsequent shader reads.
-            barrier.srcAccessMask =
-                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
-                VK_ACCESS_INDEX_READ_BIT |
-                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                VK_ACCESS_UNIFORM_READ_BIT |
-                VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
-                VK_ACCESS_SHADER_READ_BIT |
-                VK_ACCESS_SHADER_WRITE_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                VK_ACCESS_TRANSFER_READ_BIT |
-                VK_ACCESS_TRANSFER_WRITE_BIT |
-                VK_ACCESS_HOST_READ_BIT |
-                VK_ACCESS_HOST_WRITE_BIT;
+            barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-            barrier.dstAccessMask = barrier.srcAccessMask;
-
-            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-            VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
             vkCmdPipelineBarrier(commandBuffer,
                 srcStage,
@@ -1421,6 +1357,15 @@ namespace Renderer
             }
 
             builder.BindStorageImage(descriptor.nameHash, imageInfos, static_cast<i32>(descriptor.count));
+        }
+        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE_READ_WRITE)
+        {
+            ZoneScopedN("TextureReadWrite");
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID);
+
+            builder.BindImage(descriptor.nameHash, imageInfo);
         }
         else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_IMAGE)
         {

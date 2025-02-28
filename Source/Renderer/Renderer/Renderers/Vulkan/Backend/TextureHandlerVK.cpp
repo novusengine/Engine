@@ -381,6 +381,10 @@ namespace Renderer
                 // Copy data to upload buffer
                 memcpy(uploadBuffer->mappedMemory, desc.data, texture->uploadSize);
             }
+            else
+            {
+                _device->TransitionImageLayout(texture->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, desc.layers, desc.mipLevels);
+            }
 
             return textureID;
         }
