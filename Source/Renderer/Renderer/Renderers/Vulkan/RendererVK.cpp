@@ -950,23 +950,24 @@ namespace Renderer
             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             barrier.pNext = nullptr;
 
-            // Transition from shader-read to general layout
+            // Transition from shader-read to general layout.
             barrier.oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
             barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 
             barrier.image = image;
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             barrier.subresourceRange.baseMipLevel = 0;
-            barrier.subresourceRange.levelCount = textureDesc.mipLevels;  // Transition all mip levels
+            barrier.subresourceRange.levelCount = textureDesc.mipLevels;  // Transition all mip levels.
             barrier.subresourceRange.baseArrayLayer = 0;
             barrier.subresourceRange.layerCount = 1;
 
-            // Ensure that any prior color attachment writes are finished
-            barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            // Allow compute shader writes to follow.
-            barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            // Wait for any previous color attachment writes and compute shader storage writes.
+            barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            // Allow the compute shader to perform both sampled reads and storage writes.
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 
-            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            // Make sure to wait on both stages that might have written to the image.
+            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
             vkCmdPipelineBarrier(commandBuffer,
