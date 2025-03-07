@@ -216,19 +216,18 @@ namespace ClientDB
         struct ItemDisplayMaterialResources
         {
         public:
-            u8 componentSection;
             u32 displayID;
-            u32 textureHash[3];
+            u8 componentSection;
+            u32 materialResourcesID;
         };
 
         struct ItemDisplayModelMaterialResources
         {
         public:
+            u32 displayID;
             u8 modelIndex;
             u8 textureType;
-            u32 displayID;
             u32 materialResourcesID;
-            u32 textureHash[3];
         };
 
         struct ItemDisplayInfo
@@ -246,7 +245,7 @@ namespace ClientDB
             u32 modelResourcesID[2];
             u32 materialResourcesID[2];
             u32 modelType[2];
-            u32 goesetGroup[6];
+            u32 geosetGroup[6];
             u32 geosetAttachmentGroup[6];
             u32 geosetHelmetVis[2];
         };
@@ -262,7 +261,6 @@ namespace ClientDB
         struct TextureFileData
         {
         public:
-            u8 usage;
             u32 textureHash;
             u32 materialResourcesID;
         };

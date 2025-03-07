@@ -7,7 +7,7 @@
 struct FileHeader
 {
 public:
-    enum class Type
+    enum class Type : i32
     {
         Invalid = -1,
         ClientDB,

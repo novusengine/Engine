@@ -67,6 +67,7 @@ namespace Renderer
             SafeVector<TextureID>* textures = nullptr;
             SafeVector<u64>* textureHashes = nullptr;
             robin_hood::unordered_map<TextureID::type, u32>* textureIDToArrayIndex;
+            robin_hood::unordered_set<TextureID::type> ownedTextureIDs;
         };
 
         struct TextureHandlerVKData : ITextureHandlerVKData
@@ -235,7 +236,7 @@ namespace Renderer
 
             textureID = LoadTexture(desc);
 
-            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash);
+            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash, true);
             
             return textureID;
         }
@@ -287,7 +288,14 @@ namespace Renderer
                         {
                             for (u32 i = unloadStartIndex; i < textures.size(); i++)
                             {
+                                TextureID::type textureIDTyped = static_cast<TextureID::type>(textures[i]);
+                                textureArray.textureIDToArrayIndex->erase(textureIDTyped);
+
+                                if (!textureArray.ownedTextureIDs.contains(textureIDTyped))
+                                    continue;
+
                                 UnloadTexture(textures[i]);
+                                textureArray.ownedTextureIDs.erase(textureIDTyped);
                             }
                         });
 
@@ -400,7 +408,7 @@ namespace Renderer
 
             TextureID textureID = CreateDataTexture(desc);
 
-            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, 0);
+            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, 0, true);
 
             return textureID;
         }
@@ -423,7 +431,7 @@ namespace Renderer
                 NC_LOG_CRITICAL("Tried to add TextureID: {0} to invalid array {1}", id, arrayID);
             }
 
-            return AddTextureToArrayInternal(textureID, textureArrayID, data.textures.ReadGet(id)->hash);
+            return AddTextureToArrayInternal(textureID, textureArrayID, data.textures.ReadGet(id)->hash, false);
         }
 
         void TextureHandlerVK::CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, size_t srcOffset, TextureID dstTextureID)
@@ -901,14 +909,14 @@ namespace Renderer
             DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.imageView, VK_OBJECT_TYPE_IMAGE_VIEW, texture.desc.debugName.c_str());
         }
 
-        u32 TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash)
+        u32 TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership)
         {
             ZoneScoped;
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
             u32 arrayIndex = 0;
             data.textureArrays.WriteLock(
-                [&](std::vector<TextureArray>& textureArrays)
+                [&, hasOwnership](std::vector<TextureArray>& textureArrays)
                 {
                     TextureArray& textureArray = textureArrays[static_cast<TextureArrayID::type>(textureArrayID)];
 
@@ -922,6 +930,12 @@ namespace Renderer
                     arrayIndex = static_cast<u32>(textureArray.textures->Size());
                     textureArray.textures->PushBack(textureID);
                     textureArray.textureHashes->PushBack(hash);
+
+                    if (hasOwnership)
+                    {
+                        textureArray.ownedTextureIDs.insert(textureIDTyped);
+                    }
+
                     (*textureArray.textureIDToArrayIndex)[textureIDTyped] = arrayIndex;
                 });
 

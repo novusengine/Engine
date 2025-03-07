@@ -78,7 +78,7 @@ namespace Renderer
             void LoadFile(const std::string& filename, Texture& texture, TextureID textureID);
             void CreateTexture(Texture& texture);
 
-            u32 AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash);
+            u32 AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership);
 
         private:
             ITextureHandlerVKData* _data;

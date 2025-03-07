@@ -33,7 +33,10 @@ namespace Network
         GameMessageRouter();
 
         void SetMessageHandler(GameOpcode opcode, GameMessageHandler&& handler);
-        bool CallHandler(SocketID socketID, Message& message);
+
+        bool GetMessageHeader(Message& message, Network::MessageHeader& header) const;
+        bool HasValidHandlerForHeader(const Network::MessageHeader& header) const;
+        bool CallHandler(SocketID socketID, Network::MessageHeader& header, Message& message);
 
     private:
         GameMessageHandler _handlers[static_cast<OpcodeType>(GameOpcode::Count)];

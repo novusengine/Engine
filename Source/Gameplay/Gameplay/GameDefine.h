@@ -82,6 +82,7 @@ namespace GameDefine
     {
         None        = 0,
         Human       = 1,
+        Start = 1,
         Orc         = 2,
         Dwarf       = 3,
         NightElf    = 4,
@@ -98,6 +99,7 @@ namespace GameDefine
     {
         None    = 0,
         Male    = 1,
+        Start = 1,
         Female  = 2,
         Other   = 3
     };
