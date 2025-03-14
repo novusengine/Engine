@@ -34,6 +34,7 @@ namespace Renderer
         f32 lowerPixelRange;
         f32 upperPixelRange;
 
+        bool IsValidGlyph(u32 codepoint);
         const Glyph& GetGlyph(u32 codepoint);
         TextureID GetTextureID();
 

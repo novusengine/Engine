@@ -19,6 +19,12 @@ namespace Renderer
     msdfgen::FreetypeHandle* Font::_ftHandle = nullptr;
     robin_hood::unordered_map<u64, Font*> Font::_fonts;
 
+    bool Font::IsValidGlyph(u32 codepoint)
+    {
+        auto it = _codepointToGlyphIndex.find(codepoint);
+        return it != _codepointToGlyphIndex.end();
+    }
+
     const Glyph& Font::GetGlyph(u32 codepoint)
     {
         auto it = _codepointToGlyphIndex.find(codepoint);
