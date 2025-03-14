@@ -76,7 +76,7 @@ namespace Map
     struct Chunk
     {
     public:
-        static const u32 CURRENT_VERSION = 7;
+        static inline constexpr u32 CURRENT_VERSION = 7;
 
         struct HeightHeader
         {
