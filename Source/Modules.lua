@@ -2,10 +2,11 @@
 Solution.Util.Print("-- Creating Modules --")
 Solution.Util.ClearFilter()
 
+Solution.Util.SetGroupRaw(Solution.BuildSystemGroup)
 if Solution.Projects.Current.IsRoot then
-    Solution.Util.SetGroupRaw(Solution.BuildSystemGroup)
     include("Generate/Generate.lua")
 end
+include("Gen-Meta/Gen-Meta.lua")
 
 Solution.Util.SetGroup(Solution.ModuleGroup)
 local modules =
@@ -17,6 +18,9 @@ local modules =
     "Gameplay/Gameplay.lua",
     "ShaderCooker/ShaderCooker.lua",
     "Renderer/Renderer.lua",
+    "TypeParser/TypeParser.lua",
+    "TypeGenerator/TypeGenerator.lua",
+    "Meta/Meta.lua"
 }
 
 for _, v in pairs(modules) do

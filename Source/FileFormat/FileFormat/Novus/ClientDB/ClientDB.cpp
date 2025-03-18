@@ -161,6 +161,16 @@ namespace ClientDB
         return _stringTable.GetString(strIndex);
     }
 
+    u32 Data::GetStringHash(u32 index)
+    {
+        NC_ASSERT(_header.Flags.IsInitialized, "ClientDB::Data - Storage must be initialized before calling GetStringHash");
+
+        bool isIndexValid = index < _stringTable.GetNumStrings();
+        u32 strIndex = index * isIndexValid; // Force to 0 (Default "" string, if index is invalid)
+
+        return _stringTable.GetStringHash(strIndex);
+    }
+
     void Data::Sort()
     {
         std::sort(_idList.begin(), _idList.end(), [](const IDListEntry& a, const IDListEntry& b)
@@ -206,6 +216,7 @@ namespace ClientDB
             public:
                 u16 index;
                 u16 offset;
+                u8 count;
             };
 
             u32 numFields = static_cast<u32>(_fieldInfo.size());
@@ -223,6 +234,7 @@ namespace ClientDB
                 StringFieldPairs& stringFieldPair = stringFieldsPairs.emplace_back();
                 stringFieldPair.index = i;
                 stringFieldPair.offset = _fieldOffset[i];
+                stringFieldPair.count = fieldInfo.count;
             }
 
             u32 numStringFields = static_cast<u32>(stringFieldsPairs.size());
@@ -239,10 +251,13 @@ namespace ClientDB
                     {
                         StringFieldPairs& stringFieldPair = stringFieldsPairs[i];
 
-                        u32* stringRef = reinterpret_cast<u32*>(&_data[idEntry.index + stringFieldPair.offset]);
-                        const std::string& stringVal = oldStringTable.GetString(*stringRef);
+                        for (u32 stringArrIndex = 0; stringArrIndex < stringFieldPair.count; stringArrIndex++)
+                        {
+                            u32* stringRef = reinterpret_cast<u32*>(&_data[idEntry.index + stringFieldPair.offset + (stringArrIndex * 4)]);
+                            const std::string& stringVal = oldStringTable.GetString(*stringRef);
 
-                        *stringRef = _stringTable.AddString(stringVal);
+                            *stringRef = _stringTable.AddString(stringVal);
+                        }
                     }
                 }
             }
@@ -263,7 +278,7 @@ namespace ClientDB
         {
             result += fieldInfo.name.size() + 1;
         }
-        result += sizeof(FieldType) * _fieldInfo.size(); // Field Info Types
+        result += (sizeof(FieldType) + sizeof(u8)) * _fieldInfo.size(); // Field Info Types
         result += sizeof(u32) * _fieldInfo.size(); // Field Offsets
 
         result += sizeof(u32); // Num Rows
@@ -287,6 +302,9 @@ namespace ClientDB
 
         // Headers
         {
+            if (_fileHeader.version != CURRENT_VERSION)
+                _fileHeader.version = CURRENT_VERSION;
+
             if (!buffer->Put(_fileHeader))
                 return false;
 
@@ -308,6 +326,9 @@ namespace ClientDB
                         return false;
 
                     if (!buffer->Put(fieldInfo.type))
+                        return false;
+
+                    if (!buffer->PutU8(fieldInfo.count))
                         return false;
                 }
 
@@ -382,6 +403,12 @@ namespace ClientDB
 
                     if (!buffer->Get(fieldInfo.type))
                         return false;
+
+                    if (_fileHeader.version > 2)
+                    {
+                        if (!buffer->Get(fieldInfo.count))
+                            return false;
+                    }
                 }
 
                 u32 numFieldOffsetBytes = numFieldInfos * sizeof(u32);
@@ -495,17 +522,70 @@ namespace ClientDB
     
     u32 Data::GetSizeForField(const FieldInfo& fieldInfo)
     {
+        u32 fieldSize = 0;
+
         switch (fieldInfo.type)
         {
-            case FieldType::I8:         return 1;
-            case FieldType::I16:        return 2;
+            case FieldType::i8:
+            case FieldType::u8: fieldSize = 1; break;
 
-            case FieldType::I32:
-            case FieldType::F32:
-            case FieldType::StringRef:  return 4;
+            case FieldType::i16:
+            case FieldType::u16: fieldSize = 2; break;
 
-            case FieldType::I64:
-            case FieldType::F64:        return 8;
+            case FieldType::i32:
+            case FieldType::u32:
+            case FieldType::f32:
+            case FieldType::StringRef: fieldSize = 4; break;
+
+            case FieldType::i64:
+            case FieldType::u64:
+            case FieldType::f64:
+            case FieldType::vec2:
+            case FieldType::ivec2:
+            case FieldType::uvec2: fieldSize = 8; break;
+
+            case FieldType::vec3:
+            case FieldType::ivec3:
+            case FieldType::uvec3: fieldSize = 12; break;
+
+            case FieldType::vec4:
+            case FieldType::ivec4:
+            case FieldType::uvec4: fieldSize = 16; break;
+
+            default: break;
+        }
+
+        fieldSize *= fieldInfo.count;
+        return fieldSize;
+    }
+
+    u32 Data::GetAlignmentForField(const FieldInfo& fieldInfo)
+    {
+        switch (fieldInfo.type)
+        {
+            case FieldType::i8:
+            case FieldType::u8: return 1;
+
+            case FieldType::i16:
+            case FieldType::u16: return 2;
+
+            case FieldType::i32:
+            case FieldType::u32:
+            case FieldType::f32:
+            case FieldType::StringRef:
+            case FieldType::vec2:
+            case FieldType::ivec2:
+            case FieldType::uvec2:
+            case FieldType::vec3:
+            case FieldType::ivec3:
+            case FieldType::uvec3:
+            case FieldType::vec4:
+            case FieldType::ivec4:
+            case FieldType::uvec4: return 4;
+
+            case FieldType::i64:
+            case FieldType::u64:
+            case FieldType::f64: return 8;
 
             default: break;
         }
@@ -517,13 +597,16 @@ namespace ClientDB
     {
         u32 numFields = static_cast<u32>(fieldInfos.size());
         u32 totalSize = 0;
-        u32 alignment = 1;
+        u32 maxAlignment = 1;
 
         for (u32 i = 0; i < numFields; i++)
         {
             const auto& fieldInfo = fieldInfos[i];
             u32 fieldSize = GetSizeForField(fieldInfo);
-            u32 fieldAlignment = fieldSize;
+            u32 fieldAlignment = GetAlignmentForField(fieldInfo);
+
+            if (fieldAlignment > maxAlignment)
+                maxAlignment = fieldAlignment;
 
             // Calculate padding to align the current field
             u32 padding = (fieldAlignment - (totalSize % fieldAlignment)) % fieldAlignment;
@@ -531,6 +614,10 @@ namespace ClientDB
             totalSize += padding;
             totalSize += fieldSize;
         }
+
+        // Add tail padding to align the total size to the struct's maximum alignment.
+        u32 tailPadding = (maxAlignment - (totalSize % maxAlignment)) % maxAlignment;
+        totalSize += tailPadding;
 
         return totalSize;
     }
@@ -548,7 +635,7 @@ namespace ClientDB
         {
             const auto& fieldInfo = _fieldInfo[i];
             u32 fieldSize = GetSizeForField(fieldInfo);
-            u32 fieldAlignment = fieldSize;
+            u32 fieldAlignment = GetAlignmentForField(fieldInfo);
 
             // Calculate padding to align the current field
             u32 padding = (fieldAlignment - (totalSize % fieldAlignment)) % fieldAlignment;

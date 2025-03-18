@@ -256,37 +256,11 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
             numInstancesWithBitmapData += 1 * hasBitmapData;
 
             u16 liquidVertexFormat = liquidInstance.liquidVertexFormat;
-
             if (liquidVertexFormat >= 42)
             {
                 if (liquidInstance.liquidType == 2)
                 {
                     liquidVertexFormat = 2;
-                }
-                else
-                {
-                    i16 liquidTypeID = -1;
-
-                    if (context.liquidObjects->Has(liquidVertexFormat))
-                    {
-                        auto& liquidObject = context.liquidObjects->Get<ClientDB::Definitions::LiquidObject>(liquidVertexFormat);
-                        liquidTypeID = liquidObject.liquidTypeID;
-                    }
-                    else
-                    {
-                        liquidTypeID = liquidInstance.liquidType;
-                    }
-                    
-                    if (context.liquidTypes->Has(liquidTypeID))
-                    {
-                        auto& liquidType = context.liquidTypes->Get<ClientDB::Definitions::LiquidType>(liquidTypeID);
-                    
-                        if (context.liquidMaterials->Has(liquidType.materialID))
-                        {
-                            auto& liquidMaterial = context.liquidMaterials->Get<ClientDB::Definitions::LiquidMaterial>(liquidType.materialID);
-                            liquidVertexFormat = liquidMaterial.liquidVertexFormat;
-                        }
-                    }
                 }
             }
 
@@ -295,18 +269,8 @@ bool Parser::ReadMH2O(Context& context, const Parser::ParseType parseType, const
                 liquidVertexFormat = 2;
             }
 
-            if (liquidVertexFormat == 2)
-            {
-                liquidInstance.width = 8;
-                liquidInstance.height = 8;
-                liquidInstance.offsetX = 0;
-                liquidInstance.offsetY = 0;
-            }
-
             bool hasVertexData = liquidInstance.vertexDataOffset > 0 && liquidVertexFormat != 2;
             numInstancesWithVertexData += 1 * hasVertexData;
-
-            liquidInstance.liquidVertexFormat = liquidVertexFormat;
         }
 
         if (numInstancesWithBitmapData)

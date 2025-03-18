@@ -334,10 +334,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateIntCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -346,11 +347,22 @@ namespace JsonUtils
                 {
                     CVarStorage<i32>* storage = cvarSystem->GetCVarArray<i32>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = flags;
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -373,10 +385,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateFloatCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -385,11 +398,22 @@ namespace JsonUtils
                 {
                     CVarStorage<f64>* storage = cvarSystem->GetCVarArray<f64>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -412,10 +436,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateStringCVar(category, name.c_str(),description.c_str(), initial.c_str(), current.c_str(), flags);
                     }
@@ -424,11 +449,22 @@ namespace JsonUtils
                 {
                     CVarStorage<std::string>* storage = cvarSystem->GetCVarArray<std::string>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -451,10 +487,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateVecFloatCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -463,11 +500,22 @@ namespace JsonUtils
                 {
                     CVarStorage<vec4>* storage = cvarSystem->GetCVarArray<vec4>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -490,10 +538,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateVecFloatCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -502,11 +551,22 @@ namespace JsonUtils
                 {
                     CVarStorage<ivec4>* storage = cvarSystem->GetCVarArray<ivec4>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -529,10 +589,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateShowFlagCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -541,11 +602,22 @@ namespace JsonUtils
                 {
                     CVarStorage<ShowFlag>* storage = cvarSystem->GetCVarArray<ShowFlag>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -740,10 +812,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateIntCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -752,11 +825,22 @@ namespace JsonUtils
                 {
                     CVarStorage<i32>* storage = cvarSystem->GetCVarArray<i32>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = flags;
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -779,10 +863,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateFloatCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -791,11 +876,22 @@ namespace JsonUtils
                 {
                     CVarStorage<f64>* storage = cvarSystem->GetCVarArray<f64>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -818,10 +914,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateStringCVar(category, name.c_str(), description.c_str(), initial.c_str(), current.c_str(), flags);
                     }
@@ -830,11 +927,22 @@ namespace JsonUtils
                 {
                     CVarStorage<std::string>* storage = cvarSystem->GetCVarArray<std::string>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -857,10 +965,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateVecFloatCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -869,11 +978,22 @@ namespace JsonUtils
                 {
                     CVarStorage<vec4>* storage = cvarSystem->GetCVarArray<vec4>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -896,10 +1016,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateVecFloatCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -908,11 +1029,22 @@ namespace JsonUtils
                 {
                     CVarStorage<ivec4>* storage = cvarSystem->GetCVarArray<ivec4>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }
@@ -935,10 +1067,11 @@ namespace JsonUtils
                 std::string& description = value["description"].get_ref<std::string&>();
                 CVarFlags flags = value["flags"].get<CVarFlags>();
 
+                bool isRuntimeGenerated = (flags & CVarFlags::RuntimeCreated) != CVarFlags::None;
                 CVarParameter* parameter = cvarSystem->GetCVar(cvarQualifiedNameHash);
                 if (!parameter)
                 {
-                    if ((flags & CVarFlags::RuntimeCreated) != CVarFlags::None)
+                    if (isRuntimeGenerated)
                     {
                         parameter = cvarSystem->CreateShowFlagCVar(category, name.c_str(), description.c_str(), initial, current, flags);
                     }
@@ -947,11 +1080,22 @@ namespace JsonUtils
                 {
                     CVarStorage<ShowFlag>* storage = cvarSystem->GetCVarArray<ShowFlag>()->GetCurrentStorage(parameter->arrayIndex);
 
-                    storage->initial = initial;
-                    storage->current = current;
-                    parameter->description = description;
-                    parameter->type = value["type"].get<CVarType>();
-                    parameter->flags = value["flags"].get<CVarFlags>();
+                    if (isRuntimeGenerated)
+                    {
+                        storage->initial = initial;
+                        storage->current = current;
+                        parameter->description = description;
+                        parameter->type = value["type"].get<CVarType>();
+                        parameter->flags = value["flags"].get<CVarFlags>();
+                    }
+                    else
+                    {
+                        CVarType loadedType = value["type"].get<CVarType>();
+                        if (parameter->type == loadedType)
+                        {
+                            storage->current = current;
+                        }
+                    }
                 }
             }
         }

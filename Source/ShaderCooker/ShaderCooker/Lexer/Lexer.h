@@ -43,6 +43,6 @@ namespace ShaderCooker
             NC_LOG_ERROR("Lexer Error {0} : {1}", errorCode, str.c_str(), args...);
         }
 
-        static robin_hood::unordered_map<std::string_view, Token::Type> _keywordStringToType;
+        static robin_hood::unordered_map<u32, Token::Type> _keywordHashToType;
     };
 }

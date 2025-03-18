@@ -1,6 +1,5 @@
 #pragma once
 #include "FileFormat/Novus/ClientDB/ClientDB.h"
-#include "FileFormat/Novus/ClientDB/Definitions.h"
 
 #include <Base/Types.h>
 
@@ -27,10 +26,6 @@ namespace Adt
         struct Context
         {
             i32 currentMCNKIndex = -1;
-
-            ClientDB::Data* liquidObjects = nullptr;
-            ClientDB::Data* liquidTypes = nullptr;
-            ClientDB::Data* liquidMaterials = nullptr;
         };
 
         Parser() { }

@@ -30,6 +30,7 @@
 *.out
 *.app
 
+Source/Meta/Meta/Generated
 build*/
 Build*/
 .vs/

@@ -21,6 +21,7 @@ using f32 = float;
 using i64 = std::int64_t;
 using u64 = std::uint64_t;
 using f64 = double;
+using StringRef = u32;
 
 using vec2 = glm::vec2;
 using ivec2 = glm::ivec2;

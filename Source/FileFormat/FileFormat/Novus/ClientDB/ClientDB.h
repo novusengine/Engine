@@ -1,6 +1,4 @@
 #pragma once
-#include "Definitions.h"
-
 #include "FileFormat/Novus/FileHeader.h"
 
 #include <Base/FunctionTraits.h>
@@ -12,8 +10,10 @@
 
 #include <robinhood/robinhood.h>
 
+#include <concepts>
 #include <vector>
 #include <filesystem>
+#include <type_traits>
 
 namespace ClientDB
 {
@@ -37,17 +37,30 @@ namespace ClientDB
 
     enum class FieldType : u8
     {
-        I8,
-        I16,
-        I32,
-        I64,
-        F32,
-        F64,
-        StringRef
+        i8,
+        i16,
+        i32,
+        i64,
+        f32,
+        f64,
+        StringRef,
+        u8,
+        u16,
+        u32,
+        u64,
+        vec2,
+        vec3,
+        vec4,
+        ivec2,
+        ivec3,
+        ivec4,
+        uvec2,
+        uvec3,
+        uvec4
     };
     static const char* FieldTypeNames[] =
     {
-        "I8", "I16", "I32", "I64", "F32", "F64", "StringRef"
+        "i8", "i16", "i32", "i64", "f32", "f64", "StringRef", "u8", "u16", "u32", "u64", "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4"
     };
 
     struct FieldInfo
@@ -55,6 +68,7 @@ namespace ClientDB
     public:
         std::string name;
         FieldType type;
+        u8 count = 1;
     };
 
     struct IDListEntry
@@ -64,14 +78,32 @@ namespace ClientDB
         u32 index = 0;
     };
 
+    template <typename T>
+    concept ValidFieldInfo = std::is_class_v<T> && requires { T::FieldInfo; } && std::same_as<std::decay_t<decltype(T::FieldInfo)>, std::vector<FieldInfo>>;
+
     struct Data
     {
     public:
-        inline static const u32 CURRENT_VERSION = 2;
+        inline static const u32 CURRENT_VERSION = 3;
 
     public:
         bool Initialize(u8 numBytesPerRow);
         bool Initialize(const std::vector<FieldInfo>& fieldInfos);
+        
+        // Preferred overload if T meets the requirements.
+        template <typename T> requires ValidFieldInfo<T>
+        bool Initialize()
+        {
+            return Initialize(T::FieldInfo);
+        }
+
+        // Fallback overload to produce a custom error message when T is invalid.
+        template <typename T, typename = std::enable_if_t<!ValidFieldInfo<T>>>
+        bool Initialize()
+        {
+            static_assert(ValidFieldInfo<T>, "T must be a struct or class with a static member FieldInfo of type std::vector<FieldInfo>");
+            return false;
+        }
 
         void Reserve(u32 numRows);
         void Grow(u32 numRows);
@@ -208,6 +240,7 @@ namespace ClientDB
         bool HasString(const std::string& string);
         u32 AddString(const std::string& string);
         const std::string& GetString(u32 index);
+        u32 GetStringHash(u32 index);
 
         // Documentation
         // When the provided Callback return false, the function will interrupt the iteration.
@@ -325,6 +358,7 @@ namespace ClientDB
         void ClearDirty();
 
         static u32 GetSizeForField(const FieldInfo& fieldInfo);
+        static u32 GetAlignmentForField(const FieldInfo& fieldInfo);
         static u32 GetTotalSizeForFields(const std::vector<FieldInfo>& fieldInfos);
     private:
         template <typename T>

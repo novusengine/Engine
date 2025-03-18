@@ -136,36 +136,36 @@ namespace ShaderCooker
 
             switch (rule)
             {
-            case ParseRuleSet::INCLUDE:
-            {
-                switch (currentToken.type)
+                case ParseRuleSet::INCLUDE:
                 {
-                case Token::Type::KEYWORD_INCLUDE:
-                    tokenTypeStack.push(Token::Type::KEYWORD_INCLUDE);
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::KEYWORD_INCLUDE:
+                            tokenTypeStack.push(Token::Type::KEYWORD_INCLUDE);
 
-                    ruleSetStack.push(ParseRuleSet::INCLUDE_NAME);
+                            ruleSetStack.push(ParseRuleSet::INCLUDE_NAME);
+                            break;
+
+                        default:
+                            return false;
+                    }
+
                     break;
-
-                default:
-                    return false;
                 }
-
-                break;
-            }
 
             case ParseRuleSet::INCLUDE_NAME:
             {
                 switch (currentToken.type)
                 {
-                case Token::Type::STRING:
-                    tokenTypeStack.push(Token::Type::STRING);
+                    case Token::Type::STRING:
+                        tokenTypeStack.push(Token::Type::STRING);
 
-                    include.name = currentToken.stringview;
-                    include.hash = currentToken.hash;
-                    break;
+                        include.name = std::string(currentToken.nameHash.name, currentToken.nameHash.length);
+                        include.hash = currentToken.nameHash.hash;
+                        break;
 
-                default:
-                    return false;
+                    default:
+                        return false;
                 }
 
                 break;
@@ -204,139 +204,139 @@ namespace ShaderCooker
 
             switch (rule)
             {
-            case ParseRuleSet::PERMUTATION:
-            {
-                switch (currentToken.type)
+                case ParseRuleSet::PERMUTATION:
                 {
-                case Token::Type::KEYWORD_PERMUTATION:
-                    tokenTypeStack.push(Token::Type::KEYWORD_PERMUTATION);
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::KEYWORD_PERMUTATION:
+                            tokenTypeStack.push(Token::Type::KEYWORD_PERMUTATION);
 
-                    ruleSetStack.push(ParseRuleSet::END_OF_LINE);
-                    ruleSetStack.push(ParseRuleSet::CLOSE_BRACKET);
-                    ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE_SEQUENCE);
-                    ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE);
-                    ruleSetStack.push(ParseRuleSet::OPEN_BRACKET);
-                    ruleSetStack.push(ParseRuleSet::ASSIGNMENT);
-                    ruleSetStack.push(ParseRuleSet::PERMUTATION_NAME);
+                            ruleSetStack.push(ParseRuleSet::END_OF_LINE);
+                            ruleSetStack.push(ParseRuleSet::CLOSE_BRACKET);
+                            ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE_SEQUENCE);
+                            ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE);
+                            ruleSetStack.push(ParseRuleSet::OPEN_BRACKET);
+                            ruleSetStack.push(ParseRuleSet::ASSIGNMENT);
+                            ruleSetStack.push(ParseRuleSet::PERMUTATION_NAME);
+                            break;
+
+                        default:
+                            return false;
+                    }
+
                     break;
+                }
+                case ParseRuleSet::PERMUTATION_VALUE:
+                {
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::IDENTIFIER:
+                            tokenTypeStack.push(Token::Type::IDENTIFIER);
 
-                default:
-                    return false;
+                            permutationGroup.types.push_back(currentToken);
+                            break;
+
+                        default:
+                            ReportError(1, "Expected to find identifier for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                            return false;
+                    }
+
+                    break;
+                }
+                case ParseRuleSet::PERMUTATION_VALUE_SEQUENCE:
+                {
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::PARAM_SEPERATOR:
+                            tokenTypeStack.push(Token::Type::PARAM_SEPERATOR);
+
+                            ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE_SEQUENCE);
+                            ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE);
+                            break;
+                        case Token::Type::RBRACKET:
+                            break;
+
+                        default:
+                            ReportError(2, "Expected to find ',' or ']' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                            return false;
+                    }
+
+                    break;
+                }
+                case ParseRuleSet::ASSIGNMENT:
+                {
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::ASSIGN:
+                            tokenTypeStack.push(Token::Type::ASSIGN);
+                            break;
+
+                        default:
+                            ReportError(3, "Expected to find '=' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                            return false;
+                    }
+                    break;
+                }
+                case ParseRuleSet::PERMUTATION_NAME:
+                {
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::IDENTIFIER:
+                            tokenTypeStack.push(Token::Type::IDENTIFIER);
+                            break;
+
+                        default:
+                            ReportError(4, "Expected to find identifier for permutation name but found ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                            return false;
+                    }
+                    break;
+                }
+                case ParseRuleSet::OPEN_BRACKET:
+                {
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::LBRACKET:
+                            tokenTypeStack.push(Token::Type::LBRACKET);
+                            break;
+
+                        default:
+                            ReportError(5, "Expected to find '[' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                            return false;
+                    }
+                    break;
+                }
+                case ParseRuleSet::CLOSE_BRACKET:
+                {
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::RBRACKET:
+                            tokenTypeStack.push(Token::Type::RBRACKET);
+                            break;
+
+                        default:
+                            ReportError(6, "Expected to find ']' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                            return false;
+                    }
+                    break;
+                }
+                case ParseRuleSet::END_OF_LINE:
+                {
+                    switch (currentToken.type)
+                    {
+                        case Token::Type::END_OF_LINE:
+                            tokenTypeStack.push(Token::Type::END_OF_LINE);
+                            break;
+
+                        default:
+                            ReportError(7, "Expected to find ';' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                            return false;
+                    }
+                    break;
                 }
 
-                break;
-            }
-            case ParseRuleSet::PERMUTATION_VALUE:
-            {
-                switch (currentToken.type)
-                {
-                case Token::Type::IDENTIFIER:
-                    tokenTypeStack.push(Token::Type::IDENTIFIER);
-
-                    permutationGroup.types.push_back(currentToken);
-                    break;
-
                 default:
-                    ReportError(1, "Expected to find identifier for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
+                    ReportError(8, "Internal compiler error for permutation ({0}), please contact Pursche. (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
                     return false;
-                }
-
-                break;
-            }
-            case ParseRuleSet::PERMUTATION_VALUE_SEQUENCE:
-            {
-                switch (currentToken.type)
-                {
-                case Token::Type::PARAM_SEPERATOR:
-                    tokenTypeStack.push(Token::Type::PARAM_SEPERATOR);
-
-                    ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE_SEQUENCE);
-                    ruleSetStack.push(ParseRuleSet::PERMUTATION_VALUE);
-                    break;
-                case Token::Type::RBRACKET:
-                    break;
-
-                default:
-                    ReportError(2, "Expected to find ',' or ']' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
-                    return false;
-                }
-
-                break;
-            }
-            case ParseRuleSet::ASSIGNMENT:
-            {
-                switch (currentToken.type)
-                {
-                case Token::Type::ASSIGN:
-                    tokenTypeStack.push(Token::Type::ASSIGN);
-                    break;
-
-                default:
-                    ReportError(3, "Expected to find '=' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
-                    return false;
-                }
-                break;
-            }
-            case ParseRuleSet::PERMUTATION_NAME:
-            {
-                switch (currentToken.type)
-                {
-                case Token::Type::IDENTIFIER:
-                    tokenTypeStack.push(Token::Type::IDENTIFIER);
-                    break;
-
-                default:
-                    ReportError(4, "Expected to find identifier for permutation name but found ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
-                    return false;
-                }
-                break;
-            }
-            case ParseRuleSet::OPEN_BRACKET:
-            {
-                switch (currentToken.type)
-                {
-                case Token::Type::LBRACKET:
-                    tokenTypeStack.push(Token::Type::LBRACKET);
-                    break;
-
-                default:
-                    ReportError(5, "Expected to find '[' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
-                    return false;
-                }
-                break;
-            }
-            case ParseRuleSet::CLOSE_BRACKET:
-            {
-                switch (currentToken.type)
-                {
-                case Token::Type::RBRACKET:
-                    tokenTypeStack.push(Token::Type::RBRACKET);
-                    break;
-
-                default:
-                    ReportError(6, "Expected to find ']' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
-                    return false;
-                }
-                break;
-            }
-            case ParseRuleSet::END_OF_LINE:
-            {
-                switch (currentToken.type)
-                {
-                case Token::Type::END_OF_LINE:
-                    tokenTypeStack.push(Token::Type::END_OF_LINE);
-                    break;
-
-                default:
-                    ReportError(7, "Expected to find ';' for permutation ({0}). (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
-                    return false;
-                }
-                break;
-            }
-
-            default:
-                ReportError(8, "Internal compiler error for permutation ({0}), please contact Pursche. (Line: {1}, Col: {2})", permutationGroup.name.c_str(), currentToken.lineNum, currentToken.colNum);
-                return false;
             }
         }
 

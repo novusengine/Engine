@@ -302,7 +302,7 @@ namespace ShaderCooker
                             u32 index = indices[j];
 
                             std::wstring name = StringUtils::StringToWString(shader.permutationGroups[j].name);
-                            std::wstring value = StringUtils::StringToWString({ shader.permutationGroups[j].types[index].stringview.data(), shader.permutationGroups[j].types[index].stringview.length() });
+                            std::wstring value = StringUtils::StringToWString({ shader.permutationGroups[j].types[index].nameHash.name, shader.permutationGroups[j].types[index].nameHash.length });
 
                             DxcDefine* define = new DxcDefine();//permutation.defines.emplace_back();
                             *define = MakeDefine(name, value);

@@ -6,7 +6,7 @@
 
 namespace ShaderCooker
 {
-    const char* KEYWORD_PERMUTATION = (char*)"permutation";
+    const char* KEYWORD_PERMUTATION = "permutation";
     const char* KEYWORD_INCLUDE = (char*)"#include";
     const char* KEYWORD_SINGLE_COMMENT = (char*)"//";
     const char* KEYWORD_MULTI_COMMENT_START = (char*)"/*";
@@ -21,10 +21,10 @@ namespace ShaderCooker
     const size_t singleCommentLen = strlen(KEYWORD_SINGLE_COMMENT);
     const size_t multiCommentLen = strlen(KEYWORD_MULTI_COMMENT_START);
 
-    robin_hood::unordered_map<std::string_view, Token::Type> Lexer::_keywordStringToType =
+    robin_hood::unordered_map<u32, Token::Type> Lexer::_keywordHashToType =
     {
-        { KEYWORD_PERMUTATION, Token::Type::KEYWORD_PERMUTATION },
-        { KEYWORD_INCLUDE, Token::Type::KEYWORD_INCLUDE },
+        { StringUtils::hash_djb2(KEYWORD_PERMUTATION, permutationLen), Token::Type::KEYWORD_PERMUTATION },
+        { StringUtils::hash_djb2(KEYWORD_INCLUDE, includeLen), Token::Type::KEYWORD_INCLUDE },
     };
 
     bool Lexer::Process(Shader& shader)
@@ -159,7 +159,7 @@ namespace ShaderCooker
                     if (i + 1 < numTokens)
                     {
                         const Token& nameToken = permutationGroup.tokens[i + 1];
-                        permutationGroup.name = nameToken.stringview;
+                        permutationGroup.name = std::string(nameToken.nameHash.name, nameToken.nameHash.length);
                     }
                     break;
                 }
@@ -374,8 +374,7 @@ namespace ShaderCooker
         Token& token = tokens.emplace_back();
 
         token.type = Token::Type::STRING;
-        token.stringview = std::string_view(&character + 1, length - 1);
-        token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
+        token.nameHash.SetNameHash(&character + 1, length - 1);
         token.lineNum = lineNum;
         token.colNum = colNum;
 
@@ -428,8 +427,7 @@ namespace ShaderCooker
 
         Token& token = tokens.emplace_back();
         token.type = type;
-        token.stringview = std::string_view(&buffer[bufferPosition], specialCharacterLength);
-        token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
+        token.nameHash.SetNameHash(&buffer[bufferPosition], specialCharacterLength);
         token.lineNum = lineNum;
         token.colNum = colNum;
 
@@ -456,22 +454,20 @@ namespace ShaderCooker
         }
 
         size_t length = subBufferPosition - bufferPosition;
-        std::string_view stringView = std::string_view(&character, length);
+        std::string_view stringView = std::string_view();
+
+        u32 nameHash = StringUtils::hash_djb2(&character, length);
 
         // Keyword
-        auto itr = _keywordStringToType.find(stringView);
-        if (itr == _keywordStringToType.end())
-        {
+        if (!_keywordHashToType.contains(nameHash))
             return false;
-        }
 
         Token& token = tokens.emplace_back();
-        token.stringview = stringView;
-        token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
+        token.nameHash.SetNameHash(&character, length);
         token.lineNum = lineNum;
         token.colNum = colNum;
 
-        token.type = itr->second;
+        token.type = _keywordHashToType[nameHash];
         bufferPosition = subBufferPosition;
         colNum += length;
         return true;
@@ -500,17 +496,13 @@ namespace ShaderCooker
 
         Token& token = tokens.emplace_back();
         token.type = Token::Type::IDENTIFIER;
-        token.stringview = std::string_view(&character, length);
-        token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
+        token.nameHash.SetNameHash(&character, length);
         token.lineNum = lineNum;
         token.colNum = colNum;
 
         // Keyword
-        auto itr = _keywordStringToType.find(token.stringview);
-        if (itr != _keywordStringToType.end())
-        {
-            token.type = itr->second;
-        }
+        if (_keywordHashToType.contains(token.nameHash.hash))
+            token.type = _keywordHashToType[token.nameHash.hash];
 
         bufferPosition = subBufferPosition;
         colNum += length;
