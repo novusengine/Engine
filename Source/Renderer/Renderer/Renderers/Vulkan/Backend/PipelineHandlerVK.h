@@ -23,6 +23,7 @@ namespace Renderer
         class BufferHandlerVK;
         class DescriptorSetBuilderVK;
         struct GraphicsPipeline;
+        struct ComputePipeline;
 
         struct DescriptorSetLayoutData
         {
@@ -39,7 +40,7 @@ namespace Renderer
 
         public:
             void Init(Memory::Allocator* allocator, RenderDeviceVK* device, ShaderHandlerVK* shaderHandler, ImageHandlerVK* imageHandler, BufferHandlerVK* bufferHandler);
-            void DiscardPipelines();
+            void RecreatePipelines();
 
             GraphicsPipelineID CreatePipeline(const GraphicsPipelineDesc& desc);
             ComputePipelineID CreatePipeline(const ComputePipelineDesc& desc);
@@ -83,6 +84,9 @@ namespace Renderer
             bool TryFindExistingGPipeline(u64 descHash, size_t& id);
             bool TryFindExistingCPipeline(u64 descHash, size_t& id);
             DescriptorSetLayoutData& GetDescriptorSet(i32 setNumber, std::vector<DescriptorSetLayoutData>& sets);
+
+            void CreatePipelineInternal(GraphicsPipeline& pipeline, const GraphicsPipelineDesc& desc, u32 numAttachments);
+            void CreatePipelineInternal(ComputePipeline& pipeline, const ComputePipelineDesc& desc);
 
         private:
             Memory::Allocator* _allocator;
