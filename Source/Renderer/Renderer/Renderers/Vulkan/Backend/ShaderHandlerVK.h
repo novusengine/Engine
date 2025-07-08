@@ -104,7 +104,7 @@ namespace Renderer
 
         private:
             template <typename T>
-            T LoadShader(const std::string& shaderPath, const std::vector<PermutationField>& permutationFields, std::vector<Shader>& shaders)
+            T LoadShader(const std::string& shaderPath, const std::vector<PermutationField>& permutationFields, std::vector<Shader>& shaders, bool& wasCached)
             {
                 size_t id;
                 using idType = type_safe::underlying_type<T>;
@@ -114,6 +114,7 @@ namespace Renderer
                 // If shader is already loaded, return ID of already loaded version
                 if (TryFindExistingShader(permutationPath, shaders, id))
                 {
+                    wasCached = true;
                     return T(static_cast<idType>(id));
                 }
 
@@ -215,7 +216,7 @@ namespace Renderer
                         pushConstant.stageFlags = static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
                     }
                 }
-                
+                wasCached = false;
                 return T(static_cast<idType>(id));
             }
             
@@ -236,8 +237,11 @@ namespace Renderer
             ShaderCooker::ShaderCompiler* _shaderCompiler;
             bool _forceRecompileAll = false;
 
+            std::vector<VertexShaderDesc> _vertexShaderDescs;
             std::vector<Shader> _vertexShaders;
+            std::vector<PixelShaderDesc> _pixelShaderDescs;
             std::vector<Shader> _pixelShaders;
+            std::vector<ComputeShaderDesc> _computeShaderDescs;
             std::vector<Shader> _computeShaders;
         };
     }

@@ -31,5 +31,6 @@ namespace Renderer
         ivec2 offset = ivec2(0);
         uvec2 extent = uvec2(0, 0);
         TextureID renderTargets[MAX_RENDER_TARGETS];
+        bool clearRenderTargets[MAX_RENDER_TARGETS] = { false };
     };
 }

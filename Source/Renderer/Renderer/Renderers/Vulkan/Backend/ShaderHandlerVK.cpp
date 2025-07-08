@@ -62,28 +62,69 @@ namespace Renderer
         {
             ZoneScoped;
             _forceRecompileAll = forceRecompileAll;
-            
+
+            std::vector<VertexShaderDesc> vertexShadersDescs = _vertexShaderDescs;
+            std::vector<PixelShaderDesc> pixelShadersDescs = _pixelShaderDescs;
+            std::vector<ComputeShaderDesc> computeShadersDescs = _computeShaderDescs;
+
+            _vertexShaderDescs.clear();
+            _pixelShaderDescs.clear();
+            _computeShaderDescs.clear();
+
             _vertexShaders.clear();
             _pixelShaders.clear();
             _computeShaders.clear();
+
+            for (auto& desc : vertexShadersDescs)
+            {
+                LoadShader(desc);
+            }
+
+            for (auto& desc : pixelShadersDescs)
+            {
+                LoadShader(desc);
+            }
+
+            for (auto& desc : computeShadersDescs)
+            {
+                LoadShader(desc);
+            }
         }
 
         VertexShaderID ShaderHandlerVK::LoadShader(const VertexShaderDesc& desc)
         {
             ZoneScoped;
-            return LoadShader<VertexShaderID>(desc.path, desc.permutationFields, _vertexShaders);
+            bool wasCached;
+            auto shaderID = LoadShader<VertexShaderID>(desc.path, desc.permutationFields, _vertexShaders, wasCached);
+            if (!wasCached)
+            {
+                _vertexShaderDescs.push_back(desc);
+            }
+            return shaderID;
         }
 
         PixelShaderID ShaderHandlerVK::LoadShader(const PixelShaderDesc& desc)
         {
             ZoneScoped;
-            return LoadShader<PixelShaderID>(desc.path, desc.permutationFields, _pixelShaders);
+            bool wasCached;
+            auto shaderID = LoadShader<PixelShaderID>(desc.path, desc.permutationFields, _pixelShaders, wasCached);
+            if (!wasCached)
+            {
+                _pixelShaderDescs.push_back(desc);
+            }
+            return shaderID;
         }
 
         ComputeShaderID ShaderHandlerVK::LoadShader(const ComputeShaderDesc& desc)
         {
             ZoneScoped;
-            return LoadShader<ComputeShaderID>(desc.path, desc.permutationFields, _computeShaders);
+            bool wasCached;
+            auto shaderID = LoadShader<ComputeShaderID>(desc.path, desc.permutationFields, _computeShaders, wasCached);
+            if (!wasCached)
+            {
+                _computeShaderDescs.push_back(desc);
+            }
+            return shaderID;
         }
 
         void ShaderHandlerVK::ReadFile(const std::string& filename, ShaderBinary& binary)

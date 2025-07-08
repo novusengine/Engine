@@ -100,7 +100,7 @@ namespace Renderer
         vkDeviceWaitIdle(_device->_device);
 
         _shaderHandler->ReloadShaders(forceRecompileAll);
-        _pipelineHandler->DiscardPipelines();
+        _pipelineHandler->RecreatePipelines();
 
         //CreateDummyPipeline();
     }
@@ -840,7 +840,7 @@ namespace Renderer
             attachmentInfo.imageView = _textureHandler->GetImageView(desc.renderTargets[i]);
             attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             attachmentInfo.resolveMode = VK_RESOLVE_MODE_NONE;
-            attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            attachmentInfo.loadOp = (desc.clearRenderTargets[i]) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
             attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
             // Manual transition for color attachment
@@ -1472,7 +1472,7 @@ namespace Renderer
     {
         _device->RecreateSwapChain(_imageHandler, _semaphoreHandler, swapChain);
         
-        _pipelineHandler->DiscardPipelines();
+        //_pipelineHandler->DiscardPipelines();
         //CreateDummyPipeline();
         
         _imageHandler->OnResize(true);
