@@ -26,6 +26,10 @@ namespace GameDefine
             _data = (static_cast<u64>(type) << 59) | (counter & COUNTER_MASK);
         }
         static ObjectGuid FromU64(u64 rawValue);
+        static ObjectGuid CreatePlayer(u64 counter);
+        static ObjectGuid CreateCreature(u64 counter);
+        static ObjectGuid CreateGameObject(u64 counter);
+        static ObjectGuid CreateItem(u64 counter);
 
         Type GetType() const { return static_cast<Type>(_data >> 59); }
         u64 GetCounter() const { return _data & COUNTER_MASK; }
@@ -45,7 +49,7 @@ namespace GameDefine
         u8 GetCounterBytesUsed() const;
 
     public:
-        static ObjectGuid Empty;
+        static const ObjectGuid Empty;
         static constexpr u64 TYPE_MASK = 0xF800000000000000;
         static constexpr u64 COUNTER_MASK = 0x07FFFFFFFFFFFFFF;
 
@@ -82,7 +86,7 @@ namespace GameDefine
     {
         None        = 0,
         Human       = 1,
-        Start = 1,
+        Start       = 1,
         Orc         = 2,
         Dwarf       = 3,
         NightElf    = 4,
@@ -92,14 +96,14 @@ namespace GameDefine
         Troll       = 8,
 
         // Keep this updated
-        Count = Troll
+        Count       = Troll
     };
 
-    enum class Gender : u8
+    enum class UnitGender : u8
     {
         None    = 0,
         Male    = 1,
-        Start = 1,
+        Start   = 1,
         Female  = 2,
         Other   = 3
     };

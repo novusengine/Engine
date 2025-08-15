@@ -8,7 +8,7 @@
 
 namespace GameDefine
 {
-    ObjectGuid ObjectGuid::Empty;
+    const ObjectGuid ObjectGuid::Empty;
 
     ObjectGuid::ObjectGuid(u64 data) : _data(data)
     {
@@ -25,6 +25,26 @@ namespace GameDefine
     ObjectGuid ObjectGuid::FromU64(u64 rawValue)
     {
         return ObjectGuid(rawValue);
+    }
+
+    ObjectGuid ObjectGuid::CreatePlayer(u64 counter)
+    {
+        return ObjectGuid(Type::Player, counter);
+    }
+
+    ObjectGuid ObjectGuid::CreateCreature(u64 counter)
+    {
+        return ObjectGuid(Type::Creature, counter);
+    }
+
+    ObjectGuid ObjectGuid::CreateGameObject(u64 counter)
+    {
+        return ObjectGuid(Type::GameObject, counter);
+    }
+
+    ObjectGuid ObjectGuid::CreateItem(u64 counter)
+    {
+        return ObjectGuid(Type::Item, counter);
     }
 
     u8 ObjectGuid::GetCounterBytesUsed() const

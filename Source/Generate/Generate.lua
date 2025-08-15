@@ -2,9 +2,12 @@ local currentProject = Solution.Projects.Current
 
 local dependencies = { }
 Solution.Util.CreateProject("Generate", "StaticLib", currentProject.BinDir, dependencies)
+dependson("Gen-Meta")
 
 -- TODO: This needs to be fixed to work properly on Linux. Dirty fix to make runner build properly.
 if os.target() == "windows" then
+    fastuptodate "Off"
+    
     local solutionType = BuildSettings:Get("Solution Type")
     postbuildcommands
     {

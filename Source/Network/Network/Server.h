@@ -7,6 +7,8 @@
 #include <robinhood/robinhood.h>
 #include <asio/asio.hpp>
 
+#include <queue>
+
 using asio::ip::tcp;
 
 class Bytebuffer;
@@ -17,29 +19,32 @@ namespace Network
     class ServerSession : public std::enable_shared_from_this<ServerSession>
     {
     public:
-        ServerSession(Server* server, SocketID socketID, tcp::socket socket) : _server(server), _socketID(socketID), _socket(std::move(socket)) { }
+        ServerSession(Server* server, SocketID socketID, tcp::socket socket) : _server(server), _socketID(socketID), _socket(std::move(socket)), _strand(asio::make_strand(_socket.get_executor())), _timer(_strand) { }
 
         void Start();
-        void Close();
+        bool RequestClose();
 
-        void Write(const std::shared_ptr<Bytebuffer>& buffer);
-        void WriteBuffer(const BufferID bufferID, const std::shared_ptr<Bytebuffer>& buffer);
+        void Send(std::shared_ptr<Bytebuffer>& buffer);
 
     private:
+        void Write();
+        void Close();
+
         void ReadMessageHeader();
         void ReadMessageBody();
 
-        void ClearBuffer(BufferID bufferID);
         void EnqueueMessage(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer);
         void CloseInternal();
 
     private:
         SocketID _socketID = SOCKET_ID_INVALID;
         tcp::socket _socket;
-        std::atomic<u32> _isClosing = 0;
+        asio::strand<asio::any_io_executor> _strand;
+        asio::steady_timer _timer;
+        std::atomic<bool> _requestClose = false;
 
+        std::queue<std::shared_ptr<Bytebuffer>> _msgQueue;
         std::shared_ptr<Bytebuffer> _readBuffer;
-        std::shared_ptr<Bytebuffer> _pongBuffer;
 
         Server* _server = nullptr;
     };
@@ -59,6 +64,7 @@ namespace Network
         Server(u16 port);
 
         bool Start();
+        void Update();
 
         void CloseSocketID(SocketID socketID);
         void SendPacket(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer);
@@ -72,8 +78,7 @@ namespace Network
         SocketID GetNextSocketID();
         void ListenForNewConnection();
 
-        void ProcessDeferredOutMessageRequests();
-        void ProcessDeferredCloseRequests();
+        void ProcessDeferredRequests();
         void DeferCloseSocketID(SocketID socketID);
 
     private:
@@ -83,13 +88,8 @@ namespace Network
         tcp::acceptor _asioAcceptor;
         tcp::socket _asioSocket;
         std::thread* _asioThread = nullptr;
-        std::atomic<u32> _flushOutMessageEventsScheduled = false;
-        std::atomic<u32> _handleClosedRequestsScheduled = false;
 
         std::vector<Connection> _connections;
-
-        BufferID _nextBufferID = 0;
-        robin_hood::unordered_map<BufferID, std::shared_ptr<Bytebuffer>> _activeBuffers;
 
         moodycamel::ConcurrentQueue<SocketConnectedEvent> _connectedEvents;
         moodycamel::ConcurrentQueue<SocketDisconnectedEvent> _disconnectedEvents;

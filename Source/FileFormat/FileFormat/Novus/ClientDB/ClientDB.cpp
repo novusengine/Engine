@@ -453,6 +453,10 @@ namespace ClientDB
         return true;
     }
 
+    bool Data::IsInitialized()
+    {
+        return _header.Flags.IsInitialized;
+    }
     bool Data::IsDirty()
     {
         return _isDirty;

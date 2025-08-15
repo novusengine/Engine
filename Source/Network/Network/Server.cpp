@@ -14,14 +14,67 @@ namespace Network
     void ServerSession::Start()
     {
         _readBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
-        _pongBuffer = Bytebuffer::Borrow<sizeof(MessageHeader)>();
-
-        MessageHeader pongHeader;
-        pongHeader.flags.isPing = 1;
-
-        _pongBuffer->Put(pongHeader);
 
         ReadMessageHeader();
+    }
+
+    bool ServerSession::RequestClose()
+    {
+        if (_requestClose)
+            return false; // Already requested close
+
+        asio::post(_strand,
+            [self = shared_from_this()]()
+            {
+                self->_requestClose = true;
+
+                if (self->_msgQueue.empty())
+                    self->Close();
+            });
+
+        return true;
+    }
+
+    void ServerSession::Send(std::shared_ptr<Bytebuffer>& buffer)
+    {
+        asio::post(_strand,
+            [self = shared_from_this(), msg = std::move(buffer)]() mutable
+            {
+                if (self->_requestClose)
+                    return; // Ignore if closing
+
+                bool writeInProgress = !self->_msgQueue.empty();
+                self->_msgQueue.push(std::move(msg));
+
+                if (!writeInProgress)
+                    self->Write();
+            });
+    }
+
+    void ServerSession::Write()
+    {
+        auto& buffer = _msgQueue.front();
+        asio::async_write(_socket, asio::buffer(buffer->GetDataPointer(), buffer->writtenData), asio::bind_executor(_strand, [self = shared_from_this()](std::error_code ec, std::size_t length)
+        {
+            if (ec || !self)
+            {
+                NC_LOG_ERROR("Network::ServerSession : Write Failed ({0})", ec.message());
+                self->CloseInternal();
+            }
+            else
+            {
+                self->_msgQueue.pop();
+        
+                if (!self->_msgQueue.empty())
+                {
+                    self->Write();
+                }
+                else if (self->_requestClose)
+                {
+                    self->Close();
+                }
+            }
+        }));
     }
 
     void ServerSession::Close()
@@ -29,69 +82,57 @@ namespace Network
         if (!_socket.is_open())
             return;
 
-        std::error_code ec;
-        _socket.shutdown(asio::socket_base::shutdown_both, ec);
-        if (!ec)
+        _timer.expires_after(100ms);
+        _timer.async_wait(asio::bind_executor(_strand, [self = shared_from_this()](std::error_code ec)
         {
-            _socket.close(ec);
-        }
-    }
+            std::error_code ignored_ec;
+            self->_socket.shutdown(asio::socket_base::shutdown_send, ignored_ec);
 
-    void ServerSession::Write(const std::shared_ptr<Bytebuffer>& buffer)
-    {
-        asio::async_write(_socket, asio::buffer(buffer->GetDataPointer(), buffer->writtenData), [this](std::error_code ec, std::size_t length)
-        {
-            if (ec || !this)
-            {
-                NC_LOG_ERROR("Network::ServerSession : Write Failed ({0})", ec.message());
-                CloseInternal();
-            }
-        });
-    }
-
-    void ServerSession::WriteBuffer(const BufferID bufferID, const std::shared_ptr<Bytebuffer>& buffer)
-    {
-        asio::async_write(_socket, asio::buffer(buffer->GetDataPointer(), buffer->writtenData), [this, bufferID](std::error_code ec, std::size_t length)
-        {
-            if (ec || !this)
-            {
-                NC_LOG_ERROR("Network::ServerSession : WriteBuffer Failed ({0})", ec.message());
-                CloseInternal();
-            }
-
-            ClearBuffer(bufferID);
-        });
+            auto buf = std::make_shared<std::array<char, 1>>();
+            self->_socket.async_read_some(asio::buffer(*buf),
+                [self, buf](std::error_code ec, std::size_t size)
+                {
+                    std::error_code ignored_ec;
+                    self->_socket.close(ignored_ec);
+                });
+        }));
     }
 
     void ServerSession::ReadMessageHeader()
     {
-        asio::async_read(_socket, asio::buffer(_readBuffer->GetDataPointer(), sizeof(MessageHeader)), [this](std::error_code ec, std::size_t length)
+        asio::async_read(_socket, asio::buffer(_readBuffer->GetDataPointer(), sizeof(MessageHeader)), asio::bind_executor(_strand, [self = shared_from_this()](std::error_code ec, std::size_t length)
         {
-            if (ec || !this)
+            if (ec || !self)
             {
                 NC_LOG_ERROR("Network::ServerSession : ReadHeader Failed ({0})", ec.message());
-                CloseInternal();
+                self->CloseInternal();
                 return;
             }
-
-            auto* header = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer());
-            _readBuffer->SkipWrite(length);
-
+        
+            auto* header = reinterpret_cast<MessageHeader*>(self->_readBuffer->GetDataPointer());
+            self->_readBuffer->SkipWrite(length);
+        
             if (header->size > DEFAULT_BUFFER_SIZE - sizeof(MessageHeader))
             {
                 NC_LOG_ERROR("Network::ServerSession : ReadHeader Failed (Message Size Too Large)");
-                CloseInternal();
+                self->CloseInternal();
                 return;
             }
-
+        
             if (header->flags.isPing)
             {
-                Write(_pongBuffer);
+                auto pongBuffer = Bytebuffer::Borrow<sizeof(MessageHeader)>();
+        
+                MessageHeader pongHeader;
+                pongHeader.flags.isPing = 1;
+        
+                pongBuffer->Put(pongHeader);
+                self->Send(pongBuffer);
             }
-
+        
             if (header->size > 0)
             {
-                ReadMessageBody();
+                self->ReadMessageBody();
             }
             else
             {
@@ -99,16 +140,16 @@ namespace Network
                 {
                     messageBuffer->Put(*header);
                 }
-
+        
                 // Emit Message Event
-                EnqueueMessage(_socketID, messageBuffer);
-
+                self->EnqueueMessage(self->_socketID, messageBuffer);
+        
                 // Reset Read Buffer
-                _readBuffer->Reset();
-
-                ReadMessageHeader();
+                self->_readBuffer->Reset();
+        
+                self->ReadMessageHeader();
             }
-        });
+        }));
     }
 
     void ServerSession::ReadMessageBody()
@@ -116,42 +157,37 @@ namespace Network
         NC_ASSERT(_readBuffer && _readBuffer->writtenData == sizeof(MessageHeader), "Network::ServerSession : ReadMessageBody Failed (Invalid Buffer)");
 
         u32 sizeToRead = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer())->size;
-        asio::async_read(_socket, asio::buffer(_readBuffer->GetWritePointer(), sizeToRead), [this](std::error_code ec, std::size_t length)
+        asio::async_read(_socket, asio::buffer(_readBuffer->GetWritePointer(), sizeToRead), asio::bind_executor(_strand, [self = shared_from_this()](std::error_code ec, std::size_t length)
         {
-            if (ec || !this)
+            if (ec || !self)
             {
                 NC_LOG_ERROR("Network::ServerSession : ReadBody Failed ({0})", ec.message());
-                CloseInternal();
+                self->CloseInternal();
                 return;
             }
-
-            auto* header = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer());
-            _readBuffer->SkipRead(sizeof(MessageHeader));
-
+        
+            auto* header = reinterpret_cast<MessageHeader*>(self->_readBuffer->GetDataPointer());
+            self->_readBuffer->SkipRead(sizeof(MessageHeader));
+        
             std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
             {
                 messageBuffer->Put(*header);
-
+        
                 // Payload
                 {
-                    std::memcpy(messageBuffer->GetWritePointer(), _readBuffer->GetReadPointer(), header->size);
+                    std::memcpy(messageBuffer->GetWritePointer(), self->_readBuffer->GetReadPointer(), header->size);
                     messageBuffer->SkipWrite(header->size);
                 }
             }
-
+        
             // Emit Message Event
-            EnqueueMessage(_socketID, messageBuffer);
-
+            self->EnqueueMessage(self->_socketID, messageBuffer);
+        
             // Reset Read Buffer
-            _readBuffer->Reset();
-
-            ReadMessageHeader();
-        });
-    }
-
-    void ServerSession::ClearBuffer(BufferID bufferID)
-    {
-        _server->_activeBuffers.erase(bufferID);
+            self->_readBuffer->Reset();
+        
+            self->ReadMessageHeader();
+        }));
     }
 
     void ServerSession::EnqueueMessage(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer)
@@ -167,24 +203,15 @@ namespace Network
 
     void ServerSession::CloseInternal()
     {
-        u32 isClosing = _isClosing.fetch_add(1);
-        if (isClosing || !_socket.is_open())
-            return;
-
-        Close();
+        if (!RequestClose())
+            return; // Already requested close
 
         _server->DeferCloseSocketID(_socketID);
-        u32 isHandleClosedRequestsMessageScheduled = _server->_handleClosedRequestsScheduled.fetch_add(1);
-        if (isHandleClosedRequestsMessageScheduled == 0)
-        {
-            asio::post(_server->_asioContext, std::bind(&Server::ProcessDeferredCloseRequests, _server));
-        }
     }
 
     Server::Server(u16 port) : _asioAcceptor(_asioContext, tcp::endpoint(tcp::v4(), port)), _asioSocket(_asioContext), _connectedEvents(1024), _disconnectedEvents(1024), _disconnectRequests(1024), _inMessageEvents(1024), _outMessageEvents(1024)
     {
         _connections.resize(512);
-        _activeBuffers.reserve(1024);
     }
 
     bool Server::Start()
@@ -198,6 +225,11 @@ namespace Network
         return true;
     }
 
+    void Server::Update()
+    {
+        asio::post(_asioContext, std::bind(&Server::ProcessDeferredRequests, this));
+    }
+
     void Server::CloseSocketID(SocketID socketID)
     {
         if (socketID == SOCKET_ID_INVALID)
@@ -207,11 +239,6 @@ namespace Network
         }
 
         DeferCloseSocketID(socketID);
-        u32 isHandleClosedRequestsMessageScheduled = _handleClosedRequestsScheduled.fetch_add(1);
-        if (isHandleClosedRequestsMessageScheduled == 0)
-        {
-            asio::post(_asioContext, std::bind(&Server::ProcessDeferredCloseRequests, this));
-        }
     }
 
     void Server::SendPacket(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer)
@@ -226,12 +253,6 @@ namespace Network
         messageEvent.socketID = socketID;
         messageEvent.message.buffer = buffer;
         _outMessageEvents.enqueue(messageEvent);
-
-        u32 flushOutMessageEventsScheduled = _flushOutMessageEventsScheduled.fetch_add(1);
-        if (flushOutMessageEventsScheduled == 0)
-        {
-            asio::post(_asioContext, std::bind(&Server::ProcessDeferredOutMessageRequests, this));
-        }
     }
 
     SocketID Server::GetNextSocketID()
@@ -312,7 +333,7 @@ namespace Network
         });
     }
 
-    void Server::ProcessDeferredOutMessageRequests()
+    void Server::ProcessDeferredRequests()
     {
         SocketMessageEvent messageEvent;
         while (_outMessageEvents.try_dequeue(messageEvent))
@@ -329,17 +350,9 @@ namespace Network
                 continue;
             }
 
-            const BufferID bufferID = _nextBufferID++;
-            _activeBuffers[bufferID] = buffer;
-
-            connection.client->WriteBuffer(bufferID, buffer);
+            connection.client->Send(buffer);
         }
 
-        _flushOutMessageEventsScheduled.store(0);
-    }
-
-    void Server::ProcessDeferredCloseRequests()
-    {
         SocketDisconnectedEvent disconnectedEvent;
         while (_disconnectRequests.try_dequeue(disconnectedEvent))
         {
@@ -353,7 +366,7 @@ namespace Network
                 continue;
             }
 
-            connection.client->Close();
+            connection.client->RequestClose();
             connection.client = nullptr;
 
             // Emit disconnected event
@@ -361,8 +374,6 @@ namespace Network
             disconnectedEvent.socketID = socketID;
             _disconnectedEvents.enqueue(disconnectedEvent);
         }
-
-        _handleClosedRequestsScheduled.store(0);
     }
 
     void Server::DeferCloseSocketID(SocketID socketID)

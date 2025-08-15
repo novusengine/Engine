@@ -7,11 +7,19 @@ if os.target() == "windows" then
     fastuptodate "Off"
 end
 
+local metaGenDir = currentProject.RootDir .. "/Source/Meta/Meta"
+local typeGenFolder = ""
+if currentProject.IsRoot then
+    typeGenFolder = "%{wks.location}/bin/%{wks.name}/%{cfg.buildcfg}/TypeGenerator"
+else
+    typeGenFolder = "%{wks.location}/bin/%{wks.name}/Engine/%{cfg.buildcfg}/TypeGenerator"
+end
+
 prebuildcommands
 {
-    "if exist \"" .. Solution.Projects.Current.RootDir .. "/Source/Meta/Meta/Generated\" rmdir /S /Q \"" .. Solution.Projects.Current.RootDir .. "/Source/Meta/Meta/Generated\"",
+    "if exist \"" .. metaGenDir .. "/Generated\" rmdir /S /Q \"" .. metaGenDir .. "/Generated\"",
     
-    "\"%{wks.location}/bin/%{wks.name}/Engine/%{cfg.buildcfg}/TypeGenerator\" " ..
-    "\"" .. Solution.Projects.Current.RootDir .. "/Source/Meta/Meta/Source\" " ..
-    "\"" .. Solution.Projects.Current.RootDir .. "/Source/Meta/Meta/Generated\" "
+    "\"" .. typeGenFolder .. "\" " ..
+    "\"" .. metaGenDir .. "/Source\" " ..
+    "\"" .. metaGenDir .. "/Generated\" "
 }

@@ -79,7 +79,16 @@ namespace ClientDB
     };
 
     template <typename T>
+    concept ValidName = std::is_class_v<T> && requires { T::Name; } && std::same_as<std::decay_t<decltype(T::Name)>, std::string>;
+    
+    template <typename T>
+    concept ValidNameHash = std::is_class_v<T> && requires { T::NameHash; } && std::same_as<std::decay_t<decltype(T::NameHash)>, u32>;
+
+    template <typename T>
     concept ValidFieldInfo = std::is_class_v<T> && requires { T::FieldInfo; } && std::same_as<std::decay_t<decltype(T::FieldInfo)>, std::vector<FieldInfo>>;
+
+    template <typename T>
+    concept ValidClientDB = ValidName<T> && ValidNameHash<T> && ValidFieldInfo<T>;
 
     struct Data
     {
@@ -353,6 +362,7 @@ namespace ClientDB
         bool Save(const std::string& path);
         bool Read(std::shared_ptr<Bytebuffer>& buffer);
 
+        bool IsInitialized();
         bool IsDirty();
         void MarkDirty();
         void ClearDirty();

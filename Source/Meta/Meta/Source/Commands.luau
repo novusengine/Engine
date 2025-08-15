@@ -58,6 +58,18 @@ type Demorph<Command> =
     Parameters : { };
 };
 
+type CharacterCreate<Command> =
+{
+    Names : "charcreate";
+    Parameters : { name : string };
+};
+
+type CharacterDelete<Command> =
+{
+    Names : "chardelete";
+    Parameters : { name : string };
+};
+
 type Fly<Command> =
 {
     Names : "fly";

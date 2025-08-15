@@ -120,7 +120,15 @@ void WriteMetaName(std::string& fileContent, const std::string& name, u32 indent
 {
     WriteContent(fileContent, "static inline std::string Name = \"", indent);
     WriteContent(fileContent, name);
-    WriteContent(fileContent, "\";\n\n");
+    WriteContent(fileContent, "\";\n");
+};
+void WriteMetaNameHash(std::string& fileContent, const std::string& name, u32 indent)
+{
+    u32 hash = StringUtils::fnv1a_32(name.c_str(), name.size());
+
+    WriteContent(fileContent, "static inline u32 NameHash = ", indent);
+    WriteContent(fileContent, std::to_string(hash));
+    WriteContent(fileContent, ";\n\n");
 };
 
 void WriteDefaultConstructors(std::string& fileContent, const std::string& structName, u32 indent)
@@ -724,6 +732,7 @@ bool GenerateClientDB(const TypeParser::ParsedType& parsedType, std::string& fil
             // Name
             {
                 WriteMetaName(fileContent, name, indent);
+                WriteMetaNameHash(fileContent, name, indent);
             }
             
             WriteClientDBMetaFields(fileContent, parameterProperties, numParameters, indent);
