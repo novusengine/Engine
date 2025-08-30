@@ -11,3 +11,18 @@ type LuaGameEvent<Enum> =
         Count : Auto
     };
 }
+
+type LuaTriggerEvent<Enum> =
+{
+    Name : "TriggerEvent";
+    Type : u8;
+
+    Fields :
+    {
+        Invalid : Auto,
+        OnEnter : Auto,
+        OnExit : Auto,
+        OnStay : Auto,
+        Count : Auto
+    };
+}

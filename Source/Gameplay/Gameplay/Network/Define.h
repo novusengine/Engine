@@ -38,6 +38,8 @@ namespace Network
         SetItemWeaponTemplate,
         SetItemShieldTemplate,
         AddItem,
-        RemoveItem
+        RemoveItem,
+        TriggerAdd,
+        TriggerRemove
     };
 }
