@@ -39,6 +39,11 @@ namespace Network
 
         Server_SendCombatEvent,
 
+        Server_TriggerCreate,
+        Server_TriggerDestroy,
+        Client_TriggerEnter,
+        Server_TriggerEnterAck,
+
         Count
     };
 }

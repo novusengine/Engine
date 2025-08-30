@@ -111,3 +111,15 @@ type RemoveItem<Command> =
     Names : "removeitem";
     Parameters : { itemID : u32 };
 };
+
+type TriggerAdd<Command> =
+{
+    Names : "triggeradd";
+    Parameters : { name : string, flags : u16, mapID : u16, positionX : f32, positionY : f32, positionZ : f32, extentsX : f32, extentsY : f32, extentsZ : f32 };
+};
+
+type TriggerRemove<Command> =
+{
+    Names : "triggerremove";
+    Parameters : { triggerID : u32 };
+};
