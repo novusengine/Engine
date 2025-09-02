@@ -8,141 +8,6 @@
 
 namespace GameDefine
 {
-    const ObjectGuid ObjectGuid::Empty;
-
-    ObjectGuid::ObjectGuid(u64 data) : _data(data)
-    {
-        Type extractedType = GetType();
-        if (extractedType < Type::None || extractedType >= Type::Count)
-        {
-#ifdef NC_DEBUG
-            NC_ASSERT(false, "ObjectGuid created with out-of-range Type value!");
-#endif
-            _data = 0;
-        }
-    }
-
-    ObjectGuid ObjectGuid::FromU64(u64 rawValue)
-    {
-        return ObjectGuid(rawValue);
-    }
-
-    ObjectGuid ObjectGuid::CreatePlayer(u64 counter)
-    {
-        return ObjectGuid(Type::Player, counter);
-    }
-
-    ObjectGuid ObjectGuid::CreateCreature(u64 counter)
-    {
-        return ObjectGuid(Type::Creature, counter);
-    }
-
-    ObjectGuid ObjectGuid::CreateGameObject(u64 counter)
-    {
-        return ObjectGuid(Type::GameObject, counter);
-    }
-
-    ObjectGuid ObjectGuid::CreateItem(u64 counter)
-    {
-        return ObjectGuid(Type::Item, counter);
-    }
-
-    u8 ObjectGuid::GetCounterBytesUsed() const
-    {
-        u64 counter = GetCounter();
-        if (counter == 0) return 0;
-
-#if defined(_MSC_VER)
-        // MSVC: Use built-in bit scan reverse intrinsic
-        unsigned long index;
-        _BitScanReverse64(&index, counter);
-
-        // Convert bit position to bytes (add 8 since index is 0-based)
-        return static_cast<u8>((index + 8) >> 3);
-#elif defined(__GNUC__) || defined(__clang__)
-        // GCC/Clang: Use built-in leading zero count intrinsic
-        // 64 - leading zeros = position of highest set bit
-        // Add 7 and divide by 8 to get ceiling of bytes needed
-        return static_cast<u8>((64 - __builtin_clzll(counter) + 7) >> 3);
-#else
-        // Fallback: Use binary search to find highest set bit
-        // This approach progressively checks larger ranges and
-        // accumulates the byte count as it narrows down the value
-
-        u8 bytes = 1;
-
-        // Check if value exceeds 32 bits (4 bytes)
-        if (counter > 0xFFFFFFFF) { counter >>= 32; bytes += 4; }
-
-        // Check if remaining value exceeds 16 bits (2 bytes)
-        if (counter > 0xFFFF) { counter >>= 16; bytes += 2; }
-
-        // Check if remaining value exceeds 8 bits (1 byte)
-        if (counter > 0xFF) { counter >>= 8;  bytes += 1; }
-
-        return bytes;
-#endif
-    }
-
-    std::string ObjectGuid::ToString() const
-    {
-        std::string objectAsStr = "ObjectGuid (" + TypeToString(GetType()) + ", " + std::to_string(GetCounter()) + ")";
-        return objectAsStr;
-    }
-
-    std::string ObjectGuid::TypeToString(Type type)
-    {
-        switch (type)
-        {
-            case Type::None:       return "None";
-            case Type::Player:     return "Player";
-            case Type::Creature:   return "Creature";
-            case Type::GameObject: return "GameObject";
-            case Type::Item:       return "Item";
-            default:               return "Unknown"; // Handle unexpected type values
-        }
-    }
-
-    bool ObjectGuid::Deserialize(Bytebuffer* buffer)
-    {
-        u8 packedData = 0;
-        u64 counter = 0;
-
-        bool didFail = false;
-        didFail |= !buffer->GetU8(packedData);
-
-        u8 numBytes = packedData & 0x7;
-        didFail |= !buffer->GetBytes(&counter, numBytes);
-
-        bool succeeded = !didFail;
-
-        // Branchless Trick to ensure ObjectGuid is empty if either read fails
-        // If the first read fails, the resulting ObjectGuid will be empty
-        // If the first read succeeds, but the second one fails, the resulting ObjectGuid will also be empty
-        packedData *= succeeded;
-
-        ObjectGuid::Type type = static_cast<ObjectGuid::Type>(packedData >> 3);
-        *this = ObjectGuid(type, counter);
-
-        return succeeded;
-    }
-
-    bool ObjectGuid::Serialize(Bytebuffer* buffer) const
-    {
-        u8 numBytes = GetCounterBytesUsed() & 0x7;
-        u8 type = static_cast<u8>(GetType());
-        u64 counter = GetCounter();
-
-        u8 packedData = (type << 3) | numBytes;
-
-        bool didFail = false;
-        didFail |= !buffer->PutU8(packedData);
-        didFail |= !buffer->PutBytes(&counter, numBytes);
-
-        bool succeeded = !didFail;
-        return succeeded;
-    }
-
     namespace Database
     {
         bool ItemTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, ItemTemplate& result)
@@ -241,6 +106,114 @@ namespace GameDefine
         bool ItemShieldTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const ItemShieldTemplate& data)
         {
             bool succeeded = buffer->Put(data);
+            return succeeded;
+        }
+
+        bool CreatureTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, CreatureTemplate& result)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->GetU32(result.id);
+            didFail |= !buffer->GetU32(result.flags);
+            didFail |= !buffer->GetString(result.name);
+            didFail |= !buffer->GetString(result.subname);
+
+            didFail |= !buffer->GetU32(result.displayID);
+            didFail |= !buffer->GetF32(result.scale);
+
+            didFail |= !buffer->GetU16(result.minLevel);
+            didFail |= !buffer->GetU16(result.maxLevel);
+            didFail |= !buffer->GetF32(result.armorMod);
+            didFail |= !buffer->GetF32(result.healthMod);
+            didFail |= !buffer->GetF32(result.resourceMod);
+            didFail |= !buffer->GetF32(result.damageMod);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+        bool CreatureTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const CreatureTemplate& data)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->PutU32(data.id);
+            didFail |= !buffer->PutU32(data.flags);
+            didFail |= !buffer->PutString(data.name);
+            didFail |= !buffer->PutString(data.subname);
+
+            didFail |= !buffer->PutU32(data.displayID);
+            didFail |= !buffer->PutF32(data.scale);
+
+            didFail |= !buffer->PutU16(data.minLevel);
+            didFail |= !buffer->PutU16(data.maxLevel);
+            didFail |= !buffer->PutF32(data.armorMod);
+            didFail |= !buffer->PutF32(data.healthMod);
+            didFail |= !buffer->PutF32(data.resourceMod);
+            didFail |= !buffer->PutF32(data.damageMod);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+
+        bool Map::Read(std::shared_ptr<Bytebuffer>& buffer, Map& result)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->GetU32(result.id);
+            didFail |= !buffer->GetU32(result.flags);
+            didFail |= !buffer->GetString(result.name);
+
+            didFail |= !buffer->GetU16(result.type);
+            didFail |= !buffer->GetU16(result.maxPlayers);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+        bool Map::Write(std::shared_ptr<Bytebuffer>& buffer, const Map& data)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->PutU32(data.id);
+            didFail |= !buffer->PutU32(data.flags);
+
+            didFail |= !buffer->PutString(data.name);
+
+            didFail |= !buffer->PutU16(data.type);
+            didFail |= !buffer->PutU16(data.maxPlayers);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+
+        bool MapLocation::Read(std::shared_ptr<Bytebuffer>& buffer, MapLocation& result)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->GetU32(result.id);
+            didFail |= !buffer->GetString(result.name);
+
+            didFail |= !buffer->GetU32(result.mapID);
+            didFail |= !buffer->GetF32(result.positionX);
+            didFail |= !buffer->GetF32(result.positionY);
+            didFail |= !buffer->GetF32(result.positionZ);
+            didFail |= !buffer->GetF32(result.orientation);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+        bool MapLocation::Write(std::shared_ptr<Bytebuffer>& buffer, const MapLocation& data)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->PutU32(data.id);
+            didFail |= !buffer->PutString(data.name);
+
+            didFail |= !buffer->PutU32(data.mapID);
+            didFail |= !buffer->PutF32(data.positionX);
+            didFail |= !buffer->PutF32(data.positionY);
+            didFail |= !buffer->PutF32(data.positionZ);
+            didFail |= !buffer->PutF32(data.orientation);
+
+            bool succeeded = !didFail;
             return succeeded;
         }
     }

@@ -11,9 +11,11 @@
 #include "Luau/VecDeque.h"
 #include "Luau/VisitType.h"
 
-#include <iostream>
 #include <optional>
-#include <ostream>
+
+LUAU_FASTFLAG(LuauEmplaceNotPushBack)
+
+LUAU_FASTFLAG(LuauExplicitSkipBoundTypes)
 
 namespace Luau
 {
@@ -23,6 +25,11 @@ struct InstanceCollector2 : TypeOnceVisitor
     VecDeque<TypePackId> tps;
     DenseHashSet<TypeId> cyclicInstance{nullptr};
     DenseHashSet<TypeId> instanceArguments{nullptr};
+
+    InstanceCollector2()
+        : TypeOnceVisitor("InstanceCollector2", FFlag::LuauExplicitSkipBoundTypes)
+    {
+    }
 
     bool visit(TypeId ty, const TypeFunctionInstanceType& it) override
     {
@@ -46,7 +53,7 @@ struct InstanceCollector2 : TypeOnceVisitor
             cyclicInstance.insert(t);
     }
 
-    bool visit(TypeId ty, const ClassType&) override
+    bool visit(TypeId ty, const ExternType&) override
     {
         return false;
     }
@@ -125,7 +132,7 @@ std::optional<TypePackId> TypeFunctionReductionGuesser::guess(TypePackId tp)
         guessedHead.push_back(*guessedType);
     }
 
-    return arena->addTypePack(TypePack{guessedHead, tail});
+    return arena->addTypePack(TypePack{std::move(guessedHead), tail});
 }
 
 TypeFunctionReductionGuessResult TypeFunctionReductionGuesser::guessTypeFunctionReductionForFunctionExpr(
@@ -164,7 +171,10 @@ TypeFunctionReductionGuessResult TypeFunctionReductionGuesser::guessTypeFunction
         if (get<TypeFunctionInstanceType>(guess))
             continue;
 
-        results.push_back({local->name.value, guess});
+        if (FFlag::LuauEmplaceNotPushBack)
+            results.emplace_back(local->name.value, guess);
+        else
+            results.push_back({local->name.value, guess});
     }
 
     // Submit a guess for return types
@@ -182,7 +192,7 @@ TypeFunctionReductionGuessResult TypeFunctionReductionGuesser::guessTypeFunction
     functionReducesTo.clear();
     substitutable.clear();
 
-    return TypeFunctionReductionGuessResult{results, recommendedAnnotation};
+    return TypeFunctionReductionGuessResult{std::move(results), recommendedAnnotation};
 }
 
 std::optional<TypeId> TypeFunctionReductionGuesser::guessType(TypeId arg)

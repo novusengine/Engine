@@ -1,6 +1,9 @@
 #pragma once
 #include "SharedPool.h"
 #include "Base/Types.h"
+#include "Base/Math/Math.h"
+
+#include <glm/glm.hpp>
 
 #include <cassert>
 #include <cstring>
@@ -489,11 +492,11 @@ public:
 
     inline bool CanPerformRead(size_t inSize)
     {
-        return readData + inSize <= size;
+        return readData + inSize <= writtenData;
     }
     inline bool CanPerformRead(size_t inSize, size_t offset)
     {
-        return offset + inSize <= size;
+        return offset + inSize <= writtenData;
     }
     inline bool CanPerformWrite(size_t inSize)
     {
@@ -764,64 +767,41 @@ private:
 
         ptr_type acquireOrCreate(size_t bufferSizeRequirement)
         {
+            u32 bufferSize = glm::max(128u, Math::NextPowerOf2(static_cast<u32>(bufferSizeRequirement)));
+
             std::lock_guard<std::mutex> lock(_mutex);
             if (_pool.empty())
             {
-                std::unique_ptr<Bytebuffer> newObject = std::make_unique<Bytebuffer>(nullptr, bufferSizeRequirement);
+                std::unique_ptr<Bytebuffer> newObject = std::make_unique<Bytebuffer>(nullptr, bufferSize);
                 ptr_type tmp(newObject.release(), PoolDeleter{std::weak_ptr<RuntimePool*>{_thisPtr}});
                 
-                return tmp;
+                return std::move(tmp);
             }
 
             size_t bestPoolCandidateIndex = -1;
             size_t bestPoolCandidateSize = -1;
 
-            size_t closestPoolCandidateIndex = -1;
-            size_t closestPoolCandidateSize = -1;
-
             for (u32 i = 0; i < _pool.size(); i++)
             {
                 std::unique_ptr<Bytebuffer>& buffer = _pool[i];
 
-                if (buffer->size >= bufferSizeRequirement)
-                {
-                    size_t delta = buffer->size - bufferSizeRequirement;
-                    if (delta < bestPoolCandidateSize)
-                    {
-                        bestPoolCandidateSize = delta;
-                        bestPoolCandidateIndex = i;
-                    }
-                }
-                else
-                {
-                    size_t delta = bufferSizeRequirement - buffer->size;
-                    if (delta < closestPoolCandidateSize)
-                    {
-                        closestPoolCandidateSize = delta;
-                        closestPoolCandidateIndex = i;
-                    }
-                }
+                if (buffer->size < bufferSize)
+                    continue;
+
+                size_t delta = buffer->size - bufferSize;
+                if (delta > bestPoolCandidateSize)
+                    continue;
+
+                bestPoolCandidateSize = delta;
+                bestPoolCandidateIndex = i;
             }
 
             bool hasBestPoolCandidate = bestPoolCandidateIndex != -1;
-            bool hasClosestPoolCandidate = closestPoolCandidateIndex != -1;
-
-            if (hasClosestPoolCandidate && !hasBestPoolCandidate)
+            if (!hasBestPoolCandidate)
             {
-                std::unique_ptr<Bytebuffer>& buffer = _pool[closestPoolCandidateIndex];
-
-                // Resize Buffer
-                {
-                    buffer->Reset();
-                    delete[] buffer->_data;
-
-                    buffer->_data = new u8[bufferSizeRequirement];
-                    buffer->size = bufferSizeRequirement;
-                    buffer->_hasOwnership = true;
-                }
+                std::unique_ptr<Bytebuffer> buffer = std::make_unique<Bytebuffer>(nullptr, bufferSize);
 
                 ptr_type tmp(buffer.release(), PoolDeleter{ std::weak_ptr<RuntimePool*>{_thisPtr} });
-                _pool.erase(_pool.begin() + closestPoolCandidateIndex);
                 return std::move(tmp);
             }
 

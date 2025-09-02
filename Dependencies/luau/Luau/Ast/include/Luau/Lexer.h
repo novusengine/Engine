@@ -55,6 +55,7 @@ struct Lexeme
         BlockComment,
 
         Attribute,
+        AttributeOpen,
 
         BrokenString,
         BrokenComment,
@@ -187,6 +188,19 @@ public:
     static bool fixupQuotedString(std::string& data);
     static void fixupMultilineString(std::string& data);
 
+    unsigned int getOffset() const
+    {
+        return offset;
+    }
+
+    enum class BraceType
+    {
+        InterpolatedString,
+        Normal
+    };
+
+    std::optional<Lexer::BraceType> peekBraceStackTop();
+
 private:
     char peekch() const;
     char peekch(unsigned int lookahead) const;
@@ -237,12 +251,6 @@ private:
 
     bool skipComments;
     bool readNames;
-
-    enum class BraceType
-    {
-        InterpolatedString,
-        Normal
-    };
 
     std::vector<BraceType> braceStack;
 };

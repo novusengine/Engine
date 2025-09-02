@@ -6,7 +6,9 @@
 
 using namespace Luau;
 
-LUAU_FASTFLAG(LuauSolverV2);
+LUAU_FASTFLAG(LuauSolverV2)
+LUAU_FASTFLAG(LuauSolverAgnosticStringification)
+LUAU_FASTFLAG(LuauPushTypeConstraint)
 
 TEST_SUITE_BEGIN("TypeSingletons");
 
@@ -151,6 +153,24 @@ TEST_CASE_FIXTURE(Fixture, "overloaded_function_call_with_singletons")
     LUAU_REQUIRE_NO_ERRORS(result);
 }
 
+TEST_CASE_FIXTURE(Fixture, "overloaded_function_resolution_singleton_parameters")
+{
+    CheckResult result = check(R"(
+        type A = ("A") -> string
+        type B = ("B") -> number
+
+        local function foo(f: A & B)
+            return f("A"), f("B")
+        end
+    )");
+    LUAU_REQUIRE_NO_ERRORS(result);
+    TypeId t = requireType("foo");
+    const FunctionType* fooType = get<FunctionType>(requireType("foo"));
+    REQUIRE(fooType != nullptr);
+
+    CHECK(toString(t) == "(((\"A\") -> string) & ((\"B\") -> number)) -> (string, number)");
+}
+
 TEST_CASE_FIXTURE(Fixture, "overloaded_function_call_with_singletons_mismatch")
 {
     DOES_NOT_PASS_NEW_SOLVER_GUARD();
@@ -261,7 +281,7 @@ TEST_CASE_FIXTURE(Fixture, "tagged_unions_immutable_tag")
         CannotAssignToNever* tm = get<CannotAssignToNever>(result.errors[0]);
         REQUIRE(tm);
 
-        CHECK(builtinTypes->stringType == tm->rhsType);
+        CHECK(getBuiltins()->stringType == tm->rhsType);
         CHECK(CannotAssignToNever::Reason::PropertyNarrowed == tm->reason);
         REQUIRE(tm->cause.size() == 2);
         CHECK("\"Dog\"" == toString(tm->cause[0]));
@@ -271,11 +291,15 @@ TEST_CASE_FIXTURE(Fixture, "tagged_unions_immutable_tag")
 
 TEST_CASE_FIXTURE(Fixture, "table_has_a_boolean")
 {
+    ScopedFastFlag sff{FFlag::LuauSolverAgnosticStringification, true};
     CheckResult result = check(R"(
         local t={a=1,b=false}
     )");
 
-    CHECK("{ a: number, b: boolean }" == toString(requireType("t"), {true}));
+    if (FFlag::LuauSolverV2)
+        CHECK("{ a: number, b: boolean }" == toString(requireType("t"), {true}));
+    else
+        CHECK("{| a: number, b: boolean |}" == toString(requireType("t"), {true}));
 }
 
 TEST_CASE_FIXTURE(Fixture, "table_properties_singleton_strings")
@@ -357,6 +381,8 @@ TEST_CASE_FIXTURE(Fixture, "indexer_can_be_union_of_singletons")
 
 TEST_CASE_FIXTURE(Fixture, "table_properties_type_error_escapes")
 {
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+
     CheckResult result = check(R"(
         --!strict
         local x: { ["<>"] : number }
@@ -364,22 +390,16 @@ TEST_CASE_FIXTURE(Fixture, "table_properties_type_error_escapes")
     )");
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
-    if (FFlag::LuauSolverV2)
-        CHECK(
-            "Type\n"
-            "    '{ [\"\\n\"]: number }'\n"
-            "could not be converted into\n"
-            "    '{ [\"<>\"]: number }'" == toString(result.errors[0])
-        );
-    else
-        CHECK_EQ(
-            R"(Table type '{ ["\n"]: number }' not compatible with type '{| ["<>"]: number |}' because the former is missing field '<>')",
-            toString(result.errors[0])
-        );
+
+    const std::string expected =
+        R"(Table type '{ ["\n"]: number }' not compatible with type '{ ["<>"]: number }' because the former is missing field '<>')";
+    CHECK(expected == toString(result.errors[0]));
 }
 
 TEST_CASE_FIXTURE(Fixture, "error_detailed_tagged_union_mismatch_string")
 {
+    ScopedFastFlag _{FFlag::LuauPushTypeConstraint, true};
+
     CheckResult result = check(R"(
 type Cat = { tag: 'cat', catfood: string }
 type Dog = { tag: 'dog', dogfood: string }
@@ -390,7 +410,7 @@ local a: Animal = { tag = 'cat', cafood = 'something' }
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
     if (FFlag::LuauSolverV2)
-        CHECK("Type '{ cafood: string, tag: \"cat\" }' could not be converted into 'Cat | Dog'" == toString(result.errors[0]));
+        CHECK(R"(Table type '{ cafood: string, tag: "cat" }' not compatible with type 'Cat' because the former is missing field 'catfood')" == toString(result.errors[0]));
     else
     {
         const std::string expected = R"(Type 'a' could not be converted into 'Cat | Dog'
@@ -440,11 +460,10 @@ TEST_CASE_FIXTURE(Fixture, "parametric_tagged_union_alias")
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
 
-    const std::string expectedError = R"(Type
-    '{ result: string, success: boolean }'
-could not be converted into
-    'Err<number> | Ok<string>')";
-
+    const std::string expectedError = "Type\n\t"
+                                      "'{ result: string, success: boolean }'"
+                                      "\ncould not be converted into\n\t"
+                                      "'Err<number> | Ok<string>'";
     CHECK(toString(result.errors[0]) == expectedError);
 }
 
@@ -638,6 +657,19 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "singletons_stick_around_under_assignment")
         LUAU_REQUIRE_NO_ERRORS(result);
     else
         LUAU_REQUIRE_ERROR_COUNT(1, result);
+}
+
+TEST_CASE_FIXTURE(Fixture, "tagged_union_in_ternary")
+{
+    LUAU_REQUIRE_NO_ERRORS(check(R"(
+        type Result = { type: "ok", value: unknown } | { type: "error" }
+
+        local function coinflip(): boolean return true end
+
+        local function readFromDB(): Result
+            return if coinflip() then { type = "ok", value = 42 } else { type = "error" }
+        end
+    )"));
 }
 
 TEST_SUITE_END();

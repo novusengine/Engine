@@ -6,6 +6,7 @@
 #include "Luau/NotNull.h"
 #include "Luau/Variant.h"
 #include "Luau/TypeFwd.h"
+#include "Luau/TypeIds.h"
 
 #include <string>
 #include <memory>
@@ -50,6 +51,12 @@ struct GeneralizationConstraint
     TypeId sourceType;
 
     std::vector<TypeId> interiorTypes;
+    bool hasDeprecatedAttribute = false;
+    AstAttr::DeprecatedInfo deprecatedInfo;
+
+    /// If true, never introduce generics.  Always replace free types by their
+    /// bounds or unknown. Presently used only to generalize the whole module.
+    bool noGenerics = false;
 };
 
 // variables ~ iterate iterator
@@ -105,21 +112,6 @@ struct FunctionCheckConstraint
     TypePackId argsPack;
 
     class AstExprCall* callSite = nullptr;
-    NotNull<DenseHashMap<const AstExpr*, TypeId>> astTypes;
-    NotNull<DenseHashMap<const AstExpr*, TypeId>> astExpectedTypes;
-};
-
-// table_check expectedType exprType
-//
-// If `expectedType` is a table type and `exprType` is _also_ a table type,
-// propogate the member types of `expectedType` into the types of `exprType`.
-// This is used to implement bidirectional inference on table assignment.
-// Also see: FunctionCheckConstraint.
-struct TableCheckConstraint
-{
-    TypeId expectedType;
-    TypeId exprType;
-    AstExprTable* table = nullptr;
     NotNull<DenseHashMap<const AstExpr*, TypeId>> astTypes;
     NotNull<DenseHashMap<const AstExpr*, TypeId>> astExpectedTypes;
 };
@@ -271,6 +263,40 @@ struct ReducePackConstraint
     TypePackId tp;
 };
 
+// simplify ty
+struct SimplifyConstraint
+{
+    TypeId ty;
+};
+
+// push_function_type_constraint expectedFunctionType => functionType
+//
+// Attempt to "push" the types of `expectedFunctionType` into `functionType`,
+// assuming that `expr` is a lambda who's ungeneralized type is `functionType`.
+// Similar to `FunctionCheckConstraint`. For example:
+//
+//  local Foo = {} :: { bar : (number) -> () }
+//
+//  function Foo.bar(x) end
+//
+// This will force `x` to be inferred as `number`.
+struct PushFunctionTypeConstraint
+{
+    TypeId expectedFunctionType;
+    TypeId functionType;
+    NotNull<AstExprFunction> expr;
+    bool isSelf;
+};
+
+struct PushTypeConstraint
+{
+    TypeId expectedType;
+    TypeId targetType;
+    NotNull<DenseHashMap<const AstExpr*, TypeId>> astTypes;
+    NotNull<DenseHashMap<const AstExpr*, TypeId>> astExpectedTypes;
+    NotNull<const AstExpr> expr;
+};
+
 using ConstraintV = Variant<
     SubtypeConstraint,
     PackSubtypeConstraint,
@@ -289,7 +315,9 @@ using ConstraintV = Variant<
     ReduceConstraint,
     ReducePackConstraint,
     EqualityConstraint,
-    TableCheckConstraint>;
+    SimplifyConstraint,
+    PushFunctionTypeConstraint,
+    PushTypeConstraint>;
 
 struct Constraint
 {
@@ -304,7 +332,7 @@ struct Constraint
 
     std::vector<NotNull<Constraint>> dependencies;
 
-    DenseHashSet<TypeId> getMaybeMutatedFreeTypes() const;
+    TypeIds getMaybeMutatedFreeTypes() const;
 };
 
 using ConstraintPtr = std::unique_ptr<Constraint>;

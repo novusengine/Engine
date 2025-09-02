@@ -8,7 +8,6 @@
 #include "Luau/ParseResult.h"
 #include "Luau/Scope.h"
 #include "Luau/TypeArena.h"
-#include "Luau/AnyTypeSummary.h"
 #include "Luau/DataFlowGraph.h"
 
 #include <memory>
@@ -16,19 +15,16 @@
 #include <unordered_map>
 #include <optional>
 
-LUAU_FASTFLAG(LuauIncrementalAutocompleteCommentDetection)
-
 namespace Luau
 {
 
-using LogLuauProc = void (*)(std::string_view);
+using LogLuauProc = void (*)(std::string_view, std::string_view);
 extern LogLuauProc logLuau;
 
 void setLogLuau(LogLuauProc ll);
 void resetLogLuauProc();
 
 struct Module;
-struct AnyTypeSummary;
 
 using ScopePtr = std::shared_ptr<struct Scope>;
 using ModulePtr = std::shared_ptr<Module>;
@@ -67,6 +63,10 @@ bool isWithinComment(const std::vector<Comment>& commentLocations, Position pos)
 bool isWithinComment(const SourceModule& sourceModule, Position pos);
 bool isWithinComment(const ParseResult& result, Position pos);
 
+bool isWithinHotComment(const std::vector<HotComment>& hotComments, Position pos);
+bool isWithinHotComment(const SourceModule& sourceModule, Position pos);
+bool isWithinHotComment(const ParseResult& result, Position pos);
+
 struct RequireCycle
 {
     Location location;
@@ -86,13 +86,10 @@ struct Module
     TypeArena interfaceTypes;
     TypeArena internalTypes;
 
-    // Summary of Ast Nodes that either contain
-    // user annotated anys or typechecker inferred anys
-    AnyTypeSummary ats{};
-
     // Scopes and AST types refer to parse data, so we need to keep that alive
     std::shared_ptr<Allocator> allocator;
     std::shared_ptr<AstNameTable> names;
+    AstStatBlock* root = nullptr;
 
     std::vector<std::pair<Location, ScopePtr>> scopes; // never empty
 
@@ -133,6 +130,9 @@ struct Module
     // we need a sentinel value for the map.
     DenseHashMap<const AstNode*, Scope*> astScopes{nullptr};
 
+    // Stable references for type aliases registered in the environment
+    std::vector<std::unique_ptr<TypeFun>> typeFunctionAliases;
+
     std::unordered_map<Name, TypeId> declaredGlobals;
     ErrorVec errors;
     LintResult lintResult;
@@ -156,7 +156,9 @@ struct Module
     // Once a module has been typechecked, we clone its public interface into a
     // separate arena. This helps us to force Type ownership into a DAG rather
     // than a DCG.
-    void clonePublicInterface(NotNull<BuiltinTypes> builtinTypes, InternalErrorReporter& ice);
+    void clonePublicInterface_DEPRECATED(NotNull<BuiltinTypes> builtinTypes, InternalErrorReporter& ice);
+
+    void clonePublicInterface(NotNull<BuiltinTypes> builtinTypes, InternalErrorReporter& ice, SolverMode mode);
 };
 
 } // namespace Luau

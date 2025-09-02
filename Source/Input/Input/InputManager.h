@@ -58,5 +58,4 @@ private:
     std::vector<KeybindGroup*> _keybindGroups;
     CursorState _cursorState = { 0 };
     vec2 _cursorPosition = vec2(0.0f);
-    vec2 _cursorVirtualPosition = vec2(0.0f);
 };

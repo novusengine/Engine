@@ -262,7 +262,7 @@ namespace Renderer
                     vkDestroyImage(_device->_device, texture->image, nullptr);
                     vkDestroyImageView(_device->_device, texture->imageView, nullptr);
 
-                    for (u32 i = 0; i < texture->desc.mipLevels; i++)
+                    for (i32 i = 0; i < texture->desc.mipLevels; i++)
                     {
                         vkDestroyImageView(_device->_device, texture->mipViews[i], nullptr);
                     }
@@ -359,7 +359,7 @@ namespace Renderer
             {
                 // Texture with mipmaps: Sum size for each mip level.
                 size_t mipUploadSize = 0;
-                for (uint32_t i = 0; i < desc.mipLevels; ++i)
+                for (i32 i = 0; i < desc.mipLevels; ++i)
                 {
                     // For each mip level, calculate the reduced dimensions.
                     u32 mipWidth = Math::Max(1u, desc.width >> i);
@@ -878,7 +878,7 @@ namespace Renderer
             //we want a full mip chain of views
             texture.mipViews.resize(texture.desc.mipLevels);
 
-            for (u32 i = 0; i < texture.desc.mipLevels; ++i)
+            for (i32 i = 0; i < texture.desc.mipLevels; ++i)
             {
                 VkImageViewCreateInfo pyramidLevelInfo = viewInfo;
                 pyramidLevelInfo.subresourceRange.baseMipLevel = i;

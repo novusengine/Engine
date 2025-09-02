@@ -16,9 +16,12 @@ namespace TypeParser
 
     private:
         static bool TryParseType(LexerInfo& lexerInfo, ParserInfo& parserInfo);
+
         static void ParseClientDB(LexerInfo& lexerInfo, ParsedType& parsedType);
         static void ParseCommand(LexerInfo& lexerInfo, ParsedType& parsedType);
         static void ParseEnum(LexerInfo& lexerInfo, ParsedType& parsedType);
+        static void ParsePacket(LexerInfo& lexerInfo, ParsedType& parsedType);
+
         static void ParseProperty(LexerInfo& lexerInfo, ParsedType& parsedType);
         static void ParsePropertyValue(LexerInfo& lexerInfo, ParsedTypeProperty& parsedTypeProperty);
         static void ParsePropertyType(LexerInfo& lexerInfo, ParsedTypeProperty& parsedTypeProperty, TypeProperty& property);

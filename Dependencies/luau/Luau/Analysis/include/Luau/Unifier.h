@@ -80,9 +80,6 @@ struct Unifier
     bool checkInhabited = true; // Normalize types to check if they are inhabited
     CountMismatch::Context ctx = CountMismatch::Arg;
 
-    // If true, generics act as free types when unifying.
-    bool hideousFixMeGenericsAreActuallyFree = false;
-
     UnifierSharedState& sharedState;
 
     // When the Unifier is forced to unify two blocked types (or packs), they
@@ -92,10 +89,6 @@ struct Unifier
     std::vector<TypePackId> blockedTypePacks;
 
     Unifier(NotNull<Normalizer> normalizer, NotNull<Scope> scope, const Location& location, Variance variance, TxnLog* parentLog = nullptr);
-
-    // Configure the Unifier to test for scope subsumption via embedded Scope
-    // pointers rather than TypeLevels.
-    void enableNewSolver();
 
     // Test whether the two type vars unify.  Never commits the result.
     ErrorVec canUnify(TypeId subTy, TypeId superTy);
@@ -144,7 +137,7 @@ private:
     void tryUnifyTables(TypeId subTy, TypeId superTy, bool isIntersection = false, const LiteralProperties* aliasableMap = nullptr);
     void tryUnifyScalarShape(TypeId subTy, TypeId superTy, bool reversed);
     void tryUnifyWithMetatable(TypeId subTy, TypeId superTy, bool reversed);
-    void tryUnifyWithClass(TypeId subTy, TypeId superTy, bool reversed);
+    void tryUnifyWithExternType(TypeId subTy, TypeId superTy, bool reversed);
     void tryUnifyNegations(TypeId subTy, TypeId superTy);
 
     TypePackId tryApplyOverloadedFunction(TypeId function, const NormalizedFunctionType& overloads, TypePackId args);
@@ -169,7 +162,6 @@ private:
 
     std::optional<TypeId> findTablePropertyRespectingMeta(TypeId lhsType, Name name);
 
-    TxnLog combineLogsIntoIntersection(std::vector<TxnLog> logs);
     TxnLog combineLogsIntoUnion(std::vector<TxnLog> logs);
 
 public:
@@ -195,11 +187,6 @@ private:
 
     // Available after regular type pack unification errors
     std::optional<int> firstPackErrorPos;
-
-    // If true, we do a bunch of small things differently to work better with
-    // the new type inference engine. Most notably, we use the Scope hierarchy
-    // directly rather than using TypeLevels.
-    bool useNewSolver = false;
 };
 
 void promoteTypeLevels(TxnLog& log, const TypeArena* arena, TypeLevel minLevel, Scope* outerScope, bool useScope, TypePackId tp);

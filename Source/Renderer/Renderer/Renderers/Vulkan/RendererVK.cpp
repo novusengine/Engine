@@ -32,7 +32,7 @@ namespace Renderer
     RendererVK::RendererVK(Novus::Window* window)
         : _device(new Backend::RenderDeviceVK(window))
     {
-        _frameAllocator.Init(16 * 1024 * 1024, "Renderer Allocator");
+        _frameAllocator.Init(64 * 1024 * 1024, "Renderer Allocator");
 
         // Create handlers
         _bufferHandler = new Backend::BufferHandlerVK();
@@ -1340,7 +1340,7 @@ namespace Renderer
             {
                 u32 mipLevel = descriptor.imageMipLevel + i;
 
-                if (mipLevel < textureDesc.mipLevels)
+                if ((i32)mipLevel < textureDesc.mipLevels)
                 {
                     VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
                     imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;

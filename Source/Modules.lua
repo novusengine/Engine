@@ -12,15 +12,15 @@ Solution.Util.SetGroup(Solution.ModuleGroup)
 local modules =
 {
     "Base/Base.lua",
-    "Network/Network.lua",
     "FileFormat/FileFormat.lua",
+    "Meta/Meta.lua",
+    "Network/Network.lua",
     "Input/Input.lua",
     "Gameplay/Gameplay.lua",
     "ShaderCooker/ShaderCooker.lua",
     "Renderer/Renderer.lua",
     "TypeParser/TypeParser.lua",
     "TypeGenerator/TypeGenerator.lua",
-    "Meta/Meta.lua"
 }
 
 for _, v in pairs(modules) do

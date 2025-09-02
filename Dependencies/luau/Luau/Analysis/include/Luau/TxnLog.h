@@ -65,11 +65,10 @@ T* getMutable(PendingTypePack* pending)
 // Log of what TypeIds we are rebinding, to be committed later.
 struct TxnLog
 {
-    explicit TxnLog(bool useScopes = false)
+    explicit TxnLog()
         : typeVarChanges(nullptr)
         , typePackChanges(nullptr)
         , ownedSeen()
-        , useScopes(useScopes)
         , sharedSeen(&ownedSeen)
     {
     }
@@ -113,7 +112,6 @@ struct TxnLog
     // If both logs talk about the same type, pack, or table, the rhs takes
     // priority.
     void concat(TxnLog rhs);
-    void concatAsIntersections(TxnLog rhs, NotNull<TypeArena> arena);
     void concatAsUnion(TxnLog rhs, NotNull<TypeArena> arena);
 
     // Commits the TxnLog, rebinding all type pointers to their pending states.
@@ -193,16 +191,6 @@ struct TxnLog
     // The pointer returned lives until `commit` or `clear` is called.
     PendingTypePack* changeLevel(TypePackId tp, TypeLevel newLevel);
 
-    // Queues the replacement of a type's scope with the provided scope.
-    //
-    // The pointer returned lives until `commit` or `clear` is called.
-    PendingType* changeScope(TypeId ty, NotNull<Scope> scope);
-
-    // Queues the replacement of a type pack's scope with the provided scope.
-    //
-    // The pointer returned lives until `commit` or `clear` is called.
-    PendingTypePack* changeScope(TypePackId tp, NotNull<Scope> scope);
-
     // Queues a replacement of a table type with another table type with a new
     // indexer.
     //
@@ -280,8 +268,6 @@ struct TxnLog
         return Luau::get_if<T>(&ty->ty) != nullptr;
     }
 
-    std::pair<std::vector<TypeId>, std::vector<TypePackId>> getChanges() const;
-
 private:
     // unique_ptr is used to give us stable pointers across insertions into the
     // map. Otherwise, it would be really easy to accidentally invalidate the
@@ -302,12 +288,6 @@ private:
     void popSeen(TypeOrPackId lhs, TypeOrPackId rhs);
 
 public:
-    // There is one spot in the code where TxnLog has to reconcile collisions
-    // between parallel logs. In that codepath, we have to work out which of two
-    // FreeTypes subsumes the other. If useScopes is false, the TypeLevel is
-    // used.  Else we use the embedded Scope*.
-    bool useScopes = false;
-
     // It is sometimes the case under DCR that we speculatively rebind
     // GenericTypes to other types as though they were free.  We mark logs that
     // contain these kinds of substitutions as radioactive so that we know that

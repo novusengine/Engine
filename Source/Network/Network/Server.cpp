@@ -2,8 +2,10 @@
 #include "Client.h"
 #include "Util/DefineUtil.h"
 
-#include "Base/Memory/Bytebuffer.h"
-#include "Base/Util/DebugHandler.h"
+#include <Base/Memory/Bytebuffer.h>
+#include <Base/Util/DebugHandler.h>
+
+#include <Meta/Generated/Shared/NetworkPacket.h>
 
 #include <memory>
 #include <chrono>
@@ -35,16 +37,16 @@ namespace Network
         return true;
     }
 
-    void ServerSession::Send(std::shared_ptr<Bytebuffer>& buffer)
+    void ServerSession::Send(std::shared_ptr<Bytebuffer> buffer)
     {
         asio::post(_strand,
-            [self = shared_from_this(), msg = std::move(buffer)]() mutable
+            [self = shared_from_this(), msg = buffer]() mutable
             {
                 if (self->_requestClose)
                     return; // Ignore if closing
 
                 bool writeInProgress = !self->_msgQueue.empty();
-                self->_msgQueue.push(std::move(msg));
+                self->_msgQueue.push(msg);
 
                 if (!writeInProgress)
                     self->Write();
@@ -119,14 +121,17 @@ namespace Network
                 return;
             }
         
-            if (header->flags.isPing)
+            if (header->opcode == Generated::PingPacket::PACKET_ID)
             {
                 auto pongBuffer = Bytebuffer::Borrow<sizeof(MessageHeader)>();
         
-                MessageHeader pongHeader;
-                pongHeader.flags.isPing = 1;
-        
+                MessageHeader pongHeader =
+                {
+                    .opcode = Generated::PongPacket::PACKET_ID,
+                    .size = 0
+                };
                 pongBuffer->Put(pongHeader);
+
                 self->Send(pongBuffer);
             }
         
@@ -339,7 +344,6 @@ namespace Network
         while (_outMessageEvents.try_dequeue(messageEvent))
         {
             SocketID socketID = messageEvent.socketID;
-            std::shared_ptr<Bytebuffer>& buffer = messageEvent.message.buffer;
 
             u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
             Connection& connection = _connections[index];
@@ -350,7 +354,7 @@ namespace Network
                 continue;
             }
 
-            connection.client->Send(buffer);
+            connection.client->Send(messageEvent.message.buffer);
         }
 
         SocketDisconnectedEvent disconnectedEvent;

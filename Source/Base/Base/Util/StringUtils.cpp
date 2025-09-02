@@ -176,16 +176,16 @@ namespace StringUtils
         return Contains(str, substr);
     }
 
-    bool StringIsAlphaAndAtLeastLength(const std::string& input, u16 maxLength)
+    bool StringIsAlphaAndAtLeastLength(const std::string& input, u16 minLength)
     {
-        // Check if the string is at least maxLength characters long
-        if (input.length() < maxLength)
+        // Check if the string is at least minLength characters long
+        if (input.length() < minLength)
             return false;
 
         // Check each character to ensure it is an English alphabet letter
         for (char c : input)
         {
-            if (!std::isalpha(static_cast<unsigned char>(c)))
+            if (!std::isalpha(c))
                 return false;
         }
 
@@ -231,6 +231,25 @@ namespace StringUtils
         }
 
         return digitEncountered; // Must contain at least one digit to be considered numeric
+    }
+
+    bool StringIsAlphaNumeric(const std::string& input)
+    {
+        if (input.empty())
+            return false;
+
+        for (char c : input)
+        {
+            if (!std::isalnum(c))
+                return false;
+        }
+
+        return true;
+    }
+
+    void ToLower(std::string& str)
+    {
+        std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
     }
 
     std::wstring StringToWString(const std::string& s)

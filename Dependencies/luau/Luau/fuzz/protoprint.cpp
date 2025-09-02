@@ -2,27 +2,200 @@
 #include "luau.pb.h"
 
 static const std::string kNames[] = {
-    "_G",           "_VERSION",   "__add",      "__call",         "__concat",    "__div",        "__eq",      "__idiv",     "__index",
-    "__iter",       "__le",       "__len",      "__lt",           "__mod",       "__mode",       "__mul",     "__namecall", "__newindex",
-    "__pow",        "__sub",      "__type",     "__unm",          "abs",         "acos",         "arshift",   "asin",       "assert",
-    "atan",         "atan2",      "band",       "bit32",          "bnot",        "boolean",      "bor",       "btest",      "buffer",
-    "bxor",         "byte",       "ceil",       "char",           "charpattern", "clamp",        "clear",     "clock",      "clone",
-    "close",        "codepoint",  "codes",      "collectgarbage", "concat",      "copy",         "coroutine", "cos",        "cosh",
-    "countlz",      "countrz",    "create",     "date",           "debug",       "deg",          "difftime",  "error",      "exp",
-    "extract",      "fill",       "find",       "floor",          "fmod",        "foreach",      "foreachi",  "format",     "freeze",
-    "frexp",        "fromstring", "function",   "gcinfo",         "getfenv",     "getmetatable", "getn",      "gmatch",     "gsub",
-    "huge",         "info",       "insert",     "ipairs",         "isfrozen",    "isyieldable",  "ldexp",     "len",        "loadstring",
-    "log",          "log10",      "lower",      "lrotate",        "lshift",      "match",        "math",      "max",        "maxn",
-    "min",          "modf",       "move",       "newproxy",       "next",        "nil",          "noise",     "number",     "offset",
-    "os",           "pack",       "packsize",   "pairs",          "pcall",       "pi",           "pow",       "print",      "rad",
-    "random",       "randomseed", "rawequal",   "rawget",         "rawlen",      "rawset",       "readf32",   "readf64",    "readi16",
-    "readi32",      "readi8",     "readstring", "readu16",        "readu32",     "readu8",       "remove",    "rep",        "replace",
-    "require",      "resume",     "reverse",    "round",          "rrotate",     "rshift",       "running",   "select",     "setfenv",
-    "setmetatable", "sign",       "sin",        "sinh",           "sort",        "split",        "sqrt",      "status",     "string",
-    "sub",          "table",      "tan",        "tanh",           "thread",      "time",         "tonumber",  "tostring",   "tostring",
-    "traceback",    "type",       "typeof",     "unpack",         "upper",       "userdata",     "utf8",      "vector",     "wrap",
-    "writef32",     "writef64",   "writei16",   "writei32",       "writei8",     "writestring",  "writeu16",  "writeu32",   "writeu8",
-    "xpcall",       "yield",
+    "_G",
+    "_VERSION",
+    "__add",
+    "__call",
+    "__concat",
+    "__div",
+    "__eq",
+    "__idiv",
+    "__index",
+    "__iter",
+    "__le",
+    "__len",
+    "__lt",
+    "__mod",
+    "__mode",
+    "__mul",
+    "__namecall",
+    "__newindex",
+    "__pow",
+    "__sub",
+    "__type",
+    "__unm",
+    "abs",
+    "acos",
+    "arshift",
+    "asin",
+    "assert",
+    "atan",
+    "atan2",
+    "band",
+    "bit32",
+    "bnot",
+    "boolean",
+    "bor",
+    "btest",
+    "buffer",
+    "bxor",
+    "byte",
+    "ceil",
+    "char",
+    "charpattern",
+    "clamp",
+    "clear",
+    "clock",
+    "clone",
+    "close",
+    "codepoint",
+    "codes",
+    "collectgarbage",
+    "concat",
+    "copy",
+    "coroutine",
+    "cos",
+    "cosh",
+    "countlz",
+    "countrz",
+    "create",
+    "date",
+    "debug",
+    "deg",
+    "difftime",
+    "error",
+    "exp",
+    "extract",
+    "fill",
+    "find",
+    "floor",
+    "fmod",
+    "foreach",
+    "foreachi",
+    "format",
+    "freeze",
+    "frexp",
+    "fromstring",
+    "function",
+    "gcinfo",
+    "getfenv",
+    "getmetatable",
+    "getn",
+    "gmatch",
+    "gsub",
+    "huge",
+    "info",
+    "insert",
+    "ipairs",
+    "isfrozen",
+    "isyieldable",
+    "ldexp",
+    "len",
+    "loadstring",
+    "log",
+    "log10",
+    "lower",
+    "lrotate",
+    "lshift",
+    "match",
+    "math",
+    "max",
+    "maxn",
+    "min",
+    "modf",
+    "move",
+    "newproxy",
+    "next",
+    "nil",
+    "noise",
+    "number",
+    "offset",
+    "os",
+    "pack",
+    "packsize",
+    "pairs",
+    "pcall",
+    "pi",
+    "pow",
+    "print",
+    "rad",
+    "random",
+    "randomseed",
+    "rawequal",
+    "rawget",
+    "rawlen",
+    "rawset",
+    "readf32",
+    "readf64",
+    "readi16",
+    "readi32",
+    "readi8",
+    "readstring",
+    "readu16",
+    "readu32",
+    "readu8",
+    "remove",
+    "rep",
+    "replace",
+    "require",
+    "resume",
+    "reverse",
+    "round",
+    "rrotate",
+    "rshift",
+    "running",
+    "select",
+    "setfenv",
+    "setmetatable",
+    "sign",
+    "sin",
+    "sinh",
+    "sort",
+    "split",
+    "sqrt",
+    "status",
+    "string",
+    "sub",
+    "table",
+    "tan",
+    "tanh",
+    "thread",
+    "time",
+    "tonumber",
+    "tostring",
+    "tostring",
+    "traceback",
+    "type",
+    "typeof",
+    "unpack",
+    "upper",
+    "userdata",
+    "utf8",
+    "vector",
+    "wrap",
+    "writef32",
+    "writef64",
+    "writei16",
+    "writei32",
+    "writei8",
+    "writestring",
+    "writeu16",
+    "writeu32",
+    "writeu8",
+    "xpcall",
+    "yield",
+    "types",
+    "unknown",
+    "never",
+    "any",
+    "singleton",
+    "optional",
+    "generic",
+    "negationof",
+    "unionof",
+    "intersectionof",
+    "newtable",
+    "newfunction",
 };
 
 static const std::string kTypes[] = {
@@ -34,12 +207,19 @@ static const std::string kTypes[] = {
     "string",
     "thread",
     "vector",
+    "unknown",
+    "never",
 };
 
-static const std::string kClasses[] = {
+static const std::string kExternTypes[] = {
     "Vector3",
     "Instance",
     "Part",
+};
+
+static const std::string kBuiltinTypes[] = {
+    "len", "unm", "add", "sub",   "mul",      "div",   "idiv",   "pow",          "mod",          "concat",
+    "lt",  "le",  "eq",  "keyof", "rawkeyof", "index", "rawget", "setmetatable", "getmetatable",
 };
 
 struct ProtoToLuau
@@ -61,28 +241,55 @@ struct ProtoToLuau
         functions.push_back(top);
     }
 
-    void ident(const luau::Name& name)
+    std::string displayName(const luau::Name& name)
     {
         if (name.has_builtin())
         {
             size_t index = size_t(name.builtin()) % std::size(kNames);
-            source += kNames[index];
+            return kNames[index];
         }
         else if (name.has_custom())
         {
-            source += 'n';
-            source += std::to_string(name.custom() & 0xff);
+            return 'n' + std::to_string(name.custom() & 0xff);
         }
         else
         {
-            source += '_';
+            return "_";
         }
     }
 
-    void ident(const luau::Typename& name)
+    void ident(const luau::Name& name)
+    {
+        source += displayName(name);
+    }
+
+    void ident(const luau::RegularTypeName& name)
     {
         source += 't';
         source += std::to_string(name.index() & 0xff);
+    }
+
+    void ident(const luau::GenericTypeName& name)
+    {
+        source += char('A' + (name.index() % 26));
+    }
+
+    void ident(const luau::BuiltinTypeName& name)
+    {
+        size_t index = size_t(name.index()) % std::size(kBuiltinTypes);
+        source += kBuiltinTypes[index];
+    }
+
+    void ident(const luau::TypeName& name)
+    {
+        if (name.has_regular())
+            ident(name.regular());
+        else if (name.has_generic())
+            ident(name.generic());
+        else if (name.has_builtin())
+            ident(name.builtin());
+        else
+            source += "any";
     }
 
     template<typename T>
@@ -310,6 +517,11 @@ struct ProtoToLuau
 
     void print(const luau::ExprFunction& expr)
     {
+        for (size_t i = 0; i < expr.attributes_size(); ++i)
+        {
+            print(expr.attributes(i));
+            source += "\n";
+        }
         source += "function";
         function(expr);
     }
@@ -480,6 +692,8 @@ struct ProtoToLuau
             print(stat.type_alias());
         else if (stat.has_require_into_local())
             print(stat.require_into_local());
+        else if (stat.has_type_function())
+            print(stat.type_function());
         else
             source += "do end\n";
     }
@@ -768,6 +982,23 @@ struct ProtoToLuau
         source += " = require(module" + std::to_string(stat.modulenum() % 2) + ")\n";
     }
 
+    void print(const luau::StatTypeFunction& stat)
+    {
+        for (size_t i = 0; i < stat.func().attributes_size(); ++i)
+        {
+            print(stat.func().attributes(i));
+            source += "\n";
+        }
+
+        if (stat.export_())
+            source += "export ";
+
+        source += "type function ";
+        ident(stat.name());
+        function(stat.func());
+        source += '\n';
+    }
+
     void print(const luau::Type& type)
     {
         if (type.has_primitive())
@@ -784,8 +1015,8 @@ struct ProtoToLuau
             print(type.union_());
         else if (type.has_intersection())
             print(type.intersection());
-        else if (type.has_class_())
-            print(type.class_());
+        else if (type.has_extern_())
+            print(type.extern_());
         else if (type.has_ref())
             print(type.ref());
         else if (type.has_boolean())
@@ -832,22 +1063,46 @@ struct ProtoToLuau
         }
     }
 
+    void print(const luau::TableFieldAccess& expr)
+    {
+        if (expr == luau::TableFieldAccess::Read)
+            source += "read";
+        else if (expr == luau::TableFieldAccess::Write)
+            source += "write";
+    }
+
     void print(const luau::TypeTable& type)
     {
         source += '{';
         for (size_t i = 0; i < type.items_size(); ++i)
         {
-            ident(type.items(i).key());
+            auto& item = type.items(i);
+
+            if (item.has_access())
+            {
+                print(item.access());
+                source += ' ';
+            }
+
+            ident(item.key());
             source += ':';
-            print(type.items(i).type());
+            print(item.type());
             source += ',';
         }
         if (type.has_indexer())
         {
+            auto& indexer = type.indexer();
+
+            if (indexer.has_access())
+            {
+                print(indexer.access());
+                source += ' ';
+            }
+
             source += '[';
-            print(type.indexer().key());
+            print(indexer.key());
             source += "]:";
-            print(type.indexer().value());
+            print(indexer.value());
         }
         source += '}';
     }
@@ -900,10 +1155,10 @@ struct ProtoToLuau
         source += ')';
     }
 
-    void print(const luau::TypeClass& type)
+    void print(const luau::TypeExtern& type)
     {
-        size_t index = size_t(type.kind()) % std::size(kClasses);
-        source += kClasses[index];
+        size_t index = size_t(type.kind()) % std::size(kExternTypes);
+        source += kExternTypes[index];
     }
 
     void print(const luau::TypeRef& type)
@@ -925,6 +1180,73 @@ struct ProtoToLuau
             if (isgraph(ch))
                 source += ch;
         source += '"';
+    }
+
+    void print(const luau::ExprLiteralTable& table)
+    {
+        source += '{';
+        for (int i = 0; i < table.items_size(); ++i)
+        {
+            ident(table.items(i).key_name());
+            source += '=';
+
+            print(table.items(i).value());
+            source += ',';
+        }
+        source += '}';
+    }
+
+    void print(const luau::ExprLiteral& lit)
+    {
+        if (lit.has_table())
+            print(lit.table());
+        else if (lit.has_nil())
+            print(lit.nil());
+        else if (lit.has_bool_())
+            print(lit.bool_());
+        else if (lit.has_number())
+            print(lit.number());
+        else if (lit.has_string())
+            print(lit.string());
+    }
+
+    void print(const luau::ExprAttr& attr)
+    {
+        std::string name;
+        if (attr.type() == luau::AttrType::Checked)
+            name = "checked";
+        if (attr.type() == luau::AttrType::Native)
+            name = "native";
+        if (attr.type() == luau::AttrType::Deprecated)
+            name = "deprecated";
+        else
+            name = displayName(attr.name());
+
+        if (attr.braced())
+        {
+            source += "@[" + name;
+            if (attr.args_size() == 1)
+            {
+                source += " ";
+                print(attr.args(0));
+            }
+            else if (attr.args_size() > 1)
+            {
+                source += "(";
+                for (int i = 0; i < attr.args_size(); ++i)
+                {
+                    if (i != 0)
+                        source += ',';
+                    print(attr.args(i));
+                }
+                source += ")";
+            }
+            source += "]";
+        }
+        else
+        {
+            source += "@" + name;
+        }
     }
 };
 

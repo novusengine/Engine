@@ -33,89 +33,6 @@ void WriteArrayField(std::string& fileContent, const TypeParser::TypeArrayInfo& 
     WriteContent(fileContent, ">");
 };
 
-bool WriteClientDBField(std::string& fileContent, const std::string& name, const TypeParser::TypeProperty& property, u32 indent)
-{
-    switch (property.kind)
-    {
-        case TypeParser::TypePropertyKind::string:
-        {
-            NC_LOG_ERROR("ClientDB Record '{0}' has a string field which is not allowed (Did you mean to use 'stringref')", name);
-            return false;
-        }
-
-        case TypeParser::TypePropertyKind::array:
-        {
-            WriteArrayField(fileContent, *property.arrayInfo, indent);
-            break;
-        }
-        default:
-        {
-            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind), indent);
-            break;
-        }
-    }
-
-    WriteContent(fileContent, " ");
-    WriteContent(fileContent, property.name);
-    WriteContent(fileContent, ";\n");
-    return true;
-};
-
-void WriteClientDBMetaField(std::string& fileContent, const TypeParser::TypeProperty& property, u32 indent)
-{
-    WriteContent(fileContent, "{ \"", indent);
-    WriteContent(fileContent, property.name);
-    WriteContent(fileContent, "\", ClientDB::FieldType::");
-
-    switch (property.kind)
-    {
-        case TypeParser::TypePropertyKind::boolean:
-        {
-            WriteContent(fileContent, "i8");
-            break;
-        }
-
-        case TypeParser::TypePropertyKind::array:
-        {
-            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.arrayInfo->kind));
-            WriteContent(fileContent, ", ");
-            WriteContent(fileContent, std::to_string(property.arrayInfo->count));
-            break;
-        }
-        default:
-        {
-            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind));
-            break;
-        }
-    }
-
-    WriteContent(fileContent, " }");
-};
-
-void WriteClientDBMetaFields(std::string& fileContent, const TypeParser::ParsedTypeProperty& parameterProperties, u32 numParameters, u32 indent)
-{
-    WriteContent(fileContent, "static inline std::vector<ClientDB::FieldInfo> FieldInfo =\n", indent);
-    WriteContent(fileContent, "{\n", indent);
-
-    indent++;
-    {
-        for (u32 valueIndex = 0; valueIndex < numParameters; valueIndex++)
-        {
-            const TypeParser::TypeProperty& property = parameterProperties.values[valueIndex];
-
-            WriteClientDBMetaField(fileContent, property, indent);
-
-            if (valueIndex != numParameters - 1)
-                WriteContent(fileContent, ",");
-
-            WriteContent(fileContent, "\n");
-        }
-    }
-    indent--;
-
-    WriteContent(fileContent, "};\n\n", indent);
-};
-
 void WriteMetaName(std::string& fileContent, const std::string& name, u32 indent)
 {
     WriteContent(fileContent, "static inline std::string Name = \"", indent);
@@ -130,7 +47,6 @@ void WriteMetaNameHash(std::string& fileContent, const std::string& name, u32 in
     WriteContent(fileContent, std::to_string(hash));
     WriteContent(fileContent, ";\n\n");
 };
-
 void WriteDefaultConstructors(std::string& fileContent, const std::string& structName, u32 indent)
 {
     // Default Constructor
@@ -164,6 +80,86 @@ void WriteDefaultConstructors(std::string& fileContent, const std::string& struc
     }
 };
 
+bool WriteClientDBField(std::string& fileContent, const std::string& name, const TypeParser::TypeProperty& property, u32 indent)
+{
+    switch (property.kind)
+    {
+        case TypeParser::TypePropertyKind::string:
+        {
+            NC_LOG_ERROR("ClientDB Record '{0}' has a string field which is not allowed (Did you mean to use 'stringref')", name);
+            return false;
+        }
+
+        case TypeParser::TypePropertyKind::array:
+        {
+            WriteArrayField(fileContent, *property.arrayInfo, indent);
+            break;
+        }
+        default:
+        {
+            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind), indent);
+            break;
+        }
+    }
+
+    WriteContent(fileContent, " ");
+    WriteContent(fileContent, property.name);
+    WriteContent(fileContent, ";\n");
+    return true;
+};
+void WriteClientDBMetaField(std::string& fileContent, const TypeParser::TypeProperty& property, u32 indent)
+{
+    WriteContent(fileContent, "{ \"", indent);
+    WriteContent(fileContent, property.name);
+    WriteContent(fileContent, "\", ClientDB::FieldType::");
+
+    switch (property.kind)
+    {
+        case TypeParser::TypePropertyKind::boolean:
+        {
+            WriteContent(fileContent, "i8");
+            break;
+        }
+
+        case TypeParser::TypePropertyKind::array:
+        {
+            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.arrayInfo->kind));
+            WriteContent(fileContent, ", ");
+            WriteContent(fileContent, std::to_string(property.arrayInfo->count));
+            break;
+        }
+        default:
+        {
+            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind));
+            break;
+        }
+    }
+
+    WriteContent(fileContent, " }");
+};
+void WriteClientDBMetaFields(std::string& fileContent, const TypeParser::ParsedTypeProperty& parameterProperties, u32 numParameters, u32 indent)
+{
+    WriteContent(fileContent, "static inline std::vector<ClientDB::FieldInfo> FieldInfo =\n", indent);
+    WriteContent(fileContent, "{\n", indent);
+
+    indent++;
+    {
+        for (u32 valueIndex = 0; valueIndex < numParameters; valueIndex++)
+        {
+            const TypeParser::TypeProperty& property = parameterProperties.values[valueIndex];
+
+            WriteClientDBMetaField(fileContent, property, indent);
+
+            if (valueIndex != numParameters - 1)
+                WriteContent(fileContent, ",");
+
+            WriteContent(fileContent, "\n");
+        }
+    }
+    indent--;
+
+    WriteContent(fileContent, "};\n\n", indent);
+};
 void WriteClientDBSerializeFunction(std::string& fileContent, u32 indent)
 {
     WriteContent(fileContent, "bool Serialize(Bytebuffer* buffer) const\n", indent);
@@ -178,7 +174,6 @@ void WriteClientDBSerializeFunction(std::string& fileContent, u32 indent)
 
     WriteContent(fileContent, "}\n\n", indent);
 };
-
 void WriteClientDBDeserializeFunction(std::string& fileContent, u32 indent)
 {
     WriteContent(fileContent, "bool Deserialize(Bytebuffer* buffer)\n", indent);
@@ -210,19 +205,6 @@ bool WriteCommandField(std::string& fileContent, const std::string& name, const 
             return false;
         }
 
-        case TypeParser::TypePropertyKind::vec2:
-        case TypeParser::TypePropertyKind::vec3:
-        case TypeParser::TypePropertyKind::vec4:
-        case TypeParser::TypePropertyKind::ivec2:
-        case TypeParser::TypePropertyKind::ivec3:
-        case TypeParser::TypePropertyKind::ivec4:
-        case TypeParser::TypePropertyKind::uvec2:
-        case TypeParser::TypePropertyKind::uvec3:
-        case TypeParser::TypePropertyKind::uvec4:
-        {
-            NC_LOG_ERROR("Command '{0}' has a vector field which is currently not supported", name);
-            break;
-        }
 
         case TypeParser::TypePropertyKind::string:
         {
@@ -243,7 +225,6 @@ bool WriteCommandField(std::string& fileContent, const std::string& name, const 
 
     return true;
 };
-
 bool WriteCommandFields(std::string& fileContent, const std::string& name, const TypeParser::ParsedTypeProperty& parameterProperties, u32 numParameters, u32 indent)
 {
     for (u32 valueIndex = 0; valueIndex < numParameters; valueIndex++)
@@ -259,7 +240,6 @@ bool WriteCommandFields(std::string& fileContent, const std::string& name, const
 
     return true;
 };
-
 void WriteCommandMetaParameters(std::string& fileContent, u32 numParameters, u32 numOptionalParameters, u32 indent)
 {
     WriteContent(fileContent, "static inline constexpr u32 NumParameters = ", indent);
@@ -270,7 +250,6 @@ void WriteCommandMetaParameters(std::string& fileContent, u32 numParameters, u32
     WriteContent(fileContent, std::to_string(numOptionalParameters));
     WriteContent(fileContent, ";\n\n");
 };
-
 void WriteCommandMetaNameList(std::string& fileContent, const TypeParser::ParsedTypeProperty& namesProperties, u32 numCommandNames, u32 indent)
 {
     WriteContent(fileContent, "static inline constexpr std::array<std::string_view, ", indent);
@@ -302,7 +281,6 @@ void WriteCommandMetaNameList(std::string& fileContent, const TypeParser::Parsed
 
     WriteContent(fileContent, "};\n");
 };
-
 void WriteCommandMetaHelp(std::string& fileContent, const TypeParser::ParsedTypeProperty& parameterProperties, u32 numParameters, u32 indent)
 {
     WriteContent(fileContent, "static inline constexpr std::string_view CommandHelp = \"(", indent);
@@ -319,7 +297,6 @@ void WriteCommandMetaHelp(std::string& fileContent, const TypeParser::ParsedType
 
     WriteContent(fileContent, ")\";\n\n");
 };
-
 void WriteCommandMetaParameterNameList(std::string& fileContent, const TypeParser::ParsedTypeProperty& parameterProperties, u32 numParameters, u32 indent)
 {
     WriteContent(fileContent, "static inline constexpr std::array<std::string_view, ", indent);
@@ -351,7 +328,6 @@ void WriteCommandMetaParameterNameList(std::string& fileContent, const TypeParse
 
     WriteContent(fileContent, "};\n");
 };
-
 void WriteCommandMetaParameterTypeList(std::string& fileContent, const TypeParser::ParsedTypeProperty& parameterProperties, u32 numParameters, u32 indent)
 {
     WriteContent(fileContent, "using ParameterTypeList = std::tuple<", indent);
@@ -380,7 +356,6 @@ void WriteCommandMetaParameterTypeList(std::string& fileContent, const TypeParse
     }
     WriteContent(fileContent, ">;\n\n");
 };
-
 void WriteCommandReadFunction(std::string& fileContent, const std::string& structName, const TypeParser::ParsedTypeProperty& parameterProperties, u32 numParameters, u32 indent)
 {
     WriteContent(fileContent, "static bool Read(std::vector<std::string>& parameters, ", indent);
@@ -527,6 +502,429 @@ void WriteCommandReadFunction(std::string& fileContent, const std::string& struc
         }
 
         WriteContent(fileContent, "return true;\n", indent);
+    }
+    indent--;
+
+    WriteContent(fileContent, "}\n", indent);
+};
+
+bool WritePacketField(std::string& fileContent, const std::string& name, const TypeParser::TypeProperty& property, u32 indent)
+{
+    switch (property.kind)
+    {
+        case TypeParser::TypePropertyKind::None:
+        case TypeParser::TypePropertyKind::Auto:
+        case TypeParser::TypePropertyKind::Value:
+        case TypeParser::TypePropertyKind::Identifier:
+        case TypeParser::TypePropertyKind::StringRef:
+        {
+            NC_LOG_ERROR("Packet '{0}' has a {1} field which is not allowed", name, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind));
+            return false;
+        }
+
+        case TypeParser::TypePropertyKind::string:
+        {
+            WriteContent(fileContent, "std::string", indent);
+            break;
+        }
+
+        case TypeParser::TypePropertyKind::array:
+        {
+            WriteArrayField(fileContent, *property.arrayInfo, indent);
+            break;
+        }
+
+        default:
+        {
+            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind), indent);
+            break;
+        }
+    }
+
+    WriteContent(fileContent, " ");
+    WriteContent(fileContent, property.name);
+    WriteContent(fileContent, ";\n");
+
+    return true;
+};
+bool WritePacketFields(std::string& fileContent, const std::string& name, const TypeParser::ParsedTypeProperty& fieldProperties, u32 numFields, u32 indent)
+{
+    for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+    {
+        const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
+        
+        if (!WritePacketField(fileContent, name, property, indent))
+            return false;
+
+        if (valueIndex == numFields - 1)
+            WriteContent(fileContent, "\n");
+    }
+
+    return true;
+};
+void WritePacketSerializeFunction(std::string& fileContent, const TypeParser::ParsedTypeProperty& fieldProperties, u32 numFields, u32 indent)
+{
+    WriteContent(fileContent, "bool Serialize(Bytebuffer* buffer) const\n", indent);
+    WriteContent(fileContent, "{\n", indent);
+
+    indent++;
+    {
+        if (numFields == 0)
+        {
+            WriteContent(fileContent, "return true;\n", indent);
+        }
+        else
+        {
+            WriteContent(fileContent, "bool failed = false;\n\n", indent);
+
+            for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+            {
+                const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
+
+                WriteContent(fileContent, "failed |= !buffer->", indent);
+
+                switch (property.kind)
+                {
+                    case TypeParser::TypePropertyKind::i8:
+                    {
+                        WriteContent(fileContent, "PutI8(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i16:
+                    {
+                        WriteContent(fileContent, "PutI16(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i32:
+                    {
+                        WriteContent(fileContent, "PutI32(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i64:
+                    {
+                        WriteContent(fileContent, "PutI64(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u8:
+                    {
+                        WriteContent(fileContent, "PutU8(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u16:
+                    {
+                        WriteContent(fileContent, "PutU16(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u32:
+                    {
+                        WriteContent(fileContent, "PutU32(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u64:
+                    {
+                        WriteContent(fileContent, "PutU64(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::f32:
+                    {
+                        WriteContent(fileContent, "PutF32(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::f64:
+                    {
+                        WriteContent(fileContent, "PutF64(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::string:
+                    {
+                        WriteContent(fileContent, "PutString(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::objectguid:
+                    {
+                        WriteContent(fileContent, "Serialize(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    default:
+                    {
+                        WriteContent(fileContent, "Put(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+                }
+
+                WriteContent(fileContent, ");\n");
+            }
+
+            WriteContent(fileContent, "\n");
+            WriteContent(fileContent, "return !failed;\n", indent);
+        }
+    }
+    indent--;
+
+    WriteContent(fileContent, "}\n", indent);
+};
+void WritePacketDeserializeFunction(std::string& fileContent, const TypeParser::ParsedTypeProperty& fieldProperties, u32 numFields, u32 indent)
+{
+    WriteContent(fileContent, "bool Deserialize(Bytebuffer* buffer)\n", indent);
+    WriteContent(fileContent, "{\n", indent);
+
+    indent++;
+    {
+        if (numFields == 0)
+        {
+            WriteContent(fileContent, "return true;\n", indent);
+        }
+        else
+        {
+            WriteContent(fileContent, "bool failed = false;\n\n", indent);
+
+            for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+            {
+                const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
+
+                WriteContent(fileContent, "failed |= !buffer->", indent);
+
+                switch (property.kind)
+                {
+                    case TypeParser::TypePropertyKind::i8:
+                    {
+                        WriteContent(fileContent, "GetI8(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i16:
+                    {
+                        WriteContent(fileContent, "GetI16(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i32:
+                    {
+                        WriteContent(fileContent, "GetI32(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i64:
+                    {
+                        WriteContent(fileContent, "GetI64(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u8:
+                    {
+                        WriteContent(fileContent, "GetU8(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u16:
+                    {
+                        WriteContent(fileContent, "GetU16(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u32:
+                    {
+                        WriteContent(fileContent, "GetU32(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::u64:
+                    {
+                        WriteContent(fileContent, "GetU64(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::f32:
+                    {
+                        WriteContent(fileContent, "GetF32(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::f64:
+                    {
+                        WriteContent(fileContent, "GetF64(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::string:
+                    {
+                        WriteContent(fileContent, "GetString(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::objectguid:
+                    {
+                        WriteContent(fileContent, "Deserialize(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    default:
+                    {
+                        WriteContent(fileContent, "Get(");
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+                }
+
+                WriteContent(fileContent, ");\n");
+            }
+
+            WriteContent(fileContent, "\n");
+            WriteContent(fileContent, "return !failed;\n", indent);
+        }
+    }
+    indent--;
+
+    WriteContent(fileContent, "}\n", indent);
+};
+void WritePacketGetSerializedSizeFunction(std::string& fileContent, const TypeParser::ParsedTypeProperty& fieldProperties, u32 numFields, u32 indent)
+{
+    WriteContent(fileContent, "u16 GetSerializedSize() const\n", indent);
+    WriteContent(fileContent, "{\n", indent);
+
+    indent++;
+    {
+        if (numFields == 0)
+        {
+            WriteContent(fileContent, "return 0;\n", indent);
+        }
+        else
+        {
+            WriteContent(fileContent, "u16 size = 0;\n\n", indent);
+
+            u32 size = 0;
+
+            for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+            {
+                const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
+
+                switch (property.kind)
+                {
+                    case TypeParser::TypePropertyKind::boolean:
+                    case TypeParser::TypePropertyKind::i8:
+                    case TypeParser::TypePropertyKind::u8:
+                    {
+                        size += 1;
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i16:
+                    case TypeParser::TypePropertyKind::u16:
+                    {
+                        size += 2;
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i32:
+                    case TypeParser::TypePropertyKind::u32:
+                    case TypeParser::TypePropertyKind::f32:
+                    {
+                        size += 4;
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i64:
+                    case TypeParser::TypePropertyKind::u64:
+                    case TypeParser::TypePropertyKind::f64:
+                    case TypeParser::TypePropertyKind::vec2:
+                    case TypeParser::TypePropertyKind::ivec2:
+                    case TypeParser::TypePropertyKind::uvec2:
+                    {
+                        size += 8;
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::vec3:
+                    case TypeParser::TypePropertyKind::ivec3:
+                    case TypeParser::TypePropertyKind::uvec3:
+                    {
+                        size += 12;
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::vec4:
+                    case TypeParser::TypePropertyKind::ivec4:
+                    case TypeParser::TypePropertyKind::uvec4:
+                    {
+                        size += 16;
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::string:
+                    {
+                        WriteContent(fileContent, "size += static_cast<u16>(", indent);
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".length() + 1);\n");
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::array:
+                    {
+                        WriteContent(fileContent, "size += static_cast<u16>(", indent);
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".size() * sizeof(");
+                        WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.arrayInfo->kind));
+                        WriteContent(fileContent, "));\n");
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::objectguid:
+                    {
+                        WriteContent(fileContent, "size += static_cast<u16>(", indent);
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".GetCounterBytesUsed() + 1);\n");
+                        break;
+                    }
+                }
+            }
+
+            if (size > 0)
+            {
+                WriteContent(fileContent, "size += ", indent);
+                WriteContent(fileContent, std::to_string(size));
+                WriteContent(fileContent, ";\n");
+            }
+
+            WriteContent(fileContent, "\n");
+            WriteContent(fileContent, "return size;\n", indent);
+        }
     }
     indent--;
 
@@ -767,7 +1165,7 @@ bool GenerateClientDB(const TypeParser::ParsedType& parsedType, std::string& fil
 bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileContent)
 {
     std::string name = std::string(parsedType.identifierToken->nameHash.name, parsedType.identifierToken->nameHash.length);
-    std::string enumName = name + "Enum";
+    const std::string& enumName = name + "Enum";
 
     u32 indent = 1;
     u32 enumIndentLevel = indent;
@@ -957,6 +1355,7 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
                 if (isManualValue && property.arrayInfo->isNegative)
                 {
                     NC_LOG_ERROR("Enum '{0}' has field '{1}' with a negative value '{2}' which is not permitted for the type {3}", name, property.name, -static_cast<i64>(valueUnsigned), TypeParser::ParsedTypeProperty::GetTypePropertyKindName(typeProperty.type.kind));
+                    return false;
                 }
 
                 if (valueUnsigned > unsignedMaxValueForType)
@@ -967,7 +1366,7 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
 
                 if (valueUnsigned < unsignedMaxValue)
                 {
-                    NC_LOG_ERROR("Enum '{0}' has field '{1}' with a value '{2}' less than or equal to the previous field '{4}'", name, property.name, valueUnsigned, unsignedMaxValue);
+                    NC_LOG_ERROR("Enum '{0}' has field '{1}' with a value '{2}' less than or equal to the previous field '{3}'", name, property.name, valueUnsigned, unsignedMaxValue);
                     return false;
                 }
 
@@ -994,10 +1393,10 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
             else
                 WriteContent(fileContent, ",\n");
         }
+
+        WriteContent(fileContent, "};\n", indent - 1);
     }
     indent--;
-
-    WriteContent(fileContent, "};\n", indent);
 
     std::string structMetaName = enumName + "Meta";
     WriteContent(fileContent, "struct ", indent);
@@ -1054,16 +1453,112 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
         }
         indent--;
         WriteContent(fileContent, "};\n");
+
+        WriteContent(fileContent, "};\n", indent - 1);
+    }
+    indent--;
+
+    {
+        WriteContent(fileContent, "DECLARE_GENERIC_BITWISE_OPERATORS(", indent);
+        WriteContent(fileContent, enumName);
+        WriteContent(fileContent, ");\n");
+    }
+
+    return true;
+}
+bool GeneratePacket(const TypeParser::ParsedType& parsedType, std::string& fileContent, u16& currentMaxPacketID)
+{
+    std::string name = std::string(parsedType.identifierToken->nameHash.name, parsedType.identifierToken->nameHash.length);
+
+    u32 indent = 1;
+    u32 structIndentLevel = indent;
+
+    u32 propertyNameHash = "Name"_djb2;
+    u32 propertyTypeHash = "Type"_djb2;
+
+    if (!parsedType.propertyHashToIndex.contains(propertyNameHash))
+    {
+        NC_LOG_ERROR("Packet '{0}' missing 'Name' property", name);
+        return false;
+    }
+
+    u32 namePropertyIndex = parsedType.propertyHashToIndex.at(propertyNameHash);
+    const TypeParser::ParsedTypeProperty& nameProperty = parsedType.properties[namePropertyIndex];
+
+    u32 numNames = static_cast<u32>(nameProperty.values.size());
+    if (numNames == 0)
+    {
+        NC_LOG_ERROR("Packet '{0}' 'Name' property has no values", name);
+        return false;
+    }
+
+    if (numNames > 1)
+    {
+        NC_LOG_ERROR("Packet '{0}' 'Name' property has multiple values, only one is allowed", name);
+        return false;
+    }
+
+    const std::string& packetName = nameProperty.values[0].name;
+    if (packetName.empty() || !std::isalpha(packetName[0]) || !StringUtils::StringIsAlphaNumeric(packetName))
+    {
+        NC_LOG_ERROR("Packet '{0}' field 'Name' is malformed. Name must start with a non numeric character and be strictly alpha numeric", name);
+        return false;
+    }
+
+    std::string structName = nameProperty.values[0].name + "Packet";
+    WriteContent(fileContent, "struct ", indent);
+    WriteContent(fileContent, structName);
+    WriteContent(fileContent, "\n");
+    WriteContent(fileContent, "{\n", indent);
+
+    u32 fieldsPropertyHash = "Fields"_djb2;
+
+    if (!parsedType.propertyHashToIndex.contains(fieldsPropertyHash))
+    {
+        NC_LOG_ERROR("Packet '{0}' missing 'Fields' property", name);
+        return false;
+    }
+
+    if (currentMaxPacketID == std::numeric_limits<u16>::max())
+    {
+        NC_LOG_ERROR("Packet '{0}' exceeded maximum number of packets (65536)", name);
+        return false;
+    }
+
+    u32 fieldsPropertyIndex = parsedType.propertyHashToIndex.at(fieldsPropertyHash);
+    const TypeParser::ParsedTypeProperty& fieldsProperties = parsedType.properties[fieldsPropertyIndex];
+
+    indent++;
+    {
+        WriteContent(fileContent, "public:\n", indent - 1);
+        WriteContent(fileContent, "static constexpr u16 PACKET_ID = ", indent);
+        WriteContent(fileContent, std::to_string(currentMaxPacketID++));
+        WriteContent(fileContent, ";\n\n");
+
+        u32 numFields = static_cast<u32>(fieldsProperties.values.size());
+        if (numFields > 0)
+        {
+            {
+                WritePacketFields(fileContent, name, fieldsProperties, numFields, indent);
+            }
+        }
+
+        {
+            WriteContent(fileContent, "public:\n", indent - 1);
+
+            WritePacketSerializeFunction(fileContent, fieldsProperties, numFields, indent);
+            WritePacketDeserializeFunction(fileContent, fieldsProperties, numFields, indent);
+            WritePacketGetSerializedSizeFunction(fileContent, fieldsProperties, numFields, indent);
+        }
     }
     indent--;
 
     WriteContent(fileContent, "};\n", indent);
 
-
     return true;
 }
 
-bool GenerateParsedType(const TypeParser::ParsedType& parsedType, std::string& fileContent)
+bool GenerateParsedType(const TypeParser::ParsedType& parsedType, std::string& fileContent, u16& currentMaxPacketID)
 {
     switch (parsedType.kind)
     {
@@ -1080,6 +1575,11 @@ bool GenerateParsedType(const TypeParser::ParsedType& parsedType, std::string& f
         case TypeParser::ParsedTypeKind::Enum:
         {
             return GenerateEnum(parsedType, fileContent);
+        }
+
+        case TypeParser::ParsedTypeKind::Packet:
+        {
+            return GeneratePacket(parsedType, fileContent, currentMaxPacketID);
         }
 
         default: break;
@@ -1134,6 +1634,8 @@ i32 main(int argc, char* argv[])
     std::string fileContent;
     fileContent.reserve(2048);
 
+    u16 currentMaxPacketID = 0;
+
     // Find all luau files in the source directory
     for (auto& dirEntry : std::filesystem::recursive_directory_iterator(sourceDir))
     {
@@ -1178,6 +1680,7 @@ i32 main(int argc, char* argv[])
             u32 numCommands = 0;
             u32 numClientDBs = 0;
             u32 numEnums = 0;
+            u32 numPackets = 0;
 
             u32 numParsedTypes = static_cast<u32>(module.parserInfo.parsedTypes.size());
             for (u32 parsedTypeIndex = 0; parsedTypeIndex < numParsedTypes; parsedTypeIndex++)
@@ -1187,10 +1690,17 @@ i32 main(int argc, char* argv[])
                 numClientDBs += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::ClientDB);
                 numCommands += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::Command);
                 numEnums += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::Enum);
+                numPackets += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::Packet);
             }
 
             WriteContent(fileContent, "#pragma once\n");
             WriteContent(fileContent, "#include <Base/Types.h>\n\n");
+
+            if (numClientDBs > 0 || numPackets > 0)
+            {
+                WriteContent(fileContent, "#include <Base/Memory/Bytebuffer.h>");
+                WriteContent(fileContent, "\n");
+            }
 
             if (numClientDBs > 0)
             {
@@ -1198,7 +1708,7 @@ i32 main(int argc, char* argv[])
                 WriteContent(fileContent, "\n");
             }
 
-            if (numCommands > 0 || numEnums > 0)
+            if (numCommands > 0 || numEnums > 0 || numPackets > 0)
             {
                 WriteContent(fileContent, "#include <array>\n");
             }
@@ -1210,19 +1720,14 @@ i32 main(int argc, char* argv[])
                 WriteContent(fileContent, "#include <string>\n");
                 WriteContent(fileContent, "#include <tuple>\n");
             }
+
             if (numEnums > 0)
             {
                 WriteContent(fileContent, "#include <utility>\n");
             }
 
-            if (numCommands > 0 || numEnums)
+            if (numCommands > 0 || numEnums > 0 || numPackets > 0)
             {
-                WriteContent(fileContent, "\n");
-            }
-
-            if (numClientDBs > 0)
-            {
-                WriteContent(fileContent, "class Bytebuffer;\n");
                 WriteContent(fileContent, "\n");
             }
 
@@ -1234,7 +1739,7 @@ i32 main(int argc, char* argv[])
             for (u32 parsedTypeIndex = 0; parsedTypeIndex < numParsedTypes; parsedTypeIndex++)
             {
                 const TypeParser::ParsedType& parsedType = module.parserInfo.parsedTypes[parsedTypeIndex];
-                failed |= !GenerateParsedType(parsedType, fileContent);
+                failed |= !GenerateParsedType(parsedType, fileContent, currentMaxPacketID);
 
                 if (failed)
                     break;

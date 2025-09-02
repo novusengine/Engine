@@ -8,14 +8,13 @@
 
 #include <math.h>
 
+LUAU_FASTFLAGVARIABLE(LuauCodeGenDirectBtest)
+LUAU_FASTFLAGVARIABLE(LuauCodeGenVectorLerp)
+
 // TODO: when nresults is less than our actual result count, we can skip computing/writing unused results
 
 static const int kMinMaxUnrolledParams = 5;
 static const int kBit32BinaryOpUnrolledParams = 5;
-
-LUAU_FASTFLAGVARIABLE(LuauVectorLibNativeCodegen);
-LUAU_FASTFLAGVARIABLE(LuauVectorLibNativeDot);
-LUAU_FASTFLAGVARIABLE(LuauCodeGenLerp);
 
 namespace Luau
 {
@@ -285,6 +284,31 @@ static BuiltinImplResult translateBuiltinMathClamp(
     return {BuiltinImplType::UsesFallback, 1};
 }
 
+static BuiltinImplResult translateBuiltinVectorLerp(IrBuilder& build, int nparams, int ra, int arg, IrOp args, IrOp arg3, int nresults, int pcpos)
+{
+    if (!FFlag::LuauCodeGenVectorLerp || nparams < 3 || nresults > 1)
+        return {BuiltinImplType::None, -1};
+
+    IrOp arg1 = build.vmReg(arg);
+    build.loadAndCheckTag(arg1, LUA_TVECTOR, build.vmExit(pcpos));
+    build.loadAndCheckTag(args, LUA_TVECTOR, build.vmExit(pcpos));
+    builtinCheckDouble(build, arg3, pcpos);
+
+    IrOp a = build.inst(IrCmd::LOAD_TVALUE, arg1);
+    IrOp b = build.inst(IrCmd::LOAD_TVALUE, args);
+    IrOp t = builtinLoadDouble(build, arg3);
+
+    IrOp tvec = build.inst(IrCmd::NUM_TO_VEC, t);
+    IrOp one = build.inst(IrCmd::NUM_TO_VEC, build.constDouble(1.0));
+    IrOp diff = build.inst(IrCmd::SUB_VEC, b, a);
+    IrOp incr = build.inst(IrCmd::MUL_VEC, diff, tvec);
+    IrOp res = build.inst(IrCmd::ADD_VEC, a, incr);
+    IrOp ret = build.inst(IrCmd::SELECT_VEC, res, b, tvec, one);
+    build.inst(IrCmd::STORE_TVALUE, build.vmReg(ra), build.inst(IrCmd::TAG_VECTOR, ret));
+
+    return {BuiltinImplType::Full, 1};
+}
+
 static BuiltinImplResult translateBuiltinMathLerp(
     IrBuilder& build,
     int nparams,
@@ -297,8 +321,6 @@ static BuiltinImplResult translateBuiltinMathLerp(
     int pcpos
 )
 {
-    LUAU_ASSERT(FFlag::LuauCodeGenLerp);
-
     if (nparams < 3 || nresults > 1)
         return {BuiltinImplType::None, -1};
 
@@ -417,21 +439,30 @@ static BuiltinImplResult translateBuiltinBit32BinaryOp(
 
     if (btest)
     {
-        IrOp falsey = build.block(IrBlockKind::Internal);
-        IrOp truthy = build.block(IrBlockKind::Internal);
-        IrOp exit = build.block(IrBlockKind::Internal);
-        build.inst(IrCmd::JUMP_CMP_INT, res, build.constInt(0), build.cond(IrCondition::Equal), falsey, truthy);
+        if (FFlag::LuauCodeGenDirectBtest)
+        {
+            IrOp value = build.inst(IrCmd::CMP_INT, res, build.constInt(0), build.cond(IrCondition::NotEqual));
+            build.inst(IrCmd::STORE_INT, build.vmReg(ra), value);
+            build.inst(IrCmd::STORE_TAG, build.vmReg(ra), build.constTag(LUA_TBOOLEAN));
+        }
+        else
+        {
+            IrOp falsey = build.block(IrBlockKind::Internal);
+            IrOp truthy = build.block(IrBlockKind::Internal);
+            IrOp exit = build.block(IrBlockKind::Internal);
+            build.inst(IrCmd::JUMP_CMP_INT, res, build.constInt(0), build.cond(IrCondition::Equal), falsey, truthy);
 
-        build.beginBlock(falsey);
-        build.inst(IrCmd::STORE_INT, build.vmReg(ra), build.constInt(0));
-        build.inst(IrCmd::JUMP, exit);
+            build.beginBlock(falsey);
+            build.inst(IrCmd::STORE_INT, build.vmReg(ra), build.constInt(0));
+            build.inst(IrCmd::JUMP, exit);
 
-        build.beginBlock(truthy);
-        build.inst(IrCmd::STORE_INT, build.vmReg(ra), build.constInt(1));
-        build.inst(IrCmd::JUMP, exit);
+            build.beginBlock(truthy);
+            build.inst(IrCmd::STORE_INT, build.vmReg(ra), build.constInt(1));
+            build.inst(IrCmd::JUMP, exit);
 
-        build.beginBlock(exit);
-        build.inst(IrCmd::STORE_TAG, build.vmReg(ra), build.constTag(LUA_TBOOLEAN));
+            build.beginBlock(exit);
+            build.inst(IrCmd::STORE_TAG, build.vmReg(ra), build.constTag(LUA_TBOOLEAN));
+        }
     }
     else
     {
@@ -936,8 +967,6 @@ static BuiltinImplResult translateBuiltinVectorMagnitude(
     int pcpos
 )
 {
-    LUAU_ASSERT(FFlag::LuauVectorLibNativeCodegen);
-
     IrOp arg1 = build.vmReg(arg);
 
     if (nparams != 1 || nresults > 1 || arg1.kind == IrOpKind::Constant)
@@ -945,26 +974,9 @@ static BuiltinImplResult translateBuiltinVectorMagnitude(
 
     build.loadAndCheckTag(arg1, LUA_TVECTOR, build.vmExit(pcpos));
 
-    IrOp sum;
+    IrOp a = build.inst(IrCmd::LOAD_TVALUE, arg1, build.constInt(0));
 
-    if (FFlag::LuauVectorLibNativeDot)
-    {
-        IrOp a = build.inst(IrCmd::LOAD_TVALUE, arg1, build.constInt(0));
-
-        sum = build.inst(IrCmd::DOT_VEC, a, a);
-    }
-    else
-    {
-        IrOp x = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(0));
-        IrOp y = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(4));
-        IrOp z = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(8));
-
-        IrOp x2 = build.inst(IrCmd::MUL_NUM, x, x);
-        IrOp y2 = build.inst(IrCmd::MUL_NUM, y, y);
-        IrOp z2 = build.inst(IrCmd::MUL_NUM, z, z);
-
-        sum = build.inst(IrCmd::ADD_NUM, build.inst(IrCmd::ADD_NUM, x2, y2), z2);
-    }
+    IrOp sum = build.inst(IrCmd::DOT_VEC, a, a);
 
     IrOp mag = build.inst(IrCmd::SQRT_NUM, sum);
 
@@ -985,8 +997,6 @@ static BuiltinImplResult translateBuiltinVectorNormalize(
     int pcpos
 )
 {
-    LUAU_ASSERT(FFlag::LuauVectorLibNativeCodegen);
-
     IrOp arg1 = build.vmReg(arg);
 
     if (nparams != 1 || nresults > 1 || arg1.kind == IrOpKind::Constant)
@@ -994,51 +1004,24 @@ static BuiltinImplResult translateBuiltinVectorNormalize(
 
     build.loadAndCheckTag(arg1, LUA_TVECTOR, build.vmExit(pcpos));
 
-    if (FFlag::LuauVectorLibNativeDot)
-    {
-        IrOp a = build.inst(IrCmd::LOAD_TVALUE, arg1, build.constInt(0));
-        IrOp sum = build.inst(IrCmd::DOT_VEC, a, a);
+    IrOp a = build.inst(IrCmd::LOAD_TVALUE, arg1, build.constInt(0));
+    IrOp sum = build.inst(IrCmd::DOT_VEC, a, a);
 
-        IrOp mag = build.inst(IrCmd::SQRT_NUM, sum);
-        IrOp inv = build.inst(IrCmd::DIV_NUM, build.constDouble(1.0), mag);
-        IrOp invvec = build.inst(IrCmd::NUM_TO_VEC, inv);
+    IrOp mag = build.inst(IrCmd::SQRT_NUM, sum);
+    IrOp inv = build.inst(IrCmd::DIV_NUM, build.constDouble(1.0), mag);
+    IrOp invvec = build.inst(IrCmd::NUM_TO_VEC, inv);
 
-        IrOp result = build.inst(IrCmd::MUL_VEC, a, invvec);
+    IrOp result = build.inst(IrCmd::MUL_VEC, a, invvec);
 
-        result = build.inst(IrCmd::TAG_VECTOR, result);
+    result = build.inst(IrCmd::TAG_VECTOR, result);
 
-        build.inst(IrCmd::STORE_TVALUE, build.vmReg(ra), result);
-    }
-    else
-    {
-        IrOp x = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(0));
-        IrOp y = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(4));
-        IrOp z = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(8));
-
-        IrOp x2 = build.inst(IrCmd::MUL_NUM, x, x);
-        IrOp y2 = build.inst(IrCmd::MUL_NUM, y, y);
-        IrOp z2 = build.inst(IrCmd::MUL_NUM, z, z);
-
-        IrOp sum = build.inst(IrCmd::ADD_NUM, build.inst(IrCmd::ADD_NUM, x2, y2), z2);
-
-        IrOp mag = build.inst(IrCmd::SQRT_NUM, sum);
-        IrOp inv = build.inst(IrCmd::DIV_NUM, build.constDouble(1.0), mag);
-
-        IrOp xr = build.inst(IrCmd::MUL_NUM, x, inv);
-        IrOp yr = build.inst(IrCmd::MUL_NUM, y, inv);
-        IrOp zr = build.inst(IrCmd::MUL_NUM, z, inv);
-
-        build.inst(IrCmd::STORE_VECTOR, build.vmReg(ra), xr, yr, zr);
-        build.inst(IrCmd::STORE_TAG, build.vmReg(ra), build.constTag(LUA_TVECTOR));
-    }
+    build.inst(IrCmd::STORE_TVALUE, build.vmReg(ra), result);
 
     return {BuiltinImplType::Full, 1};
 }
 
 static BuiltinImplResult translateBuiltinVectorCross(IrBuilder& build, int nparams, int ra, int arg, IrOp args, IrOp arg3, int nresults, int pcpos)
 {
-    LUAU_ASSERT(FFlag::LuauVectorLibNativeCodegen);
-
     IrOp arg1 = build.vmReg(arg);
 
     if (nparams != 2 || nresults > 1 || arg1.kind == IrOpKind::Constant || args.kind == IrOpKind::Constant)
@@ -1076,8 +1059,6 @@ static BuiltinImplResult translateBuiltinVectorCross(IrBuilder& build, int npara
 
 static BuiltinImplResult translateBuiltinVectorDot(IrBuilder& build, int nparams, int ra, int arg, IrOp args, IrOp arg3, int nresults, int pcpos)
 {
-    LUAU_ASSERT(FFlag::LuauVectorLibNativeCodegen);
-
     IrOp arg1 = build.vmReg(arg);
 
     if (nparams != 2 || nresults > 1 || arg1.kind == IrOpKind::Constant || args.kind == IrOpKind::Constant)
@@ -1086,31 +1067,10 @@ static BuiltinImplResult translateBuiltinVectorDot(IrBuilder& build, int nparams
     build.loadAndCheckTag(arg1, LUA_TVECTOR, build.vmExit(pcpos));
     build.loadAndCheckTag(args, LUA_TVECTOR, build.vmExit(pcpos));
 
-    IrOp sum;
+    IrOp a = build.inst(IrCmd::LOAD_TVALUE, arg1, build.constInt(0));
+    IrOp b = build.inst(IrCmd::LOAD_TVALUE, args, build.constInt(0));
 
-    if (FFlag::LuauVectorLibNativeDot)
-    {
-        IrOp a = build.inst(IrCmd::LOAD_TVALUE, arg1, build.constInt(0));
-        IrOp b = build.inst(IrCmd::LOAD_TVALUE, args, build.constInt(0));
-
-        sum = build.inst(IrCmd::DOT_VEC, a, b);
-    }
-    else
-    {
-        IrOp x1 = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(0));
-        IrOp x2 = build.inst(IrCmd::LOAD_FLOAT, args, build.constInt(0));
-        IrOp xx = build.inst(IrCmd::MUL_NUM, x1, x2);
-
-        IrOp y1 = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(4));
-        IrOp y2 = build.inst(IrCmd::LOAD_FLOAT, args, build.constInt(4));
-        IrOp yy = build.inst(IrCmd::MUL_NUM, y1, y2);
-
-        IrOp z1 = build.inst(IrCmd::LOAD_FLOAT, arg1, build.constInt(8));
-        IrOp z2 = build.inst(IrCmd::LOAD_FLOAT, args, build.constInt(8));
-        IrOp zz = build.inst(IrCmd::MUL_NUM, z1, z2);
-
-        sum = build.inst(IrCmd::ADD_NUM, build.inst(IrCmd::ADD_NUM, xx, yy), zz);
-    }
+    IrOp sum = build.inst(IrCmd::DOT_VEC, a, b);
 
     build.inst(IrCmd::STORE_DOUBLE, build.vmReg(ra), sum);
     build.inst(IrCmd::STORE_TAG, build.vmReg(ra), build.constTag(LUA_TNUMBER));
@@ -1130,8 +1090,6 @@ static BuiltinImplResult translateBuiltinVectorMap1(
     int pcpos
 )
 {
-    LUAU_ASSERT(FFlag::LuauVectorLibNativeCodegen);
-
     IrOp arg1 = build.vmReg(arg);
 
     if (nparams != 1 || nresults > 1 || arg1.kind == IrOpKind::Constant)
@@ -1165,8 +1123,6 @@ static BuiltinImplResult translateBuiltinVectorClamp(
     int pcpos
 )
 {
-    LUAU_ASSERT(FFlag::LuauVectorLibNativeCodegen);
-
     IrOp arg1 = build.vmReg(arg);
 
     if (nparams != 3 || nresults > 1 || arg1.kind == IrOpKind::Constant || args.kind == IrOpKind::Constant || arg3.kind == IrOpKind::Constant)
@@ -1231,8 +1187,6 @@ static BuiltinImplResult translateBuiltinVectorMap2(
     int pcpos
 )
 {
-    LUAU_ASSERT(FFlag::LuauVectorLibNativeCodegen);
-
     IrOp arg1 = build.vmReg(arg);
 
     if (nparams != 2 || nresults > 1 || arg1.kind == IrOpKind::Constant || args.kind == IrOpKind::Constant)
@@ -1273,8 +1227,6 @@ BuiltinImplResult translateBuiltin(
     int pcpos
 )
 {
-    BuiltinImplResult noneResult = {BuiltinImplType::None, -1};
-
     // Builtins are not allowed to handle variadic arguments
     if (nparams == LUA_MULTRET)
         return {BuiltinImplType::None, -1};
@@ -1396,36 +1348,31 @@ BuiltinImplResult translateBuiltin(
     case LBF_BUFFER_WRITEF64:
         return translateBuiltinBufferWrite(build, nparams, ra, arg, args, arg3, nresults, pcpos, IrCmd::BUFFER_WRITEF64, 8, IrCmd::NOP);
     case LBF_VECTOR_MAGNITUDE:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorMagnitude(build, nparams, ra, arg, args, arg3, nresults, pcpos) : noneResult;
+        return translateBuiltinVectorMagnitude(build, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_NORMALIZE:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorNormalize(build, nparams, ra, arg, args, arg3, nresults, pcpos) : noneResult;
+        return translateBuiltinVectorNormalize(build, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_CROSS:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorCross(build, nparams, ra, arg, args, arg3, nresults, pcpos) : noneResult;
+        return translateBuiltinVectorCross(build, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_DOT:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorDot(build, nparams, ra, arg, args, arg3, nresults, pcpos) : noneResult;
+        return translateBuiltinVectorDot(build, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_FLOOR:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorMap1(build, IrCmd::FLOOR_NUM, nparams, ra, arg, args, arg3, nresults, pcpos)
-                                                 : noneResult;
+        return translateBuiltinVectorMap1(build, IrCmd::FLOOR_NUM, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_CEIL:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorMap1(build, IrCmd::CEIL_NUM, nparams, ra, arg, args, arg3, nresults, pcpos)
-                                                 : noneResult;
+        return translateBuiltinVectorMap1(build, IrCmd::CEIL_NUM, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_ABS:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorMap1(build, IrCmd::ABS_NUM, nparams, ra, arg, args, arg3, nresults, pcpos)
-                                                 : noneResult;
+        return translateBuiltinVectorMap1(build, IrCmd::ABS_NUM, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_SIGN:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorMap1(build, IrCmd::SIGN_NUM, nparams, ra, arg, args, arg3, nresults, pcpos)
-                                                 : noneResult;
+        return translateBuiltinVectorMap1(build, IrCmd::SIGN_NUM, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_CLAMP:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorClamp(build, nparams, ra, arg, args, arg3, nresults, fallback, pcpos)
-                                                 : noneResult;
+        return translateBuiltinVectorClamp(build, nparams, ra, arg, args, arg3, nresults, fallback, pcpos);
     case LBF_VECTOR_MIN:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorMap2(build, IrCmd::MIN_NUM, nparams, ra, arg, args, arg3, nresults, pcpos)
-                                                 : noneResult;
+        return translateBuiltinVectorMap2(build, IrCmd::MIN_NUM, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_VECTOR_MAX:
-        return FFlag::LuauVectorLibNativeCodegen ? translateBuiltinVectorMap2(build, IrCmd::MAX_NUM, nparams, ra, arg, args, arg3, nresults, pcpos)
-                                                 : noneResult;
+        return translateBuiltinVectorMap2(build, IrCmd::MAX_NUM, nparams, ra, arg, args, arg3, nresults, pcpos);
+    case LBF_VECTOR_LERP:
+        return translateBuiltinVectorLerp(build, nparams, ra, arg, args, arg3, nresults, pcpos);
     case LBF_MATH_LERP:
-        return FFlag::LuauCodeGenLerp ? translateBuiltinMathLerp(build, nparams, ra, arg, args, arg3, nresults, fallback, pcpos) : noneResult;
+        return translateBuiltinMathLerp(build, nparams, ra, arg, args, arg3, nresults, fallback, pcpos);
     default:
         return {BuiltinImplType::None, -1};
     }

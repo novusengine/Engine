@@ -53,7 +53,7 @@ namespace TypeParser
             }
             case Token::Kind::Keyword_Packet:
             {
-                parsedType.kind = ParsedTypeKind::Packet;
+                ParsePacket(lexerInfo, parsedType);
                 break;
             }
             case Token::Kind::Keyword_Enum:
@@ -109,6 +109,25 @@ namespace TypeParser
     void Parser::ParseEnum(LexerInfo& lexerInfo, ParsedType& parsedType)
     {
         parsedType.kind = ParsedTypeKind::Enum;
+        parsedType.properties.reserve(8);
+        parsedType.propertyHashToIndex.reserve(8);
+
+        parsedType.startToken = lexerInfo.ExpectToken(Token::Kind::Curley_Bracket_Open);
+        {
+            while (lexerInfo.PeekToken()->kind != Token::Kind::Curley_Bracket_Close)
+            {
+                ParseProperty(lexerInfo, parsedType);
+            }
+        }
+        parsedType.endToken = lexerInfo.ExpectToken(Token::Kind::Curley_Bracket_Close);
+
+        if (lexerInfo.PeekToken()->kind == Token::Kind::Semicolon)
+            lexerInfo.ConsumeToken();
+    }
+
+    void Parser::ParsePacket(LexerInfo& lexerInfo, ParsedType& parsedType)
+    {
+        parsedType.kind = ParsedTypeKind::Packet;
         parsedType.properties.reserve(8);
         parsedType.propertyHashToIndex.reserve(8);
 

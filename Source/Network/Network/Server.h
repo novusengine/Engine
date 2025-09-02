@@ -24,7 +24,7 @@ namespace Network
         void Start();
         bool RequestClose();
 
-        void Send(std::shared_ptr<Bytebuffer>& buffer);
+        void Send(std::shared_ptr<Bytebuffer> buffer);
 
     private:
         void Write();

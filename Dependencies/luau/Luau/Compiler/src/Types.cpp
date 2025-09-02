@@ -125,6 +125,10 @@ static LuauBytecodeType getType(
     {
         return getType(group->type, generics, typeAliases, resolveAliases, hostVectorType, userdataTypes, bytecode);
     }
+    else if (const AstTypeOptional* optional = ty->as<AstTypeOptional>())
+    {
+        return LBC_TYPE_NIL;
+    }
 
     return LBC_TYPE_ANY;
 }
@@ -767,6 +771,7 @@ struct TypeMapVisitor : AstVisitor
             case LBF_VECTOR_CLAMP:
             case LBF_VECTOR_MIN:
             case LBF_VECTOR_MAX:
+            case LBF_VECTOR_LERP:
                 recordResolvedType(node, &builtinTypes.vectorType);
                 break;
             }

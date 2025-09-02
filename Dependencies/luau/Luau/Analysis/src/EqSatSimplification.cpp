@@ -12,7 +12,6 @@
 #include "Luau/Type.h"
 #include "Luau/TypeArena.h"
 #include "Luau/TypeFunction.h"
-#include "Luau/VisitType.h"
 
 #include <fstream>
 #include <iomanip>
@@ -330,9 +329,9 @@ Id toId(
         return egraph.add(TOpaque{ty});
     else if (get<FunctionType>(ty))
         return egraph.add(TFunction{ty});
-    else if (ty == builtinTypes->classType)
+    else if (ty == builtinTypes->externType)
         return egraph.add(TTopClass{});
-    else if (get<ClassType>(ty))
+    else if (get<ExternType>(ty))
         return egraph.add(TClass{ty});
     else if (get<AnyType>(ty))
         return egraph.add(TAny{});
@@ -752,7 +751,7 @@ TypeId fromId(
     else if (node.get<TTopTable>())
         return builtinTypes->tableType;
     else if (node.get<TTopClass>())
-        return builtinTypes->classType;
+        return builtinTypes->externType;
     else if (node.get<TBuffer>())
         return builtinTypes->bufferType;
     else if (auto opaque = node.get<TOpaque>())
@@ -1007,7 +1006,7 @@ static std::string getNodeName(const StringCache& strings, const EType& node)
         return "\xe2\x88\xa9";
     else if (auto cls = node.get<TClass>())
     {
-        const ClassType* ct = get<ClassType>(cls->value());
+        const ExternType* ct = get<ExternType>(cls->value());
         LUAU_ASSERT(ct);
         return ct->name;
     }
@@ -1177,12 +1176,12 @@ enum SubclassRelationship
 
 static SubclassRelationship relateClasses(const TClass* leftClass, const TClass* rightClass)
 {
-    const ClassType* leftClassType = Luau::get<ClassType>(leftClass->value());
-    const ClassType* rightClassType = Luau::get<ClassType>(rightClass->value());
+    const ExternType* leftExternType = Luau::get<ExternType>(leftClass->value());
+    const ExternType* rightExternType = Luau::get<ExternType>(rightClass->value());
 
-    if (isSubclass(leftClassType, rightClassType))
+    if (isSubclass(leftExternType, rightExternType))
         return RightSuper;
-    else if (isSubclass(rightClassType, leftClassType))
+    else if (isSubclass(rightExternType, leftExternType))
         return LeftSuper;
     else
         return Unrelated;
@@ -2369,10 +2368,11 @@ void Simplifier::intersectTableProperty(Id id)
                                     newIntersectionParts.push_back(intersectionParts[index]);
                             }
 
-                            Id newTableProp = egraph.add(Intersection{
-                                toId(egraph, builtinTypes, mappingIdToClass, stringCache, it->second.type()),
-                                toId(egraph, builtinTypes, mappingIdToClass, stringCache, table1Ty->props.begin()->second.type())
-                            });
+                            Id newTableProp =
+                                egraph.add(Intersection{
+                                    toId(egraph, builtinTypes, mappingIdToClass, stringCache, *it->second.readTy),
+                                    toId(egraph, builtinTypes, mappingIdToClass, stringCache, *table1Ty->props.begin()->second.readTy)
+                                });
 
                             newIntersectionParts.push_back(egraph.add(TTable{jId, {stringCache.add(it->first)}, {newTableProp}}));
 
@@ -2444,7 +2444,7 @@ void Simplifier::unneededTableModification(Id id)
                 StringId propName = tbl->propNames[i];
                 const Id propType = tbl->propTypes()[i];
 
-                Id importedProp = toId(egraph, builtinTypes, mappingIdToClass, stringCache, tt->props.at(stringCache.asString(propName)).type());
+                Id importedProp = toId(egraph, builtinTypes, mappingIdToClass, stringCache, *tt->props.at(stringCache.asString(propName)).readTy);
 
                 if (find(importedProp) != find(propType))
                 {

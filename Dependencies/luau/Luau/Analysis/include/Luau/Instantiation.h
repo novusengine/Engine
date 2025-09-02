@@ -7,6 +7,8 @@
 #include "Luau/Unifiable.h"
 #include "Luau/VisitType.h"
 
+LUAU_FASTFLAG(LuauExplicitSkipBoundTypes)
+
 namespace Luau
 {
 
@@ -92,6 +94,11 @@ struct GenericTypeFinder : TypeOnceVisitor
 {
     bool found = false;
 
+    GenericTypeFinder()
+        : TypeOnceVisitor("GenericTypeFinder", FFlag::LuauExplicitSkipBoundTypes)
+    {
+    }
+
     bool visit(TypeId ty) override
     {
         return !found;
@@ -133,9 +140,9 @@ struct GenericTypeFinder : TypeOnceVisitor
         return false;
     }
 
-    bool visit(TypeId ty, const Luau::ClassType&) override
+    bool visit(TypeId ty, const Luau::ExternType&) override
     {
-        // During function instantiation, classes are not traversed even if they have generics
+        // During function instantiation, extern types are not traversed even if they have generics
         return false;
     }
 };

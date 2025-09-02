@@ -7,81 +7,6 @@ class Bytebuffer;
 
 namespace GameDefine
 {
-    struct ObjectGuid
-    {
-    public:
-        enum class Type : u8
-        {
-            None,
-            Player,
-            Creature,
-            GameObject,
-            Item,
-            Count
-        };
-
-        ObjectGuid() : _data(0) { }
-        ObjectGuid(Type type, u64 counter)
-        {
-            _data = (static_cast<u64>(type) << 59) | (counter & COUNTER_MASK);
-        }
-        static ObjectGuid FromU64(u64 rawValue);
-        static ObjectGuid CreatePlayer(u64 counter);
-        static ObjectGuid CreateCreature(u64 counter);
-        static ObjectGuid CreateGameObject(u64 counter);
-        static ObjectGuid CreateItem(u64 counter);
-
-        Type GetType() const { return static_cast<Type>(_data >> 59); }
-        u64 GetCounter() const { return _data & COUNTER_MASK; }
-        u64 GetData() const { return _data; }
-        bool IsValid() const { return GetType() != Type::None; }
-        bool IsSame(const ObjectGuid& other) const { return GetType() == other.GetType(); }
-
-        /**
-        * Calculates the minimum number of bytes needed to represent a counter value.
-        * The function determines this by finding the position of the highest set bit,
-        * effectively finding the smallest number of bytes that can contain the value.
-        *
-        * @return Number of bytes (0-7) needed to represent the counter value:
-        *         - Returns 0 if counter is 0
-        *         - Returns 1-7 based on minimum bytes needed
-        */
-        u8 GetCounterBytesUsed() const;
-
-    public:
-        static const ObjectGuid Empty;
-        static constexpr u64 TYPE_MASK = 0xF800000000000000;
-        static constexpr u64 COUNTER_MASK = 0x07FFFFFFFFFFFFFF;
-
-        std::strong_ordering operator<=>(const ObjectGuid& other) const
-        {
-            return _data <=> other._data;
-        }
-
-        // Then, the other comparison operators can be very simply defined:
-        bool operator==(const ObjectGuid& other) const { return (*this <=> other) == std::strong_ordering::equal; }
-        bool operator!=(const ObjectGuid& other) const { return !(*this == other); }
-        bool operator<(const ObjectGuid& other) const { return (*this <=> other) == std::strong_ordering::less; }
-        bool operator>(const ObjectGuid& other) const { return (*this <=> other) == std::strong_ordering::greater; }
-        bool operator<=(const ObjectGuid& other) const { return (*this <=> other) != std::strong_ordering::greater; }
-        bool operator>=(const ObjectGuid& other) const { return (*this <=> other) != std::strong_ordering::less; }
-
-        std::string ToString() const;
-        static std::string TypeToString(Type type);
-
-        bool Deserialize(Bytebuffer* buffer);
-        bool Serialize(Bytebuffer* buffer) const;
-
-    private:
-        ObjectGuid(u64 data);
-
-    private:
-        u64 _data;
-
-        static_assert(TYPE_MASK == 0xF800000000000000, "TYPE_MASK is incorrect");
-        static_assert(COUNTER_MASK == 0x07FFFFFFFFFFFFFF, "COUNTER_MASK is incorrect");
-    };
-
     enum class UnitRace : u8
     {
         None        = 0,
@@ -207,17 +132,62 @@ namespace GameDefine
             static bool Read(std::shared_ptr<Bytebuffer>& buffer, ItemShieldTemplate& result);
             static bool Write(std::shared_ptr<Bytebuffer>& buffer, const ItemShieldTemplate& data);
         };
-    }
-}
 
-namespace std // You can specialize std::hash in the std namespace
-{
-    template <>
-    struct hash<GameDefine::ObjectGuid>
-    {
-        size_t operator()(const GameDefine::ObjectGuid& og) const
+        struct CreatureTemplate
         {
-            return std::hash<u64>()(og.GetData());
-        }
-    };
+        public:
+            u32 id;
+            u32 flags;
+            
+            std::string name;
+            std::string subname;
+
+            u32 displayID;
+            f32 scale;
+
+            u16 minLevel;
+            u16 maxLevel;
+            f32 armorMod;
+            f32 healthMod;
+            f32 resourceMod;
+            f32 damageMod;
+
+        public:
+            static bool Read(std::shared_ptr<Bytebuffer>& buffer, CreatureTemplate& result);
+            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const CreatureTemplate& data);
+        };
+
+        struct Map
+        {
+        public:
+            u32 id;
+            u32 flags;
+
+            std::string name;
+
+            u16 type;
+            u16 maxPlayers;
+
+        public:
+            static bool Read(std::shared_ptr<Bytebuffer>& buffer, Map& result);
+            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const Map& data);
+        };
+
+        struct MapLocation
+        {
+        public:
+            u32 id;
+            std::string name;
+
+            u32 mapID;
+            f32 positionX;
+            f32 positionY;
+            f32 positionZ;
+            f32 orientation;
+
+        public:
+            static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapLocation& result);
+            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const MapLocation& data);
+        };
+    }
 }

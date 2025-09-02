@@ -11,6 +11,8 @@
 
 LUAU_FASTINT(LuauVisitRecursionLimit)
 LUAU_FASTFLAG(LuauSolverV2)
+LUAU_FASTFLAG(LuauSolverAgnosticVisitType)
+LUAU_FASTFLAG(LuauReduceSetTypeStackPressure)
 
 namespace Luau
 {
@@ -72,6 +74,8 @@ struct GenericTypeVisitor
 {
     using Set = S;
 
+    const std::string visitorName;
+
     Set seen;
     bool skipBoundTypes = false;
     int recursionCounter = 0;
@@ -79,8 +83,9 @@ struct GenericTypeVisitor
 
     GenericTypeVisitor() = default;
 
-    explicit GenericTypeVisitor(Set seen, bool skipBoundTypes = false)
-        : seen(std::move(seen))
+    explicit GenericTypeVisitor(const std::string visitorName, Set seen, bool skipBoundTypes = false)
+        : visitorName(visitorName)
+        , seen(std::move(seen))
         , skipBoundTypes(skipBoundTypes)
     {
     }
@@ -126,7 +131,7 @@ struct GenericTypeVisitor
     {
         return visit(ty);
     }
-    virtual bool visit(TypeId ty, const ClassType& ctv)
+    virtual bool visit(TypeId ty, const ExternType& etv)
     {
         return visit(ty);
     }
@@ -214,7 +219,21 @@ struct GenericTypeVisitor
 
     void traverse(TypeId ty)
     {
-        RecursionLimiter limiter{&recursionCounter, FInt::LuauVisitRecursionLimit};
+        // Morally, if `skipBoundTypes` is set, then whenever we
+        // encounter a bound type we should "skip" ahead to the first
+        // non-bound type. This helps keep stack pressure in check
+        // while using bound types instead of mutating types in place
+        // elsewhere (such as in generalization).
+        //
+        // We do this check here such that we now will now treat all
+        // bound types as if they're direct pointers to some final
+        // non-bound type. If we do the check later, then we might
+        // get slightly different behavior depending on the exact
+        // entry point for cyclic types.
+        if (FFlag::LuauReduceSetTypeStackPressure && is<BoundType>(ty) && skipBoundTypes)
+            ty = follow(ty);
+
+        RecursionLimiter limiter{visitorName, &recursionCounter, FInt::LuauVisitRecursionLimit};
 
         if (visit_detail::hasSeen(seen, ty))
         {
@@ -224,14 +243,38 @@ struct GenericTypeVisitor
 
         if (auto btv = get<BoundType>(ty))
         {
-            if (skipBoundTypes)
-                traverse(btv->boundTo);
-            else if (visit(ty, *btv))
-                traverse(btv->boundTo);
+            if (FFlag::LuauReduceSetTypeStackPressure)
+            {
+                // At this point, we know that `skipBoundTypes` is false, as
+                // otherwise we would have hit the above branch.
+                LUAU_ASSERT(!skipBoundTypes);
+                if (visit(ty, *btv))
+                    traverse(btv->boundTo);
+            }
+            else
+            {
+                if (skipBoundTypes)
+                    traverse(btv->boundTo);
+                else if (visit(ty, *btv))
+                    traverse(btv->boundTo);
+            }
         }
         else if (auto ftv = get<FreeType>(ty))
         {
-            if (FFlag::LuauSolverV2)
+            if (FFlag::LuauSolverAgnosticVisitType)
+            {
+                if (visit(ty, *ftv))
+                {
+                    // Regardless of the choice of solver, all free types are guaranteed to have
+                    // lower and upper bounds
+                    LUAU_ASSERT(ftv->lowerBound);
+                    LUAU_ASSERT(ftv->upperBound);
+
+                    traverse(ftv->lowerBound);
+                    traverse(ftv->upperBound);
+                }
+            }
+            else if (FFlag::LuauSolverV2)
             {
                 if (visit(ty, *ftv))
                 {
@@ -281,7 +324,7 @@ struct GenericTypeVisitor
                 {
                     for (auto& [_name, prop] : ttv->props)
                     {
-                        if (FFlag::LuauSolverV2)
+                        if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticVisitType)
                         {
                             if (auto ty = prop.readTy)
                                 traverse(*ty);
@@ -294,7 +337,7 @@ struct GenericTypeVisitor
                                 traverse(*ty);
                         }
                         else
-                            traverse(prop.type());
+                            traverse(prop.type_DEPRECATED());
                     }
 
                     if (ttv->indexer)
@@ -313,13 +356,13 @@ struct GenericTypeVisitor
                 traverse(mtv->metatable);
             }
         }
-        else if (auto ctv = get<ClassType>(ty))
+        else if (auto etv = get<ExternType>(ty))
         {
-            if (visit(ty, *ctv))
+            if (visit(ty, *etv))
             {
-                for (const auto& [name, prop] : ctv->props)
+                for (const auto& [name, prop] : etv->props)
                 {
-                    if (FFlag::LuauSolverV2)
+                    if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticVisitType)
                     {
                         if (auto ty = prop.readTy)
                             traverse(*ty);
@@ -332,19 +375,19 @@ struct GenericTypeVisitor
                             traverse(*ty);
                     }
                     else
-                        traverse(prop.type());
+                        traverse(prop.type_DEPRECATED());
                 }
 
-                if (ctv->parent)
-                    traverse(*ctv->parent);
+                if (etv->parent)
+                    traverse(*etv->parent);
 
-                if (ctv->metatable)
-                    traverse(*ctv->metatable);
+                if (etv->metatable)
+                    traverse(*etv->metatable);
 
-                if (ctv->indexer)
+                if (etv->indexer)
                 {
-                    traverse(ctv->indexer->indexType);
-                    traverse(ctv->indexer->indexResultType);
+                    traverse(etv->indexer->indexType);
+                    traverse(etv->indexer->indexResultType);
                 }
             }
         }
@@ -396,7 +439,7 @@ struct GenericTypeVisitor
                 traverse(unwrapped);
 
             // Visiting into LazyType that hasn't been unwrapped may necessarily cause infinite expansion, so we don't do that on purpose.
-            // Asserting also makes no sense, because the type _will_ happen here, most likely as a property of some ClassType
+            // Asserting also makes no sense, because the type _will_ happen here, most likely as a property of some ExternType
             // that doesn't need to be expanded.
         }
         else if (auto stv = get<SingletonType>(ty))
@@ -513,8 +556,8 @@ struct GenericTypeVisitor
  */
 struct TypeVisitor : GenericTypeVisitor<std::unordered_set<void*>>
 {
-    explicit TypeVisitor(bool skipBoundTypes = false)
-        : GenericTypeVisitor{{}, skipBoundTypes}
+    explicit TypeVisitor(const std::string visitorName, bool skipBoundTypes)
+        : GenericTypeVisitor{visitorName, {}, skipBoundTypes}
     {
     }
 };
@@ -522,8 +565,8 @@ struct TypeVisitor : GenericTypeVisitor<std::unordered_set<void*>>
 /// Visit each type under a given type.  Each type will only be checked once even if there are multiple paths to it.
 struct TypeOnceVisitor : GenericTypeVisitor<DenseHashSet<void*>>
 {
-    explicit TypeOnceVisitor(bool skipBoundTypes = false)
-        : GenericTypeVisitor{DenseHashSet<void*>{nullptr}, skipBoundTypes}
+    explicit TypeOnceVisitor(const std::string visitorName, bool skipBoundTypes)
+        : GenericTypeVisitor{visitorName, DenseHashSet<void*>{nullptr}, skipBoundTypes}
     {
     }
 };

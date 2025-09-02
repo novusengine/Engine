@@ -4,6 +4,10 @@
 
 LUAU_FASTFLAG(LuauSolverV2);
 
+LUAU_FASTFLAGVARIABLE(LuauScopeMethodsAreSolverAgnostic)
+LUAU_FASTFLAGVARIABLE(LuauNoScopeShallNotSubsumeAll)
+LUAU_FASTFLAG(LuauNameConstraintRestrictRecursiveTypes)
+
 namespace Luau
 {
 
@@ -78,6 +82,17 @@ std::optional<TypeId> Scope::lookupUnrefinedType(DefId def) const
     for (const Scope* current = this; current; current = current->parent.get())
     {
         if (auto ty = current->lvalueTypes.find(def))
+            return *ty;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<TypeId> Scope::lookupRValueRefinementType(DefId def) const
+{
+    for (const Scope* current = this; current; current = current->parent.get())
+    {
+        if (auto ty = current->rvalueRefinements.find(def))
             return *ty;
     }
 
@@ -181,20 +196,51 @@ std::optional<Binding> Scope::linearSearchForBinding(const std::string& name, bo
     return std::nullopt;
 }
 
+std::optional<std::pair<Symbol, Binding>> Scope::linearSearchForBindingPair(const std::string& name, bool traverseScopeChain) const
+{
+    const Scope* scope = this;
+
+    while (scope)
+    {
+        for (auto& [n, binding] : scope->bindings)
+        {
+            if (n.local && n.local->name == name.c_str())
+                return {{n, binding}};
+            else if (n.global.value && n.global == name.c_str())
+                return {{n, binding}};
+        }
+
+        scope = scope->parent.get();
+
+        if (!traverseScopeChain)
+            break;
+    }
+
+    return std::nullopt;
+}
+
 // Updates the `this` scope with the assignments from the `childScope` including ones that doesn't exist in `this`.
 void Scope::inheritAssignments(const ScopePtr& childScope)
 {
-    if (!FFlag::LuauSolverV2)
-        return;
+    if (FFlag::LuauScopeMethodsAreSolverAgnostic)
+    {
+        for (const auto& [k, a] : childScope->lvalueTypes)
+            lvalueTypes[k] = a;
+    }
+    else
+    {
+        if (!FFlag::LuauSolverV2)
+            return;
 
-    for (const auto& [k, a] : childScope->lvalueTypes)
-        lvalueTypes[k] = a;
+        for (const auto& [k, a] : childScope->lvalueTypes)
+            lvalueTypes[k] = a;
+    }
 }
 
 // Updates the `this` scope with the refinements from the `childScope` excluding ones that doesn't exist in `this`.
 void Scope::inheritRefinements(const ScopePtr& childScope)
 {
-    if (FFlag::LuauSolverV2)
+    if (FFlag::LuauSolverV2 || FFlag::LuauScopeMethodsAreSolverAgnostic)
     {
         for (const auto& [k, a] : childScope->rvalueRefinements)
         {
@@ -221,8 +267,50 @@ bool Scope::shouldWarnGlobal(std::string name) const
     return false;
 }
 
+bool Scope::isInvalidTypeAliasName(const std::string& name) const
+{
+    LUAU_ASSERT(FFlag::LuauNameConstraintRestrictRecursiveTypes);
+
+    for (auto scope = this; scope; scope = scope->parent.get())
+    {
+        if (scope->invalidTypeAliasNames.contains(name))
+            return true;
+    }
+
+    return false;
+}
+
+NotNull<Scope> Scope::findNarrowestScopeContaining(Location location)
+{
+    Scope* bestScope = this;
+
+    bool didNarrow;
+    do
+    {
+        didNarrow = false;
+        for (auto scope : bestScope->children)
+        {
+            if (scope->location.encloses(location))
+            {
+                bestScope = scope.get();
+                didNarrow = true;
+                break;
+            }
+        }
+    } while (didNarrow && bestScope->children.size() > 0);
+
+    return NotNull{bestScope};
+}
+
+
 bool subsumesStrict(Scope* left, Scope* right)
 {
+    if (FFlag::LuauNoScopeShallNotSubsumeAll)
+    {
+        if (!left || !right)
+            return false;
+    }
+
     while (right)
     {
         if (right->parent.get() == left)
@@ -236,6 +324,12 @@ bool subsumesStrict(Scope* left, Scope* right)
 
 bool subsumes(Scope* left, Scope* right)
 {
+    if (FFlag::LuauNoScopeShallNotSubsumeAll)
+    {
+        if (!left || !right)
+            return false;
+    }
+
     return left == right || subsumesStrict(left, right);
 }
 

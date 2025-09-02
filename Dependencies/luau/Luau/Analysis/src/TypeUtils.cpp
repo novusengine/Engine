@@ -4,16 +4,20 @@
 #include "Luau/Common.h"
 #include "Luau/Normalize.h"
 #include "Luau/Scope.h"
+#include "Luau/Simplify.h"
 #include "Luau/ToString.h"
 #include "Luau/Type.h"
 #include "Luau/TypeInfer.h"
+#include "Luau/TypePack.h"
 
 #include <algorithm>
 
-LUAU_FASTFLAG(LuauSolverV2);
-LUAU_FASTFLAG(LuauAutocompleteRefactorsForIncrementalAutocomplete);
-LUAU_FASTFLAG(LuauTrackInteriorFreeTypesOnScope);
-LUAU_FASTFLAG(LuauFreeTypesMustHaveBounds)
+LUAU_FASTFLAG(LuauSolverV2)
+LUAU_FASTFLAG(LuauEagerGeneralization4)
+LUAU_FASTFLAGVARIABLE(LuauTidyTypeUtils)
+LUAU_FASTFLAG(LuauEmplaceNotPushBack)
+LUAU_FASTFLAGVARIABLE(LuauVariadicAnyPackShouldBeErrorSuppressing)
+LUAU_FASTFLAG(LuauPushTypeConstraint)
 
 namespace Luau
 {
@@ -75,7 +79,17 @@ std::optional<Property> findTableProperty(NotNull<BuiltinTypes> builtinTypes, Er
         {
             const auto& fit = itt->props.find(name);
             if (fit != itt->props.end())
-                return fit->second.type();
+            {
+                if (FFlag::LuauSolverV2)
+                {
+                    if (fit->second.readTy)
+                        return fit->second.readTy;
+                    else
+                        return fit->second.writeTy;
+                }
+                else
+                    return fit->second.type_DEPRECATED();
+            }
         }
         else if (const auto& itf = get<FunctionType>(index))
         {
@@ -87,6 +101,8 @@ std::optional<Property> findTableProperty(NotNull<BuiltinTypes> builtinTypes, Er
         }
         else if (get<AnyType>(index))
             return builtinTypes->anyType;
+        else if (FFlag::LuauEmplaceNotPushBack)
+            errors.emplace_back(location, GenericError{"__index should either be a function or table. Got " + toString(index)});
         else
             errors.push_back(TypeError{location, GenericError{"__index should either be a function or table. Got " + toString(index)}});
 
@@ -118,13 +134,26 @@ std::optional<TypeId> findMetatableEntry(
     const TableType* mtt = getTableType(unwrapped);
     if (!mtt)
     {
-        errors.push_back(TypeError{location, GenericError{"Metatable was not a table"}});
+        if (FFlag::LuauEmplaceNotPushBack)
+            errors.emplace_back(location, GenericError{"Metatable was not a table"});
+        else
+            errors.push_back(TypeError{location, GenericError{"Metatable was not a table"}});
         return std::nullopt;
     }
 
     auto it = mtt->props.find(entry);
     if (it != mtt->props.end())
-        return it->second.type();
+    {
+        if (FFlag::LuauTidyTypeUtils || FFlag::LuauSolverV2)
+        {
+            if (it->second.readTy)
+                return it->second.readTy;
+            else
+                return it->second.writeTy;
+        }
+        else
+            return it->second.type_DEPRECATED();
+    }
     else
         return std::nullopt;
 }
@@ -157,7 +186,7 @@ std::optional<TypeId> findTablePropertyRespectingMeta(
         const auto& it = tableType->props.find(name);
         if (it != tableType->props.end())
         {
-            if (FFlag::LuauSolverV2)
+            if (FFlag::LuauTidyTypeUtils || FFlag::LuauSolverV2)
             {
                 switch (context)
                 {
@@ -168,7 +197,7 @@ std::optional<TypeId> findTablePropertyRespectingMeta(
                 }
             }
             else
-                return it->second.type();
+                return it->second.type_DEPRECATED();
         }
     }
 
@@ -187,7 +216,20 @@ std::optional<TypeId> findTablePropertyRespectingMeta(
         {
             const auto& fit = itt->props.find(name);
             if (fit != itt->props.end())
-                return fit->second.type();
+            {
+                if (FFlag::LuauSolverV2)
+                {
+                    switch (context)
+                    {
+                    case ValueContext::RValue:
+                        return fit->second.readTy;
+                    case ValueContext::LValue:
+                        return fit->second.writeTy;
+                    }
+                }
+                else
+                    return fit->second.type_DEPRECATED();
+            }
         }
         else if (const auto& itf = get<FunctionType>(index))
         {
@@ -199,6 +241,8 @@ std::optional<TypeId> findTablePropertyRespectingMeta(
         }
         else if (get<AnyType>(index))
             return builtinTypes->anyType;
+        else if (FFlag::LuauEmplaceNotPushBack)
+            errors.emplace_back(location, GenericError{"__index should either be a function or table. Got " + toString(index)});
         else
             errors.push_back(TypeError{location, GenericError{"__index should either be a function or table. Got " + toString(index)}});
 
@@ -304,8 +348,12 @@ TypePack extendTypePack(
             // also have to create a new tail.
 
             TypePack newPack;
-            newPack.tail = arena.freshTypePack(ftp->scope);
-            if (FFlag::LuauSolverV2)
+            newPack.tail = arena.freshTypePack(ftp->scope, ftp->polarity);
+
+            if (FFlag::LuauTidyTypeUtils)
+                trackInteriorFreeTypePack(ftp->scope, *newPack.tail);
+
+            if (FFlag::LuauTidyTypeUtils || FFlag::LuauSolverV2)
                 result.tail = newPack.tail;
             size_t overridesIndex = 0;
             while (result.head.size() < length)
@@ -317,15 +365,14 @@ TypePack extendTypePack(
                 }
                 else
                 {
-                    if (FFlag::LuauSolverV2)
+                    if (FFlag::LuauTidyTypeUtils || FFlag::LuauSolverV2)
                     {
-                        FreeType ft{ftp->scope, builtinTypes->neverType, builtinTypes->unknownType};
+                        FreeType ft{ftp->scope, builtinTypes->neverType, builtinTypes->unknownType, ftp->polarity};
                         t = arena.addType(ft);
-                        if (FFlag::LuauTrackInteriorFreeTypesOnScope)
-                            trackInteriorFreeType(ftp->scope, t);
+                        trackInteriorFreeType(ftp->scope, t);
                     }
                     else
-                        t = FFlag::LuauFreeTypesMustHaveBounds ? arena.freshType(builtinTypes, ftp->scope) : arena.freshType_DEPRECATED(ftp->scope);
+                        t = arena.freshType(builtinTypes, ftp->scope);
                 }
 
                 newPack.head.push_back(t);
@@ -340,7 +387,7 @@ TypePack extendTypePack(
         else if (auto etp = getMutable<ErrorTypePack>(pack))
         {
             while (result.head.size() < length)
-                result.head.push_back(builtinTypes->errorRecoveryType());
+                result.head.push_back(builtinTypes->errorType);
 
             result.tail = pack;
             return result;
@@ -432,7 +479,22 @@ TypeId stripNil(NotNull<BuiltinTypes> builtinTypes, TypeArena& arena, TypeId ty)
 
 ErrorSuppression shouldSuppressErrors(NotNull<Normalizer> normalizer, TypeId ty)
 {
-    LUAU_ASSERT(FFlag::LuauSolverV2 || FFlag::LuauAutocompleteRefactorsForIncrementalAutocomplete);
+    if (auto tfit = get<TypeFunctionInstanceType>(follow(ty)))
+    {
+        for (auto ty : tfit->typeArguments)
+        {
+            std::shared_ptr<const NormalizedType> normType = normalizer->normalize(ty);
+
+            if (!normType)
+                return ErrorSuppression::NormalizationFailed;
+
+            if (normType->shouldSuppressErrors())
+                return ErrorSuppression::Suppress;
+        }
+
+        return ErrorSuppression::DoNotSuppress;
+    }
+
     std::shared_ptr<const NormalizedType> normType = normalizer->normalize(ty);
 
     if (!normType)
@@ -443,6 +505,17 @@ ErrorSuppression shouldSuppressErrors(NotNull<Normalizer> normalizer, TypeId ty)
 
 ErrorSuppression shouldSuppressErrors(NotNull<Normalizer> normalizer, TypePackId tp)
 {
+    // Flatten t where t = ...any will produce a type pack [ {}, t]
+    // which trivially fails the tail check below, which is why we need to special case here
+    if (FFlag::LuauVariadicAnyPackShouldBeErrorSuppressing)
+    {
+        if (auto tpId = get<VariadicTypePack>(follow(tp)))
+        {
+            if (get<AnyType>(follow(tpId->ty)))
+                return ErrorSuppression::Suppress;
+        }
+    }
+
     auto [tys, tail] = flatten(tp);
 
     // check the head, one type at a time
@@ -526,14 +599,6 @@ private:
     NotNull<std::vector<TypeId>> toBlock_;
 };
 
-std::vector<TypeId> findBlockedTypesIn(AstExprTable* expr, NotNull<DenseHashMap<const AstExpr*, TypeId>> astTypes)
-{
-    std::vector<TypeId> toBlock;
-    BlockedTypeInLiteralVisitor v{astTypes, NotNull{&toBlock}};
-    expr->visit(&v);
-    return toBlock;
-}
-
 std::vector<TypeId> findBlockedArgTypesIn(AstExprCall* expr, NotNull<DenseHashMap<const AstExpr*, TypeId>> astTypes)
 {
     std::vector<TypeId> toBlock;
@@ -550,7 +615,6 @@ std::vector<TypeId> findBlockedArgTypesIn(AstExprCall* expr, NotNull<DenseHashMa
 
 void trackInteriorFreeType(Scope* scope, TypeId ty)
 {
-    LUAU_ASSERT(FFlag::LuauSolverV2 && FFlag::LuauTrackInteriorFreeTypesOnScope);
     for (; scope; scope = scope->parent.get())
     {
         if (scope->interiorFreeTypes)
@@ -564,5 +628,281 @@ void trackInteriorFreeType(Scope* scope, TypeId ty)
     // by ConstraintGenerator::visitModuleRoot.
     LUAU_ASSERT(!"No scopes in parent chain had a present `interiorFreeTypes` member.");
 }
+
+void trackInteriorFreeTypePack(Scope* scope, TypePackId tp)
+{
+    LUAU_ASSERT(tp);
+    if (!FFlag::LuauEagerGeneralization4)
+        return;
+
+    for (; scope; scope = scope->parent.get())
+    {
+        if (scope->interiorFreeTypePacks)
+        {
+            scope->interiorFreeTypePacks->push_back(tp);
+            return;
+        }
+    }
+    // There should at least be *one* generalization constraint per module
+    // where `interiorFreeTypes` is present, which would be the one made
+    // by ConstraintGenerator::visitModuleRoot.
+    LUAU_ASSERT(!"No scopes in parent chain had a present `interiorFreeTypePacks` member.");
+}
+
+bool fastIsSubtype(TypeId subTy, TypeId superTy)
+{
+    Relation r = relate(superTy, subTy);
+    return r == Relation::Coincident || r == Relation::Superset;
+}
+
+std::optional<TypeId> extractMatchingTableType(std::vector<TypeId>& tables, TypeId exprType, NotNull<BuiltinTypes> builtinTypes)
+{
+    if (tables.empty())
+        return std::nullopt;
+
+    const TableType* exprTable = get<TableType>(follow(exprType));
+    if (!exprTable)
+        return std::nullopt;
+
+    size_t tableCount = 0;
+    std::optional<TypeId> firstTable;
+
+    for (TypeId ty : tables)
+    {
+        ty = follow(ty);
+        if (auto tt = get<TableType>(ty))
+        {
+            // If the expected table has a key whose type is a string or boolean
+            // singleton and the corresponding exprType property does not match,
+            // then skip this table.
+
+            if (!firstTable)
+                firstTable = ty;
+            ++tableCount;
+
+            for (const auto& [name, expectedProp] : tt->props)
+            {
+                if (!expectedProp.readTy)
+                    continue;
+
+                const TypeId expectedType = follow(*expectedProp.readTy);
+
+                auto st = get<SingletonType>(expectedType);
+                if (!st)
+                    continue;
+
+                auto it = exprTable->props.find(name);
+                if (it == exprTable->props.end())
+                    continue;
+
+                const auto& [_name, exprProp] = *it;
+
+                if (!exprProp.readTy)
+                    continue;
+
+                const TypeId propType = follow(*exprProp.readTy);
+
+                const FreeType* ft = get<FreeType>(propType);
+
+                if (ft && get<SingletonType>(ft->lowerBound))
+                {
+                    if (fastIsSubtype(builtinTypes->booleanType, ft->upperBound) && fastIsSubtype(expectedType, builtinTypes->booleanType))
+                    {
+                        return ty;
+                    }
+
+                    if (fastIsSubtype(builtinTypes->stringType, ft->upperBound) && fastIsSubtype(expectedType, ft->lowerBound))
+                    {
+                        return ty;
+                    }
+                }
+
+                if (FFlag::LuauPushTypeConstraint && fastIsSubtype(propType, expectedType))
+                    return ty;
+            }
+        }
+    }
+
+    if (tableCount == 1)
+    {
+        LUAU_ASSERT(firstTable);
+        return firstTable;
+    }
+
+    return std::nullopt;
+}
+
+bool isRecord(const AstExprTable::Item& item)
+{
+    if (item.kind == AstExprTable::Item::Record)
+        return true;
+    else if (item.kind == AstExprTable::Item::General && item.key->is<AstExprConstantString>())
+        return true;
+    else
+        return false;
+}
+
+AstExpr* unwrapGroup(AstExpr* expr)
+{
+    while (auto group = expr->as<AstExprGroup>())
+        expr = group->expr;
+
+    return expr;
+}
+
+bool isApproximatelyFalsyType(TypeId ty)
+{
+    ty = follow(ty);
+    bool seenNil = false;
+    bool seenFalse = false;
+    if (auto ut = get<UnionType>(ty))
+    {
+        for (auto option : ut)
+        {
+            if (auto pt = get<PrimitiveType>(option); pt && pt->type == PrimitiveType::NilType)
+                seenNil = true;
+            else if (auto st = get<SingletonType>(option); st && st->variant == BooleanSingleton{false})
+                seenFalse = true;
+            else
+                return false;
+        }
+    }
+    return seenFalse && seenNil;
+}
+
+bool isApproximatelyTruthyType(TypeId ty)
+{
+    ty = follow(ty);
+    if (auto nt = get<NegationType>(ty))
+        return isApproximatelyFalsyType(nt->ty);
+    return false;
+}
+
+UnionBuilder::UnionBuilder(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes)
+    : arena(arena)
+    , builtinTypes(builtinTypes)
+{
+}
+
+void UnionBuilder::add(TypeId ty)
+{
+    ty = follow(ty);
+
+    if (is<NeverType>(ty) || isTop)
+        return;
+
+    if (is<UnknownType>(ty))
+    {
+        isTop = true;
+        return;
+    }
+
+    if (auto utv = get<UnionType>(ty))
+    {
+        for (auto option : utv)
+            options.insert(option);
+    }
+    else
+        options.insert(ty);
+}
+
+TypeId UnionBuilder::build()
+{
+    if (isTop)
+        return builtinTypes->unknownType;
+
+    if (options.empty())
+        return builtinTypes->neverType;
+
+    if (options.size() == 1)
+        return options.front();
+
+    return arena->addType(UnionType{options.take()});
+}
+
+size_t UnionBuilder::size() const
+{
+    return options.size();
+}
+
+void UnionBuilder::reserve(size_t size)
+{
+    options.reserve(size);
+}
+
+IntersectionBuilder::IntersectionBuilder(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes)
+    : arena(arena)
+    , builtinTypes(builtinTypes)
+{
+}
+
+void IntersectionBuilder::add(TypeId ty)
+{
+    ty = follow(ty);
+
+    if (is<NeverType>(ty))
+    {
+        isBottom = true;
+        return;
+    }
+
+    if (is<UnknownType>(ty))
+        return;
+
+    if (auto itv = get<IntersectionType>(ty))
+    {
+        for (auto part : itv)
+            parts.insert(part);
+    }
+    else
+        parts.insert(ty);
+}
+
+TypeId IntersectionBuilder::build()
+{
+    if (isBottom)
+        return builtinTypes->neverType;
+
+    if (parts.empty())
+        return builtinTypes->unknownType;
+
+    if (parts.size() == 1)
+        return parts.front();
+
+    return arena->addType(IntersectionType{parts.take()});
+}
+
+size_t IntersectionBuilder::size() const
+{
+    return parts.size();
+}
+
+void IntersectionBuilder::reserve(size_t size)
+{
+    parts.reserve(size);
+}
+
+
+TypeId addIntersection(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes, std::initializer_list<TypeId> list)
+{
+    IntersectionBuilder ib(arena, builtinTypes);
+    ib.reserve(list.size());
+    for (TypeId part : list)
+        ib.add(part);
+
+    return ib.build();
+}
+
+TypeId addUnion(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes, std::initializer_list<TypeId> list)
+{
+    UnionBuilder ub(arena, builtinTypes);
+    ub.reserve(list.size());
+    for (TypeId option : list)
+        ub.add(option);
+    return ub.build();
+}
+
+
+
 
 } // namespace Luau

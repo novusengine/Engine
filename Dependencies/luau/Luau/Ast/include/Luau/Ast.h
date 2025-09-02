@@ -87,8 +87,8 @@ struct AstLocal
 template<typename T>
 struct AstArray
 {
-    T* data;
-    size_t size;
+    T* data = nullptr;
+    size_t size = 0;
 
     const T* begin() const
     {
@@ -194,9 +194,17 @@ public:
     {
         Checked,
         Native,
+        Deprecated,
     };
 
-    AstAttr(const Location& location, Type type);
+    struct DeprecatedInfo
+    {
+        bool deprecated = false;
+        std::optional<std::string> use;
+        std::optional<std::string> reason;
+    };
+
+    AstAttr(const Location& location, Type type, AstArray<AstExpr*> args);
 
     AstAttr* asAttr() override
     {
@@ -205,7 +213,10 @@ public:
 
     void visit(AstVisitor* visitor) override;
 
+    DeprecatedInfo deprecatedInfo() const;
+
     Type type;
+    AstArray<AstExpr*> args;
 };
 
 class AstExpr : public AstNode
@@ -328,9 +339,28 @@ public:
 
     enum QuoteStyle
     {
+        // A string created using double quotes or an interpolated string,
+        // as in:
+        //
+        //  "foo", `My name is {protagonist}! / And I'm {antagonist}!`
+        //
         QuotedSimple,
+        // A string created using single quotes, as in:
+        //
+        //  'bar'
+        //
+        QuotedSingle,
+        // A string created using `[[ ... ]]` as in:
+        //
+        //   [[ Gee, this sure is a long string.
+        //   it even has a new line in it! ]]
+        //
         QuotedRaw,
-        Unquoted
+        // A "string" in the context of a table literal, as in:
+        //
+        //  { foo = 42 } -- `foo` here is a "constant string"
+        //
+        Unquoted,
     };
 
     AstExprConstantString(const Location& location, const AstArray<char>& value, QuoteStyle quoteStyle);
@@ -445,7 +475,7 @@ public:
         AstStatBlock* body,
         size_t functionDepth,
         const AstName& debugname,
-        const std::optional<AstTypeList>& returnAnnotation = {},
+        AstTypePack* returnAnnotation,
         AstTypePack* varargAnnotation = nullptr,
         const std::optional<Location>& argLocation = std::nullopt
     );
@@ -453,13 +483,15 @@ public:
     void visit(AstVisitor* visitor) override;
 
     bool hasNativeAttribute() const;
+    bool hasAttribute(AstAttr::Type attributeType) const;
+    AstAttr* getAttribute(AstAttr::Type attributeType) const;
 
     AstArray<AstAttr*> attributes;
     AstArray<AstGenericType*> generics;
     AstArray<AstGenericTypePack*> genericPacks;
     AstLocal* self;
     AstArray<AstLocal*> args;
-    std::optional<AstTypeList> returnAnnotation;
+    AstTypePack* returnAnnotation = nullptr;
     bool vararg = false;
     Location varargLocation;
     AstTypePack* varargAnnotation;
@@ -496,6 +528,8 @@ public:
     AstExprTable(const Location& location, const AstArray<Item>& items);
 
     void visit(AstVisitor* visitor) override;
+
+    std::optional<AstExpr*> getRecord(const char* key) const;
 
     AstArray<Item> items;
 };
@@ -890,14 +924,22 @@ class AstStatTypeFunction : public AstStat
 public:
     LUAU_RTTI(AstStatTypeFunction);
 
-    AstStatTypeFunction(const Location& location, const AstName& name, const Location& nameLocation, AstExprFunction* body, bool exported);
+    AstStatTypeFunction(
+        const Location& location,
+        const AstName& name,
+        const Location& nameLocation,
+        AstExprFunction* body,
+        bool exported,
+        bool hasErrors
+    );
 
     void visit(AstVisitor* visitor) override;
 
     AstName name;
     Location nameLocation;
-    AstExprFunction* body;
-    bool exported;
+    AstExprFunction* body = nullptr;
+    bool exported = false;
+    bool hasErrors = false;
 };
 
 class AstStatDeclareGlobal : public AstStat
@@ -929,7 +971,7 @@ public:
         const AstArray<AstArgumentName>& paramNames,
         bool vararg,
         const Location& varargLocation,
-        const AstTypeList& retTypes
+        AstTypePack* retTypes
     );
 
     AstStatDeclareFunction(
@@ -943,13 +985,14 @@ public:
         const AstArray<AstArgumentName>& paramNames,
         bool vararg,
         const Location& varargLocation,
-        const AstTypeList& retTypes
+        AstTypePack* retTypes
     );
-
 
     void visit(AstVisitor* visitor) override;
 
     bool isCheckedFunction() const;
+    bool hasAttribute(AstAttr::Type attributeType) const;
+    AstAttr* getAttribute(AstAttr::Type attributeType) const;
 
     AstArray<AstAttr*> attributes;
     AstName name;
@@ -960,10 +1003,10 @@ public:
     AstArray<AstArgumentName> paramNames;
     bool vararg = false;
     Location varargLocation;
-    AstTypeList retTypes;
+    AstTypePack* retTypes;
 };
 
-struct AstDeclaredClassProp
+struct AstDeclaredExternTypeProperty
 {
     AstName name;
     Location nameLocation;
@@ -989,16 +1032,16 @@ struct AstTableIndexer
     std::optional<Location> accessLocation;
 };
 
-class AstStatDeclareClass : public AstStat
+class AstStatDeclareExternType : public AstStat
 {
 public:
-    LUAU_RTTI(AstStatDeclareClass)
+    LUAU_RTTI(AstStatDeclareExternType)
 
-    AstStatDeclareClass(
+    AstStatDeclareExternType(
         const Location& location,
         const AstName& name,
         std::optional<AstName> superName,
-        const AstArray<AstDeclaredClassProp>& props,
+        const AstArray<AstDeclaredExternTypeProperty>& props,
         AstTableIndexer* indexer = nullptr
     );
 
@@ -1007,7 +1050,7 @@ public:
     AstName name;
     std::optional<AstName> superName;
 
-    AstArray<AstDeclaredClassProp> props;
+    AstArray<AstDeclaredExternTypeProperty> props;
     AstTableIndexer* indexer;
 };
 
@@ -1090,7 +1133,7 @@ public:
         const AstArray<AstGenericTypePack*>& genericPacks,
         const AstTypeList& argTypes,
         const AstArray<std::optional<AstArgumentName>>& argNames,
-        const AstTypeList& returnTypes
+        AstTypePack* returnTypes
     );
 
     AstTypeFunction(
@@ -1100,19 +1143,21 @@ public:
         const AstArray<AstGenericTypePack*>& genericPacks,
         const AstTypeList& argTypes,
         const AstArray<std::optional<AstArgumentName>>& argNames,
-        const AstTypeList& returnTypes
+        AstTypePack* returnTypes
     );
 
     void visit(AstVisitor* visitor) override;
 
     bool isCheckedFunction() const;
+    bool hasAttribute(AstAttr::Type attributeType) const;
+    AstAttr* getAttribute(AstAttr::Type attributeType) const;
 
     AstArray<AstAttr*> attributes;
     AstArray<AstGenericType*> generics;
     AstArray<AstGenericTypePack*> genericPacks;
     AstTypeList argTypes;
     AstArray<std::optional<AstArgumentName>> argNames;
-    AstTypeList returnTypes;
+    AstTypePack* returnTypes;
 };
 
 class AstTypeTypeof : public AstType
@@ -1125,6 +1170,16 @@ public:
     void visit(AstVisitor* visitor) override;
 
     AstExpr* expr;
+};
+
+class AstTypeOptional : public AstType
+{
+public:
+    LUAU_RTTI(AstTypeOptional)
+
+    AstTypeOptional(const Location& location);
+
+    void visit(AstVisitor* visitor) override;
 };
 
 class AstTypeUnion : public AstType
@@ -1449,6 +1504,10 @@ public:
     {
         return visit(static_cast<AstStat*>(node));
     }
+    virtual bool visit(class AstStatTypeFunction* node)
+    {
+        return visit(static_cast<AstStat*>(node));
+    }
     virtual bool visit(class AstStatDeclareFunction* node)
     {
         return visit(static_cast<AstStat*>(node));
@@ -1457,7 +1516,7 @@ public:
     {
         return visit(static_cast<AstStat*>(node));
     }
-    virtual bool visit(class AstStatDeclareClass* node)
+    virtual bool visit(class AstStatDeclareExternType* node)
     {
         return visit(static_cast<AstStat*>(node));
     }
@@ -1485,6 +1544,10 @@ public:
         return visit(static_cast<AstType*>(node));
     }
     virtual bool visit(class AstTypeTypeof* node)
+    {
+        return visit(static_cast<AstType*>(node));
+    }
+    virtual bool visit(class AstTypeOptional* node)
     {
         return visit(static_cast<AstType*>(node));
     }
@@ -1532,6 +1595,8 @@ public:
 };
 
 bool isLValue(const AstExpr*);
+bool isConstantLiteral(const AstExpr*);
+bool isLiteralTable(const AstExpr*);
 AstName getIdentifier(AstExpr*);
 Location getLocation(const AstTypeList& typeList);
 

@@ -8,8 +8,7 @@
 
 #include <limits.h>
 
-LUAU_FASTFLAGVARIABLE(LexerResumesFromPosition2)
-LUAU_FASTFLAGVARIABLE(LexerFixInterpStringStart)
+LUAU_FASTFLAG(LuauParametrizedAttributeSyntax)
 
 namespace Luau
 {
@@ -149,6 +148,9 @@ std::string Lexeme::toString() const
 
     case Attribute:
         return name ? format("'%s'", name) : "attribute";
+
+    case AttributeOpen:
+        return "'@['";
 
     case BrokenString:
         return "malformed string";
@@ -342,12 +344,9 @@ Lexer::Lexer(const char* buffer, size_t bufferSize, AstNameTable& names, Positio
     : buffer(buffer)
     , bufferSize(bufferSize)
     , offset(0)
-    , line(FFlag::LexerResumesFromPosition2 ? startPosition.line : 0)
-    , lineOffset(FFlag::LexerResumesFromPosition2 ? 0u - startPosition.column : 0)
-    , lexeme(
-          (FFlag::LexerResumesFromPosition2 ? Location(Position(startPosition.line, startPosition.column), 0) : Location(Position(0, 0), 0)),
-          Lexeme::Eof
-      )
+    , line(startPosition.line)
+    , lineOffset(0u - startPosition.column)
+    , lexeme((Location(Position(startPosition.line, startPosition.column), 0)), Lexeme::Eof)
     , names(names)
     , skipComments(false)
     , readNames(true)
@@ -793,7 +792,7 @@ Lexeme Lexer::readNext()
             return Lexeme(Location(start, 1), '}');
         }
 
-        return readInterpolatedStringSection(FFlag::LexerFixInterpStringStart ? start : position(), Lexeme::InterpStringMid, Lexeme::InterpStringEnd);
+        return readInterpolatedStringSection(start, Lexeme::InterpStringMid, Lexeme::InterpStringEnd);
     }
 
     case '=':
@@ -987,8 +986,36 @@ Lexeme Lexer::readNext()
     }
     case '@':
     {
-        std::pair<AstName, Lexeme::Type> attribute = readName();
-        return Lexeme(Location(start, position()), Lexeme::Attribute, attribute.first.value);
+        if (FFlag::LuauParametrizedAttributeSyntax)
+        {
+            if (peekch(1) == '[')
+            {
+                consume();
+                consume();
+
+                return Lexeme(Location(start, 2), Lexeme::AttributeOpen);
+            }
+            else
+            {
+                // consume @ first
+                consume();
+
+                if (isAlpha(peekch()) || peekch() == '_')
+                {
+                    std::pair<AstName, Lexeme::Type> attribute = readName();
+                    return Lexeme(Location(start, position()), Lexeme::Attribute, attribute.first.value);
+                }
+                else
+                {
+                    return Lexeme(Location(start, position()), Lexeme::Attribute, "");
+                }
+            }
+        }
+        else
+        {
+            std::pair<AstName, Lexeme::Type> attribute = readName();
+            return Lexeme(Location(start, position()), Lexeme::Attribute, attribute.first.value);
+        }
     }
     default:
         if (isDigit(peekch()))
@@ -1013,6 +1040,14 @@ Lexeme Lexer::readNext()
             return Lexeme(Location(start, 1), ch);
         }
     }
+}
+
+std::optional<Lexer::BraceType> Lexer::peekBraceStackTop()
+{
+    if (braceStack.empty())
+        return std::nullopt;
+    else
+        return {braceStack.back()};
 }
 
 LUAU_NOINLINE Lexeme Lexer::readUtf8Error()

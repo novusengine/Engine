@@ -16,8 +16,8 @@
 #include "lstate.h"
 #include "lgc.h"
 
-LUAU_FASTFLAG(LuauVectorLibNativeDot)
-LUAU_FASTFLAG(LuauCodeGenLerp)
+LUAU_FASTFLAG(LuauCodeGenDirectBtest)
+LUAU_FASTFLAGVARIABLE(LuauCodeGenVBlendpdReorder)
 
 namespace Luau
 {
@@ -620,12 +620,14 @@ void IrLoweringX64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
         // If arg < 0 then tmp1 is -1 and mask-bit is 0, result is -1
         // If arg == 0 then tmp1 is 0 and mask-bit is 0, result is 0
         // If arg > 0 then tmp1 is 0 and mask-bit is 1, result is 1
-        build.vblendvpd(inst.regX64, tmp1.reg, build.f64x2(1, 1), inst.regX64);
+        if (FFlag::LuauCodeGenVBlendpdReorder)
+            build.vblendvpd(inst.regX64, tmp1.reg, inst.regX64, build.f64x2(1, 1));
+        else
+            build.vblendvpd_DEPRECATED(inst.regX64, tmp1.reg, build.f64x2(1, 1), inst.regX64);
         break;
     }
     case IrCmd::SELECT_NUM:
     {
-        LUAU_ASSERT(FFlag::LuauCodeGenLerp);
         inst.regX64 = regs.allocRegOrReuse(SizeX64::xmmword, index, {inst.a, inst.c, inst.d}); // can't reuse b if a is a memory operand
 
         ScopedRegX64 tmp{regs, SizeX64::xmmword};
@@ -639,12 +641,32 @@ void IrLoweringX64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
         }
 
         if (inst.a.kind == IrOpKind::Inst)
-            build.vblendvpd(inst.regX64, regOp(inst.a), memRegDoubleOp(inst.b), tmp.reg);
+            if (FFlag::LuauCodeGenVBlendpdReorder)
+                build.vblendvpd(inst.regX64, regOp(inst.a), tmp.reg, memRegDoubleOp(inst.b));
+            else
+                build.vblendvpd_DEPRECATED(inst.regX64, regOp(inst.a), memRegDoubleOp(inst.b), tmp.reg);
         else
         {
             build.vmovsd(inst.regX64, memRegDoubleOp(inst.a));
-            build.vblendvpd(inst.regX64, inst.regX64, memRegDoubleOp(inst.b), tmp.reg);
+            if (FFlag::LuauCodeGenVBlendpdReorder)
+                build.vblendvpd(inst.regX64, inst.regX64, tmp.reg, memRegDoubleOp(inst.b));
+            else
+                build.vblendvpd_DEPRECATED(inst.regX64, inst.regX64, memRegDoubleOp(inst.b), tmp.reg);
         }
+        break;
+    }
+    case IrCmd::SELECT_VEC:
+    {
+        inst.regX64 = regs.allocRegOrReuse(SizeX64::xmmword, index, {inst.c, inst.d});
+
+        ScopedRegX64 tmp1{regs};
+        ScopedRegX64 tmp2{regs};
+        RegisterX64 tmpc = vecOp(inst.c, tmp1);
+        RegisterX64 tmpd = vecOp(inst.d, tmp2);
+
+        build.vcmpeqps(inst.regX64, tmpc, tmpd);
+        build.vblendvps(inst.regX64, vecOp(inst.a, tmp1), vecOp(inst.b, tmp2), inst.regX64);
+
         break;
     }
     case IrCmd::ADD_VEC:
@@ -708,8 +730,6 @@ void IrLoweringX64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
     }
     case IrCmd::DOT_VEC:
     {
-        LUAU_ASSERT(FFlag::LuauVectorLibNativeDot);
-
         inst.regX64 = regs.allocRegOrReuse(SizeX64::xmmword, index, {inst.a, inst.b});
 
         ScopedRegX64 tmp1{regs};
@@ -763,6 +783,34 @@ void IrLoweringX64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
         build.mov(inst.regX64, 1);
 
         build.setLabel(exit);
+        break;
+    }
+    case IrCmd::CMP_INT:
+    {
+        CODEGEN_ASSERT(FFlag::LuauCodeGenDirectBtest);
+
+        // Cannot reuse operand registers as a target because we have to modify it before the comparison
+        inst.regX64 = regs.allocReg(SizeX64::dword, index);
+
+        // We are going to operate on byte register, those do not clear high bits on write
+        build.xor_(inst.regX64, inst.regX64);
+
+        IrCondition cond = conditionOp(inst.c);
+
+        if (inst.a.kind == IrOpKind::Constant)
+        {
+            build.cmp(regOp(inst.b), intOp(inst.a));
+            build.setcc(getInverseCondition(getConditionInt(cond)), byteReg(inst.regX64));
+        }
+        else if (inst.a.kind == IrOpKind::Inst)
+        {
+            build.cmp(regOp(inst.a), intOp(inst.b));
+            build.setcc(getConditionInt(cond), byteReg(inst.regX64));
+        }
+        else
+        {
+            CODEGEN_ASSERT(!"Unsupported instruction form");
+        }
         break;
     }
     case IrCmd::CMP_ANY:
@@ -1223,6 +1271,40 @@ void IrLoweringX64::lowerInst(IrInst& inst, uint32_t index, const IrBlock& next)
         callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaV_getimport)]);
 
         emitUpdateBase(build);
+        break;
+    }
+    case IrCmd::GET_CACHED_IMPORT:
+    {
+        regs.assertAllFree();
+        regs.assertNoSpills();
+
+        Label skip, exit;
+
+        // If the constant for the import is set, we will use it directly, otherwise we have to call an import path lookup function
+        build.cmp(luauConstantTag(vmConstOp(inst.b)), LUA_TNIL);
+        build.jcc(ConditionX64::NotEqual, skip);
+
+        {
+            ScopedSpills spillGuard(regs);
+
+            IrCallWrapperX64 callWrap(regs, build, index);
+            callWrap.addArgument(SizeX64::qword, rState);
+            callWrap.addArgument(SizeX64::qword, luauRegAddress(vmRegOp(inst.a)));
+            callWrap.addArgument(SizeX64::dword, importOp(inst.c));
+            callWrap.addArgument(SizeX64::dword, uintOp(inst.d));
+            callWrap.call(qword[rNativeContext + offsetof(NativeContext, getImport)]);
+        }
+
+        emitUpdateBase(build);
+        build.jmp(exit);
+
+        build.setLabel(skip);
+
+        ScopedRegX64 tmp1{regs, SizeX64::xmmword};
+
+        build.vmovups(tmp1.reg, luauConstant(vmConstOp(inst.b)));
+        build.vmovups(luauReg(vmRegOp(inst.a)), tmp1.reg);
+        build.setLabel(exit);
         break;
     }
     case IrCmd::CONCAT:
@@ -2218,7 +2300,7 @@ void IrLoweringX64::jumpOrAbortOnUndef(ConditionX64 cond, IrOp target, const IrB
         }
         else
         {
-            build.jcc(getReverseCondition(cond), label);
+            build.jcc(getNegatedCondition(cond), label);
             build.ud2();
             build.setLabel(label);
         }
@@ -2354,6 +2436,11 @@ int IrLoweringX64::intOp(IrOp op) const
 unsigned IrLoweringX64::uintOp(IrOp op) const
 {
     return function.uintOp(op);
+}
+
+unsigned IrLoweringX64::importOp(IrOp op) const
+{
+    return function.importOp(op);
 }
 
 double IrLoweringX64::doubleOp(IrOp op) const

@@ -37,7 +37,8 @@ namespace TypeParser
         "Identifier",
         "string",
         "StringRef",
-        "array"
+        "array",
+        "ObjectGUID"
     };
 
     TypePropertyKind ParsedTypeProperty::GetTypePropertyKindFromNameHash(u32 nameHash)
@@ -46,6 +47,7 @@ namespace TypeParser
 
         switch (nameHash)
         {
+            case "None"_djb2:       kind = TypePropertyKind::None; break;
             case "Auto"_djb2:       kind = TypePropertyKind::Auto; break;
             case "Value"_djb2:      kind = TypePropertyKind::Value; break;
             case "boolean"_djb2:    kind = TypePropertyKind::boolean; break;
@@ -71,6 +73,7 @@ namespace TypeParser
             case "string"_djb2:     kind = TypePropertyKind::string; break;
             case "stringref"_djb2:  kind = TypePropertyKind::StringRef; break;
             case "array"_djb2:      kind = TypePropertyKind::array; break;
+            case "objectguid"_djb2: kind = TypePropertyKind::objectguid; break;
         }
 
         return kind;

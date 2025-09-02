@@ -1,5 +1,8 @@
 #pragma once
 #include <Base/Types.h>
+
+#include <Meta/Generated/Shared/NetworkEnum.h>
+
 #include <memory>
 
 class Bytebuffer;
@@ -8,6 +11,15 @@ namespace Network
 {
     typedef u32 BufferID;
     typedef u16 OpcodeType;
+    template<typename T>
+    concept PacketConcept = requires(T t, Bytebuffer * buffer)
+    {
+        { std::decay_t<T>::PACKET_ID } -> std::convertible_to<u16>;
+        
+        { t.Serialize(buffer) } -> std::same_as<bool>;
+        { t.Deserialize(buffer) } -> std::same_as<bool>;
+        { t.GetSerializedSize() } -> std::same_as<u16>;
+    };
 
     struct ConnectionInfo
     {
@@ -19,15 +31,8 @@ namespace Network
     struct MessageHeader
     {
     public:
-        struct Flags
-        {
-            u8 isPing : 1;
-        };
-
-    public:
         OpcodeType opcode = 0;
         u16 size = 0;
-        Flags flags = { 0 };
     };
 
     struct Message

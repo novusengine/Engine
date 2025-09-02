@@ -15,31 +15,4 @@ namespace Network
         None,
         Connected
     };
-
-    enum class CheatCommands : u8
-    {
-        None,
-        Damage,
-        Heal,
-        Kill,
-        Resurrect,
-        Morph,
-        Demorph,
-        Teleport,
-        CreateCharacter,
-        DeleteCharacter,
-        SetRace,
-        SetGender,
-        SetClass,
-        SetLevel,
-        SetItemTemplate,
-        SetItemStatTemplate,
-        SetItemArmorTemplate,
-        SetItemWeaponTemplate,
-        SetItemShieldTemplate,
-        AddItem,
-        RemoveItem,
-        TriggerAdd,
-        TriggerRemove
-    };
 }

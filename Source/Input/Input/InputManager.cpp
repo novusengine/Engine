@@ -141,14 +141,7 @@ void InputManager::MouseInputHandler(i32 button, i32 actionMask, i32 modifierMas
 }
 void InputManager::MousePositionHandler(f32 x, f32 y)
 {
-    if (!IsCursorVirtual())
-    {
-        _cursorPosition = vec2(x, y);
-    }
-    else
-    {
-        _cursorVirtualPosition = vec2(x, y);
-    }
+    _cursorPosition = vec2(x, y);
 
     bool wasConsumed = false;
     u32 numKeybinds = static_cast<u32>(_keybindGroups.size());
@@ -224,17 +217,10 @@ void InputManager::SetCursorVirtual(bool isVirtual)
 
 vec2 InputManager::GetMousePosition()
 {
-    return _cursorState.isVirtual ? _cursorVirtualPosition : _cursorPosition;
+    return _cursorPosition;
 }
 
 void InputManager::SetMousePosition(f32 x, f32 y)
 {
-    if (_cursorState.isVirtual)
-    {
-        _cursorVirtualPosition = vec2(x, y);
-    }
-    else
-    {
-        _cursorPosition = vec2(x, y);
-    }
+    _cursorPosition = vec2(x, y);
 }

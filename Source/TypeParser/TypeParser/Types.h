@@ -192,7 +192,8 @@ namespace TypeParser
         Identifier,
         string,
         StringRef,
-        array
+        array,
+        objectguid
     };
 
     struct TypeArrayInfo

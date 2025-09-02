@@ -21,8 +21,7 @@ LUAU_FASTINTVARIABLE(LuauCodeGenReuseSlotLimit, 64)
 LUAU_FASTINTVARIABLE(LuauCodeGenReuseUdataTagLimit, 64)
 LUAU_FASTINTVARIABLE(LuauCodeGenLiveSlotReuseLimit, 8)
 LUAU_FASTFLAGVARIABLE(DebugLuauAbortingChecks)
-LUAU_FASTFLAG(LuauVectorLibNativeDot)
-LUAU_FASTFLAGVARIABLE(LuauCodeGenLimitLiveSlotReuse)
+LUAU_FASTFLAG(LuauCodeGenDirectBtest)
 
 namespace Luau
 {
@@ -200,11 +199,7 @@ struct ConstPropState
     // Same goes for table array elements as well
     void invalidateHeapTableData()
     {
-        if (FFlag::LuauCodeGenLimitLiveSlotReuse)
-            getSlotNodeCache.clear();
-        else
-            getSlotNodeCache_DEPRECATED.clear();
-
+        getSlotNodeCache.clear();
         checkSlotMatchCache.clear();
 
         getArrAddrCache.clear();
@@ -311,8 +306,6 @@ struct ConstPropState
 
     uint32_t* getPreviousInstIndex(const IrInst& inst)
     {
-        CODEGEN_ASSERT(useValueNumbering);
-
         if (uint32_t* prevIdx = valueMap.find(inst))
         {
             // Previous load might have been removed as unused
@@ -331,7 +324,7 @@ struct ConstPropState
 
     std::pair<IrCmd, uint32_t> getPreviousVersionedLoadForTag(uint8_t tag, IrOp vmReg)
     {
-        if (useValueNumbering && !function.cfg.captured.regs.test(vmRegOp(vmReg)))
+        if (!function.cfg.captured.regs.test(vmRegOp(vmReg)))
         {
             if (tag == LUA_TBOOLEAN)
             {
@@ -356,9 +349,6 @@ struct ConstPropState
     // Find existing value of the instruction that is exactly the same, or record current on for future lookups
     void substituteOrRecord(IrInst& inst, uint32_t instIdx)
     {
-        if (!useValueNumbering)
-            return;
-
         if (uint32_t* prevIdx = getPreviousInstIndex(inst))
         {
             substitute(function, inst, IrOp{IrOpKind::Inst, *prevIdx});
@@ -373,9 +363,6 @@ struct ConstPropState
     void substituteOrRecordVmRegLoad(IrInst& loadInst)
     {
         CODEGEN_ASSERT(loadInst.a.kind == IrOpKind::VmReg);
-
-        if (!useValueNumbering)
-            return;
 
         // To avoid captured register invalidation tracking in lowering later, values from loads from captured registers are not propagated
         // This prevents the case where load value location is linked to memory in case of a spill and is then clobbered in a user call
@@ -411,9 +398,6 @@ struct ConstPropState
         CODEGEN_ASSERT(storeInst.a.kind == IrOpKind::VmReg);
         CODEGEN_ASSERT(storeInst.b.kind == IrOpKind::Inst);
 
-        if (!useValueNumbering)
-            return;
-
         // To avoid captured register invalidation tracking in lowering later, values from stores into captured registers are not propagated
         // This prevents the case where store creates an alternative value location in case of a spill and is then clobbered in a user call
         if (function.cfg.captured.regs.test(vmRegOp(storeInst.a)))
@@ -428,8 +412,6 @@ struct ConstPropState
     // Note that this pressure is approximate, as some values that might have been live at one point could have been marked dead later
     int getMaxInternalOverlap(std::vector<NumberedInstruction>& set, size_t slot)
     {
-        CODEGEN_ASSERT(FFlag::LuauCodeGenLimitLiveSlotReuse);
-
         // Start with one live range for the slot we want to reuse
         int curr = 1;
 
@@ -487,9 +469,7 @@ struct ConstPropState
             regs[i] = RegisterInfo();
 
         maxReg = 0;
-
-        if (FFlag::LuauCodeGenLimitLiveSlotReuse)
-            instPos = 0u;
+        instPos = 0u;
 
         inSafeEnv = false;
         checkedGc = false;
@@ -503,8 +483,6 @@ struct ConstPropState
     }
 
     IrFunction& function;
-
-    bool useValueNumbering = false;
 
     std::array<RegisterInfo, 256> regs;
 
@@ -526,7 +504,6 @@ struct ConstPropState
 
     // Heap changes might affect table state
     std::vector<NumberedInstruction> getSlotNodeCache; // Additionally, pcpos argument might be different
-    std::vector<uint32_t> getSlotNodeCache_DEPRECATED; // Additionally, pcpos argument might be different
     std::vector<uint32_t> checkSlotMatchCache; // Additionally, fallback block argument might be different
 
     std::vector<uint32_t> getArrAddrCache;
@@ -631,6 +608,7 @@ static void handleBuiltinEffects(ConstPropState& state, LuauBuiltinFunction bfid
     case LBF_VECTOR_CLAMP:
     case LBF_VECTOR_MIN:
     case LBF_VECTOR_MAX:
+    case LBF_VECTOR_LERP:
     case LBF_MATH_LERP:
         break;
     case LBF_TABLE_INSERT:
@@ -651,8 +629,7 @@ static void handleBuiltinEffects(ConstPropState& state, LuauBuiltinFunction bfid
 
 static void constPropInInst(ConstPropState& state, IrBuilder& build, IrFunction& function, IrBlock& block, IrInst& inst, uint32_t index)
 {
-    if (FFlag::LuauCodeGenLimitLiveSlotReuse)
-        state.instPos++;
+    state.instPos++;
 
     switch (inst.cmd)
     {
@@ -1260,49 +1237,30 @@ static void constPropInInst(ConstPropState& state, IrBuilder& build, IrFunction&
             state.getArrAddrCache.push_back(index);
         break;
     case IrCmd::GET_SLOT_NODE_ADDR:
-        if (FFlag::LuauCodeGenLimitLiveSlotReuse)
+        for (size_t i = 0; i < state.getSlotNodeCache.size(); i++)
         {
-            for (size_t i = 0; i < state.getSlotNodeCache.size(); i++)
+            auto&& [prevIdx, num, lastNum] = state.getSlotNodeCache[i];
+
+            const IrInst& prev = function.instructions[prevIdx];
+
+            if (prev.a == inst.a && prev.c == inst.c)
             {
-                auto&& [prevIdx, num, lastNum] = state.getSlotNodeCache[i];
+                // Check if this reuse will increase the overall register pressure over the limit
+                int limit = FInt::LuauCodeGenLiveSlotReuseLimit;
 
-                const IrInst& prev = function.instructions[prevIdx];
+                if (int(state.getSlotNodeCache.size()) > limit && state.getMaxInternalOverlap(state.getSlotNodeCache, i) > limit)
+                    return;
 
-                if (prev.a == inst.a && prev.c == inst.c)
-                {
-                    // Check if this reuse will increase the overall register pressure over the limit
-                    int limit = FInt::LuauCodeGenLiveSlotReuseLimit;
+                // Update live range of the value from the optimization standpoint
+                lastNum = state.instPos;
 
-                    if (int(state.getSlotNodeCache.size()) > limit && state.getMaxInternalOverlap(state.getSlotNodeCache, i) > limit)
-                        return;
-
-                    // Update live range of the value from the optimization standpoint
-                    lastNum = state.instPos;
-
-                    substitute(function, inst, IrOp{IrOpKind::Inst, prevIdx});
-                    return; // Break out from both the loop and the switch
-                }
+                substitute(function, inst, IrOp{IrOpKind::Inst, prevIdx});
+                return; // Break out from both the loop and the switch
             }
-
-            if (int(state.getSlotNodeCache.size()) < FInt::LuauCodeGenReuseSlotLimit)
-                state.getSlotNodeCache.push_back({index, state.instPos, state.instPos});
         }
-        else
-        {
-            for (uint32_t prevIdx : state.getSlotNodeCache_DEPRECATED)
-            {
-                const IrInst& prev = function.instructions[prevIdx];
 
-                if (prev.a == inst.a && prev.c == inst.c)
-                {
-                    substitute(function, inst, IrOp{IrOpKind::Inst, prevIdx});
-                    return; // Break out from both the loop and the switch
-                }
-            }
-
-            if (int(state.getSlotNodeCache_DEPRECATED.size()) < FInt::LuauCodeGenReuseSlotLimit)
-                state.getSlotNodeCache_DEPRECATED.push_back(index);
-        }
+        if (int(state.getSlotNodeCache.size()) < FInt::LuauCodeGenReuseSlotLimit)
+            state.getSlotNodeCache.push_back({index, state.instPos, state.instPos});
         break;
     case IrCmd::GET_HASH_NODE_ADDR:
     case IrCmd::GET_CLOSURE_UPVAL_ADDR:
@@ -1367,8 +1325,12 @@ static void constPropInInst(ConstPropState& state, IrBuilder& build, IrFunction&
     case IrCmd::ABS_NUM:
     case IrCmd::SIGN_NUM:
     case IrCmd::SELECT_NUM:
+    case IrCmd::SELECT_VEC:
     case IrCmd::NOT_ANY:
         state.substituteOrRecord(inst, index);
+        break;
+    case IrCmd::CMP_INT:
+        CODEGEN_ASSERT(FFlag::LuauCodeGenDirectBtest);
         break;
     case IrCmd::CMP_ANY:
         state.invalidateUserCall();
@@ -1505,9 +1467,6 @@ static void constPropInInst(ConstPropState& state, IrBuilder& build, IrFunction&
     case IrCmd::MUL_VEC:
     case IrCmd::DIV_VEC:
     case IrCmd::DOT_VEC:
-        if (inst.cmd == IrCmd::DOT_VEC)
-            LUAU_ASSERT(FFlag::LuauVectorLibNativeDot);
-
         if (IrInst* a = function.asInstOp(inst.a); a && a->cmd == IrCmd::TAG_VECTOR)
             replace(function, inst.a, a->a);
 
@@ -1572,6 +1531,15 @@ static void constPropInInst(ConstPropState& state, IrBuilder& build, IrFunction&
     case IrCmd::GET_IMPORT:
         state.invalidate(inst.a);
         state.invalidateUserCall();
+        break;
+    case IrCmd::GET_CACHED_IMPORT:
+        state.invalidate(inst.a);
+
+        // Outside of safe environment, environment traversal for an import can execute custom code
+        if (!state.inSafeEnv)
+            state.invalidateUserCall();
+
+        state.invalidateValuePropagation();
         break;
     case IrCmd::CONCAT:
         state.invalidateRegisterRange(vmRegOp(inst.a), function.uintOp(inst.b));
@@ -1883,12 +1851,11 @@ static void tryCreateLinearBlock(IrBuilder& build, std::vector<uint8_t>& visited
     constPropInBlock(build, linearBlock, state);
 }
 
-void constPropInBlockChains(IrBuilder& build, bool useValueNumbering)
+void constPropInBlockChains(IrBuilder& build)
 {
     IrFunction& function = build.function;
 
     ConstPropState state{function};
-    state.useValueNumbering = useValueNumbering;
 
     std::vector<uint8_t> visited(function.blocks.size(), false);
 
@@ -1904,7 +1871,7 @@ void constPropInBlockChains(IrBuilder& build, bool useValueNumbering)
     }
 }
 
-void createLinearBlocks(IrBuilder& build, bool useValueNumbering)
+void createLinearBlocks(IrBuilder& build)
 {
     // Go through internal block chains and outline them into a single new block.
     // Outlining will be able to linearize the execution, even if there was a jump to a block with multiple users,
@@ -1912,7 +1879,6 @@ void createLinearBlocks(IrBuilder& build, bool useValueNumbering)
     IrFunction& function = build.function;
 
     ConstPropState state{function};
-    state.useValueNumbering = useValueNumbering;
 
     std::vector<uint8_t> visited(function.blocks.size(), false);
 

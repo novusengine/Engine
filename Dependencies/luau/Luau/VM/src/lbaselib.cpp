@@ -11,6 +11,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+LUAU_DYNAMIC_FASTFLAGVARIABLE(LuauXpcallContNoYield, false)
+LUAU_DYNAMIC_FASTFLAGVARIABLE(LuauXpcallContErrorHandling, false)
+
 static void writestring(const char* s, size_t l)
 {
     fwrite(s, 1, l, stdout);
@@ -294,10 +297,7 @@ static int luaB_pcally(lua_State* L)
     // any errors from this point on are handled by continuation
     L->ci->flags |= LUA_CALLINFO_HANDLE;
 
-    // maintain yieldable invariant (baseCcalls <= nCcalls)
-    L->baseCcalls++;
     int status = luaD_pcall(L, luaB_pcallrun, func, savestack(L, func), 0);
-    L->baseCcalls--;
 
     // necessary to accomodate functions that return lots of values
     expandstacklimit(L, L->top);
@@ -348,12 +348,9 @@ static int luaB_xpcally(lua_State* L)
     StkId errf = L->base;
     StkId func = L->base + 1;
 
-    // maintain yieldable invariant (baseCcalls <= nCcalls)
-    L->baseCcalls++;
     int status = luaD_pcall(L, luaB_pcallrun, func, savestack(L, func), savestack(L, errf));
-    L->baseCcalls--;
 
-    // necessary to accomodate functions that return lots of values
+    // necessary to accommodate functions that return lots of values
     expandstacklimit(L, L->top);
 
     // yielding means we need to propagate yield; resume will call continuation function later
@@ -371,7 +368,10 @@ static void luaB_xpcallerr(lua_State* L, void* ud)
 {
     StkId func = (StkId)ud;
 
-    luaD_call(L, func, 1);
+    if (DFFlag::LuauXpcallContNoYield)
+        luaD_callny(L, func, 1);
+    else
+        luaD_call(L, func, 1);
 }
 
 static int luaB_xpcallcont(lua_State* L, int status)
@@ -390,11 +390,36 @@ static int luaB_xpcallcont(lua_State* L, int status)
         lua_pushvalue(L, 1);  // push error function on top of the stack
         lua_pushvalue(L, -3); // push error object (that was on top of the stack before)
 
-        StkId res = L->top - 3;
-        StkId errf = L->top - 2;
+        if (DFFlag::LuauXpcallContErrorHandling)
+        {
+            StkId errf = L->top - 2;
+            ptrdiff_t oldtopoffset = savestack(L, errf);
 
-        // note: we pass res as errfunc as a short cut; if errf generates an error, we'll try to execute res (boolean) and fail
-        luaD_pcall(L, luaB_xpcallerr, errf, savestack(L, errf), savestack(L, res));
+            int err = luaD_pcall(L, luaB_xpcallerr, errf, oldtopoffset, 0);
+
+            if (err != 0)
+            {
+                int errstatus = status;
+
+                // in general we preserve the status, except for cases when the error handler fails
+                // out of memory is treated specially because it's common for it to be cascading, in which case we preserve the code
+                if (status == LUA_ERRMEM && err == LUA_ERRMEM)
+                    errstatus = LUA_ERRMEM;
+                else
+                    errstatus = LUA_ERRERR;
+
+                StkId oldtop = restorestack(L, oldtopoffset);
+                luaD_seterrorobj(L, errstatus, oldtop);
+            }
+        }
+        else
+        {
+            StkId res = L->top - 3;
+            StkId errf = L->top - 2;
+
+            // note: we pass res as errfunc as a short cut; if errf generates an error, we'll try to execute res (boolean) and fail
+            luaD_pcall(L, luaB_xpcallerr, errf, savestack(L, errf), savestack(L, res));
+        }
 
         return 2;
     }

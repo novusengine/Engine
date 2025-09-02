@@ -1,7 +1,12 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 
 #include "Luau/Constraint.h"
+#include "Luau/TypeFunction.h"
 #include "Luau/VisitType.h"
+
+LUAU_FASTFLAG(LuauEagerGeneralization4)
+LUAU_FASTFLAG(LuauForceSimplifyConstraint2)
+LUAU_FASTFLAGVARIABLE(LuauExplicitSkipBoundTypes)
 
 namespace Luau
 {
@@ -15,11 +20,12 @@ Constraint::Constraint(NotNull<Scope> scope, const Location& location, Constrain
 
 struct ReferenceCountInitializer : TypeOnceVisitor
 {
+    NotNull<TypeIds> result;
+    bool traverseIntoTypeFunctions = true;
 
-    DenseHashSet<TypeId>* result;
-
-    ReferenceCountInitializer(DenseHashSet<TypeId>* result)
-        : result(result)
+    explicit ReferenceCountInitializer(NotNull<TypeIds> result)
+        : TypeOnceVisitor("ReferenceCountInitializer", FFlag::LuauExplicitSkipBoundTypes)
+        , result(result)
     {
     }
 
@@ -41,42 +47,53 @@ struct ReferenceCountInitializer : TypeOnceVisitor
         return false;
     }
 
-    bool visit(TypeId ty, const ClassType&) override
+    bool visit(TypeId ty, const TableType& tt) override
     {
-        // ClassTypes never contain free types.
+        if (FFlag::LuauEagerGeneralization4)
+        {
+            if (tt.state == TableState::Unsealed || tt.state == TableState::Free)
+                result->insert(ty);
+        }
+
+        return true;
+    }
+
+    bool visit(TypeId ty, const ExternType&) override
+    {
+        // ExternTypes never contain free types.
         return false;
     }
 
-    bool visit(TypeId, const TypeFunctionInstanceType&) override
+    bool visit(TypeId, const TypeFunctionInstanceType& tfit) override
     {
-        // We do not consider reference counted types that are inside a type
-        // function to be part of the reachable reference counted types.
-        // Otherwise, code can be constructed in just the right way such
-        // that two type functions both claim to mutate a free type, which
-        // prevents either type function from trying to generalize it, so
-        // we potentially get stuck.
-        //
-        // The default behavior here is `true` for "visit the child types"
-        // of this type, hence:
-        return false;
+        if (FFlag::LuauForceSimplifyConstraint2)
+            return tfit.function->canReduceGenerics;
+        else
+            return FFlag::LuauEagerGeneralization4 && traverseIntoTypeFunctions;
     }
 };
 
 bool isReferenceCountedType(const TypeId typ)
 {
+    if (FFlag::LuauEagerGeneralization4)
+    {
+        if (auto tt = get<TableType>(typ))
+            return tt->state == TableState::Free || tt->state == TableState::Unsealed;
+    }
+
     // n.b. this should match whatever `ReferenceCountInitializer` includes.
     return get<FreeType>(typ) || get<BlockedType>(typ) || get<PendingExpansionType>(typ);
 }
 
-DenseHashSet<TypeId> Constraint::getMaybeMutatedFreeTypes() const
+TypeIds Constraint::getMaybeMutatedFreeTypes() const
 {
     // For the purpose of this function and reference counting in general, we are only considering
     // mutations that affect the _bounds_ of the free type, and not something that may bind the free
     // type itself to a new type. As such, `ReduceConstraint` and `GeneralizationConstraint` have no
     // contribution to the output set here.
 
-    DenseHashSet<TypeId> types{{}};
-    ReferenceCountInitializer rci{&types};
+    TypeIds types;
+    ReferenceCountInitializer rci{NotNull{&types}};
 
     if (auto ec = get<EqualityConstraint>(*this))
     {
@@ -111,6 +128,13 @@ DenseHashSet<TypeId> Constraint::getMaybeMutatedFreeTypes() const
     {
         rci.traverse(fchc->argsPack);
     }
+    else if (auto fcc = get<FunctionCallConstraint>(*this); fcc && FFlag::LuauEagerGeneralization4)
+    {
+        rci.traverseIntoTypeFunctions = false;
+        rci.traverse(fcc->fn);
+        rci.traverse(fcc->argsPack);
+        rci.traverseIntoTypeFunctions = true;
+    }
     else if (auto ptc = get<PrimitiveTypeConstraint>(*this))
     {
         rci.traverse(ptc->freeType);
@@ -118,12 +142,15 @@ DenseHashSet<TypeId> Constraint::getMaybeMutatedFreeTypes() const
     else if (auto hpc = get<HasPropConstraint>(*this))
     {
         rci.traverse(hpc->resultType);
-        // `HasPropConstraints` should not mutate `subjectType`.
+        if (FFlag::LuauEagerGeneralization4)
+            rci.traverse(hpc->subjectType);
     }
     else if (auto hic = get<HasIndexerConstraint>(*this))
     {
+        if (FFlag::LuauEagerGeneralization4)
+            rci.traverse(hic->subjectType);
         rci.traverse(hic->resultType);
-        // `HasIndexerConstraint` should not mutate `subjectType` or `indexType`.
+        // `HasIndexerConstraint` should not mutate `indexType`.
     }
     else if (auto apc = get<AssignPropConstraint>(*this))
     {
@@ -146,9 +173,13 @@ DenseHashSet<TypeId> Constraint::getMaybeMutatedFreeTypes() const
     {
         rci.traverse(rpc->tp);
     }
-    else if (auto tcc = get<TableCheckConstraint>(*this))
+    else if (auto pftc = get<PushFunctionTypeConstraint>(*this))
     {
-        rci.traverse(tcc->exprType);
+        rci.traverse(pftc->functionType);
+    }
+    else if (auto ptc = get<PushTypeConstraint>(*this))
+    {
+        rci.traverse(ptc->targetType);
     }
 
     return types;

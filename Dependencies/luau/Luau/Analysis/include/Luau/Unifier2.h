@@ -26,6 +26,27 @@ enum class OccursCheckResult
     Fail
 };
 
+enum class UnifyResult
+{
+    Ok,
+    OccursCheckFailed,
+    TooComplex
+};
+
+inline UnifyResult operator &(UnifyResult lhs, UnifyResult rhs)
+{
+    if (lhs == UnifyResult::Ok)
+        return rhs;
+    return lhs;
+}
+
+inline UnifyResult& operator&=(UnifyResult& lhs, UnifyResult rhs)
+{
+    if (lhs == UnifyResult::Ok)
+        lhs = rhs;
+    return lhs;
+}
+
 struct Unifier2
 {
     NotNull<TypeArena> arena;
@@ -44,6 +65,13 @@ struct Unifier2
     // Mapping from generic type packs to `TypePack`s of free types to be used in instantiation.
     DenseHashMap<TypePackId, TypePackId> genericPackSubstitutions{nullptr};
 
+    // Unification sometimes results in the creation of new free types.
+    // We collect them here so that other systems can perform necessary
+    // bookkeeping.
+    std::vector<TypeId> newFreshTypes;
+    std::vector<TypePackId> newFreshTypePacks;
+
+    int iterationCount = 0;
     int recursionCount = 0;
     int recursionLimit = 0;
 
@@ -60,6 +88,10 @@ struct Unifier2
         DenseHashSet<const void*>* uninhabitedTypeFunctions
     );
 
+    UnifyResult unify(TypeId subTy, TypeId superTy);
+    UnifyResult unify(TypePackId subTp, TypePackId superTp);
+
+private:
     /** Attempt to commit the subtype relation subTy <: superTy to the type
      * graph.
      *
@@ -72,27 +104,28 @@ struct Unifier2
      * Presently, the only way unification can fail is if we attempt to bind one
      * free TypePack to another and encounter an occurs check violation.
      */
-    bool unify(TypeId subTy, TypeId superTy);
-    bool unifyFreeWithType(TypeId subTy, TypeId superTy);
-    bool unify(TypeId subTy, const FunctionType* superFn);
-    bool unify(const UnionType* subUnion, TypeId superTy);
-    bool unify(TypeId subTy, const UnionType* superUnion);
-    bool unify(const IntersectionType* subIntersection, TypeId superTy);
-    bool unify(TypeId subTy, const IntersectionType* superIntersection);
-    bool unify(TableType* subTable, const TableType* superTable);
-    bool unify(const MetatableType* subMetatable, const MetatableType* superMetatable);
+    UnifyResult unify_(TypeId subTy, TypeId superTy);
+    UnifyResult unifyFreeWithType(TypeId subTy, TypeId superTy);
+    UnifyResult unify_(TypeId subTy, const FunctionType* superFn);
+    UnifyResult unify_(const UnionType* subUnion, TypeId superTy);
+    UnifyResult unify_(TypeId subTy, const UnionType* superUnion);
+    UnifyResult unify_(const IntersectionType* subIntersection, TypeId superTy);
+    UnifyResult unify_(TypeId subTy, const IntersectionType* superIntersection);
+    UnifyResult unify_(TableType* subTable, const TableType* superTable);
+    UnifyResult unify_(const MetatableType* subMetatable, const MetatableType* superMetatable);
 
-    bool unify(const AnyType* subAny, const FunctionType* superFn);
-    bool unify(const FunctionType* subFn, const AnyType* superAny);
-    bool unify(const AnyType* subAny, const TableType* superTable);
-    bool unify(const TableType* subTable, const AnyType* superAny);
+    UnifyResult unify_(const AnyType* subAny, const FunctionType* superFn);
+    UnifyResult unify_(const FunctionType* subFn, const AnyType* superAny);
+    UnifyResult unify_(const AnyType* subAny, const TableType* superTable);
+    UnifyResult unify_(const TableType* subTable, const AnyType* superAny);
 
-    // TODO think about this one carefully.  We don't do unions or intersections of type packs
-    bool unify(TypePackId subTp, TypePackId superTp);
+    UnifyResult unify_(const MetatableType* subMetatable, const AnyType*);
+    UnifyResult unify_(const AnyType*, const MetatableType* superMetatable);
+
+    UnifyResult unify_(TypePackId subTp, TypePackId superTp);
 
     std::optional<TypeId> generalize(TypeId ty);
 
-private:
     /**
      * @returns simplify(left | right)
      */
@@ -110,6 +143,9 @@ private:
     // Returns true if needle occurs within haystack already.  ie if we bound
     // needle to haystack, would a cyclic TypePack result?
     OccursCheckResult occursCheck(DenseHashSet<TypePackId>& seen, TypePackId needle, TypePackId haystack);
+
+    TypeId freshType(NotNull<Scope> scope, Polarity polarity);
+    TypePackId freshTypePack(NotNull<Scope> scope, Polarity polarity);
 };
 
 } // namespace Luau

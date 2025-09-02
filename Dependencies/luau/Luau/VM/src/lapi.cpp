@@ -139,7 +139,29 @@ int lua_checkstack(lua_State* L, int size)
         res = 0; // stack overflow
     else if (size > 0)
     {
-        luaD_checkstack(L, size);
+        if (stacklimitreached(L, size))
+        {
+            struct CallContext
+            {
+                int size;
+
+                static void run(lua_State* L, void* ud)
+                {
+                    CallContext* ctx = (CallContext*)ud;
+
+                    luaD_growstack(L, ctx->size);
+                }
+            } ctx = {size};
+
+            // there could be no memory to extend the stack
+            if (luaD_rawrunprotected(L, &CallContext::run, &ctx) != LUA_OK)
+                return 0;
+        }
+        else
+        {
+            condhardstacktests(luaD_reallocstack(L, L->stacksize - EXTRA_STACK, 0));
+        }
+
         expandstacklimit(L, L->top + size);
     }
     return res;
@@ -1006,8 +1028,9 @@ void lua_call(lua_State* L, int nargs, int nresults)
 /*
 ** Execute a protected call.
 */
+// data to `f_call'
 struct CallS
-{ // data to `f_call'
+{
     StkId func;
     int nresults;
 };
@@ -1037,6 +1060,42 @@ int lua_pcall(lua_State* L, int nargs, int nresults, int errfunc)
     int status = luaD_pcall(L, f_call, &c, savestack(L, c.func), func);
 
     adjustresults(L, nresults);
+    return status;
+}
+
+/*
+** Execute a protected C call.
+*/
+// data to `f_Ccall'
+struct CCallS
+{
+    lua_CFunction func;
+    void* ud;
+};
+
+static void f_Ccall(lua_State* L, void* ud)
+{
+    struct CCallS* c = cast_to(struct CCallS*, ud);
+
+    if (!lua_checkstack(L, 2))
+        luaG_runerror(L, "stack limit");
+
+    lua_pushcclosurek(L, c->func, nullptr, 0, nullptr);
+    lua_pushlightuserdata(L, c->ud);
+    luaD_call(L, L->top - 2, 0);
+}
+
+int lua_cpcall(lua_State* L, lua_CFunction func, void* ud)
+{
+    api_check(L, L->status == 0);
+
+    struct CCallS c;
+    c.func = func;
+    c.ud = ud;
+
+    int status = luaD_pcall(L, f_Ccall, &c, savestack(L, L->top), 0);
+
+    adjustresults(L, 0);
     return status;
 }
 
@@ -1445,8 +1504,16 @@ void lua_unref(lua_State* L, int ref)
 
     global_State* g = L->global;
     LuaTable* reg = hvalue(registry(L));
-    TValue* slot = luaH_setnum(L, reg, ref);
-    setnvalue(slot, g->registryfree); // NB: no barrier needed because value isn't collectable
+
+    const TValue* slot = luaH_getnum(reg, ref);
+    api_check(L, slot != luaO_nilobject);
+
+    // similar to how 'luaH_setnum' makes non-nil slot value mutable
+    TValue* mutableSlot = (TValue*)slot;
+
+    // NB: no barrier needed because value isn't collectable
+    setnvalue(mutableSlot, g->registryfree);
+
     g->registryfree = ref;
 }
 
@@ -1470,13 +1537,12 @@ lua_Destructor lua_getuserdatadtor(lua_State* L, int tag)
     return L->global->udatagc[tag];
 }
 
-void lua_setuserdatametatable(lua_State* L, int tag, int idx)
+void lua_setuserdatametatable(lua_State* L, int tag)
 {
     api_check(L, unsigned(tag) < LUA_UTAG_LIMIT);
     api_check(L, !L->global->udatamt[tag]); // reassignment not supported
-    StkId o = index2addr(L, idx);
-    api_check(L, ttistable(o));
-    L->global->udatamt[tag] = hvalue(o);
+    api_check(L, ttistable(L->top - 1));
+    L->global->udatamt[tag] = hvalue(L->top - 1);
     L->top--;
 }
 
