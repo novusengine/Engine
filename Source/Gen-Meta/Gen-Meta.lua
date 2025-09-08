@@ -15,15 +15,11 @@ else
     typeGenFolder = "%{wks.location}/bin/%{wks.name}/Engine/%{cfg.buildcfg}/TypeGenerator"
 end
 
-local solutionType = BuildSettings:Get("Solution Type")
 prebuildcommands
 {
     "if exist \"" .. metaGenDir .. "/Generated\" rmdir /S /Q \"" .. metaGenDir .. "/Generated\"",
     
     "\"" .. typeGenFolder .. "\" " ..
     "\"" .. metaGenDir .. "/Source\" " ..
-    "\"" .. metaGenDir .. "/Generated\" ",
-
-    "cd " .. currentProject.RootDir,
-    "premake5 " .. solutionType
+    "\"" .. metaGenDir .. "/Generated\" "
 }
