@@ -21,6 +21,7 @@ namespace TypeParser
         static void ParseCommand(LexerInfo& lexerInfo, ParsedType& parsedType);
         static void ParseEnum(LexerInfo& lexerInfo, ParsedType& parsedType);
         static void ParsePacket(LexerInfo& lexerInfo, ParsedType& parsedType);
+        static void ParseLuaStruct(LexerInfo& lexerInfo, ParsedType& parsedType);
 
         static void ParseProperty(LexerInfo& lexerInfo, ParsedType& parsedType);
         static void ParsePropertyValue(LexerInfo& lexerInfo, ParsedTypeProperty& parsedTypeProperty);

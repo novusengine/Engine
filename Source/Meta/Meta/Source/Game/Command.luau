@@ -124,6 +124,12 @@ type CreatureRemove<Command> =
     Parameters : { };
 }
 
+type CreatureInfo<Command> =
+{
+    Names : "creature info";
+    Parameters : { };
+}
+
 type CheatLogin<Command> =
 {
     Names : "cheat login";

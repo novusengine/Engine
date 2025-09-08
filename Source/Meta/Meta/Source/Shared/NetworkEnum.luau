@@ -28,6 +28,7 @@ type CheatCommand<Enum> =
         ItemRemove              : Auto,
         CreatureAdd             : Auto,
         CreatureRemove          : Auto,
+        CreatureInfo            : Auto,
         MapAdd                  : Auto,
         GotoAdd                 : Auto,
         GotoAddHere             : Auto,

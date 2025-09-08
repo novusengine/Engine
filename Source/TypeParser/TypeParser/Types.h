@@ -160,8 +160,9 @@ namespace TypeParser
         None,
         ClientDB,
         Command,
+        Enum,
         Packet,
-        Enum
+        LuaStruct
     };
 
     enum class TypePropertyKind

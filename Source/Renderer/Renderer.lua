@@ -1,4 +1,5 @@
 local mod = Solution.Util.CreateModuleTable("Renderer", { "base", "shadercooker", "tracyprofiler", "imgui", "gli", "typesafe", "utfcpp", "msdf-atlas-gen" })
+dependson { "Gen-Meta" }
 
 Solution.Util.CreateStaticLib(mod.Name, Solution.Projects.Current.BinDir, mod.Dependencies, function()
     local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }

@@ -13,6 +13,7 @@ local modules =
 {
     "Base/Base.lua",
     "FileFormat/FileFormat.lua",
+    "Scripting/Scripting.lua",
     "Meta/Meta.lua",
     "Network/Network.lua",
     "Input/Input.lua",

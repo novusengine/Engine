@@ -89,6 +89,7 @@ namespace TypeParser
             Keyword_Command,
             Keyword_Packet,
             Keyword_Enum,
+            Keyword_LuaStruct,
             Keyword_Schema,
             Keyword_Table
         };

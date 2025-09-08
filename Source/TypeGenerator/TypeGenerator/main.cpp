@@ -16,6 +16,19 @@
 #include <algorithm>
 #include <execution>
 
+struct Packet
+{
+public:
+    u16 id;
+    std::string name;
+};
+struct PacketList
+{
+public:
+    u16 nextID = 0;
+    std::vector<Packet> packets;
+};
+
 void WriteContent(std::string& fileContent, const std::string& content, u32 indent = 0)
 {
     for (u32 i = 0; i < indent; i++)
@@ -931,6 +944,171 @@ void WritePacketGetSerializedSizeFunction(std::string& fileContent, const TypePa
     WriteContent(fileContent, "}\n", indent);
 };
 
+bool WriteLuaStructField(std::string& fileContent, const std::string& name, const TypeParser::TypeProperty& property, u32 indent)
+{
+    switch (property.kind)
+    {
+        case TypeParser::TypePropertyKind::None:
+        case TypeParser::TypePropertyKind::Auto:
+        case TypeParser::TypePropertyKind::Value:
+        case TypeParser::TypePropertyKind::Identifier:
+        case TypeParser::TypePropertyKind::StringRef:
+        case TypeParser::TypePropertyKind::vec4:
+        case TypeParser::TypePropertyKind::ivec4:
+        case TypeParser::TypePropertyKind::uvec4:
+        case TypeParser::TypePropertyKind::array:
+        {
+            NC_LOG_ERROR("LuaStruct '{0}' has a {1} field which is not allowed", name, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind));
+            return false;
+        }
+
+        case TypeParser::TypePropertyKind::string:
+        {
+            WriteContent(fileContent, "std::string", indent);
+            break;
+        }
+
+        default:
+        {
+            WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(property.kind), indent);
+            break;
+        }
+    }
+
+    WriteContent(fileContent, " ");
+    WriteContent(fileContent, property.name);
+    WriteContent(fileContent, ";\n");
+
+    return true;
+};
+bool WriteLuaStructFields(std::string& fileContent, const std::string& name, const TypeParser::ParsedTypeProperty& fieldProperties, u32 numFields, u32 indent)
+{
+    for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+    {
+        const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
+
+        if (!WritePacketField(fileContent, name, property, indent))
+            return false;
+
+        if (valueIndex == numFields - 1)
+            WriteContent(fileContent, "\n");
+    }
+
+    return true;
+};
+void WriteLuaStructPushFunction(std::string& fileContent, const TypeParser::ParsedTypeProperty& fieldProperties, u32 numFields, u32 indent)
+{
+    WriteContent(fileContent, "void Push(lua_State* state) const\n", indent);
+    WriteContent(fileContent, "{\n", indent);
+
+    indent++;
+    {
+        if (numFields == 0)
+        {
+            WriteContent(fileContent, "lua_pushnil(state);\n", indent);
+        }
+        else
+        {
+            WriteContent(fileContent, "lua_newtable(state);\n\n", indent);
+
+            for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+            {
+                const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
+
+                WriteContent(fileContent, "lua_pushstring(state, \"", indent);
+                WriteContent(fileContent, property.name);
+                WriteContent(fileContent, "\");\n");
+
+                switch (property.kind)
+                {
+                    case TypeParser::TypePropertyKind::boolean:
+                    {
+                        WriteContent(fileContent, "lua_pushboolean(state, ", indent);
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::i8:
+                    case TypeParser::TypePropertyKind::i16:
+                    case TypeParser::TypePropertyKind::i32:
+                    case TypeParser::TypePropertyKind::i64:
+                    case TypeParser::TypePropertyKind::u8:
+                    case TypeParser::TypePropertyKind::u16:
+                    case TypeParser::TypePropertyKind::u32:
+                    case TypeParser::TypePropertyKind::u64:
+                    case TypeParser::TypePropertyKind::f32:
+                    case TypeParser::TypePropertyKind::f64:
+                    {
+                        WriteContent(fileContent, "lua_pushnumber(state, ", indent);
+                        WriteContent(fileContent, property.name.c_str());
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::string:
+                    {
+                        WriteContent(fileContent, "lua_pushstring(state, ", indent);
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".c_str()");
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::objectguid:
+                    {
+                        WriteContent(fileContent, "lua_pushnumber(", indent);
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".GetData()");
+
+                        break;
+                    }
+
+
+                    case TypeParser::TypePropertyKind::vec2:
+                    case TypeParser::TypePropertyKind::ivec2:
+                    case TypeParser::TypePropertyKind::uvec2:
+                    {
+                        WriteContent(fileContent, "lua_pushvector(state, ", indent);
+
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".x, ");
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".y, ");
+                        WriteContent(fileContent, "0.0f");
+
+                        break;
+                    }
+
+                    case TypeParser::TypePropertyKind::vec3:
+                    case TypeParser::TypePropertyKind::ivec3:
+                    case TypeParser::TypePropertyKind::uvec3:
+                    {
+                        WriteContent(fileContent, "lua_pushvector(state, ", indent);
+
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".x, ");
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".y, ");
+                        WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ".z");
+
+                        break;
+                    }
+
+                    default:
+                    {
+                        break;
+                    }
+                }
+
+                WriteContent(fileContent, ");\n");
+                WriteContent(fileContent, "lua_settable(state, -3);\n", indent);
+            }
+        }
+    }
+    indent--;
+
+    WriteContent(fileContent, "}\n", indent);
+};
+
 bool GenerateCommand(const TypeParser::ParsedType& parsedType, std::string& fileContent)
 {
     std::string name = std::string(parsedType.identifierToken->nameHash.name, parsedType.identifierToken->nameHash.length);
@@ -1162,7 +1340,7 @@ bool GenerateClientDB(const TypeParser::ParsedType& parsedType, std::string& fil
     WriteContent(fileContent, "};\n", indent);
     return true;
 }
-bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileContent)
+bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileContent, u16& currentMaxEnumID)
 {
     std::string name = std::string(parsedType.identifierToken->nameHash.name, parsedType.identifierToken->nameHash.length);
     const std::string& enumName = name + "Enum";
@@ -1296,7 +1474,6 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
             u64 unsignedValue;
         };
 
-
         if (isSigned)
         {
             signedMaxValue = minValueForType;
@@ -1407,6 +1584,20 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
 
     indent++;
     {
+        if (currentMaxEnumID == std::numeric_limits<u16>::max())
+        {
+            NC_LOG_ERROR("Enum '{0}' exceeded maximum number of enums (65536)", name);
+            return false;
+        }
+
+        WriteContent(fileContent, "using Type = ", indent);
+        WriteContent(fileContent, TypeParser::ParsedTypeProperty::GetTypePropertyKindName(typeProperty.type.kind));
+        WriteContent(fileContent, ";\n\n");
+
+        WriteContent(fileContent, "static inline constexpr u16 EnumID = ", indent);
+        WriteContent(fileContent, std::to_string(currentMaxEnumID++));
+        WriteContent(fileContent, ";\n");
+
         WriteContent(fileContent, "static inline constexpr std::string_view EnumName = \"", indent);
         WriteContent(fileContent, nameProperty.values[0].name);
         WriteContent(fileContent, "\";\n");
@@ -1459,6 +1650,24 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
     indent--;
 
     {
+        WriteContent(fileContent, "template <>\n", indent);
+        WriteContent(fileContent, "struct EnumTraits<", indent);
+        WriteContent(fileContent, enumName);
+        WriteContent(fileContent, ">\n");
+        WriteContent(fileContent, "{\n", indent);
+
+        indent++;
+        {
+            WriteContent(fileContent, "using Meta = ", indent);
+            WriteContent(fileContent, structMetaName);
+            WriteContent(fileContent, ";\n");
+        }
+        indent--;
+
+        WriteContent(fileContent, "};\n", indent);
+    }
+
+    {
         WriteContent(fileContent, "DECLARE_GENERIC_BITWISE_OPERATORS(", indent);
         WriteContent(fileContent, enumName);
         WriteContent(fileContent, ");\n");
@@ -1466,7 +1675,7 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
 
     return true;
 }
-bool GeneratePacket(const TypeParser::ParsedType& parsedType, std::string& fileContent, u16& currentMaxPacketID)
+bool GeneratePacket(const TypeParser::ParsedType& parsedType, std::string& fileContent, PacketList& packetList)
 {
     std::string name = std::string(parsedType.identifierToken->nameHash.name, parsedType.identifierToken->nameHash.length);
 
@@ -1505,7 +1714,7 @@ bool GeneratePacket(const TypeParser::ParsedType& parsedType, std::string& fileC
         return false;
     }
 
-    std::string structName = nameProperty.values[0].name + "Packet";
+    std::string structName = packetName + "Packet";
     WriteContent(fileContent, "struct ", indent);
     WriteContent(fileContent, structName);
     WriteContent(fileContent, "\n");
@@ -1519,12 +1728,13 @@ bool GeneratePacket(const TypeParser::ParsedType& parsedType, std::string& fileC
         return false;
     }
 
-    if (currentMaxPacketID == std::numeric_limits<u16>::max())
+    if (packetList.nextID == std::numeric_limits<u16>::max())
     {
         NC_LOG_ERROR("Packet '{0}' exceeded maximum number of packets (65536)", name);
         return false;
     }
 
+    u16 packetID = packetList.nextID++;
     u32 fieldsPropertyIndex = parsedType.propertyHashToIndex.at(fieldsPropertyHash);
     const TypeParser::ParsedTypeProperty& fieldsProperties = parsedType.properties[fieldsPropertyIndex];
 
@@ -1532,14 +1742,15 @@ bool GeneratePacket(const TypeParser::ParsedType& parsedType, std::string& fileC
     {
         WriteContent(fileContent, "public:\n", indent - 1);
         WriteContent(fileContent, "static constexpr u16 PACKET_ID = ", indent);
-        WriteContent(fileContent, std::to_string(currentMaxPacketID++));
+        WriteContent(fileContent, std::to_string(packetID));
         WriteContent(fileContent, ";\n\n");
 
         u32 numFields = static_cast<u32>(fieldsProperties.values.size());
         if (numFields > 0)
         {
             {
-                WritePacketFields(fileContent, name, fieldsProperties, numFields, indent);
+                if (!WritePacketFields(fileContent, name, fieldsProperties, numFields, indent))
+                    return false;
             }
         }
 
@@ -1555,10 +1766,102 @@ bool GeneratePacket(const TypeParser::ParsedType& parsedType, std::string& fileC
 
     WriteContent(fileContent, "};\n", indent);
 
+    packetList.packets.push_back({ packetID, packetName });
+
     return true;
 }
 
-bool GenerateParsedType(const TypeParser::ParsedType& parsedType, std::string& fileContent, u16& currentMaxPacketID)
+bool GenerateLuaStruct(const TypeParser::ParsedType& parsedType, std::string& fileContent, u16& currentMaxLuaStructID)
+{
+    std::string name = std::string(parsedType.identifierToken->nameHash.name, parsedType.identifierToken->nameHash.length);
+
+    u32 indent = 1;
+    u32 structIndentLevel = indent;
+
+    u32 propertyTypeHash = "Type"_djb2;
+
+    const std::string& luaStructName = name;
+    if (luaStructName.empty() || !std::isalpha(luaStructName[0]) || !StringUtils::StringIsAlphaNumeric(luaStructName))
+    {
+        NC_LOG_ERROR("LuaStruct '{0}' field 'Name' is malformed. Name must start with a non numeric character and be strictly alpha numeric", name);
+        return false;
+    }
+
+    std::string structName = luaStructName;
+    WriteContent(fileContent, "struct ", indent);
+    WriteContent(fileContent, structName);
+    WriteContent(fileContent, "\n");
+    WriteContent(fileContent, "{\n", indent);
+
+    u32 fieldsPropertyHash = "Fields"_djb2;
+
+    if (!parsedType.propertyHashToIndex.contains(fieldsPropertyHash))
+    {
+        NC_LOG_ERROR("Packet '{0}' missing 'Fields' property", name);
+        return false;
+    }
+
+    if (currentMaxLuaStructID == std::numeric_limits<u16>::max())
+    {
+        NC_LOG_ERROR("LuaStruct '{0}' exceeded maximum number of lua structs (65536)", name);
+        return false;
+    }
+
+    u16 structID = currentMaxLuaStructID++;
+
+    u32 fieldsPropertyIndex = parsedType.propertyHashToIndex.at(fieldsPropertyHash);
+    const TypeParser::ParsedTypeProperty& fieldsProperties = parsedType.properties[fieldsPropertyIndex];
+
+    indent++;
+    {
+        u32 numFields = static_cast<u32>(fieldsProperties.values.size());
+
+        WriteContent(fileContent, "public:\n", indent - 1);
+        WriteContent(fileContent, "static constexpr u16 StructID = ", indent);
+        WriteContent(fileContent, std::to_string(structID));
+        WriteContent(fileContent, ";\n");
+        WriteContent(fileContent, "static constexpr u16 NumParameters = ", indent);
+        WriteContent(fileContent, std::to_string(numFields));
+        WriteContent(fileContent, ";\n\n");
+
+        if (numFields > 0)
+        {
+            {
+                WriteLuaStructFields(fileContent, name, fieldsProperties, numFields, indent);
+            }
+        }
+
+        {
+            WriteContent(fileContent, "public:\n", indent - 1);
+            WriteLuaStructPushFunction(fileContent, fieldsProperties, numFields, indent);
+        }
+    }
+    indent--;
+
+    WriteContent(fileContent, "};\n", indent);
+
+    {
+        WriteContent(fileContent, "template <>\n", indent);
+        WriteContent(fileContent, "struct LuaEventDataTraits<", indent);
+        WriteContent(fileContent, std::to_string(structID));
+        WriteContent(fileContent, ">\n");
+        WriteContent(fileContent, "{\n", indent);
+
+        indent++;
+        {
+            WriteContent(fileContent, "using Type = ", indent);
+            WriteContent(fileContent, structName);
+            WriteContent(fileContent, ";\n");
+        }
+        indent--;
+
+        WriteContent(fileContent, "};\n", indent);
+    }
+
+    return true;
+}
+
+bool GenerateParsedType(const TypeParser::ParsedType& parsedType, std::string& fileContent, u16& currentMaxEnumID, PacketList& packetList, u16& currentMaxLuaStructID)
 {
     switch (parsedType.kind)
     {
@@ -1574,18 +1877,151 @@ bool GenerateParsedType(const TypeParser::ParsedType& parsedType, std::string& f
 
         case TypeParser::ParsedTypeKind::Enum:
         {
-            return GenerateEnum(parsedType, fileContent);
+            return GenerateEnum(parsedType, fileContent, currentMaxEnumID);
         }
 
         case TypeParser::ParsedTypeKind::Packet:
         {
-            return GeneratePacket(parsedType, fileContent, currentMaxPacketID);
+            return GeneratePacket(parsedType, fileContent, packetList);
+        }
+
+        case TypeParser::ParsedTypeKind::LuaStruct:
+        {
+            return GenerateLuaStruct(parsedType, fileContent, currentMaxLuaStructID);
         }
 
         default: break;
     }
 
     return false;
+}
+
+bool GeneratePacketEnum(std::string& fileContent, const PacketList& packetList, u16& currentMaxEnumID)
+{
+    u32 indent = 0;
+
+    WriteContent(fileContent, "#pragma once\n", indent);
+    WriteContent(fileContent, "#include <Base/Types.h>\n\n", indent);
+
+    WriteContent(fileContent, "#include <array>\n\n", indent);
+
+    WriteContent(fileContent, "namespace Generated");
+    WriteContent(fileContent, "\n{\n");
+
+    indent++;
+    {
+        u32 numPackets = static_cast<u32>(packetList.packets.size());
+
+        std::string name = "PacketList";
+        std::string enumName = name + "Enum";
+
+        WriteContent(fileContent, "enum class PacketListEnum : u16\n", indent);
+        WriteContent(fileContent, "{\n", indent);
+
+        indent++;
+        {
+            for (u32 i = 0; i < numPackets; i++)
+            {
+                const auto& packet = packetList.packets[i];
+
+                WriteContent(fileContent, packet.name, indent);
+                WriteContent(fileContent, " = ");
+                WriteContent(fileContent, std::to_string(packet.id));
+
+                if (i < numPackets - 1)
+                    WriteContent(fileContent, ",");
+
+                WriteContent(fileContent, "\n");
+            }
+        }
+        indent--;
+
+        WriteContent(fileContent, "};\n", indent);
+
+        std::string structMetaName = enumName + "Meta";
+        WriteContent(fileContent, "struct ", indent);
+        WriteContent(fileContent, structMetaName);
+        WriteContent(fileContent, "\n");
+        WriteContent(fileContent, "{\n", indent);
+        WriteContent(fileContent, "public:\n", indent);
+
+        indent++;
+        {
+            if (currentMaxEnumID == std::numeric_limits<u16>::max())
+            {
+                NC_LOG_ERROR("Enum '{0}' exceeded maximum number of enums (65536)", name);
+                return false;
+            }
+
+            WriteContent(fileContent, "static inline constexpr u16 EnumID = ", indent);
+            WriteContent(fileContent, std::to_string(currentMaxEnumID++));
+            WriteContent(fileContent, ";\n");
+
+            WriteContent(fileContent, "static inline constexpr std::string_view EnumName = \"PacketList\";\n", indent);
+
+            WriteContent(fileContent, "static inline constexpr std::array<std::pair<std::string_view, u16>, ", indent);
+            WriteContent(fileContent, std::to_string(numPackets));
+            WriteContent(fileContent, "> EnumList = {");
+            indent++;
+            {
+                for (u32 i = 0; i < numPackets; i++)
+                {
+                    const auto& packet = packetList.packets[i];
+
+                    if (i == 0)
+                        WriteContent(fileContent, " ");
+
+                    WriteContent(fileContent, "std::pair(\"");
+                    WriteContent(fileContent, packet.name);
+                    WriteContent(fileContent, "\", ");
+                    WriteContent(fileContent, std::to_string(packet.id));
+
+                    WriteContent(fileContent, ")");
+
+                    if (i < numPackets - 1)
+                    {
+                        WriteContent(fileContent, ",");
+                    }
+
+                    WriteContent(fileContent, " ");
+                }
+            }
+            indent--;
+            WriteContent(fileContent, "};\n");
+
+            WriteContent(fileContent, "};\n", indent - 1);
+        }
+        indent--;
+
+        {
+            WriteContent(fileContent, "template <>\n", indent);
+            WriteContent(fileContent, "struct EnumTraits<", indent);
+            WriteContent(fileContent, enumName);
+            WriteContent(fileContent, ">\n");
+            WriteContent(fileContent, "{\n", indent);
+
+            indent++;
+            {
+                WriteContent(fileContent, "using Meta = ", indent);
+                WriteContent(fileContent, structMetaName);
+                WriteContent(fileContent, ";\n");
+            }
+            indent--;
+
+            WriteContent(fileContent, "};\n", indent);
+        }
+
+        {
+            WriteContent(fileContent, "DECLARE_GENERIC_BITWISE_OPERATORS(", indent);
+            WriteContent(fileContent, enumName);
+            WriteContent(fileContent, ");\n");
+        }
+    }
+    indent--;
+
+    WriteContent(fileContent, "}\n");
+
+    return true;
 }
 
 i32 main(int argc, char* argv[])
@@ -1631,10 +2067,15 @@ i32 main(int argc, char* argv[])
     std::vector<TypeParser::Module> modules;
     modules.reserve(128);
 
-    std::string fileContent;
-    fileContent.reserve(2048);
+    PacketList packetList;
+    packetList.packets.reserve(1024);
 
+    std::string fileContent;
+    fileContent.reserve(32768);
+
+    u16 currentMaxEnumID = 0;
     u16 currentMaxPacketID = 0;
+    u16 currentMaxLuaStructID = 0;
 
     // Find all luau files in the source directory
     for (auto& dirEntry : std::filesystem::recursive_directory_iterator(sourceDir))
@@ -1658,8 +2099,9 @@ i32 main(int argc, char* argv[])
             if (!fileReader.Open())
             {
                 NC_LOG_ERROR("Failed to open file {0}", path.string());
-                continue;
+                break;
             }
+
             std::shared_ptr<Bytebuffer> bytebuffer = Bytebuffer::BorrowRuntime(fileReader.Length());
             fileReader.Read(bytebuffer.get(), fileReader.Length());
 
@@ -1681,6 +2123,7 @@ i32 main(int argc, char* argv[])
             u32 numClientDBs = 0;
             u32 numEnums = 0;
             u32 numPackets = 0;
+            u32 numLuaStructs = 0;
 
             u32 numParsedTypes = static_cast<u32>(module.parserInfo.parsedTypes.size());
             for (u32 parsedTypeIndex = 0; parsedTypeIndex < numParsedTypes; parsedTypeIndex++)
@@ -1691,6 +2134,7 @@ i32 main(int argc, char* argv[])
                 numCommands += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::Command);
                 numEnums += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::Enum);
                 numPackets += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::Packet);
+                numLuaStructs += 1 * (parsedType.kind == TypeParser::ParsedTypeKind::LuaStruct);
             }
 
             WriteContent(fileContent, "#pragma once\n");
@@ -1708,7 +2152,14 @@ i32 main(int argc, char* argv[])
                 WriteContent(fileContent, "\n");
             }
 
-            if (numCommands > 0 || numEnums > 0 || numPackets > 0)
+            if (numLuaStructs > 0)
+            {
+                WriteContent(fileContent, "#include <Scripting/Defines.h>\n\n");
+
+                WriteContent(fileContent, "#include <lua.h>\n\n");
+            }
+
+            if (numCommands > 0 || numEnums > 0 || numPackets > 0 || numLuaStructs > 0)
             {
                 WriteContent(fileContent, "#include <array>\n");
             }
@@ -1721,12 +2172,12 @@ i32 main(int argc, char* argv[])
                 WriteContent(fileContent, "#include <tuple>\n");
             }
 
-            if (numEnums > 0)
+            if (numEnums > 0 || numLuaStructs > 0)
             {
                 WriteContent(fileContent, "#include <utility>\n");
             }
 
-            if (numCommands > 0 || numEnums > 0 || numPackets > 0)
+            if (numCommands > 0 || numEnums > 0 || numPackets > 0 || numLuaStructs > 0)
             {
                 WriteContent(fileContent, "\n");
             }
@@ -1739,7 +2190,7 @@ i32 main(int argc, char* argv[])
             for (u32 parsedTypeIndex = 0; parsedTypeIndex < numParsedTypes; parsedTypeIndex++)
             {
                 const TypeParser::ParsedType& parsedType = module.parserInfo.parsedTypes[parsedTypeIndex];
-                failed |= !GenerateParsedType(parsedType, fileContent, currentMaxPacketID);
+                failed |= !GenerateParsedType(parsedType, fileContent, currentMaxEnumID, packetList, currentMaxLuaStructID);
 
                 if (failed)
                     break;
@@ -1770,7 +2221,7 @@ i32 main(int argc, char* argv[])
             if (!output)
             {
                 NC_LOG_ERROR("Failed to create file ({0}). Check admin permissions", generatedPath.string());
-                return false;
+                break;
             }
 
             output.write(fileContent.c_str(), fileContent.length());
@@ -1779,7 +2230,31 @@ i32 main(int argc, char* argv[])
         catch (const std::exception&)
         {
             NC_LOG_ERROR("Failed to compile file {0}", path.string());
-            continue;
+            break;
+        }
+    }
+
+    u32 numPackets = static_cast<u32>(packetList.packets.size());
+    if (numPackets > 0)
+    {
+        fileContent.clear();
+
+        if (GeneratePacketEnum(fileContent, packetList, currentMaxEnumID))
+        {
+            std::filesystem::path generatedPath = std::filesystem::path(generatedDir) / "Shared/PacketList.h";
+            if (!std::filesystem::exists(generatedPath.parent_path()))
+                std::filesystem::create_directories(generatedPath.parent_path());
+
+            std::ofstream output(generatedPath, std::ofstream::out | std::ofstream::binary);
+            if (output)
+            {
+                output.write(fileContent.c_str(), fileContent.length());
+                output.close();
+            }
+            else
+            {
+                NC_LOG_ERROR("Failed to create file ({0}). Check admin permissions", generatedPath.string());
+            }
         }
     }
 

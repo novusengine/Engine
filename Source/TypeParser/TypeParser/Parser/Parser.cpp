@@ -25,9 +25,13 @@ namespace TypeParser
         lexerInfo.ExpectToken(Token::Kind::Op_LessThan);
 
         Token* typeKindToken = lexerInfo.ConsumeToken();
-        if (typeKindToken->kind != Token::Kind::Keyword_ClientDB && typeKindToken->kind != Token::Kind::Keyword_Command && typeKindToken->kind != Token::Kind::Keyword_Packet && typeKindToken->kind != Token::Kind::Keyword_Enum)
+        if (typeKindToken->kind != Token::Kind::Keyword_ClientDB && 
+            typeKindToken->kind != Token::Kind::Keyword_Command && 
+            typeKindToken->kind != Token::Kind::Keyword_Packet && 
+            typeKindToken->kind != Token::Kind::Keyword_Enum && 
+            typeKindToken->kind != Token::Kind::Keyword_LuaStruct)
         {
-            lexerInfo.Error(typeKindToken, "Expecting 'ClientDB', 'Command', 'Packet' or 'Enum' but got '%s'", Token::GetTokenKindName(typeKindToken->kind));
+            lexerInfo.Error(typeKindToken, "Expecting 'ClientDB', 'Command', 'Packet', 'Enum' or 'LuaStruct' but got '%s'", Token::GetTokenKindName(typeKindToken->kind));
         }
 
         lexerInfo.ExpectToken(Token::Kind::Op_GreaterThan);
@@ -59,6 +63,11 @@ namespace TypeParser
             case Token::Kind::Keyword_Enum:
             {
                 ParseEnum(lexerInfo, parsedType);
+                break;
+            }
+            case Token::Kind::Keyword_LuaStruct:
+            {
+                ParseLuaStruct(lexerInfo, parsedType);
                 break;
             }
 
@@ -128,6 +137,25 @@ namespace TypeParser
     void Parser::ParsePacket(LexerInfo& lexerInfo, ParsedType& parsedType)
     {
         parsedType.kind = ParsedTypeKind::Packet;
+        parsedType.properties.reserve(8);
+        parsedType.propertyHashToIndex.reserve(8);
+
+        parsedType.startToken = lexerInfo.ExpectToken(Token::Kind::Curley_Bracket_Open);
+        {
+            while (lexerInfo.PeekToken()->kind != Token::Kind::Curley_Bracket_Close)
+            {
+                ParseProperty(lexerInfo, parsedType);
+            }
+        }
+        parsedType.endToken = lexerInfo.ExpectToken(Token::Kind::Curley_Bracket_Close);
+
+        if (lexerInfo.PeekToken()->kind == Token::Kind::Semicolon)
+            lexerInfo.ConsumeToken();
+    }
+
+    void Parser::ParseLuaStruct(LexerInfo& lexerInfo, ParsedType& parsedType)
+    {
+        parsedType.kind = ParsedTypeKind::LuaStruct;
         parsedType.properties.reserve(8);
         parsedType.propertyHashToIndex.reserve(8);
 

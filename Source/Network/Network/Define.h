@@ -12,7 +12,7 @@ namespace Network
     typedef u32 BufferID;
     typedef u16 OpcodeType;
     template<typename T>
-    concept PacketConcept = requires(T t, Bytebuffer * buffer)
+    concept PacketConcept = requires(T t, Bytebuffer* buffer)
     {
         { std::decay_t<T>::PACKET_ID } -> std::convertible_to<u16>;
         

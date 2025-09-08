@@ -15,6 +15,7 @@ namespace TypeParser
         { "Command"_djb2, Token::Kind::Keyword_Command },
         { "Packet"_djb2, Token::Kind::Keyword_Packet },
         { "Enum"_djb2, Token::Kind::Keyword_Enum },
+        { "LuaStruct"_djb2, Token::Kind::Keyword_LuaStruct },
         { "Schema"_djb2, Token::Kind::Keyword_Schema },
         { "Table"_djb2, Token::Kind::Keyword_Table }
     };

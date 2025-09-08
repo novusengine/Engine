@@ -1,47 +1,16 @@
-type LuaGameEvent<Enum> =
+type LuaHandlerType<Enum> =
 {
-    Name : "GameEvent";
-    Type : u8;
+    Name : "LuaHandlerType";
+    Type : u16;
 
     Fields :
     {
-        Invalid : Auto,
-        Loaded : Auto,
-        Updated : Auto,
-        MapLoading : Auto,
-        ChatMessageReceived : Auto,
+        Global : Auto,
+        Event : Auto,
+        Database : Auto,
+        UI : Auto,
+        Game : Auto,
+        Unit : Auto
         Count : Auto
     };
-}
-type LuaPlayerEvent<Enum> =
-{
-    Name : "PlayerEvent";
-    Type : u8;
-
-    Fields :
-    {
-        Invalid : Auto,
-        Created : Auto,
-        Destroyed : Auto,
-        ContainerCreate : Auto,
-        ContainerAddToSlot : Auto,
-        ContainerRemoveFromSlot : Auto,
-        ContainerSwapSlots : Auto,
-        Count : Auto
-    };
- }
-
-type LuaTriggerEvent<Enum> =
-{
-    Name : "TriggerEvent";
-    Type : u8;
-
-    Fields :
-    {
-        Invalid : Auto,
-        OnEnter : Auto,
-        OnExit : Auto,
-        OnStay : Auto,
-        Count : Auto
-    };
-}
+};

@@ -48,6 +48,7 @@ namespace TypeParser
         "Command",
         "Packet",
         "Enum",
+        "LuaStruct",
     };
 
     const char* Token::GetTokenKindName(Kind kind)
