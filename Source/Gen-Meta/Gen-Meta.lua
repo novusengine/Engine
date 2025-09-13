@@ -15,11 +15,22 @@ else
     typeGenFolder = "%{wks.location}/bin/%{wks.name}/Engine/%{cfg.buildcfg}/TypeGenerator"
 end
 
-prebuildcommands
-{
-    "if exist \"" .. metaGenDir .. "/Generated\" rmdir /S /Q \"" .. metaGenDir .. "/Generated\"",
-    
-    "\"" .. typeGenFolder .. "\" " ..
-    "\"" .. metaGenDir .. "/Source\" " ..
-    "\"" .. metaGenDir .. "/Generated\" "
-}
+if os.target() == "windows" then
+    prebuildcommands
+    {
+        "if exist \"" .. metaGenDir .. "/Generated\" rmdir /S /Q \"" .. metaGenDir .. "/Generated\"",
+
+        "\"" .. typeGenFolder .. "\" " ..
+        "\"" .. metaGenDir .. "/Source\" " ..
+        "\"" .. metaGenDir .. "/Generated\" "
+    }
+elseif os.target() == "linux" then
+    prebuildcommands
+    {
+        "rm -rf \"" .. metaGenDir .. "/Generated\"",
+
+        "\"" .. typeGenFolder .. "\" " ..
+        "\"" .. metaGenDir .. "/Source\" " ..
+        "\"" .. metaGenDir .. "/Generated\" "
+    }
+end
