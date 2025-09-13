@@ -47,7 +47,7 @@ jobs:
 
     - name: Run Meta Generator
       run: |
-        META_DIR=/Source/Meta/Meta
+        META_DIR=Source/Meta/Meta
         rm -rf $META_DIR/Generated
         Build/Bin/Engine/${{ matrix.build_type }}/TypeGenerator \
           $META_DIR/Source \
