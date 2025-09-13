@@ -16,7 +16,7 @@ else
 end
 
 if os.target() == "windows" then
-    prebuildcommands
+    postbuildcommands
     {
         "if exist \"" .. metaGenDir .. "/Generated\" rmdir /S /Q \"" .. metaGenDir .. "/Generated\"",
 
@@ -25,7 +25,7 @@ if os.target() == "windows" then
         "\"" .. metaGenDir .. "/Generated\" "
     }
 elseif os.target() == "linux" then
-    prebuildcommands
+    postbuildcommands
     {
         "rm -rf \"" .. metaGenDir .. "/Generated\"",
 
