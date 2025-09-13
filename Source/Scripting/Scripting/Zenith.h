@@ -85,13 +85,6 @@ namespace Scripting
 
         template <typename T>
         T GetGlobalField(const char* key);
-        template<> bool GetGlobalField<bool>(const char* key);
-        template<> i32 GetGlobalField<i32>(const char* key);
-        template<> u32 GetGlobalField<u32>(const char* key);
-        template<> f32 GetGlobalField<f32>(const char* key);
-        template<> f64 GetGlobalField<f64>(const char* key);
-        template<> const char* GetGlobalField<const char*>(const char* key);
-        template<> vec3 GetGlobalField<vec3>(const char* key);
 
         void SetGlobalKey(const char* key);
         void AddGlobalField(const char* key, bool value);
@@ -159,29 +152,9 @@ namespace Scripting
 
         template<typename T>
         T Get(i32 index);
-        template<> bool Get<bool>(i32 index);
-        template<> i32 Get<i32>(i32 index);
-        template<> u32 Get<u32>(i32 index);
-        template<> f32 Get<f32>(i32 index);
-        template<> f64 Get<f64>(i32 index);
-        template<> const char* Get<const char*>(i32 index);
-        template<> vec3 Get<vec3>(i32 index);
 
         template<typename T>
         T CheckVal(i32 index);
-        template<> bool CheckVal<bool>(i32 index);
-        template<> i8 CheckVal<i8>(i32 index);
-        template<> i16 CheckVal<i16>(i32 index);
-        template<> i32 CheckVal<i32>(i32 index);
-        template<> i64 CheckVal<i64>(i32 index);
-        template<> u8 CheckVal<u8>(i32 index);
-        template<> u16 CheckVal<u16>(i32 index);
-        template<> u32 CheckVal<u32>(i32 index);
-        template<> u64 CheckVal<u64>(i32 index);
-        template<> f32 CheckVal<f32>(i32 index);
-        template<> f64 CheckVal<f64>(i32 index);
-        template<> const char* CheckVal<const char*>(i32 index);
-        template<> vec3 CheckVal<vec3>(i32 index);
 
         template <typename T>
         T* GetUserData(T* fallback = nullptr, i32 index = -1)
@@ -503,26 +476,44 @@ namespace Scripting
         robin_hood::unordered_set<u32> loadedModuleHashes;
     };
 
-    template<>
-    void Zenith::Push<vec2>(const vec2& value);
 
-    template<>
-    void Zenith::Push<ivec2>(const ivec2& value);
+    template<> bool Zenith::GetGlobalField<bool>(const char* key);
+    template<> i32 Zenith::GetGlobalField<i32>(const char* key);
+    template<> u32 Zenith::GetGlobalField<u32>(const char* key);
+    template<> f32 Zenith::GetGlobalField<f32>(const char* key);
+    template<> f64 Zenith::GetGlobalField<f64>(const char* key);
+    template<> const char* Zenith::GetGlobalField<const char*>(const char* key);
+    template<> vec3 Zenith::GetGlobalField<vec3>(const char* key);
 
-    template<>
-    void Zenith::Push<uvec2>(const uvec2& value);
+    template<> void Zenith::Push<vec2>(const vec2& value);
+    template<> void Zenith::Push<ivec2>(const ivec2& value);
+    template<> void Zenith::Push<uvec2>(const uvec2& value);
+    template<> void Zenith::Push<vec3>(const vec3& value);
+    template<> void Zenith::Push<ivec3>(const ivec3& value);
+    template<> void Zenith::Push<uvec3>(const uvec3& value);
+    template<> void Zenith::Push<::std::string>(const ::std::string& value);
 
-    template<>
-    void Zenith::Push<vec3>(const vec3& value);
+    template<> bool Zenith::Get<bool>(i32 index);
+    template<> i32 Zenith::Get<i32>(i32 index);
+    template<> u32 Zenith::Get<u32>(i32 index);
+    template<> f32 Zenith::Get<f32>(i32 index);
+    template<> f64 Zenith::Get<f64>(i32 index);
+    template<> const char* Zenith::Get<const char*>(i32 index);
+    template<> vec3 Zenith::Get<vec3>(i32 index);
 
-    template<>
-    void Zenith::Push<ivec3>(const ivec3& value);
-
-    template<>
-    void Zenith::Push<uvec3>(const uvec3& value);
-
-    template<>
-    void Zenith::Push<::std::string>(const ::std::string& value);
+    template<> bool Zenith::CheckVal<bool>(i32 index);
+    template<> i8 Zenith::CheckVal<i8>(i32 index);
+    template<> i16 Zenith::CheckVal<i16>(i32 index);
+    template<> i32 Zenith::CheckVal<i32>(i32 index);
+    template<> i64 Zenith::CheckVal<i64>(i32 index);
+    template<> u8 Zenith::CheckVal<u8>(i32 index);
+    template<> u16 Zenith::CheckVal<u16>(i32 index);
+    template<> u32 Zenith::CheckVal<u32>(i32 index);
+    template<> u64 Zenith::CheckVal<u64>(i32 index);
+    template<> f32 Zenith::CheckVal<f32>(i32 index);
+    template<> f64 Zenith::CheckVal<f64>(i32 index);
+    template<> const char* Zenith::CheckVal<const char*>(i32 index);
+    template<> vec3 Zenith::CheckVal<vec3>(i32 index);
 }
 
 namespace std
