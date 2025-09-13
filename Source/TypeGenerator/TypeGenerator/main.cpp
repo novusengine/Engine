@@ -1039,8 +1039,9 @@ void WriteLuaStructPushFunction(std::string& fileContent, const TypeParser::Pars
                     case TypeParser::TypePropertyKind::f32:
                     case TypeParser::TypePropertyKind::f64:
                     {
-                        WriteContent(fileContent, "lua_pushnumber(state, ", indent);
+                        WriteContent(fileContent, "lua_pushnumber(state, static_cast<f64>(", indent);
                         WriteContent(fileContent, property.name.c_str());
+                        WriteContent(fileContent, ")");
                         break;
                     }
 
@@ -1651,7 +1652,7 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
 
     {
         WriteContent(fileContent, "template <>\n", indent);
-        WriteContent(fileContent, "struct EnumTraits<", indent);
+        WriteContent(fileContent, "struct ::EnumTraits<", indent);
         WriteContent(fileContent, enumName);
         WriteContent(fileContent, ">\n");
         WriteContent(fileContent, "{\n", indent);
@@ -1995,7 +1996,7 @@ bool GeneratePacketEnum(std::string& fileContent, const PacketList& packetList, 
 
         {
             WriteContent(fileContent, "template <>\n", indent);
-            WriteContent(fileContent, "struct EnumTraits<", indent);
+            WriteContent(fileContent, "struct ::EnumTraits<", indent);
             WriteContent(fileContent, enumName);
             WriteContent(fileContent, ">\n");
             WriteContent(fileContent, "{\n", indent);
