@@ -3,9 +3,6 @@ local currentProject = Solution.Projects.Current
 local dependencies = { }
 Solution.Util.CreateProject("Gen-Meta", "Utility", currentProject.BinDir, dependencies)
 dependson { "Meta", "TypeGenerator", "TypeParser" }
-if os.target() == "windows" then
-    fastuptodate "Off"
-end
 
 local metaGenDir = currentProject.RootDir .. "/Source/Meta/Meta"
 local typeGenFolder = ""
@@ -16,18 +13,11 @@ else
 end
 
 if os.target() == "windows" then
+    fastuptodate "Off"
+
     postbuildcommands
     {
         "if exist \"" .. metaGenDir .. "/Generated\" rmdir /S /Q \"" .. metaGenDir .. "/Generated\"",
-
-        "\"" .. typeGenFolder .. "\" " ..
-        "\"" .. metaGenDir .. "/Source\" " ..
-        "\"" .. metaGenDir .. "/Generated\" "
-    }
-elseif os.target() == "linux" then
-    postbuildcommands
-    {
-        "rm -rf \"" .. metaGenDir .. "/Generated\"",
 
         "\"" .. typeGenFolder .. "\" " ..
         "\"" .. metaGenDir .. "/Source\" " ..

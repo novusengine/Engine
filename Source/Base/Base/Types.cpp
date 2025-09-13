@@ -1,4 +1,3 @@
-#pragma once
 #include "Types.h"
 
 #include "Memory/Bytebuffer.h"
