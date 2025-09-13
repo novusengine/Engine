@@ -9,6 +9,8 @@ jobs:
 
     strategy:
       fail-fast: false
+      matrix:
+        build_type: [Debug]
 
     steps:
     - uses: actions/checkout@v4
@@ -34,6 +36,24 @@ jobs:
 #        sudo apt install vulkan-sdk
 
     - name: Run Premake
+      run: |
+        export VULKAN_SDK=/usr/include/vulkan
+        premake5 gmake2
+
+    - name: Build Meta Generator files
+      run: |
+        cd Build
+        make -j$(nproc) -k Gen-Meta
+
+    - name: Run Meta Generator
+      run: |
+        META_DIR=/Source/Meta/Meta
+        rm -rf $META_DIR/Generated
+        Build/Bin/Engine/${{ matrix.build_type }}/TypeGenerator \
+          $META_DIR/Source \
+          $META_DIR/Generated
+
+    - name: Re-run Premake
       run: |
         export VULKAN_SDK=/usr/include/vulkan
         premake5 gmake2
