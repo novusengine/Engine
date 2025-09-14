@@ -7,8 +7,12 @@ on:
 jobs:
 #  call-windows-build:
 #    name: Windows Build
-#    uses: ./.github/workflows/win-build.yml
+#    uses: novusengine/Workflows/.github/workflows/win-build.yml@master
+#    with:
+#      project: Engine
 
   call-linux-build:
     name: Linux Build
-    uses: ./.github/workflows/linux-build.yml
+    uses: novusengine/Workflows/.github/workflows/linux-build.yml@master
+    with:
+      project: Engine
