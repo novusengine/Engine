@@ -17,8 +17,6 @@ if os.target() == "windows" then
 
     postbuildcommands
     {
-        "if exist \"" .. metaGenDir .. "/Generated\" rmdir /S /Q \"" .. metaGenDir .. "/Generated\"",
-
         "\"" .. typeGenFolder .. "\" " ..
         "\"" .. metaGenDir .. "/Source\" " ..
         "\"" .. metaGenDir .. "/Generated\" "

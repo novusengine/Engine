@@ -5,9 +5,14 @@ type LuaHandlerType<Enum> =
 
     Fields :
     {
-        Global : Auto,
-        Event : Auto,
-        Message : Auto,
-        Count : Auto
+        Global     : Auto,
+        Event      : Auto,
+        Message    : Auto,
+        Unit       : Auto,
+        Character  : Auto,
+        Spell      : Auto,
+        Item       : Auto,
+        Creature   : Auto,
+        Count      : Auto
     };
 };

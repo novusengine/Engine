@@ -219,3 +219,27 @@ type TriggerRemove<Command> =
     Names : {"trigger remove", "trigger rem"};
     Parameters : { triggerID : u32 };
 };
+
+type SpellSync<Command> =
+{
+    Names : "spell sync";
+    Parameters : { spellID : u32 };
+};
+
+type SpellSyncAll<Command> =
+{
+    Names : "spell sync all";
+    Parameters : { };
+};
+
+type CreatureAddScript<Command> =
+{
+    Names : "creature add script";
+    Parameters : { scriptName : string };
+};
+
+type CreatureRemoveScript<Command> =
+{
+    Names : "creature remove script";
+    Parameters : { };
+};

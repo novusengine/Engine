@@ -487,12 +487,42 @@ namespace Scripting
         Push(value);
         SetField(key);
     }
+    void Zenith::AddTableField(const char* key, const i8 value)
+    {
+        Push(value);
+        SetField(key);
+    }
+    void Zenith::AddTableField(const char* key, const i16 value)
+    {
+        Push(value);
+        SetField(key);
+    }
     void Zenith::AddTableField(const char* key, const i32 value)
     {
         Push(value);
         SetField(key);
     }
+    void Zenith::AddTableField(const char* key, const i64 value)
+    {
+        Push(value);
+        SetField(key);
+    }
+    void Zenith::AddTableField(const char* key, const u8 value)
+    {
+        Push(value);
+        SetField(key);
+    }
+    void Zenith::AddTableField(const char* key, const u16 value)
+    {
+        Push(value);
+        SetField(key);
+    }
     void Zenith::AddTableField(const char* key, const u32 value)
+    {
+        Push(value);
+        SetField(key);
+    }
+    void Zenith::AddTableField(const char* key, const u64 value)
     {
         Push(value);
         SetField(key);
@@ -527,12 +557,42 @@ namespace Scripting
         Push(value);
         SetTableKey(key);
     }
+    void Zenith::AddTableField(i32 key, const i8 value)
+    {
+        Push(value);
+        SetTableKey(key);
+    }
+    void Zenith::AddTableField(i32 key, const i16 value)
+    {
+        Push(value);
+        SetTableKey(key);
+    }
     void Zenith::AddTableField(i32 key, const i32 value)
     {
         Push(value);
         SetTableKey(key);
     }
+    void Zenith::AddTableField(i32 key, const i64 value)
+    {
+        Push(value);
+        SetTableKey(key);
+    }
+    void Zenith::AddTableField(i32 key, const u8 value)
+    {
+        Push(value);
+        SetTableKey(key);
+    }
+    void Zenith::AddTableField(i32 key, const u16 value)
+    {
+        Push(value);
+        SetTableKey(key);
+    }
     void Zenith::AddTableField(i32 key, const u32 value)
+    {
+        Push(value);
+        SetTableKey(key);
+    }
+    void Zenith::AddTableField(i32 key, const u64 value)
     {
         Push(value);
         SetTableKey(key);

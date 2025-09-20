@@ -1,12 +1,13 @@
 type PowerType<Enum> =
 {
     Name : "PowerType";
-    Type : i8;
+    Type : u8;
 
     Fields :
     {
-        Health : Value<-2>,
-        Mana : Value<0>,
+        Invalid : Auto,
+        Health : Auto,
+        Mana : Auto,
         Rage : Auto,
         Focus : Auto,
         Energy : Auto,
@@ -22,9 +23,10 @@ type StatType<Enum> =
 
     Fields :
     {
+        Invalid : Auto,
+        Stamina : Auto,
         Strength : Auto,
         Agility : Auto,
-        Stamina : Auto,
         Intellect : Auto,
         Spirit : Auto,
         Count : Auto
@@ -38,7 +40,7 @@ type ResistanceType<Enum> =
 
     Fields :
     {
-        Normal : Auto,
+        Invalid : Auto,
         Holy : Auto,
         Fire : Auto,
         Nature : Auto,

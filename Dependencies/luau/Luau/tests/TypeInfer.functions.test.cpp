@@ -22,17 +22,18 @@ LUAU_FASTFLAG(LuauInstantiateInSubtyping)
 LUAU_FASTFLAG(LuauSolverV2)
 LUAU_FASTINT(LuauTarjanChildLimit)
 LUAU_FASTFLAG(DebugLuauEqSatSimplification)
-LUAU_FASTFLAG(LuauEagerGeneralization4)
 LUAU_FASTFLAG(LuauCollapseShouldNotCrash)
 LUAU_FASTFLAG(LuauFormatUseLastPosition)
 LUAU_FASTFLAG(LuauSolverAgnosticStringification)
-LUAU_FASTFLAG(LuauSuppressErrorsForMultipleNonviableOverloads)
 LUAU_FASTFLAG(LuauSubtypingGenericsDoesntUseVariance)
 LUAU_FASTFLAG(LuauUnifyShortcircuitSomeIntersectionsAndUnions)
-LUAU_FASTFLAG(LuauSubtypingReportGenericBoundMismatches)
+LUAU_FASTFLAG(LuauSubtypingReportGenericBoundMismatches2)
 LUAU_FASTFLAG(LuauSolverAgnosticStringification)
 LUAU_FASTFLAG(LuauSubtypingGenericPacksDoesntUseVariance)
-LUAU_FASTFLAG(LuauReturnMappedGenericPacksFromSubtyping2)
+LUAU_FASTFLAG(LuauReturnMappedGenericPacksFromSubtyping3)
+LUAU_FASTFLAG(LuauFixNilRightPad)
+LUAU_FASTFLAG(LuauNoScopeShallNotSubsumeAll)
+LUAU_FASTFLAG(LuauNoOrderingTypeFunctions)
 
 TEST_SUITE_BEGIN("TypeInferFunctions");
 
@@ -247,8 +248,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "vararg_function_is_quantified")
 
 TEST_CASE_FIXTURE(Fixture, "list_only_alternative_overloads_that_match_argument_count")
 {
-    ScopedFastFlag _{FFlag::LuauSuppressErrorsForMultipleNonviableOverloads, true};
-
     CheckResult result = check(R"(
         local multiply: ((number)->number) & ((number)->string) & ((number, number)->number)
         multiply("")
@@ -1442,6 +1441,10 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "infer_generic_lib_function_function_argument
 {
     ScopedFastFlag sffs[] = {
         {FFlag::LuauSolverV2, true},
+        {FFlag::LuauSubtypingReportGenericBoundMismatches2, true},
+        {FFlag::LuauNoOrderingTypeFunctions, true},
+        {FFlag::LuauSubtypingGenericsDoesntUseVariance, true},
+        {FFlag::LuauNoScopeShallNotSubsumeAll, true},
     };
 
     CheckResult result = check(R"(
@@ -1449,14 +1452,10 @@ local a = {{x=4}, {x=7}, {x=1}}
 table.sort(a, function(x, y) return x.x < y.x end)
     )");
 
-    if (FFlag::LuauSubtypingReportGenericBoundMismatches)
-    {
-        // FIXME CLI-161355
-        LUAU_REQUIRE_ERROR_COUNT(1, result);
-        CHECK(get<GenericBoundsMismatch>(result.errors[0]));
-    }
-    else
-        LUAU_REQUIRE_NO_ERRORS(result);
+    // FIXME CLI-161355
+    LUAU_REQUIRE_ERROR_COUNT(2, result);
+    CHECK(get<CannotInferBinaryOperation>(result.errors[0]));
+    CHECK(get<GenericBoundsMismatch>(result.errors[1]));
 }
 
 TEST_CASE_FIXTURE(Fixture, "variadic_any_is_compatible_with_a_generic_TypePack")
@@ -1686,9 +1685,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "function_decl_non_self_sealed_overwrite")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "function_decl_non_self_sealed_overwrite_2")
 {
-    ScopedFastFlag _[] = {
-        {FFlag::LuauEagerGeneralization4, true},
-    };
     CheckResult result = check(R"(
 local t: { f: ((x: number) -> number)? } = {}
 
@@ -1774,18 +1770,10 @@ t.f = function(x)
 end
     )");
 
-    if (FFlag::LuauEagerGeneralization4 && FFlag::LuauSolverV2)
+    if (FFlag::LuauSolverV2)
     {
         LUAU_CHECK_ERROR_COUNT(1, result);
         LUAU_CHECK_ERROR(result, WhereClauseNeeded);
-    }
-    else if (FFlag::LuauSolverV2)
-    {
-        LUAU_REQUIRE_ERROR_COUNT(1, result);
-        CHECK_EQ(
-            toString(result.errors[0]),
-            R"(Type function instance add<a, number> depends on generic function parameters but does not appear in the function signature; this construct cannot be type-checked at this time)"
-        );
     }
     else
     {
@@ -1969,17 +1957,11 @@ TEST_CASE_FIXTURE(Fixture, "dont_infer_parameter_types_for_functions_from_their_
 
     CHECK_EQ("<a>(a) -> a", toString(requireType("f")));
 
-    if (FFlag::LuauEagerGeneralization4 && FFlag::LuauSolverV2)
+    if (FFlag::LuauSolverV2)
     {
         LUAU_CHECK_NO_ERRORS(result);
         if (!FFlag::LuauSubtypingGenericsDoesntUseVariance) // FIXME CLI-162439, the below fails on Linux with the flag on
             CHECK("<a>({ read p: { read q: a } }) -> (a & ~(false?))?" == toString(requireType("g")));
-    }
-    else if (FFlag::LuauSolverV2)
-    {
-        // FIXME CLI-143852: Depends on interleaving generalization and type function reduction.
-        LUAU_CHECK_ERRORS(result);
-        CHECK_EQ("({ read p: unknown }) -> (*error-type* | ~(false?))?", toString(requireType("g")));
     }
     else
     {
@@ -2413,8 +2395,7 @@ TEST_CASE_FIXTURE(Fixture, "generic_packs_are_not_variadic")
     ScopedFastFlag sffs[] = {
         {FFlag::LuauSolverV2, true},
         {FFlag::LuauSubtypingGenericPacksDoesntUseVariance, true},
-        {FFlag::LuauReturnMappedGenericPacksFromSubtyping2, true},
-        {FFlag::LuauEagerGeneralization4, true}
+        {FFlag::LuauReturnMappedGenericPacksFromSubtyping3, true},
     };
 
     CheckResult result = check(R"(
@@ -2605,7 +2586,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "tf_suggest_return_type")
 {
     ScopedFastFlag sffs[] = {
         {FFlag::LuauSolverV2, true},
-        {FFlag::LuauEagerGeneralization4, true},
     };
 
     // CLI-114134: This test:
@@ -2631,9 +2611,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "tf_suggest_arg_type")
     if (!FFlag::LuauSolverV2)
         return;
 
-    ScopedFastFlag sff[] = {
-        {FFlag::LuauEagerGeneralization4, true},
-    };
+    ScopedFastFlag _{FFlag::LuauNoOrderingTypeFunctions, true};
 
     CheckResult result = check(R"(
         function fib(n, u)
@@ -2641,13 +2619,14 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "tf_suggest_arg_type")
         end
     )");
 
-    LUAU_REQUIRE_ERROR_COUNT(1, result);
-    auto err = get<ExplicitFunctionAnnotationRecommended>(result.errors.back());
-    LUAU_ASSERT(err);
-    CHECK("number" == toString(err->recommendedReturn));
-    REQUIRE(err->recommendedArgs.size() == 2);
-    CHECK("number" == toString(err->recommendedArgs[0].second));
-    CHECK("number" == toString(err->recommendedArgs[1].second));
+    LUAU_REQUIRE_ERROR_COUNT(2, result);
+    CHECK(get<CannotInferBinaryOperation>(result.errors[0]));
+    auto err2 = get<ExplicitFunctionAnnotationRecommended>(result.errors[1]);
+    LUAU_ASSERT(err2);
+    CHECK("number" == toString(err2->recommendedReturn));
+    REQUIRE(err2->recommendedArgs.size() == 2);
+    CHECK("number" == toString(err2->recommendedArgs[0].second));
+    CHECK("number" == toString(err2->recommendedArgs[1].second));
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "tf_suggest_arg_type_2")
@@ -2936,39 +2915,17 @@ TEST_CASE_FIXTURE(Fixture, "unifier_should_not_bind_free_types")
     if (FFlag::LuauSolverV2)
     {
         // The new solver should ideally be able to do better here, but this is no worse than the old solver.
+        LUAU_REQUIRE_ERROR_COUNT(2, result);
+        auto tm1 = get<TypeMismatch>(result.errors[0]);
+        REQUIRE(tm1);
+        CHECK(toString(tm1->wantedType) == "string");
+        CHECK(toString(tm1->givenType) == "boolean");
 
-        if (FFlag::LuauEagerGeneralization4)
-        {
-            LUAU_REQUIRE_ERROR_COUNT(2, result);
+        auto tm2 = get<TypeMismatch>(result.errors[1]);
+        REQUIRE(tm2);
+        CHECK(toString(tm2->wantedType) == "string");
 
-            auto tm1 = get<TypeMismatch>(result.errors[0]);
-            REQUIRE(tm1);
-            CHECK(toString(tm1->wantedType) == "string");
-            CHECK(toString(tm1->givenType) == "boolean");
-
-            auto tm2 = get<TypeMismatch>(result.errors[1]);
-            REQUIRE(tm2);
-            CHECK(toString(tm2->wantedType) == "string");
-
-            CHECK(toString(tm2->givenType) == "unknown & ~(false?)");
-        }
-        else
-        {
-            // Unfortunately, this example forces constraints a _ton_, meaning
-            // that we can easily end up being unable to solve constraints. This
-            // gets better with greedy generalization.
-            LUAU_REQUIRE_ERROR_COUNT(3, result);
-
-            auto tm1 = get<TypeMismatch>(result.errors[1]);
-            REQUIRE(tm1);
-            CHECK(toString(tm1->wantedType) == "string");
-            CHECK(toString(tm1->givenType) == "boolean");
-
-            auto tm2 = get<TypeMismatch>(result.errors[2]);
-            REQUIRE(tm2);
-            CHECK(toString(tm2->wantedType) == "string");
-            CHECK(toString(tm2->givenType) == "~(false?)");
-        }
+        CHECK(toString(tm2->givenType) == "unknown & ~(false?)");
     }
     else
     {
@@ -3285,7 +3242,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "function_calls_should_not_crash")
     ScopedFastFlag sffs[] = {
         {FFlag::LuauSolverV2, true},
         // crash only happens right now with eager generalization off
-        {FFlag::LuauEagerGeneralization4, false},
         {FFlag::LuauCollapseShouldNotCrash, true},
     };
 
@@ -3340,6 +3296,37 @@ end
     );
 
     LUAU_REQUIRE_NO_ERRORS(result);
+}
+
+TEST_CASE_FIXTURE(Fixture, "call_function_with_nothing_but_nil")
+{
+    ScopedFastFlag _{FFlag::LuauFixNilRightPad, true};
+
+    LUAU_REQUIRE_NO_ERRORS(check(R"(
+        local function f(n: number, x: string?, y: string?, z: string?) end
+
+        local function g(n)
+            f(n)
+        end
+    )"));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "oss_1640")
+{
+    ScopedFastFlag _{FFlag::LuauFixNilRightPad, true};
+
+    LUAU_REQUIRE_NO_ERRORS(check(R"(
+        --!strict
+        table.create(1) -- top function call
+
+        local function f(): string
+            if true then
+                table.create(1) -- middle function call
+            end
+
+            return table.concat({})
+        end
+    )"));
 }
 
 TEST_SUITE_END();

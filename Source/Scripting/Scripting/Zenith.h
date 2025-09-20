@@ -175,16 +175,28 @@ namespace Scripting
         void SetTableKey(i32 key);
         void SetTableKey(const char* key);
         void AddTableField(const char* key, const bool value);
+        void AddTableField(const char* key, const i8 value);
+        void AddTableField(const char* key, const i16 value);
         void AddTableField(const char* key, const i32 value);
+        void AddTableField(const char* key, const i64 value);
+        void AddTableField(const char* key, const u8 value);
+        void AddTableField(const char* key, const u16 value);
         void AddTableField(const char* key, const u32 value);
+        void AddTableField(const char* key, const u64 value);
         void AddTableField(const char* key, const f32 value);
         void AddTableField(const char* key, const f64 value);
         void AddTableField(const char* key, const char* value);
         void AddTableField(const char* key, const vec3& value);
         void AddTableField(const char* key, const lua_CFunction value);
         void AddTableField(i32 key, const bool value);
+        void AddTableField(i32 key, const i8 value);
+        void AddTableField(i32 key, const i16 value);
         void AddTableField(i32 key, const i32 value);
+        void AddTableField(i32 key, const i64 value);
+        void AddTableField(i32 key, const u8 value);
+        void AddTableField(i32 key, const u16 value);
         void AddTableField(i32 key, const u32 value);
+        void AddTableField(i32 key, const u64 value);
         void AddTableField(i32 key, const f32 value);
         void AddTableField(i32 key, const f64 value);
         void AddTableField(i32 key, const char* value);
@@ -275,7 +287,8 @@ namespace Scripting
                 bool hasReturnedBoolean = lua_isboolean(state, functionTop);
                 result = hasReturnedBoolean ? lua_toboolean(state, functionTop) != 0 : false;
 
-                Pop();
+                if (hasReturnedBoolean)
+                    Pop();
             }
 
             Pop(numArguments + numFunctions);
@@ -308,8 +321,8 @@ namespace Scripting
             return true;
         }
 
-        template <LuaEventDataConcept EventDataType, LuaEventTypeConcept EventType>
-        bool RegisterEventTypeID(EventType eventType)
+        template <LuaEventDataConcept EventDataType, LuaEventTypeConcept EventType, typename Callback = std::nullptr_t> requires LuaEventCallbackConcept<Callback, EventDataType>
+        bool RegisterEventTypeID(EventType eventType, Callback&& callback = nullptr)
         {
             u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
             u16 eventDataID = std::decay_t<EventDataType>::StructID;
@@ -333,6 +346,18 @@ namespace Scripting
                 return false;
 
             eventState.eventDataID = eventDataID;
+            eventState.callback = nullptr;
+
+            if constexpr (!std::is_same_v<std::remove_cvref_t<Callback>, std::nullptr_t>)
+            {
+                auto cb = std::forward<Callback>(callback);
+                eventState.callback = [cb = std::move(cb)](Zenith* zenith, void* rawData)
+                {
+                    EventDataType& data = *static_cast<EventDataType*>(rawData);
+                    return cb(zenith, data);
+                };
+            }
+
             return true;
         }
 
@@ -353,8 +378,7 @@ namespace Scripting
             eventState.eventDataID = eventDataID;
             return true;
         }
-
-        inline bool RegisterEventCallbackRaw(u16 eventTypeID, u16 eventID, i32 funcRef)
+        inline bool RegisterEventCallbackRaw(u16 eventTypeID, u16 eventID, u16 variantID, i32 funcRef)
         {
             if (funcRef == 0)
                 return false;
@@ -368,12 +392,11 @@ namespace Scripting
                 return false;
 
             EventState& eventState = eventTypeState.eventIDToEventState[eventID];
-            eventState.FuncRefList.push_back(funcRef);
+            eventState.eventVariantToFuncRef[variantID].push_back(funcRef);
 
             return true;
-        }
-        
-        inline bool HasEventCallbackRaw(u16 eventTypeID, u16 eventID)
+        }    
+        inline bool HasEventCallbackRaw(u16 eventTypeID, u16 eventID, u16 variantID)
         {
             auto& eventTypeMap = eventState.eventTypeToState;
             if (!eventTypeMap.contains(eventTypeID))
@@ -383,24 +406,25 @@ namespace Scripting
             if (!eventTypeState.eventIDToEventState.contains(eventID))
                 return false;
 
-            const EventState& eventState = eventTypeState.eventIDToEventState[eventID];
-            if (eventState.FuncRefList.empty())
+            EventState& eventState = eventTypeState.eventIDToEventState[eventID];
+            const auto& eventVariantFuncList = eventState.eventVariantToFuncRef[variantID];
+            if (eventVariantFuncList.empty())
                 return false;
 
             return true;
         }
 
         template <LuaEventTypeConcept EventType>
-        bool RegisterEventCallback(EventType eventType, i32 funcRef)
+        bool RegisterEventCallback(EventType eventType, u16 variantID, i32 funcRef)
         {
             u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
-            return RegisterEventCallbackRaw(eventTypeID, eventTypeVal, funcRef);
+            return RegisterEventCallbackRaw(eventTypeID, eventTypeVal, variantID, funcRef);
         }
 
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
-        bool CallEvent(EventType eventType, EventDataType&& eventData)
+        bool CallEvent(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
         {
             u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
             u16 eventDataID = std::decay_t<EventDataType>::StructID;
@@ -418,20 +442,36 @@ namespace Scripting
             if (eventState.eventDataID != eventDataID)
                 return false;
 
+            auto itr = eventState.eventVariantToFuncRef.find(variantID);
+            if (itr == eventState.eventVariantToFuncRef.end())
+                return false;
+
+            auto& funcRefList = itr->second;
+            if (funcRefList.empty())
+                return false;
+
             u32 packedEventID = static_cast<u32>(eventTypeVal) | (static_cast<u32>(eventTypeID) << 16);
             bool hasParameters = EventDataType::NumParameters > 0;
             u32 numParametersToPush = 1 + (1 * hasParameters); // 1 for eventID, 1 for eventData if it has parameters
 
             Push((u32)packedEventID);
-            eventData.Push(state);
 
-            CallAllFunctions(eventState.FuncRefList, numParametersToPush, false);
+            if (eventState.callback)
+            {
+                eventState.callback(this, &eventData);
+            }
+            else
+            {
+                eventData.Push(state);
+            }
+
+            CallAllFunctions(funcRefList, numParametersToPush, false);
 
             return true;
         }
 
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
-        bool CallEventBool(EventType eventType, EventDataType&& eventData)
+        bool CallEventBool(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
         {
             u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
             u16 eventDataID = std::decay_t<EventDataType>::StructID;
@@ -449,16 +489,30 @@ namespace Scripting
             if (eventState.eventDataID != eventDataID)
                 return false;
 
+            auto itr = eventState.eventVariantToFuncRef.find(variantID);
+            if (itr == eventState.eventVariantToFuncRef.end())
+                return false;
+
+            auto& funcRefList = itr->second;
+            if (funcRefList.empty())
+                return false;
+
             u32 packedEventID = static_cast<u32>(eventTypeVal) | (static_cast<u32>(eventTypeID) << 16);
             bool hasParameters = EventDataType::NumParameters > 0;
             u32 numParametersToPush = 1 + (1 * hasParameters); // 1 for eventID, 1 for eventData if it has parameters
 
             Push((u32)packedEventID);
-            eventData.Push(state);
+            if (eventState.callback)
+            {
+                eventState.callback(this, &eventData);
+            }
+            else
+            {
+                eventData.Push(state);
+            }
 
-            CallAllFunctionsBool(eventState.FuncRefList, numParametersToPush);
-
-            return true;
+            bool result = CallAllFunctionsBool(funcRefList, numParametersToPush);
+            return result;
         }
 
     private: // Internal Helpers

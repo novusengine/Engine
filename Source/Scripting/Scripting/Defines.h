@@ -13,6 +13,8 @@ typedef i32(*lua_CFunction)(lua_State* L);
 
 namespace Scripting
 {
+    struct Zenith;
+
     using LuaHandlerID = u16;
     using LuaUserDataDtor = void(void*);
 
@@ -23,7 +25,7 @@ namespace Scripting
     };
 
     template <typename T>
-    concept LuaEventDataConcept = requires(T t, lua_State * state)
+    concept LuaEventDataConcept = requires(T t, lua_State* state)
     {
         { std::decay_t<T>::StructID } -> std::convertible_to<u16>;
         { std::decay_t<T>::NumParameters } -> std::convertible_to<u16>;
@@ -31,13 +33,25 @@ namespace Scripting
         { t.Push(state) } -> std::same_as<void>;
     };
 
+    template<typename T, typename EventDataType>
+    concept LuaEventCallbackConcept = 
+        std::same_as<std::remove_cvref_t<T>, std::nullptr_t> ||
+        requires(T t, Zenith* z, EventDataType& data)
+        {
+            { t(z, data) } -> std::same_as<void>;
+        };
+
+    using LuaGenericEventCallback = std::function<void(Zenith*, void*)>;
+
     struct EventState
     {
     public:
         static const u16 EVENT_DATA_ID_INVALID = std::numeric_limits<u16>::max();
 
         u16 eventDataID = EVENT_DATA_ID_INVALID;
-        std::vector<i32> FuncRefList;
+        LuaGenericEventCallback callback = nullptr;
+
+        robin_hood::unordered_map<u16, std::vector<i32>> eventVariantToFuncRef;
     };
 
     struct EventTypeState
@@ -46,7 +60,6 @@ namespace Scripting
         robin_hood::unordered_map<u16, EventState> eventIDToEventState;
     };
 
-    struct Zenith;
     class LuaHandlerBase
     {
     public:

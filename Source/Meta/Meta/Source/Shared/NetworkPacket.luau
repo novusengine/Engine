@@ -115,17 +115,43 @@ type Server_UnitDisplayInfoUpdate<Packet> =
     };
 };
 
-type Server_UnitResourcesUpdate<Packet> =
+type Server_UnitPowerUpdate<Packet> =
 {
-    Name : "UnitResourcesUpdate";
+    Name : "UnitPowerUpdate";
 
     Fields :
     {
         guid : objectguid,
-        powerType : i8,
-        base : f32,
-        current : f32,
-        max : f32
+        kind : u8,
+        base : f64,
+        current : f64,
+        max : f64
+    };
+};
+
+type Server_UnitResistanceUpdate<Packet> =
+{
+    Name : "UnitResistanceUpdate";
+
+    Fields :
+    {
+        kind : u8,
+        base : f64,
+        current : f64,
+        max : f64
+    };
+};
+
+type Server_UnitStatUpdate<Packet> =
+{
+    Name : "UnitStatUpdate";
+
+    Fields :
+    {
+        kind : u8,
+        base : f64,
+        current : f64,
+        max : f64
     };
 };
 
@@ -156,9 +182,10 @@ type Server_UnitCastSpell<Packet> =
 
     Fields :
     {
+        spellID : u32,
         guid : objectguid,
         castTime : f32,
-        castDuration : f32
+        timeToCast : f32
     };
 };
 

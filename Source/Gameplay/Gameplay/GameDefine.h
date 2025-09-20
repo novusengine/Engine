@@ -152,6 +152,8 @@ namespace GameDefine
             f32 resourceMod;
             f32 damageMod;
 
+            std::string scriptName;
+
         public:
             static bool Read(std::shared_ptr<Bytebuffer>& buffer, CreatureTemplate& result);
             static bool Write(std::shared_ptr<Bytebuffer>& buffer, const CreatureTemplate& data);
@@ -188,6 +190,46 @@ namespace GameDefine
         public:
             static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapLocation& result);
             static bool Write(std::shared_ptr<Bytebuffer>& buffer, const MapLocation& data);
+        };
+
+        struct Spell
+        {
+        public:
+            u32 id;
+
+            std::string name;
+            std::string description;
+            std::string auraDescription;
+            u32 iconID;
+
+            f32 castTime;
+            f32 cooldown;
+
+        public:
+            static bool Read(std::shared_ptr<Bytebuffer>& buffer, Spell& result);
+            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const Spell& data);
+        };
+
+        struct SpellEffect
+        {
+        public:
+            u32 id;
+            u32 spellID;
+
+            u8 effectPriority;
+            u8 effectType;
+
+            i32 effectValue1;
+            i32 effectValue2;
+            i32 effectValue3;
+
+            i32 effectMiscValue1;
+            i32 effectMiscValue2;
+            i32 effectMiscValue3;
+
+        public:
+            static bool Read(std::shared_ptr<Bytebuffer>& buffer, SpellEffect& result);
+            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const SpellEffect& data);
         };
     }
 }

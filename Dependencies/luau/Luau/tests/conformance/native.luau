@@ -633,4 +633,89 @@ do
   assert(t[1] == 150 and t[2] == 510 and t[3] == 1100)
 end
 
+local function splitStoreRestore(x)
+  local c1; c1 = function() return 1 + x end
+  local c2; c2 = function() return 2 + x end
+  local c3; c3 = function() return 3 + x end
+  local c4; c4 = function() return 4 + x end
+  local c5; c5 = function() return 5 + x end
+  local c6; c6 = function() return 6 + x end
+  local c7; c7 = function() return 7 + x end
+  local c8; c8 = function() return 8 + x end
+  local c9; c9 = function() return 9 + x end
+  local ca; ca = function() return 10 + x end
+  local cb; cb = function() return 11 + x end
+  local cc; cc = function() return 12 + x end
+  local cd; cd = function() return 13 + x end
+  local ce; ce = function() return 14 + x end
+  local cf; cf = function() return 15 + x end
+
+  local t = {}
+
+  t.a1 = c1
+  t.a2 = c2
+  t.a3 = c3
+  t.a4 = c4
+  t.a5 = c5
+  t.a6 = c6
+  t.a7 = c7
+  t.a8 = c8
+  t.a9 = c9
+  t.aa = ca
+  t.ab = cb
+  t.ac = cc
+  t.ad = cd
+  t.ae = ce
+  t.af = cf
+
+  assert(is_native())
+  return t
+end
+
+assert(splitStoreRestore(2).ad() == 15)
+
+local function guard1(a)
+  local c = 0
+  if type(a) == "number" then
+    c = a * 2
+  end
+  return c
+end
+
+assert(guard1(4) == 8)
+assert(guard1({}) == 0)
+
+local function guard2(a)
+  local c = 0
+  if type(a) ~= "number" then
+    c = 4
+  end
+  return c
+end
+
+assert(guard2(4) == 0)
+assert(guard2({}) == 4)
+
+local function guard3(a)
+  local c = 0
+  if typeof(a) == "number" then
+    c = a * 2
+  end
+  return c
+end
+
+assert(guard3(4) == 8)
+assert(guard3({}) == 0)
+
+local function guard4(a)
+  local c = 0
+  if typeof(a) ~= "number" then
+    c = 4
+  end
+  return c
+end
+
+assert(guard4(4) == 0)
+assert(guard4({}) == 4)
+
 return('OK')

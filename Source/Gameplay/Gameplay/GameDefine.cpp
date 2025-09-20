@@ -127,6 +127,7 @@ namespace GameDefine
             didFail |= !buffer->GetF32(result.healthMod);
             didFail |= !buffer->GetF32(result.resourceMod);
             didFail |= !buffer->GetF32(result.damageMod);
+            didFail |= !buffer->GetString(result.scriptName);
 
             bool succeeded = !didFail;
             return succeeded;
@@ -149,6 +150,7 @@ namespace GameDefine
             didFail |= !buffer->PutF32(data.healthMod);
             didFail |= !buffer->PutF32(data.resourceMod);
             didFail |= !buffer->PutF32(data.damageMod);
+            didFail |= !buffer->PutString(data.scriptName);
 
             bool succeeded = !didFail;
             return succeeded;
@@ -212,6 +214,56 @@ namespace GameDefine
             didFail |= !buffer->PutF32(data.positionY);
             didFail |= !buffer->PutF32(data.positionZ);
             didFail |= !buffer->PutF32(data.orientation);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+
+        bool Spell::Read(std::shared_ptr<Bytebuffer>& buffer, Spell& result)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->GetU32(result.id);
+            didFail |= !buffer->GetString(result.name);
+            didFail |= !buffer->GetString(result.description);
+            didFail |= !buffer->GetString(result.auraDescription);
+            didFail |= !buffer->GetU32(result.iconID);
+            didFail |= !buffer->GetF32(result.castTime);
+            didFail |= !buffer->GetF32(result.cooldown);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+        bool Spell::Write(std::shared_ptr<Bytebuffer>& buffer, const Spell& data)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->PutU32(data.id);
+            didFail |= !buffer->PutString(data.name);
+            didFail |= !buffer->PutString(data.description);
+            didFail |= !buffer->PutString(data.auraDescription);
+            didFail |= !buffer->PutU32(data.iconID);
+            didFail |= !buffer->PutF32(data.castTime);
+            didFail |= !buffer->PutF32(data.cooldown);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+
+        bool SpellEffect::Read(std::shared_ptr<Bytebuffer>& buffer, SpellEffect& result)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->Get(result);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+        bool SpellEffect::Write(std::shared_ptr<Bytebuffer>& buffer, const SpellEffect& data)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->Put(data);
 
             bool succeeded = !didFail;
             return succeeded;

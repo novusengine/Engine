@@ -37,6 +37,10 @@ type CheatCommand<Enum> =
         GotoLocation            : Auto,
         GotoXYZ                 : Auto,
         TriggerAdd              : Auto,
-        TriggerRemove           : Auto
+        TriggerRemove           : Auto,
+        SpellSet                : Auto,
+        SpellEffectSet          : Auto,
+        CreatureAddScript       : Auto,
+        CreatureRemoveScript    : Auto
     };
 };

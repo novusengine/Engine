@@ -445,7 +445,27 @@ type Spell<ClientDB> =
     {
         name : stringref,
         description : stringref,
-        auraDescription : stringref
+        auraDescription : stringref,
+        iconID : u32,
+        castTime : f32,
+        cooldown : f32
+    };
+};
+
+type SpellEffects<ClientDB> =
+{
+    Name : "SpellEffects";
+    Fields :
+    {
+        spellID : u32,
+        effectPriority : u8,
+        effectType : u8,
+        effectValue1 : i32,
+        effectValue2 : i32,
+        effectValue3 : i32,
+        effectMiscValue1 : i32,
+        effectMiscValue2 : i32,
+        effectMiscValue3 : i32
     };
 };
 

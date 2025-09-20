@@ -10,6 +10,7 @@ type LuaGameEvent<Enum> =
         Updated : Auto,
         MapLoading : Auto,
         ChatMessageReceived : Auto,
+        LocalMoverChanged : Auto,
         Count : Auto
     };
 }
@@ -51,6 +52,15 @@ type LuaGameEventDataChatMessageReceived<LuaStruct> =
         message : string
     };
 }
+type LuaGameEventDataLocalMoverChanged<LuaStruct> =
+{
+    Name : "GameEventDataLocalMoverChanged";
+
+    Fields :
+    {
+        moverID : u32
+    };
+}
 
 type LuaUnitEvent<Enum> =
 {
@@ -62,6 +72,7 @@ type LuaUnitEvent<Enum> =
         Invalid : Auto,
         Add : Auto,
         Remove : Auto,
+        TargetChanged : Auto,
         Count : Auto
     };
 }
@@ -81,6 +92,16 @@ type LuaUnitEventDataRemove<LuaStruct> =
     Fields :
     {
         unitID : u32
+    };
+}
+type LuaUnitEventDataTargetChanged<LuaStruct> =
+{
+    Name : "UnitEventDataTargetChanged";
+
+    Fields :
+    {
+        unitID : u32,
+        targetID : u32
     };
 }
 

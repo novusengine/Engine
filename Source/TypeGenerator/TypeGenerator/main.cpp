@@ -2025,6 +2025,13 @@ bool GeneratePacketEnum(std::string& fileContent, const PacketList& packetList, 
     return true;
 }
 
+struct CachedFile
+{
+public:
+    std::filesystem::file_time_type lastModifiedTime;
+    std::string path;
+};
+
 i32 main(int argc, char* argv[])
 {
     quill::Backend::start();
@@ -2059,6 +2066,93 @@ i32 main(int argc, char* argv[])
 
     NC_LOG_INFO("Source Dir: {0}", sourceDir);
     NC_LOG_INFO("Generated Dir: {0}", generatedDir);
+
+    std::filesystem::path fileCachePath = std::filesystem::path(generatedDir) / ".filecache";
+    robin_hood::unordered_map<u32, CachedFile> cachedFiles;
+
+    bool isDirty = true;
+
+    if (std::filesystem::exists(fileCachePath))
+    {
+        FileReader fileReader(fileCachePath.string());
+        if (fileReader.Open())
+        {
+            isDirty = false;
+
+            std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(fileReader.Length());
+
+            fileReader.Read(buffer.get(), fileReader.Length());
+
+            u32 numCachedFiles = 0;
+            buffer->GetU32(numCachedFiles);
+
+            cachedFiles.reserve(numCachedFiles);
+            for (u32 i = 0; i < numCachedFiles; i++)
+            {
+                CachedFile cachedFile;
+                std::filesystem::file_time_type::rep lastModifiedTime = 0;
+
+                buffer->Get(lastModifiedTime);
+                buffer->GetString(cachedFile.path);
+
+                cachedFile.lastModifiedTime = std::filesystem::file_time_type(std::chrono::file_clock::duration(lastModifiedTime));
+
+                // Check if the file still exists, and if it does, check if it was modified more recently than the cached time
+                std::filesystem::path sourcePath = sourceDir / std::filesystem::path(cachedFile.path);
+                bool fileExists = std::filesystem::exists(sourcePath);
+                bool fileHasBeenModified = fileExists && (std::filesystem::last_write_time(sourcePath) > cachedFile.lastModifiedTime);
+
+                u32 pathHash = StringUtils::fnv1a_32(cachedFile.path.c_str(), cachedFile.path.length());
+                cachedFiles[pathHash] = std::move(cachedFile);
+
+                if ((!fileExists && sourcePath.filename() != "PacketList.luau") || fileHasBeenModified)
+                {
+                    isDirty = true;
+                    break;
+                }
+            }
+        }
+
+        // Check if new source files have been added since last generation
+        if (!isDirty)
+        {
+            for (auto& dirEntry : std::filesystem::recursive_directory_iterator(sourceDir))
+            {
+                std::filesystem::path path = dirEntry.path();
+                path = path.make_preferred();
+
+                // Skip non files
+                if (!dirEntry.is_regular_file())
+                    continue;
+
+                // Skip non .luau files
+                if (!StringUtils::EndsWith(path.filename().string(), ".luau"))
+                    continue;
+
+                std::string relativePath = std::filesystem::relative(path, sourceDir).string();
+                u32 pathHash = StringUtils::fnv1a_32(relativePath.c_str(), relativePath.length());
+
+                if (!cachedFiles.contains(pathHash))
+                {
+                    isDirty = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!isDirty)
+    {
+        NC_LOG_INFO("No files have changed since last generation, skipping...");
+        return 0;
+    }
+    cachedFiles.clear();
+
+    if (std::filesystem::exists(generatedDir))
+    {
+        std::filesystem::remove_all(generatedDir);
+        std::filesystem::create_directories(generatedDir);
+    }
 
     std::chrono::system_clock::time_point startTime = std::chrono::system_clock::now();
 
@@ -2227,6 +2321,14 @@ i32 main(int argc, char* argv[])
 
             output.write(fileContent.c_str(), fileContent.length());
             output.close();
+
+            u32 pathHash = StringUtils::fnv1a_32(relativePath.string().c_str(), relativePath.string().length());
+            auto& cachedFile = cachedFiles[pathHash];
+            cachedFile.lastModifiedTime = std::filesystem::last_write_time(path);
+
+            // Make path relative to the generated dir
+            cachedFile.path = std::filesystem::relative(generatedPath, generatedDir).replace_extension(".luau").string();
+
         }
         catch (const std::exception&)
         {
@@ -2251,12 +2353,37 @@ i32 main(int argc, char* argv[])
             {
                 output.write(fileContent.c_str(), fileContent.length());
                 output.close();
+
+                u32 pathHash = StringUtils::fnv1a_32(generatedPath.string().c_str(), generatedPath.string().length());
+                auto& cachedFile = cachedFiles[pathHash];
+                cachedFile.lastModifiedTime = std::filesystem::last_write_time(generatedPath);
+                cachedFile.path = std::filesystem::relative(generatedPath, generatedDir).replace_extension(".luau").string();
             }
             else
             {
                 NC_LOG_ERROR("Failed to create file ({0}). Check admin permissions", generatedPath.string());
             }
         }
+    }
+
+    // Write out the file cache
+    {
+        std::shared_ptr<Bytebuffer> buffer = Bytebuffer::Borrow<1048576>();
+
+        u32 numCachedFiles = static_cast<u32>(cachedFiles.size());
+        buffer->PutU32(numCachedFiles);
+
+        for (auto& pair : cachedFiles)
+        {
+            auto& cachedFile = pair.second;
+
+            std::filesystem::file_time_type::rep lastModifiedTime = cachedFile.lastModifiedTime.time_since_epoch().count();
+            buffer->Put(lastModifiedTime);
+            buffer->PutString(cachedFile.path);
+        }
+
+        FileWriter fileWriter(fileCachePath, buffer);
+        fileWriter.Write();
     }
 
     std::chrono::system_clock::time_point endTime = std::chrono::system_clock::now();
