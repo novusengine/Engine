@@ -230,6 +230,7 @@ namespace GameDefine
             didFail |= !buffer->GetU32(result.iconID);
             didFail |= !buffer->GetF32(result.castTime);
             didFail |= !buffer->GetF32(result.cooldown);
+            didFail |= !buffer->GetF32(result.duration);
 
             bool succeeded = !didFail;
             return succeeded;
@@ -245,6 +246,7 @@ namespace GameDefine
             didFail |= !buffer->PutU32(data.iconID);
             didFail |= !buffer->PutF32(data.castTime);
             didFail |= !buffer->PutF32(data.cooldown);
+            didFail |= !buffer->PutF32(data.duration);
 
             bool succeeded = !didFail;
             return succeeded;
@@ -260,6 +262,25 @@ namespace GameDefine
             return succeeded;
         }
         bool SpellEffect::Write(std::shared_ptr<Bytebuffer>& buffer, const SpellEffect& data)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->Put(data);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+
+        bool SpellProcData::Read(std::shared_ptr<Bytebuffer>& buffer, SpellProcData& result)
+        {
+            bool didFail = false;
+
+            didFail |= !buffer->Get(result);
+
+            bool succeeded = !didFail;
+            return succeeded;
+        }
+        bool SpellProcData::Write(std::shared_ptr<Bytebuffer>& buffer, const SpellProcData& data)
         {
             bool didFail = false;
 

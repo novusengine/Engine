@@ -204,6 +204,7 @@ namespace GameDefine
 
             f32 castTime;
             f32 cooldown;
+            f32 duration;
 
         public:
             static bool Read(std::shared_ptr<Bytebuffer>& buffer, Spell& result);
@@ -230,6 +231,26 @@ namespace GameDefine
         public:
             static bool Read(std::shared_ptr<Bytebuffer>& buffer, SpellEffect& result);
             static bool Write(std::shared_ptr<Bytebuffer>& buffer, const SpellEffect& data);
+        };
+
+        struct SpellProcData
+        {
+        public:
+            u32 id;
+
+            u32 phaseMask;
+            u64 typeMask;
+            u64 hitMask;
+            u64 flags;
+
+            f32 procsPerMinute;
+            f32 chanceToProc;
+            u32 internalCooldownMS;
+            i32 charges;
+
+        public:
+            static bool Read(std::shared_ptr<Bytebuffer>& buffer, SpellProcData& result);
+            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const SpellProcData& data);
         };
     }
 }

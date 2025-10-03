@@ -24,11 +24,15 @@ type StatType<Enum> =
     Fields :
     {
         Invalid : Auto,
+        Health : Auto,
         Stamina : Auto,
         Strength : Auto,
         Agility : Auto,
         Intellect : Auto,
         Spirit : Auto,
+        Armor : Auto,
+        AttackPower : Auto,
+        SpellPower : Auto,
         Count : Auto
     };
 };

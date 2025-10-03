@@ -448,7 +448,8 @@ type Spell<ClientDB> =
         auraDescription : stringref,
         iconID : u32,
         castTime : f32,
-        cooldown : f32
+        cooldown : f32,
+        duration : f32
     };
 };
 
@@ -466,6 +467,33 @@ type SpellEffects<ClientDB> =
         effectMiscValue1 : i32,
         effectMiscValue2 : i32,
         effectMiscValue3 : i32
+    };
+};
+
+type SpellProcData<ClientDB> =
+{
+    Name : "SpellProcData";
+    Fields :
+    {
+        phaseMask : u32,
+        typeMask : u64,
+        hitMask : u64,
+        flags : u64,
+        procsPerMinute : f32,
+        chanceToProc : f32,
+        internalCooldownMS : u32,
+        charges : i32
+    };
+};
+
+type SpellProcLink<ClientDB> =
+{
+    Name : "SpellProcLink";
+    Fields :
+    {
+        spellID : u32,
+        effectMask : u64,
+        procDataID : u32
     };
 };
 

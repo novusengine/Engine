@@ -1617,7 +1617,6 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
 
                 u64 fieldValue = fieldValues[i];
 
-
                 WriteContent(fileContent, "std::pair(\"");
                 WriteContent(fileContent, fieldsProperties.values[i].name);
                 WriteContent(fileContent, "\", ");
@@ -1629,6 +1628,10 @@ bool GenerateEnum(const TypeParser::ParsedType& parsedType, std::string& fileCon
                 else if (isUnsigned)
                 {
                     WriteContent(fileContent, std::to_string(fieldValue));
+                    WriteContent(fileContent, "u");
+
+                    if (typeProperty.type.kind == TypeParser::TypePropertyKind::u64)
+                        WriteContent(fileContent, "ll");
                 }
 
                 WriteContent(fileContent, ")");

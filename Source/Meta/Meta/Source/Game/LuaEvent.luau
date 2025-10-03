@@ -73,6 +73,12 @@ type LuaUnitEvent<Enum> =
         Add : Auto,
         Remove : Auto,
         TargetChanged : Auto,
+        PowerUpdate : Auto,
+        ResistanceUpdate : Auto,
+        StatUpdate : Auto,
+        AuraAdd : Auto,
+        AuraUpdate : Auto,
+        AuraRemove : Auto,
         Count : Auto
     };
 }
@@ -102,6 +108,79 @@ type LuaUnitEventDataTargetChanged<LuaStruct> =
     {
         unitID : u32,
         targetID : u32
+    };
+}
+type LuaUnitEventDataPowerUpdate<LuaStruct> =
+{
+    Name : "UnitEventDataPowerUpdate";
+
+    Fields :
+    {
+        unitID : u32,
+        powerType : u8,
+        base : f64,
+        current : f64,
+        max : f64
+    };
+}
+type LuaUnitEventDataResistanceUpdate<LuaStruct> =
+{
+    Name : "UnitEventDataResistanceUpdate";
+
+    Fields :
+    {
+        unitID : u32,
+        resistanceType : u8,
+        base : f64,
+        current : f64,
+        max : f64
+    };
+}
+type LuaUnitEventDataStatUpdate<LuaStruct> =
+{
+    Name : "UnitEventDataStatUpdate";
+
+    Fields :
+    {
+        unitID : u32,
+        statType : u8,
+        base : f64,
+        current : f64
+    };
+}
+type LuaUnitEventDataAuraAdd<LuaStruct> =
+{
+    Name : "UnitEventDataAuraAdd";
+
+    Fields :
+    {
+        unitID : u32,
+        auraID : u32,
+        spellID : u32,
+        duration : f32,
+        stacks : u16
+    };
+}
+type LuaUnitEventDataAuraUpdate<LuaStruct> =
+{
+    Name : "UnitEventDataAuraUpdate";
+
+    Fields :
+    {
+        unitID : u32,
+        auraID : u32,
+        duration : f32,
+        stacks : u16
+    };
+}
+type LuaUnitEventDataAuraRemove<LuaStruct> =
+{
+    Name : "UnitEventDataAuraRemove";
+
+    Fields :
+    {
+        unitID : u32,
+        auraID : u32
     };
 }
 

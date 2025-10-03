@@ -123,6 +123,7 @@ type LuaSpellEvent<Enum> =
         Invalid : Auto,
         OnPrepare : Auto,
         OnHandleEffect : Auto,
+        OnFinish : Auto,
         Count : Auto
     };
 }
@@ -146,6 +147,73 @@ type LuaSpellEventDataOnHandleEffect<LuaStruct> =
         casterID : u32,
         spellEntity : u32,
         spellID : u32,
+        procID : u32,
+        effectIndex : u8,
+        effectType : u8
+    };
+}
+
+type LuaSpellEventDataOnFinish<LuaStruct> =
+{
+    Name : "SpellEventDataOnFinish";
+    
+    Fields :
+    {
+        casterID : u32,
+        spellEntity : u32,
+        spellID : u32
+    };
+}
+
+type LuaAuraEvent<Enum> =
+{
+    Name : "AuraEvent";
+    Type : u8;
+
+    Fields :
+    {
+        Invalid : Auto,
+        OnApply : Auto,
+        OnRemove : Auto,
+        OnHandleEffect : Auto,
+        Count : Auto
+    };
+}
+type LuaAuraEventDataOnApply<LuaStruct> =
+{
+    Name : "AuraEventDataOnApply";
+
+    Fields :
+    {
+        casterID : u32,
+        targetID : u32,
+        auraEntity : u32,
+        spellID : u32
+    };
+}
+type LuaAuraEventDataOnRemove<LuaStruct> =
+{
+    Name : "AuraEventDataOnRemove";
+
+    Fields :
+    {
+        casterID : u32,
+        targetID : u32,
+        auraEntity : u32,
+        spellID : u32
+    };
+}
+type LuaAuraEventDataOnHandleEffect<LuaStruct> =
+{
+    Name : "AuraEventDataOnHandleEffect";
+
+    Fields :
+    {
+        casterID : u32,
+        targetID : u32,
+        auraEntity : u32,
+        spellID : u32,
+        procID : u32,
         effectIndex : u8,
         effectType : u8
     };

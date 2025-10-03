@@ -150,7 +150,7 @@ namespace Scripting
                 lua_pushstring(zenith->state, method.name);
 
                 lua_pushlightuserdata(zenith->state, (void*)&method);
-                lua_pushcclosure(zenith->state, thunk, "Thunk", 1);
+                lua_pushcclosure(zenith->state, thunk, method.name, 1);
                 lua_rawset(zenith->state, -3);
             }
 

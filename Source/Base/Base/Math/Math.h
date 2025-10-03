@@ -255,4 +255,79 @@ namespace Math
             return MatrixMul(translateMatrix, ScaleMatrix(rotMatrix, scale));
         }
     }
+
+    // ---------------------------
+    // SplitMix64 (for seeding)
+    // ---------------------------
+    struct SplitMix64
+    {
+    public:
+
+        explicit SplitMix64(u64 seed) : _state(seed) {}
+
+        u64 Next()
+        {
+            u64 z = (_state += 0x9E3779B97f4A7C15ull);
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+            return z ^ (z >> 31);
+        }
+
+    private:
+        u64 _state;
+    };
+
+    // ---------------------------
+    // Xoroshiro128++
+    // ---------------------------
+    struct Xoroshiro128PP
+    {
+    public:
+        explicit Xoroshiro128PP(u64 seed = 1)
+        {
+            Seed(seed);
+        }
+
+        inline u64 RotL(const u64 x, int k) const
+        {
+            return (x << k) | (x >> (64 - k));
+        }
+
+        void Seed(u64 seed)
+        {
+            SplitMix64 sm(seed);
+            _s[0] = sm.Next();
+            _s[1] = sm.Next();
+        }
+
+        u64 Next()
+        {
+            const uint64_t s0 = _s[0];
+            uint64_t s1 = _s[1];
+            const uint64_t result = RotL(s0 + s1, 17) + s0;
+
+            s1 ^= s0;
+            _s[0] = RotL(s0, 49) ^ s1 ^ (s1 << 21);
+            _s[1] = RotL(s1, 28);
+
+            return result;
+        }
+
+        // Generate [0,1] float
+        f32 NextF32()
+        {
+            // Use high 24 bits for float precision
+            return (Next() >> 40) * (1.0f / (1ull << 24));
+        }
+
+        // Generate [0,1] double
+        f64 NextF64()
+        {
+            // Use high 53 bits for double precision
+            return (Next() >> 11) * (1.0 / (1ull << 53));
+        }
+
+    private:
+        u64 _s[2];
+    };
 };

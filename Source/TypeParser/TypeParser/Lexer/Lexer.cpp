@@ -22,9 +22,6 @@ namespace TypeParser
 
     void Lexer::Process(Module& module)
     {
-        NC_LOG_INFO("Lexer : Processing (Bytes: {0})", module.lexerInfo.size);
-        NC_LOG_INFO("Lexer : Token Capacity ({0})", module.lexerInfo.tokens.capacity());
-
         while (true)
         {
             Token& token = module.lexerInfo.NewToken();
@@ -33,8 +30,6 @@ namespace TypeParser
             if (token.kind == Token::Kind::End_of_File)
                 break;
         }
-
-        NC_LOG_INFO("Lexer : Processed (Bytes: {0}, Tokens: {1}, Lines: {2})", module.lexerInfo.size, module.lexerInfo.tokens.size(), module.lexerInfo.line);
     }
 
     void Lexer::GetNextToken(LexerInfo& lexerInfo, Token& token)

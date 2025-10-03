@@ -4,15 +4,11 @@ namespace TypeParser
 {
     void Parser::Process(Module& module)
     {
-        NC_LOG_INFO("Parser : Processing (Tokens: {0})", module.lexerInfo.tokens.size());
-
         while (true)
         {
             if (!TryParseType(module.lexerInfo, module.parserInfo))
                 break;
         }
-
-        NC_LOG_INFO("Parser : Processed (Tokens: {0}, Types: {1})", module.lexerInfo.tokens.size(), module.parserInfo.parsedTypes.size());
     }
 
     bool Parser::TryParseType(LexerInfo& lexerInfo, ParserInfo& parserInfo)

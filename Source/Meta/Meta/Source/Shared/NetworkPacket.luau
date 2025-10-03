@@ -86,6 +86,7 @@ type Server_UnitAdd<Packet> =
     {
         guid : objectguid,
         name : string,
+        unitClass : u8,
         position : vec3,
         scale : vec3,
         pitchYaw : vec2
@@ -150,8 +151,7 @@ type Server_UnitStatUpdate<Packet> =
     {
         kind : u8,
         base : f64,
-        current : f64,
-        max : f64
+        current : f64
     };
 };
 
@@ -450,5 +450,41 @@ type Server_TriggerRemove<Packet> =
     Fields :
     {
         triggerID : u32
+    };
+}
+
+type Server_UnitAddAura<Packet> =
+{
+    Name : "ServerUnitAddAura";
+
+    Fields :
+    {
+        guid : objectguid,
+        auraInstanceID : u32,
+        spellID : u32,
+        duration : f32,
+        stacks : u16
+    };
+}
+type Server_UnitUpdateAura<Packet> =
+{
+    Name : "ServerUnitUpdateAura";
+
+    Fields :
+    {
+        guid : objectguid,
+        auraInstanceID : u32,
+        duration : f32,
+        stacks : u16
+    };
+}
+type Server_UnitRemoveAura<Packet> =
+{
+    Name : "ServerUnitRemoveAura";
+
+    Fields :
+    {
+        guid : objectguid,
+        auraInstanceID : u32
     };
 }

@@ -40,6 +40,8 @@ type CheatCommand<Enum> =
         TriggerRemove           : Auto,
         SpellSet                : Auto,
         SpellEffectSet          : Auto,
+        SpellProcDataSet        : Auto,
+        SpellProcLinkSet        : Auto,
         CreatureAddScript       : Auto,
         CreatureRemoveScript    : Auto
     };

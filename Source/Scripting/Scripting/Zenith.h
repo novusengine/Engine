@@ -157,12 +157,10 @@ namespace Scripting
         T CheckVal(i32 index);
 
         template <typename T>
-        T* GetUserData(T* fallback = nullptr, i32 index = -1)
+        T* GetUserData(i32 index = -1)
         {
             if (!IsUserData(index))
-            {
-                return fallback;
-            }
+                return nullptr;
 
             return reinterpret_cast<T*>(ToUserData(index));
         }
@@ -482,18 +480,20 @@ namespace Scripting
                 return false;
 
             EventTypeState& eventTypeState = eventTypeMap[eventTypeID];
-            if (!eventTypeState.eventIDToEventState.contains(eventTypeVal))
+
+            auto eventStateItr = eventTypeState.eventIDToEventState.find(eventTypeVal);
+            if (eventStateItr == eventTypeState.eventIDToEventState.end())
                 return false;
 
-            EventState& eventState = eventTypeState.eventIDToEventState[eventTypeVal];
+            EventState& eventState = eventStateItr->second;
             if (eventState.eventDataID != eventDataID)
                 return false;
 
-            auto itr = eventState.eventVariantToFuncRef.find(variantID);
-            if (itr == eventState.eventVariantToFuncRef.end())
+            auto funcRefListItr = eventState.eventVariantToFuncRef.find(variantID);
+            if (funcRefListItr == eventState.eventVariantToFuncRef.end())
                 return false;
 
-            auto& funcRefList = itr->second;
+            auto& funcRefList = funcRefListItr->second;
             if (funcRefList.empty())
                 return false;
 
