@@ -42,8 +42,8 @@ namespace Renderer
         void ReloadShaders(bool forceRecompileAll) override;
         void ClearUploadBuffers() override;
 
-        void SetRenderSize(vec2 renderSize) override;
-        vec2 GetRenderSize() override;
+        void SetRenderSize(const vec2& renderSize) override;
+        const vec2& GetRenderSize() override;
 
         vec2 GetWindowSize() override;
         ImageFormat GetSwapChainImageFormat() override;
