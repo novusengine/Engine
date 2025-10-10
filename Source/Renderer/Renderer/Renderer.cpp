@@ -10,6 +10,14 @@ namespace Renderer
     {
     }
 
+    void Renderer::SetRenderSize(const vec2& renderSize)
+    {
+        for (auto& callback : _onRenderSizeChangedCallbacks)
+        {
+            callback(renderSize);
+        }
+    }
+
     RenderGraph& Renderer::CreateRenderGraph(RenderGraphDesc& desc)
     {
         RenderGraph* renderGraph = Memory::Allocator::New<RenderGraph>(desc.allocator, desc.allocator, this);

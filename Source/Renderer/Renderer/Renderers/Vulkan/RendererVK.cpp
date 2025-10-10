@@ -110,13 +110,15 @@ namespace Renderer
         _uploadBufferHandler->Clear();
     }
 
-    void RendererVK::SetRenderSize(vec2 renderSize)
+    void RendererVK::SetRenderSize(const vec2& renderSize)
     {
         _renderSize = renderSize;
         _renderSizeChanged = true;
+
+        Renderer::SetRenderSize(renderSize);
     }
 
-    vec2 RendererVK::GetRenderSize()
+    const vec2& RendererVK::GetRenderSize()
     {
         return _renderSize;
     }

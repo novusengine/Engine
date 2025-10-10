@@ -49,6 +49,8 @@ namespace Renderer
     class Renderer
     {
     public:
+        ~Renderer();
+
         virtual void InitDebug() = 0;
         virtual void InitWindow(Novus::Window* window) = 0;
         virtual void Deinit() = 0;
@@ -57,13 +59,12 @@ namespace Renderer
         virtual void ReloadShaders(bool forceRecompileAll) = 0;
         virtual void ClearUploadBuffers() = 0;
 
-        virtual void SetRenderSize(vec2 renderSize) = 0;
-        virtual vec2 GetRenderSize() = 0;
+        virtual void SetRenderSize(const vec2& renderSize);
+        virtual const vec2& GetRenderSize() = 0;
+        void AddOnRenderSizeChanged(const std::function<void(const vec2&)>& func) { _onRenderSizeChangedCallbacks.push_back(func); }
 
         virtual vec2 GetWindowSize() = 0;
         virtual ImageFormat GetSwapChainImageFormat() = 0;
-
-        virtual ~Renderer();
 
         [[nodiscard]] RenderGraph& CreateRenderGraph(RenderGraphDesc& desc);
 
@@ -245,6 +246,7 @@ namespace Renderer
         bool _isExecutingCommandlist = false;
 
         std::vector<TimeQueryID> _frameTimeQueries;
+        std::vector<std::function<void(const vec2&)>> _onRenderSizeChangedCallbacks;
 
         friend class RenderGraph;
     };

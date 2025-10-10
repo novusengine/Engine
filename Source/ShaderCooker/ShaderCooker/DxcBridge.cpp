@@ -171,11 +171,12 @@ namespace ShaderCooker
 
         defines.push_back(MakeDefine(L"DEBUG", L"0"));
         defines.push_back(MakeDefine(L"GLOBAL", L"1"));
-        defines.push_back(MakeDefine(L"SHADOWS", L"2"));
-        defines.push_back(MakeDefine(L"PER_PASS", L"3"));
-        defines.push_back(MakeDefine(L"PER_DRAW", L"4"));
-        defines.push_back(MakeDefine(L"TERRAIN", L"5"));
-        defines.push_back(MakeDefine(L"MODEL", L"6"));
+        defines.push_back(MakeDefine(L"TILES", L"2"));
+        defines.push_back(MakeDefine(L"LIGHT", L"3"));
+        defines.push_back(MakeDefine(L"PER_PASS", L"4"));
+        defines.push_back(MakeDefine(L"PER_DRAW", L"5"));
+        defines.push_back(MakeDefine(L"TERRAIN", L"6"));
+        defines.push_back(MakeDefine(L"MODEL", L"7"));
 
         // Define all SHADER_*PROFILE* to 0
         for (const char* profile : validProfilesArray)
