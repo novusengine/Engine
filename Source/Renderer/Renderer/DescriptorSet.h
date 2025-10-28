@@ -52,7 +52,8 @@ namespace Renderer
     {
         DEBUG,
         GLOBAL,
-        SHADOWS,
+        TILES,
+        LIGHT,
         PER_PASS,
         PER_DRAW,
         TERRAIN,
@@ -65,7 +66,8 @@ namespace Renderer
         {
             case DEBUG: return "DEBUG";
             case GLOBAL: return "GLOBAL";
-            case SHADOWS: return "SHADOWS";
+            case TILES: return "TILES";
+            case LIGHT: return "LIGHT";
             case PER_PASS: return "PER_PASS";
             case PER_DRAW: return "PER_DRAW";
             case TERRAIN: return "TERRAIN";
