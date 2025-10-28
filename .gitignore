@@ -31,6 +31,7 @@
 *.app
 
 Source/Meta/Meta/Generated
+!Dependencies/libsodium/libsodium/lib/windows/*.lib
 build*/
 Build*/
 .vs/
