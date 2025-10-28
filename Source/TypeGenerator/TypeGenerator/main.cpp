@@ -218,7 +218,6 @@ bool WriteCommandField(std::string& fileContent, const std::string& name, const 
             return false;
         }
 
-
         case TypeParser::TypePropertyKind::string:
         {
             WriteContent(fileContent, "std::string", indent);
@@ -1003,106 +1002,99 @@ void WriteLuaStructPushFunction(std::string& fileContent, const TypeParser::Pars
 
     indent++;
     {
-        if (numFields == 0)
-        {
-            WriteContent(fileContent, "lua_pushnil(state);\n", indent);
-        }
-        else
-        {
-            WriteContent(fileContent, "lua_newtable(state);\n\n", indent);
+        WriteContent(fileContent, "lua_newtable(state);\n\n", indent);
 
-            for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+        for (u32 valueIndex = 0; valueIndex < numFields; valueIndex++)
+        {
+            const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
+
+            WriteContent(fileContent, "lua_pushstring(state, \"", indent);
+            WriteContent(fileContent, property.name);
+            WriteContent(fileContent, "\");\n");
+
+            switch (property.kind)
             {
-                const TypeParser::TypeProperty& property = fieldProperties.values[valueIndex];
-
-                WriteContent(fileContent, "lua_pushstring(state, \"", indent);
-                WriteContent(fileContent, property.name);
-                WriteContent(fileContent, "\");\n");
-
-                switch (property.kind)
+                case TypeParser::TypePropertyKind::boolean:
                 {
-                    case TypeParser::TypePropertyKind::boolean:
-                    {
-                        WriteContent(fileContent, "lua_pushboolean(state, ", indent);
-                        WriteContent(fileContent, property.name.c_str());
-                        break;
-                    }
-
-                    case TypeParser::TypePropertyKind::i8:
-                    case TypeParser::TypePropertyKind::i16:
-                    case TypeParser::TypePropertyKind::i32:
-                    case TypeParser::TypePropertyKind::i64:
-                    case TypeParser::TypePropertyKind::u8:
-                    case TypeParser::TypePropertyKind::u16:
-                    case TypeParser::TypePropertyKind::u32:
-                    case TypeParser::TypePropertyKind::u64:
-                    case TypeParser::TypePropertyKind::f32:
-                    case TypeParser::TypePropertyKind::f64:
-                    {
-                        WriteContent(fileContent, "lua_pushnumber(state, static_cast<f64>(", indent);
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ")");
-                        break;
-                    }
-
-                    case TypeParser::TypePropertyKind::string:
-                    {
-                        WriteContent(fileContent, "lua_pushstring(state, ", indent);
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ".c_str()");
-                        break;
-                    }
-
-                    case TypeParser::TypePropertyKind::objectguid:
-                    {
-                        WriteContent(fileContent, "lua_pushnumber(", indent);
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ".GetData()");
-
-                        break;
-                    }
-
-
-                    case TypeParser::TypePropertyKind::vec2:
-                    case TypeParser::TypePropertyKind::ivec2:
-                    case TypeParser::TypePropertyKind::uvec2:
-                    {
-                        WriteContent(fileContent, "lua_pushvector(state, ", indent);
-
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ".x, ");
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ".y, ");
-                        WriteContent(fileContent, "0.0f");
-
-                        break;
-                    }
-
-                    case TypeParser::TypePropertyKind::vec3:
-                    case TypeParser::TypePropertyKind::ivec3:
-                    case TypeParser::TypePropertyKind::uvec3:
-                    {
-                        WriteContent(fileContent, "lua_pushvector(state, ", indent);
-
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ".x, ");
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ".y, ");
-                        WriteContent(fileContent, property.name.c_str());
-                        WriteContent(fileContent, ".z");
-
-                        break;
-                    }
-
-                    default:
-                    {
-                        break;
-                    }
+                    WriteContent(fileContent, "lua_pushboolean(state, ", indent);
+                    WriteContent(fileContent, property.name.c_str());
+                    break;
                 }
 
-                WriteContent(fileContent, ");\n");
-                WriteContent(fileContent, "lua_settable(state, -3);\n", indent);
+                case TypeParser::TypePropertyKind::i8:
+                case TypeParser::TypePropertyKind::i16:
+                case TypeParser::TypePropertyKind::i32:
+                case TypeParser::TypePropertyKind::i64:
+                case TypeParser::TypePropertyKind::u8:
+                case TypeParser::TypePropertyKind::u16:
+                case TypeParser::TypePropertyKind::u32:
+                case TypeParser::TypePropertyKind::u64:
+                case TypeParser::TypePropertyKind::f32:
+                case TypeParser::TypePropertyKind::f64:
+                {
+                    WriteContent(fileContent, "lua_pushnumber(state, static_cast<f64>(", indent);
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ")");
+                    break;
+                }
+
+                case TypeParser::TypePropertyKind::string:
+                {
+                    WriteContent(fileContent, "lua_pushstring(state, ", indent);
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ".c_str()");
+                    break;
+                }
+
+                case TypeParser::TypePropertyKind::objectguid:
+                {
+                    WriteContent(fileContent, "lua_pushnumber(", indent);
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ".GetData()");
+
+                    break;
+                }
+
+
+                case TypeParser::TypePropertyKind::vec2:
+                case TypeParser::TypePropertyKind::ivec2:
+                case TypeParser::TypePropertyKind::uvec2:
+                {
+                    WriteContent(fileContent, "lua_pushvector(state, ", indent);
+
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ".x, ");
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ".y, ");
+                    WriteContent(fileContent, "0.0f");
+
+                    break;
+                }
+
+                case TypeParser::TypePropertyKind::vec3:
+                case TypeParser::TypePropertyKind::ivec3:
+                case TypeParser::TypePropertyKind::uvec3:
+                {
+                    WriteContent(fileContent, "lua_pushvector(state, ", indent);
+
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ".x, ");
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ".y, ");
+                    WriteContent(fileContent, property.name.c_str());
+                    WriteContent(fileContent, ".z");
+
+                    break;
+                }
+
+                default:
+                {
+                    break;
+                }
             }
+
+            WriteContent(fileContent, ");\n");
+            WriteContent(fileContent, "lua_settable(state, -3);\n", indent);
         }
     }
     indent--;
@@ -1932,9 +1924,13 @@ bool GeneratePacketEnum(std::string& fileContent, const PacketList& packetList, 
                 WriteContent(fileContent, " = ");
                 WriteContent(fileContent, std::to_string(packet.id));
 
-                if (i < numPackets - 1)
-                    WriteContent(fileContent, ",");
+                WriteContent(fileContent, ",\n");
+            }
 
+            // Write Count
+            {
+                WriteContent(fileContent, "Count = ", indent);
+                WriteContent(fileContent, std::to_string(numPackets + 1));
                 WriteContent(fileContent, "\n");
             }
         }
@@ -1964,7 +1960,7 @@ bool GeneratePacketEnum(std::string& fileContent, const PacketList& packetList, 
             WriteContent(fileContent, "static inline constexpr std::string_view EnumName = \"PacketList\";\n", indent);
 
             WriteContent(fileContent, "static inline constexpr std::array<std::pair<std::string_view, u16>, ", indent);
-            WriteContent(fileContent, std::to_string(numPackets));
+            WriteContent(fileContent, std::to_string(numPackets + 1));
             WriteContent(fileContent, "> EnumList = {");
             indent++;
             {
@@ -1982,12 +1978,14 @@ bool GeneratePacketEnum(std::string& fileContent, const PacketList& packetList, 
 
                     WriteContent(fileContent, ")");
 
-                    if (i < numPackets - 1)
-                    {
-                        WriteContent(fileContent, ",");
-                    }
+                    WriteContent(fileContent, ", ");
+                }
 
-                    WriteContent(fileContent, " ");
+                // Write Count
+                {
+                    WriteContent(fileContent, "std::pair(\"Count\", ");
+                    WriteContent(fileContent, std::to_string(numPackets + 1));
+                    WriteContent(fileContent, ") ");
                 }
             }
             indent--;

@@ -302,9 +302,9 @@ namespace Math
 
         u64 Next()
         {
-            const uint64_t s0 = _s[0];
-            uint64_t s1 = _s[1];
-            const uint64_t result = RotL(s0 + s1, 17) + s0;
+            const u64 s0 = _s[0];
+            u64 s1 = _s[1];
+            const u64 result = RotL(s0 + s1, 17) + s0;
 
             s1 ^= s0;
             _s[0] = RotL(s0, 49) ^ s1 ^ (s1 << 21);

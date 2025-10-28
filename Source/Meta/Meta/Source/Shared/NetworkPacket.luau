@@ -13,7 +13,47 @@ type Client_Connect<Packet> =
 
     Fields :
     {
-        characterName : string,
+        accountName : string,
+    };
+};
+
+type Server_AuthChallenge<Packet> =
+{
+    Name : "ServerAuthChallenge";
+
+    Fields :
+    {
+        challenge : array<u8, 36>,
+    };
+};
+
+type Client_AuthChallenge<Packet> =
+{
+    Name : "ClientAuthChallenge";
+
+    Fields :
+    {
+        challenge : array<u8, 32>,
+    };
+};
+
+type Server_AuthProof<Packet> =
+{
+    Name : "ServerAuthProof";
+
+    Fields :
+    {
+        proof : array<u8, 64>,
+    };
+};
+
+type Client_AuthProof<Packet> =
+{
+    Name : "ClientAuthProof";
+
+    Fields :
+    {
+        proof : array<u8, 32>,
     };
 };
 
@@ -488,3 +528,36 @@ type Server_UnitRemoveAura<Packet> =
         auraInstanceID : u32
     };
 }
+type Server_CharacterList<Packet> =
+{
+    Name : "ServerCharacterList";
+
+    Fields :
+    {
+    };
+};
+type Client_CharacterSelect<Packet> =
+{
+    Name : "ClientCharacterSelect";
+
+    Fields :
+    {
+        characterIndex : u8
+    };
+};
+type Client_CharacterLogout<Packet> =
+{
+    Name : "ClientCharacterLogout";
+
+    Fields :
+    {
+    };
+};
+type Server_CharacterLogout<Packet> =
+{
+    Name : "ServerCharacterLogout";
+
+    Fields :
+    {
+    };
+};

@@ -5,6 +5,8 @@
 #include <Base/FunctionTraits.h>
 #include <Base/Memory/Bytebuffer.h>
 
+#include <Meta/Generated/Shared/PacketList.h>
+
 #include <Network/Define.h>
 
 #include <robinhood/robinhood.h>
@@ -15,17 +17,17 @@ class Bytebuffer;
 
 namespace Network
 {
-    using MessageHandlerFn = std::function<bool(SocketID, Message& message)>;
+    using GameMessageHandlerFn = std::function<bool(SocketID, Message& message)>;
     struct GameMessageHandler
     {
         GameMessageHandler() { }
-        GameMessageHandler(ConnectionStatus inStatus, u16 inSize, MessageHandlerFn inHandler) : status(inStatus), minSize(inSize), maxSize(inSize), handler(inHandler) { }
-        GameMessageHandler(ConnectionStatus inStatus, u16 inMinSize, i16 inMaxSize, MessageHandlerFn inHandler) : status(inStatus), minSize(inMinSize), maxSize(inMaxSize), handler(inHandler) { }
+        GameMessageHandler(ConnectionStatus inStatus, u16 inSize, GameMessageHandlerFn inHandler) : status(inStatus), minSize(inSize), maxSize(inSize), handler(inHandler) { }
+        GameMessageHandler(ConnectionStatus inStatus, u16 inMinSize, i16 inMaxSize, GameMessageHandlerFn inHandler) : status(inStatus), minSize(inMinSize), maxSize(inMaxSize), handler(inHandler) { }
 
         ConnectionStatus status = ConnectionStatus::None;
         u16 minSize = 0;
         i16 maxSize = 0;
-        MessageHandlerFn handler = nullptr;
+        GameMessageHandlerFn handler = nullptr;
     };
 
     class GameMessageRouter
@@ -74,6 +76,6 @@ namespace Network
         bool CallHandler(SocketID socketID, Network::MessageHeader& header, Message& message);
 
     private:
-        GameMessageHandler _handlers[1024u];
+        GameMessageHandler _handlers[(u16)Generated::PacketListEnum::Count];
     };
 }

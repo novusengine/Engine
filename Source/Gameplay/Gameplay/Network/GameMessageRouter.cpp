@@ -18,7 +18,7 @@ namespace Network
         if (!message.buffer->Get(header))
             return false;
 
-        if (header.opcode == Generated::InvalidPacket::PACKET_ID || header.opcode >= 1024)
+        if (header.opcode == Generated::InvalidPacket::PACKET_ID || header.opcode >= (u16)Generated::PacketListEnum::Count)
             return false;
 
         return true;

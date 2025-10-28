@@ -133,7 +133,7 @@ type CreatureInfo<Command> =
 type CheatLogin<Command> =
 {
     Names : "cheat login";
-    Parameters : { characterName : string};
+    Parameters : { accountName : string};
 }
 
 type CheatDamage<Command> =

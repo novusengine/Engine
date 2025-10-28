@@ -8,6 +8,7 @@ type LuaGameEvent<Enum> =
         Invalid : Auto,
         Loaded : Auto,
         Updated : Auto,
+        CharacterListChanged : Auto,
         MapLoading : Auto,
         ChatMessageReceived : Auto,
         LocalMoverChanged : Auto,
@@ -30,6 +31,14 @@ type LuaGameEventDataUpdated<LuaStruct> =
     Fields :
     {
         deltaTime : f32
+    };
+}
+type LuaGameEventDataCharacterListChanged<LuaStruct> =
+{
+    Name : "GameEventDataCharacterListChanged";
+
+    Fields :
+    {
     };
 }
 type LuaGameEventDataMapLoading<LuaStruct> =

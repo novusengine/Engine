@@ -93,3 +93,24 @@ type ItemEquipSlot<Enum> =
         Count : Auto
     };
 };
+
+type UnitClass<Enum> =
+{
+    Name : "UnitClass";
+    Type : u8;
+
+    Fields :
+    {
+        Invalid : Auto,
+        Warrior : Auto,
+        Paladin : Auto,
+        Hunter : Auto,
+        Rogue : Auto,
+        Priest : Auto,
+        Shaman : Auto,
+        Mage : Auto,
+        Warlock : Auto,
+        Druid : Auto,
+        Count : Auto
+    };
+};

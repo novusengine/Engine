@@ -37,6 +37,14 @@ namespace Network
         return true;
     }
 
+    void ServerSession::SetLaneID(u64 laneID)
+    {
+        asio::post(_strand, [self = shared_from_this(), laneID]() mutable
+        {
+            self->_laneID = laneID;
+        });
+    }
+
     void ServerSession::Send(std::shared_ptr<Bytebuffer> buffer)
     {
         asio::post(_strand,
@@ -147,7 +155,7 @@ namespace Network
                 }
         
                 // Emit Message Event
-                self->EnqueueMessage(self->_socketID, messageBuffer);
+                self->EnqueueMessage(self->_socketID, messageBuffer, self->_laneID);
         
                 // Reset Read Buffer
                 self->_readBuffer->Reset();
@@ -186,7 +194,7 @@ namespace Network
             }
         
             // Emit Message Event
-            self->EnqueueMessage(self->_socketID, messageBuffer);
+            self->EnqueueMessage(self->_socketID, messageBuffer, self->_laneID);
         
             // Reset Read Buffer
             self->_readBuffer->Reset();
@@ -195,7 +203,7 @@ namespace Network
         }));
     }
 
-    void ServerSession::EnqueueMessage(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer)
+    void ServerSession::EnqueueMessage(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer, u64 laneID)
     {
         if (!_server)
             return;
@@ -203,7 +211,9 @@ namespace Network
         SocketMessageEvent messageEvent;
         messageEvent.socketID = _socketID;
         messageEvent.message.buffer = std::move(buffer);
-        _server->_inMessageEvents.enqueue(messageEvent);
+
+        auto& laneInMessageQueue = _server->_laneToInMessageQueue.at(laneID);
+        laneInMessageQueue.enqueue(messageEvent);
     }
 
     void ServerSession::CloseInternal()
@@ -214,9 +224,12 @@ namespace Network
         _server->DeferCloseSocketID(_socketID);
     }
 
-    Server::Server(u16 port) : _asioAcceptor(_asioContext, tcp::endpoint(tcp::v4(), port)), _asioSocket(_asioContext), _connectedEvents(1024), _disconnectedEvents(1024), _disconnectRequests(1024), _inMessageEvents(1024), _outMessageEvents(1024)
+    Server::Server(u16 port) : _asioAcceptor(_asioContext, tcp::endpoint(tcp::v4(), port)), _asioSocket(_asioContext), _connectedEvents(1024), _disconnectedEvents(1024), _disconnectRequests(1024), _changeLaneRequests(1024), _outMessageEvents(1024)
     {
         _connections.resize(512);
+
+        _laneToInMessageQueue.reserve(8192);
+        AddLane(DEFAULT_LANE_ID);
     }
 
     bool Server::Start()
@@ -233,6 +246,26 @@ namespace Network
     void Server::Update()
     {
         asio::post(_asioContext, std::bind(&Server::ProcessDeferredRequests, this));
+    }
+
+    void Server::AddLane(u64 laneID)
+    {
+        if (_laneToInMessageQueue.contains(laneID))
+            return;
+
+        _laneToInMessageQueue[laneID] = moodycamel::ConcurrentQueue<SocketMessageEvent>(1024);
+    }
+
+    void Server::SetSocketIDLane(SocketID socketID, u64 laneID)
+    {
+        if (!_laneToInMessageQueue.contains(laneID))
+            return;
+
+        SocketChangeLaneEvent changeLaneEvent;
+        changeLaneEvent.socketID = socketID;
+        changeLaneEvent.laneID = laneID;
+
+        _changeLaneRequests.enqueue(changeLaneEvent);
     }
 
     void Server::CloseSocketID(SocketID socketID)
@@ -350,7 +383,7 @@ namespace Network
 
             if (!connection.client || connection.id != socketID)
             {
-                NC_LOG_ERROR("Network::Server : ProcessDeferredOutMessageRequests Failed (Client Not Found)");
+                NC_LOG_ERROR("Network::Server : ProcessDeferred OutMessageEvent Failed (Client Not Found)");
                 continue;
             }
 
@@ -366,7 +399,7 @@ namespace Network
 
             if (!connection.client && connection.id == socketID)
             {
-                NC_LOG_ERROR("Network::Server : CloseSocketID Failed (Client Not Found)");
+                NC_LOG_ERROR("Network::Server : ProcessDeferred DisconnectedEvent Failed (Client Not Found)");
                 continue;
             }
 
@@ -377,6 +410,23 @@ namespace Network
             SocketDisconnectedEvent disconnectedEvent;
             disconnectedEvent.socketID = socketID;
             _disconnectedEvents.enqueue(disconnectedEvent);
+        }
+
+        SocketChangeLaneEvent changeLaneEvent;
+        while (_changeLaneRequests.try_dequeue(changeLaneEvent))
+        {
+            SocketID socketID = messageEvent.socketID;
+
+            u32 index = Util::DefineUtil::GetSocketIDValue(socketID);
+            Connection& connection = _connections[index];
+
+            if (!connection.client || connection.id != socketID)
+            {
+                NC_LOG_ERROR("Network::Server : ProcessDeferred ChangeLaneEvent Failed (Client Not Found)");
+                continue;
+            }
+
+            connection.client->SetLaneID(changeLaneEvent.laneID);
         }
     }
 

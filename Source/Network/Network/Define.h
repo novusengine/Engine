@@ -49,6 +49,7 @@ namespace Network
     constexpr u32 SOCKET_ID_VERSION_MASK = (1 << SOCKET_ID_VERSION_BITS) - 1;
     constexpr u32 SOCKET_ID_VALUE_MASK = (1 << SOCKET_ID_VALUE_BITS) - 1;
 
+    constexpr u64 DEFAULT_LANE_ID = std::numeric_limits<u64>::max();
     constexpr u32 DEFAULT_BUFFER_SIZE = 2048;
 
     struct SocketConnectedEvent
@@ -61,6 +62,12 @@ namespace Network
     {
     public:
         SocketID socketID = SOCKET_ID_INVALID;
+    };
+    struct SocketChangeLaneEvent
+    {
+    public:
+        SocketID socketID = SOCKET_ID_INVALID;
+        u64 laneID;
     };
     struct SocketMessageEvent
     {

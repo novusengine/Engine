@@ -449,8 +449,7 @@ namespace Scripting
                 return false;
 
             u32 packedEventID = static_cast<u32>(eventTypeVal) | (static_cast<u32>(eventTypeID) << 16);
-            bool hasParameters = EventDataType::NumParameters > 0;
-            u32 numParametersToPush = 1 + (1 * hasParameters); // 1 for eventID, 1 for eventData if it has parameters
+            u32 numParametersToPush = 1 + 1; // 1 for eventID, 1 for eventData
 
             Push((u32)packedEventID);
 

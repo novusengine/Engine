@@ -29,6 +29,8 @@ local dependencies =
     "msdfgen/msdfgen.lua",
     "msdf-atlas-gen/msdf-atlas-gen.lua",
     "rtree/rtree.lua",
+    "libsodium/libsodium.lua",
+    "spake2-ee/spake2-ee.lua",
 }
 
 for k,v in pairs(dependencies) do

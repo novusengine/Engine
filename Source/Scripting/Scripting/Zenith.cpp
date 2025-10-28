@@ -384,7 +384,7 @@ namespace Scripting
 
     template<> bool Zenith::CheckVal<bool>(i32 index)
     {
-        return ToBoolean(index);
+        return luaL_checkboolean(state, index);
     }
     template<> i8 Zenith::CheckVal<i8>(i32 index)
     {

@@ -24,6 +24,7 @@ namespace Network
         void Start();
         bool RequestClose();
 
+        void SetLaneID(u64 laneID);
         void Send(std::shared_ptr<Bytebuffer> buffer);
 
     private:
@@ -33,7 +34,7 @@ namespace Network
         void ReadMessageHeader();
         void ReadMessageBody();
 
-        void EnqueueMessage(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer);
+        void EnqueueMessage(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer, u64 laneID = DEFAULT_LANE_ID);
         void CloseInternal();
 
     private:
@@ -43,6 +44,7 @@ namespace Network
         asio::steady_timer _timer;
         std::atomic<bool> _requestClose = false;
 
+        std::atomic<u64> _laneID = DEFAULT_LANE_ID;
         std::queue<std::shared_ptr<Bytebuffer>> _msgQueue;
         std::shared_ptr<Bytebuffer> _readBuffer;
 
@@ -66,13 +68,15 @@ namespace Network
         bool Start();
         void Update();
 
+        void AddLane(u64 laneID);
+        void SetSocketIDLane(SocketID socketID, u64 laneID);
         void CloseSocketID(SocketID socketID);
         void SendPacket(SocketID socketID, std::shared_ptr<Bytebuffer>& buffer);
 
     public:
         moodycamel::ConcurrentQueue<SocketConnectedEvent>& GetConnectedEvents() { return _connectedEvents; };
         moodycamel::ConcurrentQueue<SocketDisconnectedEvent>& GetDisconnectedEvents() { return _disconnectedEvents; };
-        moodycamel::ConcurrentQueue<SocketMessageEvent>& GetMessageEvents() { return _inMessageEvents; };
+        moodycamel::ConcurrentQueue<SocketMessageEvent>& GetMessageEvents(u64 lane) { return _laneToInMessageQueue.at(lane); };
 
     private:
         SocketID GetNextSocketID();
@@ -94,7 +98,9 @@ namespace Network
         moodycamel::ConcurrentQueue<SocketConnectedEvent> _connectedEvents;
         moodycamel::ConcurrentQueue<SocketDisconnectedEvent> _disconnectedEvents;
         moodycamel::ConcurrentQueue<SocketDisconnectedEvent> _disconnectRequests;
-        moodycamel::ConcurrentQueue<SocketMessageEvent> _inMessageEvents;
+        moodycamel::ConcurrentQueue<SocketChangeLaneEvent> _changeLaneRequests;
         moodycamel::ConcurrentQueue<SocketMessageEvent> _outMessageEvents;
+
+        robin_hood::unordered_map<u64, moodycamel::ConcurrentQueue<SocketMessageEvent>> _laneToInMessageQueue;
     };
 }
