@@ -243,3 +243,8 @@ type CreatureRemoveScript<Command> =
     Names : "creature remove script";
     Parameters : { };
 };
+type CheatPathGenerate<Command> =
+{
+    Names : "cheat path generate";
+    Parameters : { };
+};

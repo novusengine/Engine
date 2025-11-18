@@ -143,19 +143,6 @@ type Server_UnitRemove<Packet> =
     };
 };
 
-type Server_UnitDisplayInfoUpdate<Packet> =
-{
-    Name : "UnitDisplayInfoUpdate";
-
-    Fields :
-    {
-        guid : objectguid,
-        displayID : u32,
-        race : u8,
-        gender : u8
-    };
-};
-
 type Server_UnitPowerUpdate<Packet> =
 {
     Name : "UnitPowerUpdate";
@@ -556,6 +543,40 @@ type Client_CharacterLogout<Packet> =
 type Server_CharacterLogout<Packet> =
 {
     Name : "ServerCharacterLogout";
+
+    Fields :
+    {
+    };
+};
+type Server_ObjectNetFieldUpdate<Packet> =
+{
+    Name : "ServerObjectNetFieldUpdate";
+
+    Fields :
+    {
+    };
+};
+type Server_UnitNetFieldUpdate<Packet> =
+{
+    Name : "ServerUnitNetFieldUpdate";
+
+    Fields :
+    {
+    };
+};
+type Client_PathGenerate<Packet> =
+{
+    Name : "ClientPathGenerate";
+
+    Fields :
+    {
+        start : vec3,
+        end : vec3
+    };
+};
+type Server_PathVisualization<Packet> =
+{
+    Name : "ServerPathVisualization";
 
     Fields :
     {

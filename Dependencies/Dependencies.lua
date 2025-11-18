@@ -31,6 +31,7 @@ local dependencies =
     "rtree/rtree.lua",
     "libsodium/libsodium.lua",
     "spake2-ee/spake2-ee.lua",
+    "recastnavigation/recastnavigation.lua"
 }
 
 for k,v in pairs(dependencies) do

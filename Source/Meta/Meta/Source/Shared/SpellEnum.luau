@@ -1,4 +1,3 @@
-
 type SpellProcPhaseType<Enum> =
 {
     Name : "SpellProcPhaseType";

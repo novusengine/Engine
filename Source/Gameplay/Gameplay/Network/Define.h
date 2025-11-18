@@ -1,5 +1,9 @@
 #pragma once
-#include "Base/Types.h"
+#include "NetFields.h"
+
+#include <Base/Types.h>
+
+#include <Meta/Generated/Shared/NetFieldsEnum.h>
 
 namespace Network
 {
@@ -15,4 +19,10 @@ namespace Network
         None,
         Connected
     };
+
+    using ObjectNetFields = NetFields<Generated::ObjectNetFieldsEnum>;
+    using ObjectNetFieldsListener = NetFieldListener<Generated::ObjectNetFieldsEnum>;
+
+    using UnitNetFields = NetFields<Generated::UnitNetFieldsEnum>;
+    using UnitNetFieldsListener = NetFieldListener<Generated::UnitNetFieldsEnum>;
 }
