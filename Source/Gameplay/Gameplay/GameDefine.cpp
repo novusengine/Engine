@@ -162,6 +162,7 @@ namespace GameDefine
 
             didFail |= !buffer->GetU32(result.id);
             didFail |= !buffer->GetU32(result.flags);
+            didFail |= !buffer->GetString(result.internalName);
             didFail |= !buffer->GetString(result.name);
 
             didFail |= !buffer->GetU16(result.type);
@@ -177,6 +178,7 @@ namespace GameDefine
             didFail |= !buffer->PutU32(data.id);
             didFail |= !buffer->PutU32(data.flags);
 
+            didFail |= !buffer->PutString(data.internalName);
             didFail |= !buffer->PutString(data.name);
 
             didFail |= !buffer->PutU16(data.type);

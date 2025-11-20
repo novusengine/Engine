@@ -165,6 +165,7 @@ namespace GameDefine
             u32 id;
             u32 flags;
 
+            std::string internalName;
             std::string name;
 
             u16 type;

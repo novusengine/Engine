@@ -6,7 +6,7 @@ RecastNavigation.SetupRecast = function()
     local sourceDir = basePath .. "/Recast"
 
     Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
-        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "DT_POLYREF64" }
 
         Solution.Util.SetLanguage("C++")
         Solution.Util.SetCppDialect(17)
@@ -32,7 +32,7 @@ RecastNavigation.SetupDetour = function()
     local sourceDir = basePath .. "/Detour"
 
     Solution.Util.CreateStaticLib(dep.Name, Solution.Projects.Current.BinDir, dep.Dependencies, function()
-        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS" }
+        local defines = { "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS", "_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS", "DT_POLYREF64" }
 
         Solution.Util.SetLanguage("C++")
         Solution.Util.SetCppDialect(17)
@@ -51,6 +51,7 @@ RecastNavigation.SetupDetour = function()
     Solution.Util.CreateDep(dep.NameLow, dep.Dependencies, function()
         Solution.Util.SetIncludes(sourceDir)
         Solution.Util.SetLinks(dep.Name)
+        Solution.Util.SetDefines({"DT_POLYREF64"})
     end)
 end
 
