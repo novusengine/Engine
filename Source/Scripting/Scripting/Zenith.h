@@ -299,7 +299,7 @@ namespace Scripting
         {
             auto& eventTypeMap = eventState.eventTypeToState;
 
-            using Meta = typename EnumTraits<EventType>::Meta;
+            using Meta = typename Generated::EnumTraits<EventType>::Meta;
             u16 eventTypeID = Meta::EnumID;
             if (eventTypeMap.contains(eventTypeID))
                 return false;
@@ -322,7 +322,7 @@ namespace Scripting
         template <LuaEventDataConcept EventDataType, LuaEventTypeConcept EventType, typename Callback = std::nullptr_t> requires LuaEventCallbackConcept<Callback, EventDataType>
         bool RegisterEventTypeID(EventType eventType, Callback&& callback = nullptr)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
+            u16 eventTypeID = Generated::EnumTraits<EventType>::Meta::EnumID;
             u16 eventDataID = std::decay_t<EventDataType>::StructID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
@@ -415,7 +415,7 @@ namespace Scripting
         template <LuaEventTypeConcept EventType>
         bool RegisterEventCallback(EventType eventType, u16 variantID, i32 funcRef)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
+            u16 eventTypeID = Generated::EnumTraits<EventType>::Meta::EnumID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
             return RegisterEventCallbackRaw(eventTypeID, eventTypeVal, variantID, funcRef);
@@ -424,7 +424,7 @@ namespace Scripting
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
         bool CallEvent(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
+            u16 eventTypeID = Generated::EnumTraits<EventType>::Meta::EnumID;
             u16 eventDataID = std::decay_t<EventDataType>::StructID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
@@ -470,7 +470,7 @@ namespace Scripting
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
         bool CallEventBool(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
+            u16 eventTypeID = Generated::EnumTraits<EventType>::Meta::EnumID;
             u16 eventDataID = std::decay_t<EventDataType>::StructID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 

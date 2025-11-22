@@ -15,7 +15,7 @@ namespace Network
     template <typename T>
     concept HasMetaEnumTraits = requires
     {
-        typename EnumTraits<T>::Meta;
+        typename Generated::EnumTraits<T>::Meta;
     };
 
     template <typename TEnum> requires std::is_enum_v<TEnum>&& std::is_same_v<std::underlying_type_t<TEnum>, u16>&& HasMetaEnumTraits<TEnum>
@@ -24,7 +24,7 @@ namespace Network
     template <typename TEnum> requires std::is_enum_v<TEnum> && std::is_same_v<std::underlying_type_t<TEnum>, u16> && HasMetaEnumTraits<TEnum>
     struct NetFields
     {
-        using Meta = typename EnumTraits<TEnum>::Meta;
+        using Meta = typename Generated::EnumTraits<TEnum>::Meta;
         static constexpr u16 NumFields = static_cast<u16>(Meta::EnumList.size());
 
     public:
