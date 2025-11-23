@@ -62,9 +62,7 @@ namespace Network
         template <PacketConcept PacketStruct>
         void UnregisterPacketHandler(OpcodeType opcode)
         {
-            auto opcodeValue = static_cast<OpcodeType>(PacketStruct::PACKET_ID);
-
-            GameMessageHandler& handler = _handlers[opcodeValue];
+            GameMessageHandler& handler = _handlers[opcode];
             handler.status = ConnectionStatus::None;
             handler.minSize = 0;
             handler.maxSize = 0;
