@@ -10,6 +10,34 @@ namespace Renderer
     {
     }
 
+    void Renderer::SetGetShaderEntryCallback(const std::function<const ShaderEntry& (u32)>& callback)
+    {
+        _getShaderEntryCallback = callback;
+    }
+
+    const ShaderEntry& Renderer::GetShaderEntry(u32 shaderNameHash)
+    {
+        if (!_getShaderEntryCallback)
+        {
+            NC_LOG_CRITICAL("Renderer::GetShaderEntry called but no callback is set!");
+        }
+        return _getShaderEntryCallback(shaderNameHash);
+    }
+
+    void Renderer::SetGetBlitPipelineCallback(const std::function<GraphicsPipelineID(u32)>& callback)
+    {
+        _getBlitPipelineCallback = callback;
+    }
+
+    const GraphicsPipelineID Renderer::GetBlitPipeline(u32 shaderNameHash)
+    {
+        if (!_getBlitPipelineCallback)
+        {
+            NC_LOG_CRITICAL("Renderer::GetBlitPipeline called but no callback is set!");
+        }
+        return _getBlitPipelineCallback(shaderNameHash);
+    }
+
     void Renderer::SetRenderSize(const vec2& renderSize)
     {
         for (auto& callback : _onRenderSizeChangedCallbacks)

@@ -364,7 +364,7 @@ namespace Renderer
                     // For each mip level, calculate the reduced dimensions.
                     u32 mipWidth = Math::Max(1u, desc.width >> i);
                     u32 mipHeight = Math::Max(1u, desc.height >> i);
-                    mipUploadSize += mipWidth * mipHeight * FormatTexelSize(FormatConverterVK::ToVkFormat(texture->desc.format));
+                    mipUploadSize += static_cast<u64>(static_cast<f64>(mipWidth) * static_cast<f64>(mipHeight) * FormatTexelSize(FormatConverterVK::ToVkFormat(texture->desc.format)));
                 }
                 texture->uploadSize = mipUploadSize;
             }

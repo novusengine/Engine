@@ -1,6 +1,7 @@
 #pragma once
 #include "ComputeShaderDesc.h"
 
+#include <Base/Platform.h>
 #include <Base/Types.h>
 
 #include <type_safe/strong_typedef.hpp>

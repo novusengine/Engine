@@ -2,17 +2,21 @@
 #include "Lexer/Lexer.h"
 #include "Parser/Parser.h"
 #include "DxcBridge.h"
+#include "SlangBridge.h"
 #include "ShaderCache.h"
 
 #include <Base/Memory/FileReader.h>
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/StringUtils.h>
 
+#include <FileFormat/Novus/ShaderPack/ShaderPack.h>
+
 // NOTE: This will need edits to add Linux support to ShaderCooker
 #ifdef _WINDOWS
 #include <wrl/client.h>
 #endif
 #include <dxcapi.h>
+
 
 namespace fs = std::filesystem;
 
@@ -100,7 +104,6 @@ namespace ShaderCooker
             return false;
 
         std::string includePathString = includePath.make_preferred().string();
-        //std::transform(includePathString.begin(), includePathString.end(), includePathString.begin(), ::tolower);
 
         u32 strHash = StringUtils::fnv1a_32(includePathString.c_str(), includePathString.length());
         _shaderHashToPaths[strHash].push_back(shaderPath);
@@ -283,8 +286,7 @@ namespace ShaderCooker
                         continue;
                     }
 
-                    ShaderCooker::DxcBridge dxcBridge;
-                    dxcBridge.AddIncludeDir(_sourceDirPath);
+                    ShaderCooker::SlangBridge slangBridge(_sourceDirPath);
 
                     // Figure out the actual permutations
                     u32 numPermutationGroups = static_cast<u32>(shader.permutationGroups.size());
@@ -295,24 +297,16 @@ namespace ShaderCooker
                     while (1)
                     {
                         Permutation& permutation = shader.permutations.emplace_back();
-
-                        // Print current permutation
                         for (u32 j = 0; j < numPermutationGroups; j++)
                         {
                             u32 index = indices[j];
 
-                            std::wstring name = StringUtils::StringToWString(shader.permutationGroups[j].name);
-                            std::wstring value = StringUtils::StringToWString({ shader.permutationGroups[j].types[index].nameHash.name, shader.permutationGroups[j].types[index].nameHash.length });
-
-                            DxcDefine* define = new DxcDefine();//permutation.defines.emplace_back();
-                            *define = MakeDefine(name, value);
-
-                            permutation.defines.push_back(define);
+                            std::string value = { shader.permutationGroups[j].types[index].nameHash.name, shader.permutationGroups[j].types[index].nameHash.length };
+                            permutation.defines.push_back({ .name = shader.permutationGroups[j].name, .value = value });
                         }
 
                         // Find the rightmost permutationGroup that has more elements left after the current element in that group
                         i32 next = numPermutationGroups - 1;
-
                         while (next >= 0 && indices[next] + 1 >= shader.permutationGroups[next].types.size())
                         {
                             next--;
@@ -339,20 +333,9 @@ namespace ShaderCooker
                     {
                         shader.permutations.emplace_back();
                     }
-                    else
-                    {
-                        // If it has parsed permutations we need to create an empty .spv file named without he permutation data
-                        std::string name = fs::relative(shader.path, _sourceDirPath).string();
-                        std::filesystem::path outputPath = _binDirPath / (name + ".spv");
-                        outputPath = std::filesystem::absolute(outputPath.make_preferred());
 
-                        // Create output directories
-                        std::filesystem::create_directories(outputPath.parent_path());
-
-                        std::ofstream ofstream(outputPath, std::ios::trunc | std::ofstream::binary);
-                        ofstream.close();
-                    }
                     u32 numPermutations = static_cast<u32>(shader.permutations.size());
+                    std::vector<FileFormat::ShaderInMemory> shaderOutputs(numPermutations);
 
                     // If we found a permutation block at the top of the shader we need to strip it
                     if (numPermutationGroups > 0)
@@ -361,58 +344,70 @@ namespace ShaderCooker
                         shader.source = shader.source.substr(endOfPermutationBlockOffset);
                     }
 
-                    if (numPermutations > 1)
-                    {
-                        NC_LOG_INFO(">> Generating {0} permutations from {1}", numPermutations, shader.name.c_str());
-                    }
-
                     bool didFail = false;
                     // Compile permutations
                     for (u32 i = 0; i < numPermutations; i++)
                     {
                         Permutation& permutation = shader.permutations[i];
 
-                        dxcBridge.ClearDefines();
-                        for (DxcDefine* define : permutation.defines)
+                        slangBridge.ClearDefines();
+                        for (Define& define : permutation.defines)
                         {
-                            dxcBridge.AddDefine(define);
+                            slangBridge.AddDefine(define.name, define.value);
                         }
 
-                        char* blob;
-                        size_t size;
-                        if (!dxcBridge.Compile(shader.path, shader.source, blob, size, _sourceDirPath))
+                        std::string name = fs::relative(shader.path, _sourceDirPath).string();
+                        if (i == 0)
                         {
-                            NC_LOG_ERROR("Failed to compile");
+                            if (numPermutations > 1)
+                            {
+                                NC_LOG_INFO("Compiling: {0} ({1} permutations)", name.c_str(), numPermutations);
+                            }
+                            else
+                            {
+                                NC_LOG_INFO("Compiling: {0}", name.c_str());
+                            }
+                        }
+
+                        std::string permutationName;
+                        GetPermutationFilename(shader, i, name, permutationName);
+                        u32 permutationNameHash = StringUtils::fnv1a_32(permutationName.c_str(), permutationName.length());
+                        shaderOutputs[i].permutationNameHash = permutationNameHash;
+
+                        if (!slangBridge.Compile(shader.path, shader.source, shaderOutputs[i]))
+                        {
+                            NC_LOG_ERROR("{0} Failed to compile with Slang", permutationName.c_str());
                             didFail = true;
                             break;
                         }
 
-                        std::string name = fs::relative(shader.path, _sourceDirPath).string();
+                        if (_debugOutputSPV)
+                        {
+                            std::filesystem::path outputPath = _binDirPath / (permutationName + ".spv");
+                            outputPath = std::filesystem::absolute(outputPath.make_preferred());
 
-                        std::string permutationName;
-                        GetPermutationFilename(shader, i, name, permutationName);
+                            // Create output directories
+                            std::filesystem::create_directories(outputPath.parent_path());
 
-                        std::filesystem::path outputPath = _binDirPath / permutationName;
-                        outputPath = std::filesystem::absolute(outputPath.make_preferred());
-
-                        // Create output directories
-                        std::filesystem::create_directories(outputPath.parent_path());
-
-                        // Output file
-                        std::ofstream ofstream(outputPath, std::ios::trunc | std::ofstream::binary);
-                        ofstream.write(blob, size);
-                        ofstream.close();
+                            // Output file
+                            std::ofstream ofstream(outputPath, std::ios::trunc | std::ofstream::binary);
+                            ofstream.write(reinterpret_cast<const char*>(shaderOutputs[i].data), shaderOutputs[i].size);
+                            ofstream.close();
+                        }
                     }
                     _numFailedShaders += static_cast<u32>(didFail);
-
-                    if (numPermutations > 1)
-                    {
-                        NC_LOG_INFO("");
-                    }
                     _shaderCache->Touch(shader.path);
 
                     if (!didFail)
                     {
+                        std::filesystem::path outputPath = _binDirPath / fs::relative(shader.path, _sourceDirPath);
+                        outputPath.replace_extension(FileFormat::SHADER_PACK_EXTENSION);
+
+                        std::filesystem::create_directories(outputPath.parent_path());
+
+                        FileFormat::ShaderPack shaderPack;
+                        shaderPack.Save(outputPath.string(), shaderOutputs);
+
                         _numCompiledShaders++;
                     }
                 }
@@ -437,31 +432,24 @@ namespace ShaderCooker
         return true;
     }
 
-    void ShaderCompiler::GetFilename(std::string inputFileName, std::string& filename)
-    {
-        filename = inputFileName + ".spv";
-    }
-
-    void ShaderCompiler::GetPermutationFilename(Shader& shader, u32 permutationID, std::string inputFileName, std::string& filename)
+    void ShaderCompiler::GetPermutationFilename(const Shader& shader, u32 permutationID, const std::string& inputFileName, std::string& filename)
     {
         filename = inputFileName;
         size_t offset = filename.find_first_of('.');
 
-        std::string extension = filename.substr(offset) + ".spv";
+        std::string extension = filename.substr(offset);
         filename = filename.substr(0, offset);
 
-        Permutation& permutation = shader.permutations[permutationID];
+        const Permutation& permutation = shader.permutations[permutationID];
 
         for (u32 i = 0; i < permutation.defines.size(); i++)
         {
-            DxcDefine& define = *permutation.defines[i];
-
-            filename += "-" + StringUtils::WStringToString(define.Name) + StringUtils::WStringToString(define.Value);
+            const Define& define = permutation.defines[i];
+            filename += "-" + define.name + define.value;
         }
 
         filename += extension;
-
-        NC_LOG_INFO("Compiling: {0}", filename.c_str());
+        std::replace(filename.begin(), filename.end(), '\\', '/');
     }
 
 }

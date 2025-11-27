@@ -63,17 +63,13 @@ namespace Renderer
             ZoneScoped;
             _forceRecompileAll = forceRecompileAll;
 
-            std::vector<VertexShaderDesc> vertexShadersDescs = _vertexShaderDescs;
-            std::vector<PixelShaderDesc> pixelShadersDescs = _pixelShaderDescs;
-            std::vector<ComputeShaderDesc> computeShadersDescs = _computeShaderDescs;
+            std::vector<VertexShaderDesc> vertexShadersDescs = _vertexShaderStore.descs;
+            std::vector<PixelShaderDesc> pixelShadersDescs = _pixelShaderStore.descs;
+            std::vector<ComputeShaderDesc> computeShadersDescs = _computeShaderStore.descs;
 
-            _vertexShaderDescs.clear();
-            _pixelShaderDescs.clear();
-            _computeShaderDescs.clear();
-
-            _vertexShaders.clear();
-            _pixelShaders.clear();
-            _computeShaders.clear();
+            _vertexShaderStore.Clear();
+            _pixelShaderStore.Clear();
+            _computeShaderStore.Clear();
 
             for (auto& desc : vertexShadersDescs)
             {
@@ -94,11 +90,20 @@ namespace Renderer
         VertexShaderID ShaderHandlerVK::LoadShader(const VertexShaderDesc& desc)
         {
             ZoneScoped;
+            VertexShaderID shaderID;
             bool wasCached;
-            auto shaderID = LoadShader<VertexShaderID>(desc.path, desc.permutationFields, _vertexShaders, wasCached);
+            if (desc.shaderEntry.shaderData != nullptr && desc.shaderEntry.shaderSize != 0)
+            {
+                shaderID = LoadShaderFromMemory<VertexShaderID>(desc.shaderEntry, _vertexShaderStore, wasCached);
+            }
+            else
+            {
+                shaderID = LoadShaderFromFile<VertexShaderID>(desc.path, desc.permutationFields, _vertexShaderStore, wasCached);
+            }
+
             if (!wasCached)
             {
-                _vertexShaderDescs.push_back(desc);
+                _vertexShaderStore.descs.push_back(desc);
             }
             return shaderID;
         }
@@ -106,11 +111,20 @@ namespace Renderer
         PixelShaderID ShaderHandlerVK::LoadShader(const PixelShaderDesc& desc)
         {
             ZoneScoped;
+            PixelShaderID shaderID;
             bool wasCached;
-            auto shaderID = LoadShader<PixelShaderID>(desc.path, desc.permutationFields, _pixelShaders, wasCached);
+            if (desc.shaderEntry.shaderData != nullptr && desc.shaderEntry.shaderSize != 0)
+            {
+                shaderID = LoadShaderFromMemory<PixelShaderID>(desc.shaderEntry, _pixelShaderStore, wasCached);
+            }
+            else
+            {
+                shaderID = LoadShaderFromFile<PixelShaderID>(desc.path, desc.permutationFields, _pixelShaderStore, wasCached);
+            }
+            
             if (!wasCached)
             {
-                _pixelShaderDescs.push_back(desc);
+                _pixelShaderStore.descs.push_back(desc);
             }
             return shaderID;
         }
@@ -118,13 +132,105 @@ namespace Renderer
         ComputeShaderID ShaderHandlerVK::LoadShader(const ComputeShaderDesc& desc)
         {
             ZoneScoped;
+            ComputeShaderID shaderID;
             bool wasCached;
-            auto shaderID = LoadShader<ComputeShaderID>(desc.path, desc.permutationFields, _computeShaders, wasCached);
+
+            if (desc.shaderEntry.shaderData != nullptr && desc.shaderEntry.shaderSize != 0)
+            {
+                shaderID = LoadShaderFromMemory<ComputeShaderID>(desc.shaderEntry, _computeShaderStore, wasCached);
+            }
+            else
+            {
+                shaderID = LoadShaderFromFile<ComputeShaderID>(desc.path, desc.permutationFields, _computeShaderStore, wasCached);
+            }
+
             if (!wasCached)
             {
-                _computeShaderDescs.push_back(desc);
+                _computeShaderStore.descs.push_back(desc);
             }
             return shaderID;
+        }
+
+        void ShaderHandlerVK::ReflectShader(const uint32_t* shaderData, size_t shaderSize, BindReflection& bindReflection, const std::string& shaderPath)
+        {
+            // Reflect descriptor sets
+            SpvReflectShaderModule reflectModule;
+            SpvReflectResult result = spvReflectCreateShaderModule(shaderSize, shaderData, &reflectModule);
+
+            if (result != SPV_REFLECT_RESULT_SUCCESS)
+            {
+                NC_LOG_CRITICAL("We failed to reflect the spirv of {0}", shaderPath);
+            }
+
+            uint32_t descriptorSetCount = 0;
+            result = spvReflectEnumerateDescriptorSets(&reflectModule, &descriptorSetCount, NULL);
+
+            if (result != SPV_REFLECT_RESULT_SUCCESS)
+            {
+                NC_LOG_CRITICAL("We failed to reflect the spirv descriptor set count of {0}", shaderPath);
+            }
+
+            if (descriptorSetCount > 0)
+            {
+                std::vector<SpvReflectDescriptorSet*> descriptorSets(descriptorSetCount);
+
+                result = spvReflectEnumerateDescriptorSets(&reflectModule, &descriptorSetCount, descriptorSets.data());
+
+                if (result != SPV_REFLECT_RESULT_SUCCESS)
+                {
+                    NC_LOG_CRITICAL("We failed to reflect the spirv descriptor sets of {0}", shaderPath);
+                }
+
+                for (auto* descriptorSet : descriptorSets)
+                {
+                    for (uint32_t binding = 0; binding < descriptorSet->binding_count; binding++)
+                    {
+                        const SpvReflectDescriptorBinding* reflectionBinding = descriptorSet->bindings[binding];
+                        BindInfo bindInfo;
+                        bindInfo.descriptorType = static_cast<VkDescriptorType>(reflectionBinding->descriptor_type);
+                        bindInfo.set = descriptorSet->set;
+                        bindInfo.binding = reflectionBinding->binding;
+                        bindInfo.count = reflectionBinding->count;
+                        bindInfo.stageFlags = static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
+
+                        if (bindInfo.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+                        {
+                            bindInfo.isUsed = reflectionBinding->accessed;
+
+                            bool isWriteable = (reflectionBinding->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE) == 0;
+                            bindInfo.isWrite = (reflectionBinding->resource_type & SPV_REFLECT_RESOURCE_FLAG_UAV) && isWriteable;
+                        }
+
+                        bindInfo.name = reflectionBinding->name;
+                        bindInfo.nameHash = StringUtils::fnv1a_32(bindInfo.name.c_str(), bindInfo.name.length());
+
+                        bindReflection.dataBindings.push_back(bindInfo);
+                    }
+                }
+            }
+
+            uint32_t pushConstantCount = 0;
+            result = spvReflectEnumeratePushConstantBlocks(&reflectModule, &pushConstantCount, NULL);
+
+            if (result != SPV_REFLECT_RESULT_SUCCESS)
+            {
+                NC_LOG_CRITICAL("We failed to reflect the spirv push constant count of {0}", shaderPath);
+            }
+
+            if (pushConstantCount > 0)
+            {
+                std::vector<SpvReflectBlockVariable*> blockVariables(pushConstantCount);
+
+                result = spvReflectEnumeratePushConstantBlocks(&reflectModule, &pushConstantCount, blockVariables.data());
+
+                for (SpvReflectBlockVariable* variable : blockVariables)
+                {
+                    BindInfoPushConstant& pushConstant = bindReflection.pushConstants.emplace_back();
+                    pushConstant.offset = variable->offset;
+                    pushConstant.size = variable->size;
+                    pushConstant.stageFlags = static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
+                }
+            }
         }
 
         void ShaderHandlerVK::ReadFile(const std::string& filename, ShaderBinary& binary)
@@ -146,13 +252,13 @@ namespace Renderer
             file.close();
         }
 
-        VkShaderModule ShaderHandlerVK::CreateShaderModule(const ShaderBinary& binary, const std::string& debugName)
+        VkShaderModule ShaderHandlerVK::CreateShaderModule(const uint32_t* shaderData, size_t shaderSize, const std::string& debugName)
         {
             ZoneScoped;
             VkShaderModuleCreateInfo createInfo = {};
             createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            createInfo.codeSize = binary.size();
-            createInfo.pCode = reinterpret_cast<const uint32_t*>(binary.data());
+            createInfo.codeSize = shaderSize;
+            createInfo.pCode = shaderData;
 
             if (createInfo.codeSize == 0)
             {
@@ -170,21 +276,22 @@ namespace Renderer
             return shaderModule;
         }
 
-        bool ShaderHandlerVK::TryFindExistingShader(const std::string& shaderPath, std::vector<Shader>& shaders, size_t& id)
+        bool ShaderHandlerVK::TryFindExistingShader(const std::string& shaderPath, ShaderStoreBase& shaderStore, size_t& id)
         {
             ZoneScoped;
             u32 shaderPathHash = StringUtils::fnv1a_32(shaderPath.c_str(), shaderPath.length());
+            return TryFindExistingShader(shaderPathHash, shaderStore, id);
+        }
 
-            id = 0;
-            for (Shader& existingShader : shaders)
+        bool ShaderHandlerVK::TryFindExistingShader(u32 shaderHash, ShaderStoreBase& shaderStore, size_t& id)
+        {
+            ZoneScoped;
+            if (shaderStore.hashToIndex.find(shaderHash) != shaderStore.hashToIndex.end())
             {
-                if (StringUtils::fnv1a_32(existingShader.path.c_str(), existingShader.path.length()) == shaderPathHash)
-                {
-                    return true;
-                }
-                id++;
+                id = shaderStore.hashToIndex[shaderHash];
+                return true;
             }
-
+            
             return false;
         }
         

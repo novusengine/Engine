@@ -7,6 +7,7 @@ namespace Renderer
 {
     struct PermutationField
     {
+    public:
         std::string key;
         std::string value;
     };

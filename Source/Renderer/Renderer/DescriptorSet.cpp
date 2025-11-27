@@ -1,8 +1,19 @@
 #include "DescriptorSet.h"
 #include "RenderGraphResources.h"
+#include "Renderer.h"
 
 namespace Renderer
 {
+    void DescriptorSet::RegisterPipeline(Renderer* renderer, ComputePipelineID pipelineID)
+    {
+        renderer->GetDescriptorMetaFromPipeline(_metaInfo, pipelineID, _slot);
+    }
+
+    void DescriptorSet::RegisterPipeline(Renderer* renderer, GraphicsPipelineID pipelineID)
+    {
+        renderer->GetDescriptorMetaFromPipeline(_metaInfo, pipelineID, _slot);
+    }
+
     void DescriptorSet::Bind(StringUtils::StringHash nameHash, BufferID bufferID)
     {
         NC_ASSERT(!_locked, "DescriptorSet : Tried to Bind a BufferID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");

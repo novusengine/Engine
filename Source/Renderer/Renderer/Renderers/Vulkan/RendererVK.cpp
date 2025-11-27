@@ -1874,6 +1874,7 @@ namespace Renderer
             if (result == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 RecreateSwapChain(swapChain);
+                PopMarker(commandListID);
                 return;
             }
             else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -1941,10 +1942,6 @@ namespace Renderer
             ImageBarrier(commandListID, imageID);
             BeginRenderPass(commandListID, renderPassDesc);
 
-            // Load shaders
-            VertexShaderDesc vertexShaderDesc;
-            vertexShaderDesc.path = "Blitting/blit.vs.hlsl";
-
             ImageDesc imageDesc = _imageHandler->GetImageDesc(imageID);
             ImageComponentType componentType = ToImageComponentType(imageDesc.format);
             std::string componentTypeName = "";
@@ -1972,21 +1969,9 @@ namespace Renderer
             {
                 componentTypeName += std::to_string(componentCount);
             }
+            u32 componentTypeNameHash = StringUtils::fnv1a_32(componentTypeName.c_str(), componentTypeName.size());
+            GraphicsPipelineID pipelineID = GetBlitPipeline(componentTypeNameHash);
 
-            PixelShaderDesc pixelShaderDesc;
-            pixelShaderDesc.path = "Blitting/blit.ps.hlsl";
-            pixelShaderDesc.AddPermutationField("TEX_TYPE", componentTypeName);
-
-            GraphicsPipelineDesc pipelineDesc;
-            pipelineDesc.states.vertexShader = _shaderHandler->LoadShader(vertexShaderDesc);
-            pipelineDesc.states.pixelShader = _shaderHandler->LoadShader(pixelShaderDesc);
-
-            pipelineDesc.states.rasterizerState.cullMode = CullMode::BACK;
-            pipelineDesc.states.rasterizerState.frontFaceMode = FrontFaceState::COUNTERCLOCKWISE;
-
-            pipelineDesc.states.renderTargetFormats[0] = _device->GetSwapChainImageFormat();
-
-            GraphicsPipelineID pipelineID = _pipelineHandler->CreatePipeline(pipelineDesc);
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);
             Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(pipelineID);
 
@@ -2005,9 +1990,9 @@ namespace Renderer
             imageInfo.imageView = _imageHandler->GetColorView(imageID);
             builder.BindImage("_texture"_h, imageInfo);
 
-            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(DescriptorSetSlot::GLOBAL, Backend::DescriptorLifetime::PerFrame);
+            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(DescriptorSetSlot::PER_PASS, Backend::DescriptorLifetime::PerFrame);
 
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, DescriptorSetSlot::GLOBAL, 1, &descriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, DescriptorSetSlot::PER_PASS, 1, &descriptorSet, 0, nullptr);
 
             struct BlitConstant
             {
@@ -2035,7 +2020,7 @@ namespace Renderer
             tracyScope->End();
             tracyScope = nullptr;
 #endif
-
+            PopMarker(commandListID);
             _commandListHandler->EndCommandList(commandListID, frameFence);
         }
 
@@ -2238,5 +2223,15 @@ namespace Renderer
     bool RendererVK::HasExtendedTextureSupport()
     {
         return _device->HasExtendedTextureSupport();
+    }
+
+    void RendererVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot)
+    {
+        _pipelineHandler->GetDescriptorMetaFromPipeline(metaInfo, pipeline, slot);
+    }
+
+    void RendererVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot)
+    {
+        _pipelineHandler->GetDescriptorMetaFromPipeline(metaInfo, pipeline, slot);
     }
 }
