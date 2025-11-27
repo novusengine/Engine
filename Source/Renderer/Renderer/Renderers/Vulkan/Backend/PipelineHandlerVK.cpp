@@ -333,6 +333,96 @@ namespace Renderer
             return *data.computePipelines[static_cast<cIDType>(id)].descriptorSetBuilder;
         }
 
+        void AddDescriptorMetaEntry(DescriptorMetaInfo& metaInfo, Backend::BindInfo bindInfo, DescriptorSetSlot slot)
+        {
+            u32 nameHash = bindInfo.nameHash;
+            u32 bindingIndex = bindInfo.binding;
+            DescriptorMetaType type = FormatConverterVK::ToDescriptorMetaType(bindInfo.descriptorType);
+            u32 setSlot = bindInfo.set;
+
+            if (setSlot != static_cast<u32>(slot))
+            {
+                return;
+            }
+
+            NC_ASSERT(type != DescriptorMetaType::UNIFORM_BUFFER_DYNAMIC, "Shader is using useless Uniform Buffer Dynamic descriptor");
+            NC_ASSERT(type != DescriptorMetaType::STORAGE_BUFFER_DYNAMIC, "Shader is using useless Storage Buffer Dynamic descriptor");
+            NC_ASSERT(type != DescriptorMetaType::INPUT_ATTACHMENT, "Shader is using useless Input Attachment descriptor");
+
+            // If we already have a binding with this name, we need to make sure it matches
+            if (metaInfo.nameHashToDescriptorIndex.contains(nameHash))
+            {
+                u32 existingIndex = metaInfo.nameHashToDescriptorIndex[nameHash];
+                DescriptorMeta& existingMeta = metaInfo.descriptors[existingIndex];
+                NC_ASSERT(existingMeta.nameHash == nameHash, "DescriptorMeta nameHash mismatch");
+                NC_ASSERT(existingMeta.bindingIndex == bindingIndex, "DescriptorMeta bindingIndex mismatch");
+                return;
+            }
+
+            // If we already have a binding with this binding index, we need to make sure it matches
+            if (metaInfo.bindingIndexToDescriptorIndex.contains(bindingIndex))
+            {
+                u32 existingIndex = metaInfo.bindingIndexToDescriptorIndex[bindingIndex];
+                DescriptorMeta& existingMeta = metaInfo.descriptors[existingIndex];
+                NC_ASSERT(existingMeta.nameHash == nameHash, "DescriptorMeta nameHash mismatch");
+                NC_ASSERT(existingMeta.bindingIndex == bindingIndex, "DescriptorMeta bindingIndex mismatch");
+                return;
+            }
+
+            // If we didn't have it yet, add it
+            DescriptorMeta meta = {
+                .name = bindInfo.name,
+                .nameHash = nameHash,
+                .bindingIndex = bindingIndex,
+                .type = type
+            };
+            u32 descriptorIndex = static_cast<u32>(metaInfo.descriptors.size());
+            metaInfo.descriptors.push_back(meta);
+            metaInfo.nameHashToDescriptorIndex[meta.nameHash] = descriptorIndex;
+            metaInfo.bindingIndexToDescriptorIndex[meta.bindingIndex] = descriptorIndex;
+        }
+
+        void PipelineHandlerVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipelineID, DescriptorSetSlot slot)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            auto& pipeline = data.graphicsPipelines[static_cast<gIDType>(pipelineID)];
+
+            if (pipeline.desc.states.vertexShader != VertexShaderID::Invalid())
+            {
+                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(pipeline.desc.states.vertexShader);
+
+                for(auto& bindInfo : bindReflection.dataBindings)
+                {
+                    AddDescriptorMetaEntry(metaInfo, bindInfo, slot);
+                }
+            }
+            if (pipeline.desc.states.pixelShader != PixelShaderID::Invalid())
+            {
+                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(pipeline.desc.states.pixelShader);
+
+                for (auto& bindInfo : bindReflection.dataBindings)
+                {
+                    AddDescriptorMetaEntry(metaInfo, bindInfo, slot);
+                }
+            }
+        }
+
+        void PipelineHandlerVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipelineID, DescriptorSetSlot slot)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            auto& pipeline = data.computePipelines[static_cast<cIDType>(pipelineID)];
+            
+            if (pipeline.desc.computeShader != ComputeShaderID::Invalid())
+            {
+                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(pipeline.desc.computeShader);
+
+                for (auto& bindInfo : bindReflection.dataBindings)
+                {
+                    AddDescriptorMetaEntry(metaInfo, bindInfo, slot);
+                }
+            }
+        }
+
         u64 PipelineHandlerVK::CalculateCacheDescHash(const GraphicsPipelineDesc& desc)
         {
             GraphicsPipelineCacheDesc cacheDesc = {};
@@ -531,7 +621,7 @@ namespace Renderer
                 if (!inputLayout.enabled)
                     break;
 
-                if (inputLayout.inputClassification == Renderer::InputClassification::PER_VERTEX)
+                if (inputLayout.inputClassification == InputClassification::PER_VERTEX)
                 {
                     numVertexAttributes++;
                     vertexStride += FormatConverterVK::ToByteSize(inputLayout.format);
@@ -581,7 +671,7 @@ namespace Renderer
                 if (!inputLayout.enabled)
                     break;
 
-                bool isPerVertex = inputLayout.inputClassification == Renderer::InputClassification::PER_VERTEX;
+                bool isPerVertex = inputLayout.inputClassification == InputClassification::PER_VERTEX;
 
                 u8 binding = (isPerVertex) ? vertexBinding : instanceBinding;
 

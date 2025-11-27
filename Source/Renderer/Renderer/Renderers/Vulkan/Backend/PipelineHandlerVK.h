@@ -1,4 +1,6 @@
 #pragma once
+#include "Renderer/DescriptorMeta.h"
+#include "Renderer/DescriptorSet.h"
 #include "Renderer/Descriptors/GraphicsPipelineDesc.h"
 #include "Renderer/Descriptors/ComputePipelineDesc.h"
 
@@ -77,6 +79,9 @@ namespace Renderer
 
             DescriptorSetBuilderVK& GetDescriptorSetBuilder(GraphicsPipelineID id);
             DescriptorSetBuilderVK& GetDescriptorSetBuilder(ComputePipelineID id);
+
+            void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot);
+            void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot);
 
         private:
             u64 CalculateCacheDescHash(const GraphicsPipelineDesc& desc);

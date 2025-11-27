@@ -1,8 +1,10 @@
 #pragma once
 #include <Base/Types.h>
 
+#include "DescriptorMeta.h"
 #include "DescriptorSet.h"
-#include "Renderer/RenderStates.h"
+#include "RenderStates.h"
+#include "ShaderEntry.h"
 
 // Descriptors
 #include "Descriptors/BufferDesc.h"
@@ -56,6 +58,8 @@ namespace Renderer
         virtual void Deinit() = 0;
 
         virtual void SetShaderSourceDirectory(const std::string& path) = 0;
+        virtual void SetGetShaderEntryCallback(const std::function<const ShaderEntry& (u32)>& callback);
+        virtual void SetGetBlitPipelineCallback(const std::function<GraphicsPipelineID(u32)>& callback);
         virtual void ReloadShaders(bool forceRecompileAll) = 0;
         virtual void ClearUploadBuffers() = 0;
 
@@ -237,8 +241,14 @@ namespace Renderer
 
         virtual bool HasExtendedTextureSupport() = 0;
 
+        virtual void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot) = 0;
+        virtual void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot) = 0;
+
     protected:
         Renderer() {}; // Pure virtual class, disallow creation of it
+
+        const ShaderEntry& GetShaderEntry(u32 shaderNameHash);
+        const GraphicsPipelineID GetBlitPipeline(u32 shaderNameHash);
 
         void BeginExecutingCommandlist() { _isExecutingCommandlist = true; };
         void EndExecutingCommandlist() { _isExecutingCommandlist = false; };
@@ -247,6 +257,9 @@ namespace Renderer
 
         std::vector<TimeQueryID> _frameTimeQueries;
         std::vector<std::function<void(const vec2&)>> _onRenderSizeChangedCallbacks;
+
+        std::function<const ShaderEntry& (u32)> _getShaderEntryCallback;
+        std::function<GraphicsPipelineID(u32)> _getBlitPipelineCallback;
 
         friend class RenderGraph;
     };

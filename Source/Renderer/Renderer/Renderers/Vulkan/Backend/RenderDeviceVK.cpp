@@ -429,12 +429,18 @@ namespace Renderer
             synchronization2Features.synchronization2 = VK_TRUE;
             synchronization2Features.pNext = &dynamicRenderingFeatures;
 
+            VkPhysicalDeviceVulkan11Features device11Features = {};
+            device11Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+            device11Features.shaderDrawParameters = VK_TRUE;
+            device11Features.pNext = &synchronization2Features;
+
             VkPhysicalDeviceFeatures2 deviceFeatures = {};
             deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             deviceFeatures.features.samplerAnisotropy = VK_TRUE;
             deviceFeatures.features.fragmentStoresAndAtomics = VK_TRUE;
             deviceFeatures.features.vertexPipelineStoresAndAtomics = VK_TRUE;
             deviceFeatures.features.shaderInt64 = VK_TRUE;
+            deviceFeatures.features.shaderInt16 = VK_TRUE;
             deviceFeatures.features.multiDrawIndirect = VK_TRUE;
             deviceFeatures.features.drawIndirectFirstInstance = VK_TRUE;
             deviceFeatures.features.independentBlend = VK_TRUE;
@@ -443,8 +449,7 @@ namespace Renderer
             deviceFeatures.features.depthClamp = VK_TRUE;
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
             deviceFeatures.features.shaderImageGatherExtended = VK_TRUE;
-
-            deviceFeatures.pNext = &synchronization2Features;
+            deviceFeatures.pNext = &device11Features;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);
 

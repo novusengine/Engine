@@ -1,5 +1,5 @@
 #pragma once
-#include "PermutationField.h"
+#include "Renderer/ShaderEntry.h"
 
 #include <Base/Types.h>
 
@@ -9,6 +9,10 @@ namespace Renderer
 {
     struct VertexShaderDesc
     {
+        // Load already in memory
+        ShaderEntry shaderEntry;
+
+        // Load by file
         void AddPermutationField(const std::string& key, const std::string& value)
         {
             PermutationField& permutationField = permutationFields.emplace_back();

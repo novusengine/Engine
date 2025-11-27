@@ -208,6 +208,9 @@ namespace Renderer
 
         bool HasExtendedTextureSupport() override;
 
+        void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot) override;
+        void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot) override;
+
     private:
         [[nodiscard]] bool ReflectDescriptorSet(const std::string& name, u32 nameHash, u32 type, i32& set, const std::vector<Backend::BindInfo>& bindInfos, u32& outBindInfoIndex, VkDescriptorSetLayoutBinding* outDescriptorLayoutBinding);
         void BindDescriptor(Backend::DescriptorSetBuilderVK& builder, Descriptor& descriptor);

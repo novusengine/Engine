@@ -39,6 +39,7 @@ public:
     T initial;
     T current;
     CVarParameter* parameter;
+    std::vector<std::function<void(const T&)>> onValueChangedCallbacks;
 };
 
 template<typename T>
@@ -114,6 +115,19 @@ public:
     void SetShowFlagCVar(StringUtils::StringHash hash, const ShowFlag& value) override final;
     void SetShowFlagCVar(CVarCategory category, StringUtils::StringHash hash, const ShowFlag& value) override final;
 
+    void AddOnFloatValueChanged(StringUtils::StringHash hash, std::function<void(const f64&)> callback) override final;
+    void AddOnFloatValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const f64&)> callback) override final;
+    void AddOnIntValueChanged(StringUtils::StringHash hash, std::function<void(const i32&)> callback) override final;
+    void AddOnIntValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const i32&)> callback) override final;
+    void AddOnStringValueChanged(StringUtils::StringHash hash, std::function<void(const std::string&)> callback) override final;
+    void AddOnStringValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const std::string&)> callback) override final;
+    void AddOnVecFloatValueChanged(StringUtils::StringHash hash, std::function<void(const vec4&)> callback) override final;
+    void AddOnVecFloatValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const vec4&)> callback) override final;
+    void AddOnVecIntValueChanged(StringUtils::StringHash hash, std::function<void(const ivec4&)> callback) override final;
+    void AddOnVecIntValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const ivec4&)> callback) override final;
+    void AddOnShowFlagValueChanged(StringUtils::StringHash hash, std::function<void(const ShowFlag&)> callback) override final;
+    void AddOnShowFlagValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const ShowFlag&)> callback) override final;
+
     constexpr static int MAX_INT_CVARS = 1000;
 
     CVarArray<i32> intCVars2{ MAX_INT_CVARS };
@@ -174,6 +188,12 @@ void CVarArray<T>::SetCurrent(const T &val, i32 index)
     cvars[index].current = val;
 
     CVarSystemImpl::Get()->MarkDirty();
+
+    // Call any callbacks
+    for (auto& callback : cvars[index].onValueChangedCallbacks)
+    {
+        callback(val);
+    }
 }
 
 template<typename T>
