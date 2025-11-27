@@ -1,0 +1,2142 @@
+// GENERATED CODE; DO NOT EDIT
+//
+// input file: slang-ast-expr.h
+
+// BEGIN FIDDLE SCRAPER OUTPUT
+#ifndef SLANG_AST_EXPR_H_INCLUDED
+#define SLANG_AST_EXPR_H_INCLUDED 1
+#ifdef FIDDLE
+#undef FIDDLE
+#undef FIDDLEX
+#undef FIDDLEY
+#endif
+#define FIDDLEY(ARG) FIDDLE_##ARG
+#define FIDDLEX(ARG) FIDDLEY(ARG)
+#define FIDDLE FIDDLEX(__LINE__)
+#ifdef FIDDLE_9
+#undef FIDDLE_9
+#endif
+#define FIDDLE_9(...) \
+/* end */
+
+#ifdef FIDDLE_18
+#undef FIDDLE_18
+#endif
+#define FIDDLE_18(...) \
+/* end */
+
+#ifdef FIDDLE_21
+#undef FIDDLE_21
+#endif
+#define FIDDLE_21(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::IncompleteExpr; \
+public: IncompleteExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_25
+#undef FIDDLE_25
+#endif
+#define FIDDLE_25(...) \
+/* end */
+
+#ifdef FIDDLE_28
+#undef FIDDLE_28
+#endif
+#define FIDDLE_28(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::DeclRefExpr; \
+protected: DeclRefExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_31
+#undef FIDDLE_31
+#endif
+#define FIDDLE_31(...) \
+/* end */
+
+#ifdef FIDDLE_42
+#undef FIDDLE_42
+#endif
+#define FIDDLE_42(...) \
+/* end */
+
+#ifdef FIDDLE_45
+#undef FIDDLE_45
+#endif
+#define FIDDLE_45(...) \
+private: typedef DeclRefExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::VarExpr; \
+public: VarExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_48
+#undef FIDDLE_48
+#endif
+#define FIDDLE_48(...) \
+/* end */
+
+#ifdef FIDDLE_51
+#undef FIDDLE_51
+#endif
+#define FIDDLE_51(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::DefaultConstructExpr; \
+public: DefaultConstructExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_56
+#undef FIDDLE_56
+#endif
+#define FIDDLE_56(...) \
+/* end */
+
+#ifdef FIDDLE_59
+#undef FIDDLE_59
+#endif
+#define FIDDLE_59(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::OverloadedExpr; \
+public: OverloadedExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_75
+#undef FIDDLE_75
+#endif
+#define FIDDLE_75(...) \
+/* end */
+
+#ifdef FIDDLE_78
+#undef FIDDLE_78
+#endif
+#define FIDDLE_78(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::OverloadedExpr2; \
+public: OverloadedExpr2() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_87
+#undef FIDDLE_87
+#endif
+#define FIDDLE_87(...) \
+/* end */
+
+#ifdef FIDDLE_90
+#undef FIDDLE_90
+#endif
+#define FIDDLE_90(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::LiteralExpr; \
+protected: LiteralExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_94
+#undef FIDDLE_94
+#endif
+#define FIDDLE_94(...) \
+/* end */
+
+#ifdef FIDDLE_97
+#undef FIDDLE_97
+#endif
+#define FIDDLE_97(...) \
+/* end */
+
+#ifdef FIDDLE_100
+#undef FIDDLE_100
+#endif
+#define FIDDLE_100(...) \
+private: typedef LiteralExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::IntegerLiteralExpr; \
+public: IntegerLiteralExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_101
+#undef FIDDLE_101
+#endif
+#define FIDDLE_101(...) \
+/* end */
+
+#ifdef FIDDLE_104
+#undef FIDDLE_104
+#endif
+#define FIDDLE_104(...) \
+/* end */
+
+#ifdef FIDDLE_107
+#undef FIDDLE_107
+#endif
+#define FIDDLE_107(...) \
+private: typedef LiteralExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::FloatingPointLiteralExpr; \
+public: FloatingPointLiteralExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_108
+#undef FIDDLE_108
+#endif
+#define FIDDLE_108(...) \
+/* end */
+
+#ifdef FIDDLE_111
+#undef FIDDLE_111
+#endif
+#define FIDDLE_111(...) \
+/* end */
+
+#ifdef FIDDLE_114
+#undef FIDDLE_114
+#endif
+#define FIDDLE_114(...) \
+private: typedef LiteralExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::BoolLiteralExpr; \
+public: BoolLiteralExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_115
+#undef FIDDLE_115
+#endif
+#define FIDDLE_115(...) \
+/* end */
+
+#ifdef FIDDLE_118
+#undef FIDDLE_118
+#endif
+#define FIDDLE_118(...) \
+/* end */
+
+#ifdef FIDDLE_121
+#undef FIDDLE_121
+#endif
+#define FIDDLE_121(...) \
+private: typedef LiteralExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::NullPtrLiteralExpr; \
+public: NullPtrLiteralExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_124
+#undef FIDDLE_124
+#endif
+#define FIDDLE_124(...) \
+/* end */
+
+#ifdef FIDDLE_127
+#undef FIDDLE_127
+#endif
+#define FIDDLE_127(...) \
+private: typedef LiteralExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::NoneLiteralExpr; \
+public: NoneLiteralExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_130
+#undef FIDDLE_130
+#endif
+#define FIDDLE_130(...) \
+/* end */
+
+#ifdef FIDDLE_133
+#undef FIDDLE_133
+#endif
+#define FIDDLE_133(...) \
+private: typedef LiteralExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::StringLiteralExpr; \
+public: StringLiteralExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_140
+#undef FIDDLE_140
+#endif
+#define FIDDLE_140(...) \
+/* end */
+
+#ifdef FIDDLE_143
+#undef FIDDLE_143
+#endif
+#define FIDDLE_143(...) \
+/* end */
+
+#ifdef FIDDLE_146
+#undef FIDDLE_146
+#endif
+#define FIDDLE_146(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::MakeArrayFromElementExpr; \
+public: MakeArrayFromElementExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_150
+#undef FIDDLE_150
+#endif
+#define FIDDLE_150(...) \
+/* end */
+
+#ifdef FIDDLE_153
+#undef FIDDLE_153
+#endif
+#define FIDDLE_153(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::InitializerListExpr; \
+public: InitializerListExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_154
+#undef FIDDLE_154
+#endif
+#define FIDDLE_154(...) \
+/* end */
+
+#ifdef FIDDLE_159
+#undef FIDDLE_159
+#endif
+#define FIDDLE_159(...) \
+/* end */
+
+#ifdef FIDDLE_162
+#undef FIDDLE_162
+#endif
+#define FIDDLE_162(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::GetArrayLengthExpr; \
+public: GetArrayLengthExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_163
+#undef FIDDLE_163
+#endif
+#define FIDDLE_163(...) \
+/* end */
+
+#ifdef FIDDLE_166
+#undef FIDDLE_166
+#endif
+#define FIDDLE_166(...) \
+/* end */
+
+#ifdef FIDDLE_169
+#undef FIDDLE_169
+#endif
+#define FIDDLE_169(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ExpandExpr; \
+public: ExpandExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_170
+#undef FIDDLE_170
+#endif
+#define FIDDLE_170(...) \
+/* end */
+
+#ifdef FIDDLE_173
+#undef FIDDLE_173
+#endif
+#define FIDDLE_173(...) \
+/* end */
+
+#ifdef FIDDLE_176
+#undef FIDDLE_176
+#endif
+#define FIDDLE_176(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::EachExpr; \
+public: EachExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_177
+#undef FIDDLE_177
+#endif
+#define FIDDLE_177(...) \
+/* end */
+
+#ifdef FIDDLE_181
+#undef FIDDLE_181
+#endif
+#define FIDDLE_181(...) \
+/* end */
+
+#ifdef FIDDLE_184
+#undef FIDDLE_184
+#endif
+#define FIDDLE_184(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ExprWithArgsBase; \
+protected: ExprWithArgsBase() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_185
+#undef FIDDLE_185
+#endif
+#define FIDDLE_185(...) \
+/* end */
+
+#ifdef FIDDLE_189
+#undef FIDDLE_189
+#endif
+#define FIDDLE_189(...) \
+/* end */
+
+#ifdef FIDDLE_192
+#undef FIDDLE_192
+#endif
+#define FIDDLE_192(...) \
+private: typedef ExprWithArgsBase Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::AggTypeCtorExpr; \
+public: AggTypeCtorExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_193
+#undef FIDDLE_193
+#endif
+#define FIDDLE_193(...) \
+/* end */
+
+#ifdef FIDDLE_199
+#undef FIDDLE_199
+#endif
+#define FIDDLE_199(...) \
+/* end */
+
+#ifdef FIDDLE_202
+#undef FIDDLE_202
+#endif
+#define FIDDLE_202(...) \
+private: typedef ExprWithArgsBase Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::AppExprBase; \
+protected: AppExprBase() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_203
+#undef FIDDLE_203
+#endif
+#define FIDDLE_203(...) \
+/* end */
+
+#ifdef FIDDLE_213
+#undef FIDDLE_213
+#endif
+#define FIDDLE_213(...) \
+/* end */
+
+#ifdef FIDDLE_216
+#undef FIDDLE_216
+#endif
+#define FIDDLE_216(...) \
+private: typedef AppExprBase Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::InvokeExpr; \
+public: InvokeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_219
+#undef FIDDLE_219
+#endif
+#define FIDDLE_219(...) \
+/* end */
+
+#ifdef FIDDLE_222
+#undef FIDDLE_222
+#endif
+#define FIDDLE_222(...) \
+private: typedef InvokeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ExplicitCtorInvokeExpr; \
+public: ExplicitCtorInvokeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_236
+#undef FIDDLE_236
+#endif
+#define FIDDLE_236(...) \
+/* end */
+
+#ifdef FIDDLE_239
+#undef FIDDLE_239
+#endif
+#define FIDDLE_239(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::TryExpr; \
+public: TryExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_240
+#undef FIDDLE_240
+#endif
+#define FIDDLE_240(...) \
+/* end */
+
+#ifdef FIDDLE_242
+#undef FIDDLE_242
+#endif
+#define FIDDLE_242(...) \
+/* end */
+
+#ifdef FIDDLE_248
+#undef FIDDLE_248
+#endif
+#define FIDDLE_248(...) \
+/* end */
+
+#ifdef FIDDLE_251
+#undef FIDDLE_251
+#endif
+#define FIDDLE_251(...) \
+private: typedef InvokeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::NewExpr; \
+public: NewExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_254
+#undef FIDDLE_254
+#endif
+#define FIDDLE_254(...) \
+/* end */
+
+#ifdef FIDDLE_257
+#undef FIDDLE_257
+#endif
+#define FIDDLE_257(...) \
+private: typedef InvokeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::OperatorExpr; \
+public: OperatorExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_260
+#undef FIDDLE_260
+#endif
+#define FIDDLE_260(...) \
+/* end */
+
+#ifdef FIDDLE_263
+#undef FIDDLE_263
+#endif
+#define FIDDLE_263(...) \
+private: typedef OperatorExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::InfixExpr; \
+public: InfixExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_266
+#undef FIDDLE_266
+#endif
+#define FIDDLE_266(...) \
+/* end */
+
+#ifdef FIDDLE_269
+#undef FIDDLE_269
+#endif
+#define FIDDLE_269(...) \
+private: typedef OperatorExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::PrefixExpr; \
+public: PrefixExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_272
+#undef FIDDLE_272
+#endif
+#define FIDDLE_272(...) \
+/* end */
+
+#ifdef FIDDLE_275
+#undef FIDDLE_275
+#endif
+#define FIDDLE_275(...) \
+private: typedef OperatorExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::PostfixExpr; \
+public: PostfixExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_278
+#undef FIDDLE_278
+#endif
+#define FIDDLE_278(...) \
+/* end */
+
+#ifdef FIDDLE_281
+#undef FIDDLE_281
+#endif
+#define FIDDLE_281(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::IndexExpr; \
+public: IndexExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_282
+#undef FIDDLE_282
+#endif
+#define FIDDLE_282(...) \
+/* end */
+
+#ifdef FIDDLE_283
+#undef FIDDLE_283
+#endif
+#define FIDDLE_283(...) \
+/* end */
+
+#ifdef FIDDLE_290
+#undef FIDDLE_290
+#endif
+#define FIDDLE_290(...) \
+/* end */
+
+#ifdef FIDDLE_293
+#undef FIDDLE_293
+#endif
+#define FIDDLE_293(...) \
+private: typedef DeclRefExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::MemberExpr; \
+public: MemberExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_294
+#undef FIDDLE_294
+#endif
+#define FIDDLE_294(...) \
+/* end */
+
+#ifdef FIDDLE_299
+#undef FIDDLE_299
+#endif
+#define FIDDLE_299(...) \
+/* end */
+
+#ifdef FIDDLE_302
+#undef FIDDLE_302
+#endif
+#define FIDDLE_302(...) \
+private: typedef MemberExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::DerefMemberExpr; \
+public: DerefMemberExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_306
+#undef FIDDLE_306
+#endif
+#define FIDDLE_306(...) \
+/* end */
+
+#ifdef FIDDLE_309
+#undef FIDDLE_309
+#endif
+#define FIDDLE_309(...) \
+private: typedef DeclRefExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::StaticMemberExpr; \
+public: StaticMemberExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_314
+#undef FIDDLE_314
+#endif
+#define FIDDLE_314(...) \
+/* end */
+
+#ifdef FIDDLE_317
+#undef FIDDLE_317
+#endif
+#define FIDDLE_317(...) \
+public: \
+/* end */
+
+#ifdef FIDDLE_323
+#undef FIDDLE_323
+#endif
+#define FIDDLE_323(...) \
+/* end */
+
+#ifdef FIDDLE_324
+#undef FIDDLE_324
+#endif
+#define FIDDLE_324(...) \
+/* end */
+
+#ifdef FIDDLE_327
+#undef FIDDLE_327
+#endif
+#define FIDDLE_327(...) \
+/* end */
+
+#ifdef FIDDLE_330
+#undef FIDDLE_330
+#endif
+#define FIDDLE_330(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::MatrixSwizzleExpr; \
+public: MatrixSwizzleExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_331
+#undef FIDDLE_331
+#endif
+#define FIDDLE_331(...) \
+/* end */
+
+#ifdef FIDDLE_332
+#undef FIDDLE_332
+#endif
+#define FIDDLE_332(...) \
+/* end */
+
+#ifdef FIDDLE_333
+#undef FIDDLE_333
+#endif
+#define FIDDLE_333(...) \
+/* end */
+
+#ifdef FIDDLE_337
+#undef FIDDLE_337
+#endif
+#define FIDDLE_337(...) \
+/* end */
+
+#ifdef FIDDLE_340
+#undef FIDDLE_340
+#endif
+#define FIDDLE_340(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::SwizzleExpr; \
+public: SwizzleExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_341
+#undef FIDDLE_341
+#endif
+#define FIDDLE_341(...) \
+/* end */
+
+#ifdef FIDDLE_342
+#undef FIDDLE_342
+#endif
+#define FIDDLE_342(...) \
+/* end */
+
+#ifdef FIDDLE_347
+#undef FIDDLE_347
+#endif
+#define FIDDLE_347(...) \
+/* end */
+
+#ifdef FIDDLE_350
+#undef FIDDLE_350
+#endif
+#define FIDDLE_350(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::MakeRefExpr; \
+public: MakeRefExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_351
+#undef FIDDLE_351
+#endif
+#define FIDDLE_351(...) \
+/* end */
+
+#ifdef FIDDLE_355
+#undef FIDDLE_355
+#endif
+#define FIDDLE_355(...) \
+/* end */
+
+#ifdef FIDDLE_358
+#undef FIDDLE_358
+#endif
+#define FIDDLE_358(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::DerefExpr; \
+public: DerefExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_359
+#undef FIDDLE_359
+#endif
+#define FIDDLE_359(...) \
+/* end */
+
+#ifdef FIDDLE_363
+#undef FIDDLE_363
+#endif
+#define FIDDLE_363(...) \
+/* end */
+
+#ifdef FIDDLE_366
+#undef FIDDLE_366
+#endif
+#define FIDDLE_366(...) \
+private: typedef InvokeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::TypeCastExpr; \
+public: TypeCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_372
+#undef FIDDLE_372
+#endif
+#define FIDDLE_372(...) \
+/* end */
+
+#ifdef FIDDLE_375
+#undef FIDDLE_375
+#endif
+#define FIDDLE_375(...) \
+private: typedef TypeCastExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ExplicitCastExpr; \
+public: ExplicitCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_379
+#undef FIDDLE_379
+#endif
+#define FIDDLE_379(...) \
+/* end */
+
+#ifdef FIDDLE_382
+#undef FIDDLE_382
+#endif
+#define FIDDLE_382(...) \
+private: typedef TypeCastExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ImplicitCastExpr; \
+public: ImplicitCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_387
+#undef FIDDLE_387
+#endif
+#define FIDDLE_387(...) \
+/* end */
+
+#ifdef FIDDLE_390
+#undef FIDDLE_390
+#endif
+#define FIDDLE_390(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::BuiltinCastExpr; \
+public: BuiltinCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_391
+#undef FIDDLE_391
+#endif
+#define FIDDLE_391(...) \
+/* end */
+
+#ifdef FIDDLE_394
+#undef FIDDLE_394
+#endif
+#define FIDDLE_394(...) \
+/* end */
+
+#ifdef FIDDLE_397
+#undef FIDDLE_397
+#endif
+#define FIDDLE_397(...) \
+private: typedef TypeCastExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::LValueImplicitCastExpr; \
+public: LValueImplicitCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_407
+#undef FIDDLE_407
+#endif
+#define FIDDLE_407(...) \
+/* end */
+
+#ifdef FIDDLE_410
+#undef FIDDLE_410
+#endif
+#define FIDDLE_410(...) \
+private: typedef LValueImplicitCastExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::OutImplicitCastExpr; \
+public: OutImplicitCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_418
+#undef FIDDLE_418
+#endif
+#define FIDDLE_418(...) \
+/* end */
+
+#ifdef FIDDLE_421
+#undef FIDDLE_421
+#endif
+#define FIDDLE_421(...) \
+private: typedef LValueImplicitCastExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::InOutImplicitCastExpr; \
+public: InOutImplicitCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_433
+#undef FIDDLE_433
+#endif
+#define FIDDLE_433(...) \
+/* end */
+
+#ifdef FIDDLE_436
+#undef FIDDLE_436
+#endif
+#define FIDDLE_436(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::CastToSuperTypeExpr; \
+public: CastToSuperTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_441
+#undef FIDDLE_441
+#endif
+#define FIDDLE_441(...) \
+/* end */
+
+#ifdef FIDDLE_444
+#undef FIDDLE_444
+#endif
+#define FIDDLE_444(...) \
+/* end */
+
+#ifdef FIDDLE_449
+#undef FIDDLE_449
+#endif
+#define FIDDLE_449(...) \
+/* end */
+
+#ifdef FIDDLE_452
+#undef FIDDLE_452
+#endif
+#define FIDDLE_452(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::IsTypeExpr; \
+public: IsTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_453
+#undef FIDDLE_453
+#endif
+#define FIDDLE_453(...) \
+/* end */
+
+#ifdef FIDDLE_454
+#undef FIDDLE_454
+#endif
+#define FIDDLE_454(...) \
+/* end */
+
+#ifdef FIDDLE_457
+#undef FIDDLE_457
+#endif
+#define FIDDLE_457(...) \
+/* end */
+
+#ifdef FIDDLE_460
+#undef FIDDLE_460
+#endif
+#define FIDDLE_460(...) \
+/* end */
+
+#ifdef FIDDLE_465
+#undef FIDDLE_465
+#endif
+#define FIDDLE_465(...) \
+/* end */
+
+#ifdef FIDDLE_468
+#undef FIDDLE_468
+#endif
+#define FIDDLE_468(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::AsTypeExpr; \
+public: AsTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_469
+#undef FIDDLE_469
+#endif
+#define FIDDLE_469(...) \
+/* end */
+
+#ifdef FIDDLE_470
+#undef FIDDLE_470
+#endif
+#define FIDDLE_470(...) \
+/* end */
+
+#ifdef FIDDLE_473
+#undef FIDDLE_473
+#endif
+#define FIDDLE_473(...) \
+/* end */
+
+#ifdef FIDDLE_476
+#undef FIDDLE_476
+#endif
+#define FIDDLE_476(...) \
+/* end */
+
+#ifdef FIDDLE_479
+#undef FIDDLE_479
+#endif
+#define FIDDLE_479(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::SizeOfLikeExpr; \
+protected: SizeOfLikeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_481
+#undef FIDDLE_481
+#endif
+#define FIDDLE_481(...) \
+/* end */
+
+#ifdef FIDDLE_484
+#undef FIDDLE_484
+#endif
+#define FIDDLE_484(...) \
+/* end */
+
+#ifdef FIDDLE_487
+#undef FIDDLE_487
+#endif
+#define FIDDLE_487(...) \
+/* end */
+
+#ifdef FIDDLE_490
+#undef FIDDLE_490
+#endif
+#define FIDDLE_490(...) \
+private: typedef SizeOfLikeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::SizeOfExpr; \
+public: SizeOfExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_493
+#undef FIDDLE_493
+#endif
+#define FIDDLE_493(...) \
+/* end */
+
+#ifdef FIDDLE_496
+#undef FIDDLE_496
+#endif
+#define FIDDLE_496(...) \
+private: typedef SizeOfLikeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::AlignOfExpr; \
+public: AlignOfExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_499
+#undef FIDDLE_499
+#endif
+#define FIDDLE_499(...) \
+/* end */
+
+#ifdef FIDDLE_502
+#undef FIDDLE_502
+#endif
+#define FIDDLE_502(...) \
+private: typedef SizeOfLikeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::CountOfExpr; \
+public: CountOfExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_505
+#undef FIDDLE_505
+#endif
+#define FIDDLE_505(...) \
+/* end */
+
+#ifdef FIDDLE_508
+#undef FIDDLE_508
+#endif
+#define FIDDLE_508(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::AddressOfExpr; \
+public: AddressOfExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_509
+#undef FIDDLE_509
+#endif
+#define FIDDLE_509(...) \
+/* end */
+
+#ifdef FIDDLE_512
+#undef FIDDLE_512
+#endif
+#define FIDDLE_512(...) \
+/* end */
+
+#ifdef FIDDLE_515
+#undef FIDDLE_515
+#endif
+#define FIDDLE_515(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::MakeOptionalExpr; \
+public: MakeOptionalExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_517
+#undef FIDDLE_517
+#endif
+#define FIDDLE_517(...) \
+/* end */
+
+#ifdef FIDDLE_518
+#undef FIDDLE_518
+#endif
+#define FIDDLE_518(...) \
+/* end */
+
+#ifdef FIDDLE_525
+#undef FIDDLE_525
+#endif
+#define FIDDLE_525(...) \
+/* end */
+
+#ifdef FIDDLE_528
+#undef FIDDLE_528
+#endif
+#define FIDDLE_528(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ModifierCastExpr; \
+public: ModifierCastExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_533
+#undef FIDDLE_533
+#endif
+#define FIDDLE_533(...) \
+/* end */
+
+#ifdef FIDDLE_536
+#undef FIDDLE_536
+#endif
+#define FIDDLE_536(...) \
+/* end */
+
+#ifdef FIDDLE_539
+#undef FIDDLE_539
+#endif
+#define FIDDLE_539(...) \
+private: typedef OperatorExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::SelectExpr; \
+public: SelectExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_542
+#undef FIDDLE_542
+#endif
+#define FIDDLE_542(...) \
+/* end */
+
+#ifdef FIDDLE_545
+#undef FIDDLE_545
+#endif
+#define FIDDLE_545(...) \
+private: typedef OperatorExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::LogicOperatorShortCircuitExpr; \
+public: LogicOperatorShortCircuitExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_552
+#undef FIDDLE_552
+#endif
+#define FIDDLE_552(...) \
+/* end */
+
+#ifdef FIDDLE_556
+#undef FIDDLE_556
+#endif
+#define FIDDLE_556(...) \
+/* end */
+
+#ifdef FIDDLE_559
+#undef FIDDLE_559
+#endif
+#define FIDDLE_559(...) \
+private: typedef AppExprBase Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::GenericAppExpr; \
+public: GenericAppExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_564
+#undef FIDDLE_564
+#endif
+#define FIDDLE_564(...) \
+/* end */
+
+#ifdef FIDDLE_567
+#undef FIDDLE_567
+#endif
+#define FIDDLE_567(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::SharedTypeExpr; \
+public: SharedTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_572
+#undef FIDDLE_572
+#endif
+#define FIDDLE_572(...) \
+/* end */
+
+#ifdef FIDDLE_575
+#undef FIDDLE_575
+#endif
+#define FIDDLE_575(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::AssignExpr; \
+public: AssignExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_576
+#undef FIDDLE_576
+#endif
+#define FIDDLE_576(...) \
+/* end */
+
+#ifdef FIDDLE_577
+#undef FIDDLE_577
+#endif
+#define FIDDLE_577(...) \
+/* end */
+
+#ifdef FIDDLE_584
+#undef FIDDLE_584
+#endif
+#define FIDDLE_584(...) \
+/* end */
+
+#ifdef FIDDLE_587
+#undef FIDDLE_587
+#endif
+#define FIDDLE_587(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ParenExpr; \
+public: ParenExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_593
+#undef FIDDLE_593
+#endif
+#define FIDDLE_593(...) \
+/* end */
+
+#ifdef FIDDLE_596
+#undef FIDDLE_596
+#endif
+#define FIDDLE_596(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::TupleExpr; \
+public: TupleExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_603
+#undef FIDDLE_603
+#endif
+#define FIDDLE_603(...) \
+/* end */
+
+#ifdef FIDDLE_606
+#undef FIDDLE_606
+#endif
+#define FIDDLE_606(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ThisExpr; \
+public: ThisExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_613
+#undef FIDDLE_613
+#endif
+#define FIDDLE_613(...) \
+/* end */
+
+#ifdef FIDDLE_616
+#undef FIDDLE_616
+#endif
+#define FIDDLE_616(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ReturnValExpr; \
+public: ReturnValExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_622
+#undef FIDDLE_622
+#endif
+#define FIDDLE_622(...) \
+/* end */
+
+#ifdef FIDDLE_625
+#undef FIDDLE_625
+#endif
+#define FIDDLE_625(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::LetExpr; \
+public: LetExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_626
+#undef FIDDLE_626
+#endif
+#define FIDDLE_626(...) \
+/* end */
+
+#ifdef FIDDLE_627
+#undef FIDDLE_627
+#endif
+#define FIDDLE_627(...) \
+/* end */
+
+#ifdef FIDDLE_630
+#undef FIDDLE_630
+#endif
+#define FIDDLE_630(...) \
+/* end */
+
+#ifdef FIDDLE_633
+#undef FIDDLE_633
+#endif
+#define FIDDLE_633(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ExtractExistentialValueExpr; \
+public: ExtractExistentialValueExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_634
+#undef FIDDLE_634
+#endif
+#define FIDDLE_634(...) \
+/* end */
+
+#ifdef FIDDLE_638
+#undef FIDDLE_638
+#endif
+#define FIDDLE_638(...) \
+/* end */
+
+#ifdef FIDDLE_641
+#undef FIDDLE_641
+#endif
+#define FIDDLE_641(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::OpenRefExpr; \
+public: OpenRefExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_642
+#undef FIDDLE_642
+#endif
+#define FIDDLE_642(...) \
+/* end */
+
+#ifdef FIDDLE_645
+#undef FIDDLE_645
+#endif
+#define FIDDLE_645(...) \
+/* end */
+
+#ifdef FIDDLE_648
+#undef FIDDLE_648
+#endif
+#define FIDDLE_648(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::DetachExpr; \
+public: DetachExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_649
+#undef FIDDLE_649
+#endif
+#define FIDDLE_649(...) \
+/* end */
+
+#ifdef FIDDLE_655
+#undef FIDDLE_655
+#endif
+#define FIDDLE_655(...) \
+/* end */
+
+#ifdef FIDDLE_658
+#undef FIDDLE_658
+#endif
+#define FIDDLE_658(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::HigherOrderInvokeExpr; \
+protected: HigherOrderInvokeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_659
+#undef FIDDLE_659
+#endif
+#define FIDDLE_659(...) \
+/* end */
+
+#ifdef FIDDLE_660
+#undef FIDDLE_660
+#endif
+#define FIDDLE_660(...) \
+/* end */
+
+#ifdef FIDDLE_663
+#undef FIDDLE_663
+#endif
+#define FIDDLE_663(...) \
+/* end */
+
+#ifdef FIDDLE_666
+#undef FIDDLE_666
+#endif
+#define FIDDLE_666(...) \
+private: typedef HigherOrderInvokeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::PrimalSubstituteExpr; \
+public: PrimalSubstituteExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_669
+#undef FIDDLE_669
+#endif
+#define FIDDLE_669(...) \
+/* end */
+
+#ifdef FIDDLE_672
+#undef FIDDLE_672
+#endif
+#define FIDDLE_672(...) \
+private: typedef HigherOrderInvokeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::DifferentiateExpr; \
+protected: DifferentiateExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_678
+#undef FIDDLE_678
+#endif
+#define FIDDLE_678(...) \
+/* end */
+
+#ifdef FIDDLE_681
+#undef FIDDLE_681
+#endif
+#define FIDDLE_681(...) \
+private: typedef DifferentiateExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ForwardDifferentiateExpr; \
+public: ForwardDifferentiateExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_687
+#undef FIDDLE_687
+#endif
+#define FIDDLE_687(...) \
+/* end */
+
+#ifdef FIDDLE_690
+#undef FIDDLE_690
+#endif
+#define FIDDLE_690(...) \
+private: typedef DifferentiateExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::BackwardDifferentiateExpr; \
+public: BackwardDifferentiateExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_696
+#undef FIDDLE_696
+#endif
+#define FIDDLE_696(...) \
+/* end */
+
+#ifdef FIDDLE_699
+#undef FIDDLE_699
+#endif
+#define FIDDLE_699(...) \
+private: typedef HigherOrderInvokeExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::DispatchKernelExpr; \
+public: DispatchKernelExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_700
+#undef FIDDLE_700
+#endif
+#define FIDDLE_700(...) \
+/* end */
+
+#ifdef FIDDLE_701
+#undef FIDDLE_701
+#endif
+#define FIDDLE_701(...) \
+/* end */
+
+#ifdef FIDDLE_704
+#undef FIDDLE_704
+#endif
+#define FIDDLE_704(...) \
+/* end */
+
+#ifdef FIDDLE_707
+#undef FIDDLE_707
+#endif
+#define FIDDLE_707(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::LambdaExpr; \
+public: LambdaExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_708
+#undef FIDDLE_708
+#endif
+#define FIDDLE_708(...) \
+/* end */
+
+#ifdef FIDDLE_709
+#undef FIDDLE_709
+#endif
+#define FIDDLE_709(...) \
+/* end */
+
+#ifdef FIDDLE_713
+#undef FIDDLE_713
+#endif
+#define FIDDLE_713(...) \
+/* end */
+
+#ifdef FIDDLE_716
+#undef FIDDLE_716
+#endif
+#define FIDDLE_716(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::TreatAsDifferentiableExpr; \
+public: TreatAsDifferentiableExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_717
+#undef FIDDLE_717
+#endif
+#define FIDDLE_717(...) \
+/* end */
+
+#ifdef FIDDLE_735
+#undef FIDDLE_735
+#endif
+#define FIDDLE_735(...) \
+/* end */
+
+#ifdef FIDDLE_742
+#undef FIDDLE_742
+#endif
+#define FIDDLE_742(...) \
+/* end */
+
+#ifdef FIDDLE_745
+#undef FIDDLE_745
+#endif
+#define FIDDLE_745(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ThisTypeExpr; \
+public: ThisTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_755
+#undef FIDDLE_755
+#endif
+#define FIDDLE_755(...) \
+/* end */
+
+#ifdef FIDDLE_758
+#undef FIDDLE_758
+#endif
+#define FIDDLE_758(...) \
+private: typedef VarExpr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ThisInterfaceExpr; \
+public: ThisInterfaceExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_762
+#undef FIDDLE_762
+#endif
+#define FIDDLE_762(...) \
+/* end */
+
+#ifdef FIDDLE_765
+#undef FIDDLE_765
+#endif
+#define FIDDLE_765(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::AndTypeExpr; \
+public: AndTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_766
+#undef FIDDLE_766
+#endif
+#define FIDDLE_766(...) \
+/* end */
+
+#ifdef FIDDLE_767
+#undef FIDDLE_767
+#endif
+#define FIDDLE_767(...) \
+/* end */
+
+#ifdef FIDDLE_771
+#undef FIDDLE_771
+#endif
+#define FIDDLE_771(...) \
+/* end */
+
+#ifdef FIDDLE_774
+#undef FIDDLE_774
+#endif
+#define FIDDLE_774(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::ModifiedTypeExpr; \
+public: ModifiedTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_775
+#undef FIDDLE_775
+#endif
+#define FIDDLE_775(...) \
+/* end */
+
+#ifdef FIDDLE_776
+#undef FIDDLE_776
+#endif
+#define FIDDLE_776(...) \
+/* end */
+
+#ifdef FIDDLE_780
+#undef FIDDLE_780
+#endif
+#define FIDDLE_780(...) \
+/* end */
+
+#ifdef FIDDLE_783
+#undef FIDDLE_783
+#endif
+#define FIDDLE_783(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::PointerTypeExpr; \
+public: PointerTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_784
+#undef FIDDLE_784
+#endif
+#define FIDDLE_784(...) \
+/* end */
+
+#ifdef FIDDLE_788
+#undef FIDDLE_788
+#endif
+#define FIDDLE_788(...) \
+/* end */
+
+#ifdef FIDDLE_791
+#undef FIDDLE_791
+#endif
+#define FIDDLE_791(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::FuncTypeExpr; \
+public: FuncTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_792
+#undef FIDDLE_792
+#endif
+#define FIDDLE_792(...) \
+/* end */
+
+#ifdef FIDDLE_793
+#undef FIDDLE_793
+#endif
+#define FIDDLE_793(...) \
+/* end */
+
+#ifdef FIDDLE_796
+#undef FIDDLE_796
+#endif
+#define FIDDLE_796(...) \
+/* end */
+
+#ifdef FIDDLE_799
+#undef FIDDLE_799
+#endif
+#define FIDDLE_799(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::TupleTypeExpr; \
+public: TupleTypeExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_800
+#undef FIDDLE_800
+#endif
+#define FIDDLE_800(...) \
+/* end */
+
+#ifdef FIDDLE_806
+#undef FIDDLE_806
+#endif
+#define FIDDLE_806(...) \
+/* end */
+
+#ifdef FIDDLE_809
+#undef FIDDLE_809
+#endif
+#define FIDDLE_809(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::PartiallyAppliedGenericExpr; \
+public: PartiallyAppliedGenericExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_825
+#undef FIDDLE_825
+#endif
+#define FIDDLE_825(...) \
+/* end */
+
+#ifdef FIDDLE_828
+#undef FIDDLE_828
+#endif
+#define FIDDLE_828(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::PackExpr; \
+public: PackExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_829
+#undef FIDDLE_829
+#endif
+#define FIDDLE_829(...) \
+/* end */
+
+#ifdef FIDDLE_832
+#undef FIDDLE_832
+#endif
+#define FIDDLE_832(...) \
+/* end */
+
+#ifdef FIDDLE_835
+#undef FIDDLE_835
+#endif
+#define FIDDLE_835(...) \
+public: \
+/* end */
+
+#ifdef FIDDLE_868
+#undef FIDDLE_868
+#endif
+#define FIDDLE_868(...) \
+/* end */
+
+#ifdef FIDDLE_875
+#undef FIDDLE_875
+#endif
+#define FIDDLE_875(...) \
+/* end */
+
+#ifdef FIDDLE_880
+#undef FIDDLE_880
+#endif
+#define FIDDLE_880(...) \
+/* end */
+
+#ifdef FIDDLE_885
+#undef FIDDLE_885
+#endif
+#define FIDDLE_885(...) \
+/* end */
+
+#ifdef FIDDLE_888
+#undef FIDDLE_888
+#endif
+#define FIDDLE_888(...) \
+/* end */
+
+#ifdef FIDDLE_892
+#undef FIDDLE_892
+#endif
+#define FIDDLE_892(...) \
+/* end */
+
+#ifdef FIDDLE_895
+#undef FIDDLE_895
+#endif
+#define FIDDLE_895(...) \
+/* end */
+
+#ifdef FIDDLE_898
+#undef FIDDLE_898
+#endif
+#define FIDDLE_898(...) \
+public: \
+/* end */
+
+#ifdef FIDDLE_901
+#undef FIDDLE_901
+#endif
+#define FIDDLE_901(...) \
+/* end */
+
+#ifdef FIDDLE_902
+#undef FIDDLE_902
+#endif
+#define FIDDLE_902(...) \
+/* end */
+
+#ifdef FIDDLE_905
+#undef FIDDLE_905
+#endif
+#define FIDDLE_905(...) \
+/* end */
+
+#ifdef FIDDLE_908
+#undef FIDDLE_908
+#endif
+#define FIDDLE_908(...) \
+private: typedef Expr Super; \
+friend class ::Slang::ASTBuilder; \
+friend struct ::Slang::SyntaxClassInfo; \
+public: static const ::Slang::SyntaxClassInfo kSyntaxClassInfo; \
+public: static constexpr ASTNodeType kType = ASTNodeType::SPIRVAsmExpr; \
+public: SPIRVAsmExpr() {} \
+public: \
+/* end */
+
+#ifdef FIDDLE_910
+#undef FIDDLE_910
+#endif
+#define FIDDLE_910(...) \
+/* end */
+
+
+#endif
+// END FIDDLE SCRAPER OUTPUT
+
+// END OF FIDDLE-GENERATED FILE
