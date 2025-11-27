@@ -1,7 +1,6 @@
 #include "ShaderCompiler.h"
 #include "Lexer/Lexer.h"
 #include "Parser/Parser.h"
-#include "DxcBridge.h"
 #include "SlangBridge.h"
 #include "ShaderCache.h"
 
@@ -10,13 +9,6 @@
 #include <Base/Util/StringUtils.h>
 
 #include <FileFormat/Novus/ShaderPack/ShaderPack.h>
-
-// NOTE: This will need edits to add Linux support to ShaderCooker
-#ifdef _WINDOWS
-#include <wrl/client.h>
-#endif
-#include <dxcapi.h>
-
 
 namespace fs = std::filesystem;
 
@@ -133,18 +125,6 @@ namespace ShaderCooker
 
         shader = _shaders[index];
         return true;
-    }
-
-    DxcDefine MakeDefine(const std::wstring& name, const std::wstring& value)
-    {
-        DxcDefine define;
-        define.Name = new wchar_t[name.size() + 1];
-        wmemcpy((wchar_t*)define.Name, name.c_str(), name.size() + 1);
-
-        define.Value = new wchar_t[value.size() + 1];
-        wmemcpy((wchar_t*)define.Value, value.c_str(), value.size() + 1);
-
-        return define;
     }
 
     void ShaderCompiler::Run()

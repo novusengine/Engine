@@ -1,4 +1,4 @@
-local mod = Solution.Util.CreateModuleTable("ShaderCooker", { "base", "fileformat", "dxcompiler", "slang-slang" })
+local mod = Solution.Util.CreateModuleTable("ShaderCooker", { "base", "fileformat", "slang-slang" })
 dependson { "Gen-Meta" }
 
 Solution.Util.CreateStaticLib(mod.Name, Solution.Projects.Current.BinDir, mod.Dependencies, function()

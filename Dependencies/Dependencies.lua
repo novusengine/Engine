@@ -8,7 +8,6 @@ local dependencies =
     "vulkan/vulkan.lua",
     "base64/base64.lua",
     "catch2/catch2.lua",
-    "dxcompiler/dxcompiler.lua",
     "enkits/enkiTS.lua",
     "entt/entt.lua",
     "glfw/glfw.lua",
