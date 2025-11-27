@@ -155,8 +155,23 @@ Slang.SetupCore = function()
         {
             sourceDir .. "/*.h",
             sourceDir .. "/*.cpp",
-            sourceDir .. "/windows/*.cpp"
+            
         }
+
+        if os.target() == "windows" then
+            local platformFiles =
+            {
+                sourceDir .. "/windows/*.cpp"
+            }
+            Solution.Util.MergeIntoTable(files, platformFiles)
+        else
+            local platformFiles =
+            {
+                sourceDir .. "/unix/*.cpp"
+            }
+            Solution.Util.MergeIntoTable(files, platformFiles)
+        end
+
         Solution.Util.SetFiles(files)
         Solution.Util.SetIncludes(includeDir)
         Solution.Util.SetDefines(defines)
@@ -182,9 +197,17 @@ Slang.SetupCompilerCore = function()
         local files =
         {
             sourceDir .. "/*.h",
-            sourceDir .. "/*.cpp",
-            sourceDir .. "/windows/*.cpp"
+            sourceDir .. "/*.cpp"
         }
+
+        if os.target() == "windows" then
+            local platformFiles =
+            {
+                sourceDir .. "/windows/*.cpp"
+            }
+            Solution.Util.MergeIntoTable(files, platformFiles)
+        end
+
         Solution.Util.SetFiles(files)
         Solution.Util.SetIncludes(includeDir)
         Solution.Util.SetDefines(defines)
