@@ -93,6 +93,19 @@ public:
     virtual void SetShowFlagCVar(StringUtils::StringHash hash, const ShowFlag& value) = 0;
     virtual void SetShowFlagCVar(CVarCategory category, StringUtils::StringHash hash, const ShowFlag& value) = 0;
 
+    virtual void AddOnFloatValueChanged(StringUtils::StringHash hash, std::function<void(const f64&)> callback) = 0;
+    virtual void AddOnFloatValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const f64&)> callback) = 0;
+    virtual void AddOnIntValueChanged(StringUtils::StringHash hash, std::function<void(const i32&)> callback) = 0;
+    virtual void AddOnIntValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const i32&)> callback) = 0;
+    virtual void AddOnStringValueChanged(StringUtils::StringHash hash, std::function<void(const std::string&)> callback) = 0;
+    virtual void AddOnStringValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const std::string&)> callback) = 0;
+    virtual void AddOnVecFloatValueChanged(StringUtils::StringHash hash, std::function<void(const vec4&)> callback) = 0;
+    virtual void AddOnVecFloatValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const vec4&)> callback) = 0;
+    virtual void AddOnVecIntValueChanged(StringUtils::StringHash hash, std::function<void(const ivec4&)> callback) = 0;
+    virtual void AddOnVecIntValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const ivec4&)> callback) = 0;
+    virtual void AddOnShowFlagValueChanged(StringUtils::StringHash hash, std::function<void(const ShowFlag&)> callback) = 0;
+    virtual void AddOnShowFlagValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const ShowFlag&)> callback) = 0;
+
     virtual CVarParameter* CreateFloatCVar(CVarCategory category, const char* name, const char* description, f64 defaultValue, f64 currentValue, CVarFlags flags = CVarFlags::None) = 0;
     virtual CVarParameter* CreateIntCVar(CVarCategory category, const char* name, const char* description, i32 defaultValue, i32 currentValue, CVarFlags flags = CVarFlags::None) = 0;
     virtual CVarParameter* CreateStringCVar(CVarCategory category, const char* name, const char* description, const char* defaultValue, const char* currentValue, CVarFlags flags = CVarFlags::None) = 0;
@@ -124,6 +137,8 @@ public:
     f32 GetFloat();
     f32* GetFloatPtr();
     void Set(f64 val);
+
+    void AddOnValueChanged(std::function<void(const f64&)> callback);
 };
 
 struct AutoCVar_Int : AutoCVar
@@ -136,6 +151,8 @@ public:
     void Set(i32 val);
 
     void Toggle();
+
+    void AddOnValueChanged(std::function<void(const i32&)> callback);
 };
 
 struct AutoCVar_String : AutoCVar
@@ -145,6 +162,8 @@ public:
 
     const char* Get();
     void Set(std::string&& val);
+
+    void AddOnValueChanged(std::function<void(const std::string&)> callback);
 };
 
 struct AutoCVar_VecFloat : AutoCVar
@@ -154,6 +173,8 @@ public:
 
     vec4 Get();
     void Set(const vec4& val);
+
+    void AddOnValueChanged(std::function<void(const vec4&)> callback);
 };
 
 struct AutoCVar_VecInt : AutoCVar
@@ -163,6 +184,8 @@ public:
 
     ivec4 Get();
     void Set(const ivec4& val);
+
+    void AddOnValueChanged(std::function<void(const ivec4&)> callback);
 };
 
 struct AutoCVar_ShowFlag : AutoCVar
@@ -172,4 +195,6 @@ public:
 
     ShowFlag Get();
     void Set(const ShowFlag& val);
+
+    void AddOnValueChanged(std::function<void(const ShowFlag&)> callback);
 };

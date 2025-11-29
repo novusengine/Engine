@@ -7,13 +7,17 @@
 #include <cassert>
 #include <filesystem>
 
-struct DxcDefine;
-
 namespace ShaderCooker
 {
+    struct Define
+    {
+        std::string name;
+        std::string value;
+    };
+
     struct Permutation
     {
-        std::vector<DxcDefine*> defines;
+        std::vector<Define> defines;
     };
 
     struct PermutationGroup

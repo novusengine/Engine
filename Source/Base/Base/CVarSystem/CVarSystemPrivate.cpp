@@ -240,6 +240,91 @@ void CVarSystemImpl::SetShowFlagCVar(CVarCategory category, StringUtils::StringH
     SetShowFlagCVar(qualifiedNameHash, value);
 }
 
+void CVarSystemImpl::AddOnFloatValueChanged(StringUtils::StringHash hash, std::function<void(const f64&)> callback) 
+{
+    GetCVarArray<f64>()->GetCurrentStorage(GetCVar(hash)->arrayIndex)->onValueChangedCallbacks.push_back(callback);
+}
+void CVarSystemImpl::AddOnFloatValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const f64&)> callback)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    AddOnFloatValueChanged(qualifiedNameHash, callback);
+}
+void CVarSystemImpl::AddOnIntValueChanged(StringUtils::StringHash hash, std::function<void(const i32&)> callback)
+{
+    GetCVarArray<i32>()->GetCurrentStorage(GetCVar(hash)->arrayIndex)->onValueChangedCallbacks.push_back(callback);
+}
+void CVarSystemImpl::AddOnIntValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const i32&)> callback)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    AddOnIntValueChanged(qualifiedNameHash, callback);
+}
+void CVarSystemImpl::AddOnStringValueChanged(StringUtils::StringHash hash, std::function<void(const std::string&)> callback)
+{
+    GetCVarArray<std::string>()->GetCurrentStorage(GetCVar(hash)->arrayIndex)->onValueChangedCallbacks.push_back(callback);
+}
+void CVarSystemImpl::AddOnStringValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const std::string&)> callback)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    AddOnStringValueChanged(qualifiedNameHash, callback);
+}
+void CVarSystemImpl::AddOnVecFloatValueChanged(StringUtils::StringHash hash, std::function<void(const vec4&)> callback)
+{
+    GetCVarArray<vec4>()->GetCurrentStorage(GetCVar(hash)->arrayIndex)->onValueChangedCallbacks.push_back(callback);
+}
+void CVarSystemImpl::AddOnVecFloatValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const vec4&)> callback)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    AddOnVecFloatValueChanged(qualifiedNameHash, callback);
+}
+void CVarSystemImpl::AddOnVecIntValueChanged(StringUtils::StringHash hash, std::function<void(const ivec4&)> callback)
+{
+    GetCVarArray<ivec4>()->GetCurrentStorage(GetCVar(hash)->arrayIndex)->onValueChangedCallbacks.push_back(callback);
+}
+void CVarSystemImpl::AddOnVecIntValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const ivec4&)> callback)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    AddOnVecIntValueChanged(qualifiedNameHash, callback);
+}
+void CVarSystemImpl::AddOnShowFlagValueChanged(StringUtils::StringHash hash, std::function<void(const ShowFlag&)> callback)
+{
+    GetCVarArray<ShowFlag>()->GetCurrentStorage(GetCVar(hash)->arrayIndex)->onValueChangedCallbacks.push_back(callback);
+}
+void CVarSystemImpl::AddOnShowFlagValueChanged(CVarCategory category, StringUtils::StringHash hash, std::function<void(const ShowFlag&)> callback)
+{
+    u32 qualifiedNameHash = 0;
+    if (!LookupCVar(category, hash, qualifiedNameHash))
+    {
+        return;
+    }
+
+    AddOnShowFlagValueChanged(qualifiedNameHash, callback);
+}
+
 CVarParameter* CVarSystemImpl::CreateFloatCVar(CVarCategory category, const char* name, const char* description, f64 defaultValue, f64 currentValue, CVarFlags flags)
 {
     CVarParameter* param = nullptr;
@@ -452,6 +537,11 @@ void AutoCVar_Float::Set(f64 f)
     CVarSystemImpl::Get()->GetCVarArray<f64>()->SetCurrent(f, index);
 }
 
+void AutoCVar_Float::AddOnValueChanged(std::function<void(const f64&)> callback)
+{
+    CVarSystemImpl::Get()->GetCVarArray<f64>()->GetCurrentStorage(index)->onValueChangedCallbacks.push_back(callback);
+}
+
 AutoCVar_Int::AutoCVar_Int(CVarCategory category, const char* name, const char* description, i32 defaultValue, CVarFlags flags)
 {
     CVarParameter* cvar = CVarSystem::Get()->CreateIntCVar(category, name, description, defaultValue, defaultValue, flags);
@@ -485,6 +575,11 @@ void AutoCVar_Int::Toggle()
     Set(enabled ? 0 : 1);
 }
 
+void AutoCVar_Int::AddOnValueChanged(std::function<void(const i32&)> callback)
+{
+    CVarSystemImpl::Get()->GetCVarArray<i32>()->GetCurrentStorage(index)->onValueChangedCallbacks.push_back(callback);
+}
+
 AutoCVar_String::AutoCVar_String(CVarCategory category, const char* name, const char* description, const char* defaultValue, CVarFlags flags)
 {
     CVarParameter* cvar = CVarSystem::Get()->CreateStringCVar(category, name, description, defaultValue, defaultValue, flags);
@@ -499,6 +594,11 @@ const char* AutoCVar_String::Get()
 void AutoCVar_String::Set(std::string&& val)
 {
     CVarSystemImpl::Get()->GetCVarArray<std::string>()->SetCurrent(val, index);
+}
+
+void AutoCVar_String::AddOnValueChanged(std::function<void(const std::string&)> callback)
+{
+    CVarSystemImpl::Get()->GetCVarArray<std::string>()->GetCurrentStorage(index)->onValueChangedCallbacks.push_back(callback);
 }
 
 AutoCVar_VecFloat::AutoCVar_VecFloat(CVarCategory category, const char* name, const char* description, const vec4& defaultValue, CVarFlags flags /*= CVarFlags::None*/)
@@ -517,6 +617,11 @@ void AutoCVar_VecFloat::Set(const vec4& val)
     CVarSystemImpl::Get()->GetCVarArray<vec4>()->SetCurrent(val, index);
 }
 
+void AutoCVar_VecFloat::AddOnValueChanged(std::function<void(const vec4&)> callback)
+{
+    CVarSystemImpl::Get()->GetCVarArray<vec4>()->GetCurrentStorage(index)->onValueChangedCallbacks.push_back(callback);
+}
+
 AutoCVar_VecInt::AutoCVar_VecInt(CVarCategory category, const char* name, const char* description, const ivec4& defaultValue, CVarFlags flags)
 {
     CVarParameter* cvar = CVarSystem::Get()->CreateVecIntCVar(category, name, description, defaultValue, defaultValue, flags);
@@ -533,6 +638,11 @@ void AutoCVar_VecInt::Set(const ivec4& val)
     CVarSystemImpl::Get()->GetCVarArray<ivec4>()->SetCurrent(val, index);
 }
 
+void AutoCVar_VecInt::AddOnValueChanged(std::function<void(const ivec4&)> callback)
+{
+    CVarSystemImpl::Get()->GetCVarArray<ivec4>()->GetCurrentStorage(index)->onValueChangedCallbacks.push_back(callback);
+}
+
 AutoCVar_ShowFlag::AutoCVar_ShowFlag(CVarCategory category, const char* name, const char* description, const ShowFlag& defaultValue, CVarFlags flags)
 {
     CVarParameter* cvar = CVarSystem::Get()->CreateShowFlagCVar(category, name, description, defaultValue, defaultValue, flags);
@@ -547,4 +657,9 @@ ShowFlag AutoCVar_ShowFlag::Get()
 void AutoCVar_ShowFlag::Set(const ShowFlag& val)
 {
     CVarSystemImpl::Get()->GetCVarArray<ShowFlag>()->SetCurrent(val, index);
+}
+
+void AutoCVar_ShowFlag::AddOnValueChanged(std::function<void(const ShowFlag&)> callback)
+{
+    CVarSystemImpl::Get()->GetCVarArray<ShowFlag>()->GetCurrentStorage(index)->onValueChangedCallbacks.push_back(callback);
 }

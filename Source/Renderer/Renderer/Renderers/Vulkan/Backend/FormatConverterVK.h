@@ -1,4 +1,5 @@
 #pragma once
+#include "Renderer/DescriptorMeta.h"
 #include "Renderer/RenderStates.h"
 
 #include <Base/Types.h>
@@ -35,6 +36,7 @@ namespace Renderer
 
             static bool ToAnisotropyEnabled(SamplerFilter filter);
             static u32 ToByteSize(const InputFormat format);
+            static DescriptorMetaType ToDescriptorMetaType(const VkDescriptorType descriptorType);
         };
     }
 }

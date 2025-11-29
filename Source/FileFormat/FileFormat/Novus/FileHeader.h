@@ -15,7 +15,8 @@ public:
         MapChunk,
         MapObject,
         MapObjectGroup,
-        ComplexModel
+        ComplexModel,
+        ShaderPack
     };
 
 public:

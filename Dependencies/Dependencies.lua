@@ -8,7 +8,6 @@ local dependencies =
     "vulkan/vulkan.lua",
     "base64/base64.lua",
     "catch2/catch2.lua",
-    "dxcompiler/dxcompiler.lua",
     "enkits/enkiTS.lua",
     "entt/entt.lua",
     "glfw/glfw.lua",
@@ -31,7 +30,8 @@ local dependencies =
     "rtree/rtree.lua",
     "libsodium/libsodium.lua",
     "spake2-ee/spake2-ee.lua",
-    "recastnavigation/recastnavigation.lua"
+    "recastnavigation/recastnavigation.lua",
+    "slang/slang.lua"
 }
 
 for k,v in pairs(dependencies) do

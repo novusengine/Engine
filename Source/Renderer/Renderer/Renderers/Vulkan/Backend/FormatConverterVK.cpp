@@ -604,5 +604,38 @@ namespace Renderer
 
             return 1;
         }
+
+        DescriptorMetaType FormatConverterVK::ToDescriptorMetaType(const VkDescriptorType descriptorType)
+        {
+            switch (descriptorType)
+            {
+                case VK_DESCRIPTOR_TYPE_SAMPLER:
+                    return DescriptorMetaType::SAMPLER;
+                case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+                    return DescriptorMetaType::COMBINED_IMAGE_SAMPLER;
+                case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+                    return DescriptorMetaType::SAMPLED_IMAGE;
+                case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                    return DescriptorMetaType::STORAGE_IMAGE;
+                case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+                    return DescriptorMetaType::UNIFORM_TEXEL_BUFFER;
+                case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+                    return DescriptorMetaType::STORAGE_TEXEL_BUFFER;
+                case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                    return DescriptorMetaType::UNIFORM_BUFFER;
+                case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+                    return DescriptorMetaType::STORAGE_BUFFER;
+                case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+                    return DescriptorMetaType::UNIFORM_BUFFER_DYNAMIC;
+                case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+                    return DescriptorMetaType::STORAGE_BUFFER_DYNAMIC;
+                case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+                    return DescriptorMetaType::INPUT_ATTACHMENT;
+                default:
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more descriptor types?");
+            }
+
+            return DescriptorMetaType();
+        }
     }
 }
