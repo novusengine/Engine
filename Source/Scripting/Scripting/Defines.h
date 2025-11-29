@@ -5,8 +5,10 @@
 
 #include <robinhood/robinhood.h>
 
-template <u16 TEventDataID>
-struct LuaEventDataTraits;
+namespace Generated {
+    template <u16 TEventDataID>
+    struct LuaEventDataTraits;
+}
 
 struct lua_State;
 typedef i32(*lua_CFunction)(lua_State* L);
@@ -21,7 +23,7 @@ namespace Scripting
     template <typename T>
     concept LuaEventTypeConcept = requires(T t)
     {
-        { EnumTraits<std::decay_t<T>>::Meta::EnumID } -> std::convertible_to<u16>;
+        { Generated::EnumTraits<std::decay_t<T>>::Meta::EnumID } -> std::convertible_to<u16>;
     };
 
     template <typename T>

@@ -41,8 +41,10 @@ using mat4x4 = glm::mat4x4;
 using mat4a = glm::mat4x3;
 using quat = glm::quat;
 
-template <typename TEnum>
-struct EnumTraits;
+namespace Generated {
+    template <typename TEnum>
+    struct EnumTraits;
+}
 
 #define DECLARE_GENERIC_BITWISE_OPERATORS(T) inline const T operator~ (T a) { return (T)~(i32)a; } \
 inline const T operator| (T a, T b) { return (T)((i32)a | (i32)b); } \
