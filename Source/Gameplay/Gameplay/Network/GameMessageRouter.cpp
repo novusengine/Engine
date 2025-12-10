@@ -2,7 +2,7 @@
 
 #include <Base/Memory/Bytebuffer.h>
 
-#include <Meta/Generated/Shared/NetworkPacket.h>
+#include <MetaGen/Shared/Packet/Packet.h>
 
 namespace Network
 {
@@ -18,7 +18,7 @@ namespace Network
         if (!message.buffer->Get(header))
             return false;
 
-        if (header.opcode == Generated::InvalidPacket::PACKET_ID || header.opcode >= (u16)Generated::PacketListEnum::Count)
+        if (header.opcode == (u16)MetaGen::PacketListEnum::Invalid || header.opcode >= (u16)MetaGen::PacketListEnum::Count)
             return false;
 
         return true;

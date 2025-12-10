@@ -5,7 +5,7 @@
 #include <Base/FunctionTraits.h>
 #include <Base/Memory/Bytebuffer.h>
 
-#include <Meta/Generated/Shared/PacketList.h>
+#include <MetaGen/PacketList.h>
 
 #include <Network/Define.h>
 
@@ -76,6 +76,6 @@ namespace Network
         bool CallHandler(SocketID socketID, Network::MessageHeader& header, Message& message);
 
     private:
-        GameMessageHandler _handlers[(u16)Generated::PacketListEnum::Count];
+        GameMessageHandler _handlers[(u16)MetaGen::PacketListEnum::Count];
     };
 }

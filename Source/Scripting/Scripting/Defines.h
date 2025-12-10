@@ -21,14 +21,14 @@ namespace Scripting
     template <typename T>
     concept LuaEventTypeConcept = requires(T t)
     {
-        { EnumTraits<std::decay_t<T>>::Meta::EnumID } -> std::convertible_to<u16>;
+        { EnumTraits<std::decay_t<T>>::Meta::ENUM_ID } -> std::convertible_to<u16>;
     };
 
     template <typename T>
     concept LuaEventDataConcept = requires(T t, lua_State* state)
     {
-        { std::decay_t<T>::StructID } -> std::convertible_to<u16>;
-        { std::decay_t<T>::NumParameters } -> std::convertible_to<u16>;
+        { std::decay_t<T>::STRUCT_ID } -> std::convertible_to<u16>;
+        { std::decay_t<T>::NUM_PARAMETERS } -> std::convertible_to<u16>;
 
         { t.Push(state) } -> std::same_as<void>;
     };

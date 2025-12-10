@@ -1,8 +1,6 @@
 #pragma once
 #include <Base/Types.h>
 
-#include <Meta/Generated/Shared/NetworkEnum.h>
-
 #include <memory>
 
 class Bytebuffer;
@@ -18,7 +16,7 @@ namespace Network
         
         { t.Serialize(buffer) } -> std::same_as<bool>;
         { t.Deserialize(buffer) } -> std::same_as<bool>;
-        { t.GetSerializedSize() } -> std::same_as<u16>;
+        { t.GetSerializedSize() } -> std::same_as<u32>;
     };
 
     struct ConnectionInfo

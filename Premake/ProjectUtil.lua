@@ -289,6 +289,8 @@ Solution.Util.CreateProject = function(name, projectType, binDir, dependencies, 
     if callback then
         callback()
     end
+    
+    vpaths {}
 end
 
 Solution.Util.CreateStaticLib = function(name, binDir, dependencies, callback)

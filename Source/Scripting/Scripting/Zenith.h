@@ -300,15 +300,15 @@ namespace Scripting
             auto& eventTypeMap = eventState.eventTypeToState;
 
             using Meta = typename EnumTraits<EventType>::Meta;
-            u16 eventTypeID = Meta::EnumID;
+            u16 eventTypeID = Meta::ENUM_ID;
             if (eventTypeMap.contains(eventTypeID))
                 return false;
 
             eventTypeMap[eventTypeID] = EventTypeState();
 
-            CreateTable(Meta::EnumName.data());
+            CreateTable(Meta::ENUM_NAME.data());
 
-            for (const auto& pair : Meta::EnumList)
+            for (const auto& pair : Meta::ENUM_FIELD_LIST)
             {
                 u32 eventID = static_cast<u32>(pair.second) | (static_cast<u32>(eventTypeID) << 16);
                 AddTableField(pair.first.data(), eventID);
@@ -322,8 +322,8 @@ namespace Scripting
         template <LuaEventDataConcept EventDataType, LuaEventTypeConcept EventType, typename Callback = std::nullptr_t> requires LuaEventCallbackConcept<Callback, EventDataType>
         bool RegisterEventTypeID(EventType eventType, Callback&& callback = nullptr)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
-            u16 eventDataID = std::decay_t<EventDataType>::StructID;
+            u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
+            u16 eventDataID = std::decay_t<EventDataType>::STRUCT_ID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
             auto& eventTypeMap = eventState.eventTypeToState;
@@ -415,7 +415,7 @@ namespace Scripting
         template <LuaEventTypeConcept EventType>
         bool RegisterEventCallback(EventType eventType, u16 variantID, i32 funcRef)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
+            u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
             return RegisterEventCallbackRaw(eventTypeID, eventTypeVal, variantID, funcRef);
@@ -424,8 +424,8 @@ namespace Scripting
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
         bool CallEvent(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
-            u16 eventDataID = std::decay_t<EventDataType>::StructID;
+            u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
+            u16 eventDataID = std::decay_t<EventDataType>::STRUCT_ID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
             auto& eventTypeMap = eventState.eventTypeToState;
@@ -470,8 +470,8 @@ namespace Scripting
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
         bool CallEventBool(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
         {
-            u16 eventTypeID = EnumTraits<EventType>::Meta::EnumID;
-            u16 eventDataID = std::decay_t<EventDataType>::StructID;
+            u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
+            u16 eventDataID = std::decay_t<EventDataType>::STRUCT_ID;
             u16 eventTypeVal = static_cast<u16>(eventType);
 
             auto& eventTypeMap = eventState.eventTypeToState;
@@ -497,7 +497,7 @@ namespace Scripting
                 return false;
 
             u32 packedEventID = static_cast<u32>(eventTypeVal) | (static_cast<u32>(eventTypeID) << 16);
-            bool hasParameters = EventDataType::NumParameters > 0;
+            bool hasParameters = EventDataType::NUM_PARAMETERS > 0;
             u32 numParametersToPush = 1 + (1 * hasParameters); // 1 for eventID, 1 for eventData if it has parameters
 
             Push((u32)packedEventID);

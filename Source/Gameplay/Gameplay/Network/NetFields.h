@@ -25,10 +25,10 @@ namespace Network
     struct NetFields
     {
         using Meta = typename EnumTraits<TEnum>::Meta;
-        static constexpr u16 NumFields = static_cast<u16>(Meta::EnumList.size());
+        static constexpr u16 NUM_FIELDS = static_cast<u16>(Meta::ENUM_FIELD_LIST.size());
 
     public:
-        static_assert(NumFields > 0, "NumFields must be greater than zero.");
+        static_assert(NUM_FIELDS > 0, "NUM_FIELDS must be greater than zero.");
         
         template <typename T> requires std::is_trivially_copyable_v<std::decay_t<T>>
         void SetField(TEnum startField, T&& value, u8 fieldByteOffset = 0, u8 fieldBitOffset = 0, u8 bitCount = sizeof(std::decay_t<T>) * 8)
@@ -53,7 +53,7 @@ namespace Network
 
             u16 startFieldIndex = static_cast<u16>(startField);
             constexpr u16 numFieldsTouched = (sizeof(DecayedT) + fieldSize - 1) / fieldSize;
-            NC_ASSERT(startFieldIndex + numFieldsTouched <= NumFields, "Attempting to Set NetField out of bounds");
+            NC_ASSERT(startFieldIndex + numFieldsTouched <= NUM_FIELDS, "Attempting to Set NetField out of bounds");
 
             std::byte* base = reinterpret_cast<std::byte*>(fields);
             std::byte* dest = base + (startFieldIndex * fieldSize) + fieldByteOffset;
@@ -99,7 +99,7 @@ namespace Network
             constexpr u16 fieldBits = fieldSize * 8;
 
             const u16 startFieldIndex = static_cast<u16>(startField);
-            NC_ASSERT(startFieldIndex < NumFields, "Start field index out of bounds.");
+            NC_ASSERT(startFieldIndex < NUM_FIELDS, "Start field index out of bounds.");
 
             const std::byte* base = reinterpret_cast<const std::byte*>(fields);
             const std::byte* src = base + (startFieldIndex * fieldSize) + fieldByteOffset;
@@ -109,7 +109,7 @@ namespace Network
             {
                 // Multi-field or full-field read
                 NC_ASSERT(fieldByteOffset == 0 && fieldBitOffset == 0, "Byte/Bit offsets only allowed for partial reads.");
-                NC_ASSERT(startFieldIndex + ((typeSize + fieldSize - 1) / fieldSize) <= NumFields, "Read exceeds field range.");
+                NC_ASSERT(startFieldIndex + ((typeSize + fieldSize - 1) / fieldSize) <= NUM_FIELDS, "Read exceeds field range.");
 
                 T result;
                 std::memcpy(&result, src, sizeof(T));
@@ -146,7 +146,7 @@ namespace Network
         T* GetFieldPtr(TEnum startField)
         {
             u16 startFieldIndex = static_cast<u16>(startField);
-            NC_ASSERT(startFieldIndex < NumFields, "Start field index out of bounds.");
+            NC_ASSERT(startFieldIndex < NUM_FIELDS, "Start field index out of bounds.");
 
             T* ptr = reinterpret_cast<T*>(&fields[startFieldIndex]);
             return ptr;
@@ -154,7 +154,7 @@ namespace Network
 
         bool SerializeSetFields(Bytebuffer* buffer)
         {
-            constexpr u16 NumMaskQwords = (FieldMaskSize + 7) / 8;
+            constexpr u16 NumMaskQwords = (FIELD_MASK_SIZE + 7) / 8;
 
             const u64* mask64 = reinterpret_cast<const u64*>(setFieldMask);
             const u16 lastQwordIndex = NumMaskQwords - 1;
@@ -180,7 +180,7 @@ namespace Network
 
             const u16 startByte = firstQword * 8;
             const u16 endByte = (lastQword + 1) * 8;
-            const u16 maskCount = (endByte > FieldMaskSize ? FieldMaskSize : endByte) - startByte;
+            const u16 maskCount = (endByte > FIELD_MASK_SIZE ? FIELD_MASK_SIZE : endByte) - startByte;
 
             // Header: start byte | number of mask bytes written
             buffer->PutU8(static_cast<u8>(startByte));
@@ -192,7 +192,7 @@ namespace Network
             // Process 64-bit chunks for set bits
             const u16 startBlock = startByte * 8;
             const u16 endBlock = endByte * 8;
-            const u16 limit = (endBlock > NumFields) ? NumFields : endBlock;
+            const u16 limit = (endBlock > NUM_FIELDS) ? NUM_FIELDS : endBlock;
 
             for (u16 q = firstQword; q <= lastQword; ++q)
             {
@@ -224,7 +224,7 @@ namespace Network
             if (!isDirty)
                 return false;
 
-            constexpr u16 NumMaskQwords = (FieldMaskSize + 7) / 8;
+            constexpr u16 NumMaskQwords = (FIELD_MASK_SIZE + 7) / 8;
 
             const u64* mask64 = reinterpret_cast<const u64*>(dirtyFieldMask);
             const u16 lastQwordIndex = NumMaskQwords - 1;
@@ -251,7 +251,7 @@ namespace Network
 
             const u16 startByte = firstQword * 8;
             const u16 endByte = (lastQword + 1) * 8;
-            const u16 maskCount = (endByte > FieldMaskSize ? FieldMaskSize : endByte) - startByte;
+            const u16 maskCount = (endByte > FIELD_MASK_SIZE ? FIELD_MASK_SIZE : endByte) - startByte;
 
             // Header: start byte | number of mask bytes written
             buffer->PutU8(static_cast<u8>(startByte));
@@ -263,7 +263,7 @@ namespace Network
             // Process 64-bit chunks for dirty bits
             const u16 startBlock = startByte * 8;
             const u16 endBlock = endByte * 8;
-            const u16 limit = (endBlock > NumFields) ? NumFields : endBlock;
+            const u16 limit = (endBlock > NUM_FIELDS) ? NUM_FIELDS : endBlock;
 
             for (u16 q = firstQword; q <= lastQword; ++q)
             {
@@ -294,7 +294,7 @@ namespace Network
         void SetFieldsDirty(TEnum startField, u16 numFields = 1)
         {
             u16 startFieldIndex = static_cast<u16>(startField);
-            if (startFieldIndex + numFields > NumFields)
+            if (startFieldIndex + numFields > NUM_FIELDS)
                 return;
 
             const u16 startByte = startFieldIndex / 8;
@@ -339,12 +339,12 @@ namespace Network
         }
 
     public:
-        static constexpr u16 FieldMaskSize = (NumFields + 7) / 8;
+        static constexpr u16 FIELD_MASK_SIZE = (NUM_FIELDS + 7) / 8;
 
         // Fields are stored as a 4 byte integer array, however dirtymask is stored as a byte array where one bit refers to 1 field
-        u32 fields[NumFields];
-        u8 setFieldMask[FieldMaskSize];
-        u8 dirtyFieldMask[FieldMaskSize];
+        u32 fields[NUM_FIELDS];
+        u8 setFieldMask[FIELD_MASK_SIZE];
+        u8 dirtyFieldMask[FIELD_MASK_SIZE];
         bool isDirty = false;
     };
 

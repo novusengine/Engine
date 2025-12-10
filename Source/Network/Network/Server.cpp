@@ -5,7 +5,7 @@
 #include <Base/Memory/Bytebuffer.h>
 #include <Base/Util/DebugHandler.h>
 
-#include <Meta/Generated/Shared/NetworkPacket.h>
+#include <MetaGen/Shared/Packet/Packet.h>
 
 #include <memory>
 #include <chrono>
@@ -129,13 +129,13 @@ namespace Network
                 return;
             }
         
-            if (header->opcode == Generated::PingPacket::PACKET_ID)
+            if (header->opcode == MetaGen::Shared::Packet::ClientPingPacket::PACKET_ID)
             {
                 auto pongBuffer = Bytebuffer::Borrow<sizeof(MessageHeader)>();
         
                 MessageHeader pongHeader =
                 {
-                    .opcode = Generated::PongPacket::PACKET_ID,
+                    .opcode = MetaGen::Shared::Packet::ServerPongPacket::PACKET_ID,
                     .size = 0
                 };
                 pongBuffer->Put(pongHeader);

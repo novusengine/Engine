@@ -3,7 +3,8 @@
 
 #include <Base/Types.h>
 
-#include <Meta/Generated/Shared/NetFieldsEnum.h>
+#include <MetaGen/EnumTraits.h>
+#include <MetaGen/Shared/NetField/NetField.h>
 
 namespace Network
 {
@@ -20,9 +21,9 @@ namespace Network
         Connected
     };
 
-    using ObjectNetFields = NetFields<Generated::ObjectNetFieldsEnum>;
-    using ObjectNetFieldsListener = NetFieldListener<Generated::ObjectNetFieldsEnum>;
+    using ObjectNetFields = NetFields<MetaGen::Shared::NetField::ObjectNetFieldEnum>;
+    using ObjectNetFieldsListener = NetFieldListener<MetaGen::Shared::NetField::ObjectNetFieldEnum>;
 
-    using UnitNetFields = NetFields<Generated::UnitNetFieldsEnum>;
-    using UnitNetFieldsListener = NetFieldListener<Generated::UnitNetFieldsEnum>;
+    using UnitNetFields = NetFields<MetaGen::Shared::NetField::UnitNetFieldEnum>;
+    using UnitNetFieldsListener = NetFieldListener<MetaGen::Shared::NetField::UnitNetFieldEnum>;
 }

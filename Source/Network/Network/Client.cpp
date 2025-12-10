@@ -2,6 +2,8 @@
 
 #include "Base/Util/DebugHandler.h"
 
+#include <MetaGen/PacketList.h>
+
 #include <entt/entt.hpp>
 #include <tracy/Tracy.hpp>
 
@@ -114,9 +116,10 @@ namespace Network
                     Stop();
                     return;
                 }
-        
+
                 if (header->size > 0)
                 {
+                    _readBuffer->SkipRead(sizeof(MessageHeader));
                     ReadMessageBody();
                 }
                 else
@@ -153,7 +156,7 @@ namespace Network
             if (!ec)
             {
                 auto* header = reinterpret_cast<MessageHeader*>(_readBuffer->GetDataPointer());
-                _readBuffer->SkipRead(sizeof(MessageHeader));
+                _readBuffer->SkipWrite(length);
         
                 std::shared_ptr<Bytebuffer> messageBuffer = Bytebuffer::Borrow<DEFAULT_BUFFER_SIZE>();
                 {

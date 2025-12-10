@@ -79,16 +79,16 @@ namespace ClientDB
     };
 
     template <typename T>
-    concept ValidName = std::is_class_v<T> && requires { T::Name; } && std::same_as<std::decay_t<decltype(T::Name)>, std::string>;
+    concept ValidName = std::is_class_v<T> && requires { T::NAME; } && std::same_as<std::decay_t<decltype(T::NAME)>, std::string>;
     
     template <typename T>
-    concept ValidNameHash = std::is_class_v<T> && requires { T::NameHash; } && std::same_as<std::decay_t<decltype(T::NameHash)>, u32>;
+    concept ValidNameHash = std::is_class_v<T> && requires { T::NAME_HASH; } && std::same_as<std::decay_t<decltype(T::NAME_HASH)>, u32>;
 
     template <typename T>
-    concept ValidFieldInfo = std::is_class_v<T> && requires { T::FieldInfo; } && std::same_as<std::decay_t<decltype(T::FieldInfo)>, std::vector<FieldInfo>>;
+    concept ValidFieldList = std::is_class_v<T> && requires { T::FIELD_LIST; } && std::same_as<std::decay_t<decltype(T::FIELD_LIST)>, std::vector<FieldInfo>>;
 
     template <typename T>
-    concept ValidClientDB = ValidName<T> && ValidNameHash<T> && ValidFieldInfo<T>;
+    concept ValidClientDB = ValidName<T> && ValidNameHash<T> && ValidFieldList<T>;
 
     struct Data
     {
@@ -100,17 +100,17 @@ namespace ClientDB
         bool Initialize(const std::vector<FieldInfo>& fieldInfos);
         
         // Preferred overload if T meets the requirements.
-        template <typename T> requires ValidFieldInfo<T>
+        template <typename T> requires ValidFieldList<T>
         bool Initialize()
         {
-            return Initialize(T::FieldInfo);
+            return Initialize(T::FIELD_LIST);
         }
 
         // Fallback overload to produce a custom error message when T is invalid.
-        template <typename T, typename = std::enable_if_t<!ValidFieldInfo<T>>>
+        template <typename T, typename = std::enable_if_t<!ValidFieldList<T>>>
         bool Initialize()
         {
-            static_assert(ValidFieldInfo<T>, "T must be a struct or class with a static member FieldInfo of type std::vector<FieldInfo>");
+            static_assert(ValidFieldList<T>, "T must be a struct or class with a static member FIELD_LIST of type std::vector<FieldInfo>");
             return false;
         }
 

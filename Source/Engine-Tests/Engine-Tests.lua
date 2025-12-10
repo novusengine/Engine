@@ -8,10 +8,17 @@ Solution.Util.CreateConsoleApp(mod.Name, Solution.Projects.Current.BinDir, mod.D
     Solution.Util.SetLanguage("C++")
     Solution.Util.SetCppDialect(20)
 
+    local projFile = mod.Path .. "/" .. mod.Name .. ".lua"
     local files = Solution.Util.GetFilesForCpp(mod.Path)
+    table.insert(files, projFile)
+
     Solution.Util.SetFiles(files)
     Solution.Util.SetIncludes(mod.Path)
     Solution.Util.SetDefines(defines)
     
-    vpaths { ["Tests"] = "**" }
+    vpaths {
+        ["/*"] = { "*.lua" },
+        ["Catch2/*"] = { "../../Dependencies/catch2/catch2/**" },
+        ["Tests/*"] = { mod.Name .. "/**" }
+    }
 end)
