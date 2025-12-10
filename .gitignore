@@ -30,7 +30,7 @@
 *.out
 *.app
 
-Source/Meta/Meta/Generated
+Source/Meta/MetaGen
 !Dependencies/libsodium/libsodium/lib/windows/*.lib
 build*/
 Build*/
