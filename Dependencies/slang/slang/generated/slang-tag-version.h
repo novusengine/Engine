@@ -1,1 +1,0 @@
-#define SLANG_TAG_VERSION "v2025.19.1"

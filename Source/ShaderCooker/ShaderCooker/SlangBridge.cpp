@@ -6,9 +6,9 @@
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/StringUtils.h>
 
-#include <slang.h>
-#include <slang-com-helper.h>
-#include <slang-com-ptr.h>
+#include <slang/slang.h>
+#include <slang/slang-com-helper.h>
+#include <slang/slang-com-ptr.h>
 
 namespace fs = std::filesystem;
 
