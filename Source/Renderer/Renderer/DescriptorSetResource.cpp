@@ -1,18 +1,21 @@
 #include "DescriptorSetResource.h"
 
-#include <Renderer/RenderGraphResources.h>
 #include <Renderer/DescriptorSet.h>
+#include <Renderer/Renderer.h>
+#include <Renderer/RenderGraphResources.h>
+
+#include <tracy/Tracy.hpp>
 
 namespace Renderer
 {
     DescriptorSetResource::DescriptorSetResource()
-        : _id(DescriptorSetID::Invalid())
+        : _id(DescriptorSetResourceID::Invalid())
         , _renderGraphResources(nullptr)
     {
 
     }
 
-    DescriptorSetResource::DescriptorSetResource(DescriptorSetID id, RenderGraphResources& renderGraphResources)
+    DescriptorSetResource::DescriptorSetResource(DescriptorSetResourceID id, RenderGraphResources& renderGraphResources)
         : _id(id)
         , _renderGraphResources(&renderGraphResources)
     {
@@ -21,427 +24,217 @@ namespace Renderer
 
     void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, ImageResource resource, u32 mipLevel) const
     {
+        ZoneScoped;
         ImageID imageID = _renderGraphResources->GetImage(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_IMAGE;
-                boundDescriptors[i].imageID = imageID;
-                boundDescriptors[i].imageMipLevel = mipLevel;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_IMAGE;
-        boundDescriptor.imageID = imageID;
-        boundDescriptor.imageMipLevel = mipLevel;
-    }
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
 
-    void DescriptorSetResource::BindArray(StringUtils::StringHash nameHash, ImageResource resource, u32 mipLevel, u32 arrayIndex) const
-    {
-        ImageID imageID = _renderGraphResources->GetImage(resource);
-        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
 
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        // Verify non-mutable access type
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+        if (descriptorReflection.accessType != FileFormat::DescriptorAccessTypeReflection::Read)
         {
-            if (nameHash == boundDescriptors[i].nameHash && arrayIndex == boundDescriptors[i].arrayIndex)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_IMAGE_ARRAY;
-                boundDescriptors[i].imageID = imageID;
-                boundDescriptors[i].imageMipLevel = mipLevel;
-                boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSetResource::Bind: Tried to bind non-mutable ImageResources to a descriptor namehash '{}' that is not a read-only descriptor", nameHash.computedHash);
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_IMAGE_ARRAY;
-        boundDescriptor.imageID = imageID;
-        boundDescriptor.imageMipLevel = mipLevel;
-        boundDescriptor.arrayIndex = arrayIndex;
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptor(descriptorSetID, bindingIndex, imageID, mipLevel, DescriptorType::SampledImage, frameIndex);
     }
 
     void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, ImageMutableResource resource, u32 mipLevel) const
     {
+        ZoneScoped;
         ImageID imageID = _renderGraphResources->GetImage(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_IMAGE;
-                boundDescriptors[i].imageID = imageID;
-                boundDescriptors[i].imageMipLevel = mipLevel;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_IMAGE;
-        boundDescriptor.imageID = imageID;
-        boundDescriptor.imageMipLevel = mipLevel;
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
+
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
+
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+        DescriptorType descriptorType = (descriptorReflection.accessType == FileFormat::DescriptorAccessTypeReflection::Read) ? DescriptorType::SampledImage : DescriptorType::StorageImage;
+
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptor(descriptorSetID, bindingIndex, imageID, mipLevel, descriptorType, frameIndex);
     }
 
-    void DescriptorSetResource::BindArray(StringUtils::StringHash nameHash, ImageMutableResource resource, u32 mipLevel, u32 arrayIndex) const
+    void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, ImageMutableResource resource, u32 mipLevel, u32 mipCount) const
     {
+        ZoneScoped;
         ImageID imageID = _renderGraphResources->GetImage(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash && arrayIndex == boundDescriptors[i].arrayIndex)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_IMAGE_ARRAY;
-                boundDescriptors[i].imageID = imageID;
-                boundDescriptors[i].imageMipLevel = mipLevel;
-                boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_IMAGE_ARRAY;
-        boundDescriptor.imageID = imageID;
-        boundDescriptor.imageMipLevel = mipLevel;
-        boundDescriptor.arrayIndex = arrayIndex;
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
+
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
+
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+        DescriptorType descriptorType = (descriptorReflection.accessType == FileFormat::DescriptorAccessTypeReflection::Read) ? DescriptorType::SampledImage : DescriptorType::StorageImage;
+
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptorArray(descriptorSetID, bindingIndex, imageID, mipLevel, mipCount, descriptorType, frameIndex);
     }
 
     void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, DepthImageResource resource) const
     {
+        ZoneScoped;
         DepthImageID imageID = _renderGraphResources->GetImage(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE;
-                boundDescriptors[i].depthImageID = imageID;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_DEPTH_IMAGE;
-        boundDescriptor.depthImageID = imageID;
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
+
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
+
+        // Verify non-mutable access type
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+        if (descriptorReflection.accessType != FileFormat::DescriptorAccessTypeReflection::Read)
+        {
+            NC_LOG_CRITICAL("DescriptorSetResource::Bind: Tried to bind non-mutable DepthImageResource to a descriptor namehash '{}' that is not a read-only descriptor", nameHash.computedHash);
+        }
+
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptor(descriptorSetID, bindingIndex, imageID, DescriptorType::SampledImage, frameIndex);
     }
 
     void DescriptorSetResource::BindArray(StringUtils::StringHash nameHash, DepthImageResource resource, u32 arrayIndex) const
     {
+        ZoneScoped;
         DepthImageID imageID = _renderGraphResources->GetImage(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash && arrayIndex == boundDescriptors[i].arrayIndex)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE_ARRAY;
-                boundDescriptors[i].depthImageID = imageID;
-                boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_DEPTH_IMAGE_ARRAY;
-        boundDescriptor.depthImageID = imageID;
-        boundDescriptor.arrayIndex = arrayIndex;
-    }
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
 
-    void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, DepthImageMutableResource resource) const
-    {
-        DepthImageID imageID = _renderGraphResources->GetImage(resource);
-        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
 
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        // Verify non-mutable access type
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+        if (descriptorReflection.accessType != FileFormat::DescriptorAccessTypeReflection::Read)
         {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE;
-                boundDescriptors[i].depthImageID = imageID;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSetResource::Bind: Tried to bind non-mutable DepthImageResource to a descriptor namehash '{}' that is not a read-only descriptor", nameHash.computedHash);
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_DEPTH_IMAGE;
-        boundDescriptor.depthImageID = imageID;
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptorArray(descriptorSetID, bindingIndex, imageID, arrayIndex, DescriptorType::SampledImage, frameIndex);
     }
 
     void DescriptorSetResource::BindArray(StringUtils::StringHash nameHash, DepthImageMutableResource resource, u32 arrayIndex) const
     {
+        ZoneScoped;
         DepthImageID imageID = _renderGraphResources->GetImage(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash && arrayIndex == boundDescriptors[i].arrayIndex)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE_ARRAY;
-                boundDescriptors[i].depthImageID = imageID;
-                boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_DEPTH_IMAGE_ARRAY;
-        boundDescriptor.depthImageID = imageID;
-        boundDescriptor.arrayIndex = arrayIndex;
-    }
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
 
-    void DescriptorSetResource::BindStorage(StringUtils::StringHash nameHash, ImageMutableResource resource, u32 mipLevel, u32 mipCount) const
-    {
-        ImageID imageID = _renderGraphResources->GetImage(resource);
-        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
 
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+        DescriptorType descriptorType = (descriptorReflection.accessType == FileFormat::DescriptorAccessTypeReflection::Read) ? DescriptorType::SampledImage : DescriptorType::StorageImage;
 
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
-        {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_STORAGE_IMAGE;
-                boundDescriptors[i].imageID = imageID;
-                boundDescriptors[i].imageMipLevel = mipLevel;
-                boundDescriptors[i].count = mipCount;
-                return;
-            }
-        }
-
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        boundDescriptor.imageID = imageID;
-        boundDescriptor.imageMipLevel = mipLevel;
-        boundDescriptor.count = mipCount;
-    }
-
-    void DescriptorSetResource::BindStorageArray(StringUtils::StringHash nameHash, ImageMutableResource resource, u32 mipLevel, u32 mipCount) const
-    {
-        ImageID imageID = _renderGraphResources->GetImage(resource);
-        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
-        {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_STORAGE_IMAGE_ARRAY;
-                boundDescriptors[i].imageID = imageID;
-                boundDescriptors[i].imageMipLevel = mipLevel;
-                boundDescriptors[i].count = mipCount;
-                return;
-            }
-        }
-
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_STORAGE_IMAGE_ARRAY;
-        boundDescriptor.imageID = imageID;
-        boundDescriptor.imageMipLevel = mipLevel;
-        boundDescriptor.count = mipCount;
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptorArray(descriptorSetID, bindingIndex, imageID, arrayIndex, descriptorType, frameIndex);
     }
 
     void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, BufferResource resource)
     {
+        ZoneScoped;
         BufferID bufferID = _renderGraphResources->GetBuffer(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_BUFFER;
-                boundDescriptors[i].bufferID = bufferID;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_BUFFER;
-        boundDescriptor.bufferID = bufferID;
-    }
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
 
-    void DescriptorSetResource::BindArray(StringUtils::StringHash nameHash, BufferResource resource, u32 arrayIndex)
-    {
-        BufferID bufferID = _renderGraphResources->GetBuffer(resource);
-        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
 
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
 
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
-        {
-            if (nameHash == boundDescriptors[i].nameHash && arrayIndex == boundDescriptors[i].arrayIndex)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_BUFFER_ARRAY;
-                boundDescriptors[i].bufferID = bufferID;
-                boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
-            }
-        }
-
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_BUFFER_ARRAY;
-        boundDescriptor.bufferID = bufferID;
-        boundDescriptor.arrayIndex = arrayIndex;
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptor(descriptorSetID, bindingIndex, bufferID, DescriptorType::StorageBuffer, frameIndex);
     }
 
     void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, BufferMutableResource resource)
     {
+        ZoneScoped;
         BufferID bufferID = _renderGraphResources->GetBuffer(resource);
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_BUFFER;
-                boundDescriptors[i].bufferID = bufferID;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_BUFFER;
-        boundDescriptor.bufferID = bufferID;
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
+
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
+
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptor(descriptorSetID, bindingIndex, bufferID, DescriptorType::StorageBuffer, frameIndex);
     }
 
-    void DescriptorSetResource::BindArray(StringUtils::StringHash nameHash, BufferMutableResource resource, u32 arrayIndex)
+    void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, TextureID textureID, u32 mipLevel)
     {
-        BufferID bufferID = _renderGraphResources->GetBuffer(resource);
+        ZoneScoped;
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash && arrayIndex == boundDescriptors[i].arrayIndex)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_BUFFER_ARRAY;
-                boundDescriptors[i].bufferID = bufferID;
-                boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_BUFFER_ARRAY;
-        boundDescriptor.bufferID = bufferID;
-        boundDescriptor.arrayIndex = arrayIndex;
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
+
+        DescriptorType descriptorType = (descriptorReflection.accessType == FileFormat::DescriptorAccessTypeReflection::Read) ? DescriptorType::SampledImage : DescriptorType::StorageImage;
+
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptor(descriptorSetID, bindingIndex, textureID, mipLevel, descriptorType, frameIndex);
     }
 
-    void DescriptorSetResource::BindRead(StringUtils::StringHash nameHash, TextureID textureID)
+    void DescriptorSetResource::Bind(StringUtils::StringHash nameHash, TextureID textureID, u32 mipLevel, u32 mipCount)
     {
+        ZoneScoped;
         DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-        
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
+        if (!descriptorSet->_initialized)
         {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_TEXTURE;
-                boundDescriptors[i].textureID = textureID;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_TEXTURE;
-        boundDescriptor.textureID = textureID;
-    }
+        u32 bindingIndex = descriptorSet->GetBindingIndex(nameHash.computedHash);
+        FileFormat::DescriptorReflection& descriptorReflection = descriptorSet->GetDescriptorReflection(bindingIndex);
 
-    void DescriptorSetResource::BindReadWrite(StringUtils::StringHash nameHash, TextureID textureID)
-    {
-        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
+        DescriptorType descriptorType = (descriptorReflection.accessType == FileFormat::DescriptorAccessTypeReflection::Read) ? DescriptorType::SampledImage : DescriptorType::StorageImage;
 
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
-        {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_TEXTURE_READ_WRITE;
-                boundDescriptors[i].textureID = textureID;
-                return;
-            }
-        }
-
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_TEXTURE_READ_WRITE;
-        boundDescriptor.textureID = textureID;
-    }
-
-    void DescriptorSetResource::BindWrite(StringUtils::StringHash nameHash, TextureID textureID, u32 mipLevel, u32 mipCount)
-    {
-        DescriptorSet* descriptorSet = _renderGraphResources->GetDescriptorSet(_id);
-        
-        std::vector<Descriptor>& boundDescriptors = descriptorSet->GetMutableDescriptors();
-
-        for (u32 i = 0; i < boundDescriptors.size(); i++)
-        {
-            if (nameHash == boundDescriptors[i].nameHash)
-            {
-                boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_TEXTURE_WRITE;
-                boundDescriptors[i].textureID = textureID;
-                boundDescriptors[i].imageMipLevel = mipLevel;
-                boundDescriptors[i].count = mipCount;
-                return;
-            }
-        }
-
-        Descriptor& boundDescriptor = boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_TEXTURE_WRITE;
-        boundDescriptor.textureID = textureID;
-        boundDescriptor.imageMipLevel = mipLevel;
-        boundDescriptor.count = mipCount;
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
+        u32 frameIndex = descriptorSet->_renderer->GetCurrentFrameIndex();
+        descriptorSet->_renderer->BindDescriptorArray(descriptorSetID, bindingIndex, textureID, mipLevel, mipCount, descriptorType, frameIndex);
     }
 }

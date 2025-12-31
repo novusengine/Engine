@@ -2,6 +2,7 @@
 
 #include <Renderer/Renderers/Vulkan/Backend/RenderDeviceVK.h>
 #include <Renderer/Renderers/Vulkan/Backend/DebugMarkerUtilVK.h>
+#include <Renderer/Renderers/Vulkan/Backend/FormatConverterVK.h>
 
 #include <Base/Util/StringUtils.h>
 #include <Base/Util/DebugHandler.h>
@@ -92,7 +93,7 @@ namespace Renderer
             ZoneScoped;
             VertexShaderID shaderID;
             bool wasCached;
-            if (desc.shaderEntry.shaderData != nullptr && desc.shaderEntry.shaderSize != 0)
+            if (desc.shaderEntry != nullptr)
             {
                 shaderID = LoadShaderFromMemory<VertexShaderID>(desc.shaderEntry, _vertexShaderStore, wasCached);
             }
@@ -113,7 +114,7 @@ namespace Renderer
             ZoneScoped;
             PixelShaderID shaderID;
             bool wasCached;
-            if (desc.shaderEntry.shaderData != nullptr && desc.shaderEntry.shaderSize != 0)
+            if (desc.shaderEntry != nullptr)
             {
                 shaderID = LoadShaderFromMemory<PixelShaderID>(desc.shaderEntry, _pixelShaderStore, wasCached);
             }
@@ -135,7 +136,7 @@ namespace Renderer
             ComputeShaderID shaderID;
             bool wasCached;
 
-            if (desc.shaderEntry.shaderData != nullptr && desc.shaderEntry.shaderSize != 0)
+            if (desc.shaderEntry != nullptr)
             {
                 shaderID = LoadShaderFromMemory<ComputeShaderID>(desc.shaderEntry, _computeShaderStore, wasCached);
             }
@@ -151,7 +152,7 @@ namespace Renderer
             return shaderID;
         }
 
-        void ShaderHandlerVK::ReflectShader(const uint32_t* shaderData, size_t shaderSize, BindReflection& bindReflection, const std::string& shaderPath)
+        void ShaderHandlerVK::ReflectUsedBindings(const uint32_t* shaderData, size_t shaderSize, BindReflection& bindReflection, const std::string& shaderPath)
         {
             // Reflect descriptor sets
             SpvReflectShaderModule reflectModule;
@@ -229,6 +230,41 @@ namespace Renderer
                     pushConstant.offset = variable->offset;
                     pushConstant.size = variable->size;
                     pushConstant.stageFlags = static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
+                }
+            }
+        }
+
+        void ShaderHandlerVK::ReflectFullBindings(const ShaderEntry* shaderEntry, BindReflection& bindReflection)
+        {
+            const FileFormat::ShaderReflection& reflection = shaderEntry->reflection;
+
+            for (const auto& [set, descriptorSet] : reflection.descriptorSets)
+            {
+                for (const auto& [binding, descriptor] : descriptorSet.descriptors)
+                {
+                    if (set == 0)
+                    {
+                        BindInfoPushConstant pushConstant;
+                        pushConstant.offset = descriptor.byteOffset;
+                        pushConstant.size = descriptor.byteSize;
+                        pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+
+                        bindReflection.pushConstants.push_back(pushConstant);
+                    }
+                    else
+                    {
+                        BindInfo bindInfo;
+                        bindInfo.name = descriptor.name;
+                        bindInfo.nameHash = StringUtils::fnv1a_32(descriptor.name.c_str(), descriptor.name.length());
+                        bindInfo.descriptorType = FormatConverterVK::ToVkDescriptorType(descriptor);
+                        bindInfo.set = set;
+                        bindInfo.binding = binding;
+                        bindInfo.count = descriptor.count;
+                        bindInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+                        bindInfo.isUsed = descriptor.isUsed;
+                        bindInfo.isWrite = (descriptor.accessType == FileFormat::DescriptorAccessTypeReflection::ReadWrite || descriptor.accessType == FileFormat::DescriptorAccessTypeReflection::Write);
+                        bindReflection.dataBindings.push_back(bindInfo);
+                    }
                 }
             }
         }

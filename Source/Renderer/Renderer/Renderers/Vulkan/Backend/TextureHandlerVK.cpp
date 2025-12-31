@@ -4,6 +4,7 @@
 #include "FormatConverterVK.h"
 #include "DebugMarkerUtilVK.h"
 #include "BufferHandlerVK.h"
+#include "DescriptorHandlerVK.h"
 #include "UploadBufferHandlerVK.h"
 #include "SamplerHandlerVK.h"
 
@@ -60,6 +61,12 @@ namespace Renderer
             bool layoutUndefined = true;
         };
 
+        struct TextureArrayBinding
+        {
+            DescriptorSetID descriptorSetID;
+            u32 bindingIndex;
+        };
+
         struct TextureArray
         {
             u32 size;
@@ -68,6 +75,9 @@ namespace Renderer
             SafeVector<u64>* textureHashes = nullptr;
             robin_hood::unordered_map<TextureID::type, u32>* textureIDToArrayIndex;
             robin_hood::unordered_set<TextureID::type> ownedTextureIDs;
+
+            std::vector<TextureArrayBinding> registeredBindings;
+            u32 lastFlushedCount = 0;  // Track how many textures were in last descriptor update
         };
 
         struct TextureHandlerVKData : ITextureHandlerVKData
@@ -79,11 +89,12 @@ namespace Renderer
             SafeVector<TextureArray> textureArrays;
         };
 
-        void TextureHandlerVK::Init(RenderDeviceVK* device, BufferHandlerVK* bufferHandler, UploadBufferHandlerVK* uploadBufferHandler, SamplerHandlerVK* samplerHandler)
+        void TextureHandlerVK::Init(RenderDeviceVK* device, BufferHandlerVK* bufferHandler, DescriptorHandlerVK* descriptorHandler, UploadBufferHandlerVK* uploadBufferHandler, SamplerHandlerVK* samplerHandler)
         {
             _data = new TextureHandlerVKData();
             _device = device;
             _bufferHandler = bufferHandler;
+            _descriptorHandler = descriptorHandler;
             _uploadBufferHandler = uploadBufferHandler;
             _samplerHandler = samplerHandler;
         }
@@ -143,6 +154,47 @@ namespace Renderer
             {
                 vkFreeDescriptorSets(_device->_device, _device->_imguiContext->imguiPool, static_cast<u32>(data.descriptorsToFree.size()), data.descriptorsToFree.data());
                 data.descriptorsToFree.clear();
+            }
+
+            // Flush texture array updates - only update newly added textures
+            if (_descriptorHandler != nullptr)
+            {
+                data.textureArrays.WriteLock(
+                    [&](std::vector<TextureArray>& textureArrays)
+                    {
+                        for (size_t i = 0; i < textureArrays.size(); i++)
+                        {
+                            TextureArray& textureArray = textureArrays[i];
+
+                            u32 currentCount = static_cast<u32>(textureArray.textures->Size());
+                            if (currentCount <= textureArray.lastFlushedCount)
+                            {
+                                continue; // No new textures to flush
+                            }
+
+                            u32 newTexturesCount = currentCount - textureArray.lastFlushedCount;
+                            u32 startIndex = textureArray.lastFlushedCount;
+
+                            // Update all registered descriptor sets with only the new textures
+                            textureArray.textures->ReadLock(
+                                [&](const std::vector<TextureID>& textures)
+                                {
+                                    const TextureID* textureIDs = textures.data() + startIndex;
+
+                                    for (const auto& binding : textureArray.registeredBindings)
+                                    {
+                                        _descriptorHandler->UpdateTextureArrayDescriptors(
+                                            binding.descriptorSetID, 
+                                            binding.bindingIndex, 
+                                            textureIDs, 
+                                            startIndex, 
+                                            newTexturesCount);
+                                    }
+                                });
+
+                            textureArray.lastFlushedCount = currentCount;
+                        }
+                    });
             }
         }
 
@@ -301,6 +353,9 @@ namespace Renderer
 
                     textureArray.textureHashes->Resize(unloadStartIndex);
                     textureArray.textures->Resize(unloadStartIndex);
+
+                    // Update lastFlushedCount so subsequent loads in the same frame get flushed correctly
+                    textureArray.lastFlushedCount = Math::Min(textureArray.lastFlushedCount, unloadStartIndex);
                 });
         }
 
@@ -328,6 +383,83 @@ namespace Renderer
                 });
 
             return TextureArrayID(static_cast<TextureArrayID::type>(nextHandle));
+        }
+
+        void TextureHandlerVK::RegisterTextureArrayBinding(TextureArrayID textureArrayID, DescriptorSetID descriptorSetID, u32 bindingIndex)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
+
+            if (data.textureArrays.Size() <= id)
+            {
+                NC_LOG_CRITICAL("TextureHandlerVK::RegisterTextureArrayBinding: Tried to register binding for invalid TextureArrayID: {0}", id);
+            }
+
+            data.textureArrays.WriteLock(
+                [&](std::vector<TextureArray>& textureArrays)
+                {
+                    TextureArray& textureArray = textureArrays[id];
+
+                    // Check if this binding already exists
+                    for (const auto& binding : textureArray.registeredBindings)
+                    {
+                        if (binding.descriptorSetID == descriptorSetID && binding.bindingIndex == bindingIndex)
+                        {
+                            return; // Already registered
+                        }
+                    }
+
+                    TextureArrayBinding newBinding;
+                    newBinding.descriptorSetID = descriptorSetID;
+                    newBinding.bindingIndex = bindingIndex;
+                    textureArray.registeredBindings.push_back(newBinding);
+                });
+        }
+
+        void TextureHandlerVK::FlushTextureArrayDescriptors(TextureArrayID textureArrayID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
+
+            if (data.textureArrays.Size() <= id)
+            {
+                NC_LOG_CRITICAL("TextureHandlerVK::RegisterTextureArrayBinding: Tried to register binding for invalid TextureArrayID: {0}", id);
+            }
+
+            data.textureArrays.WriteLock(
+                [&](std::vector<TextureArray>& textureArrays)
+                {
+                    TextureArray& textureArray = textureArrays[id];
+                    
+                    u32 currentCount = static_cast<u32>(textureArray.textures->Size());
+                    if (currentCount <= textureArray.lastFlushedCount)
+                    {
+                        return; // No new textures to flush
+                    }
+
+                    u32 newTexturesCount = currentCount - textureArray.lastFlushedCount;
+                    u32 startIndex = textureArray.lastFlushedCount;
+
+                    // Update all registered descriptor sets with only the new textures
+                    textureArray.textures->ReadLock(
+                        [&](const std::vector<TextureID>& textures)
+                        {
+                            const TextureID* textureIDs = textures.data() + startIndex;
+
+                            for (const auto& binding : textureArray.registeredBindings)
+                            {
+                                _descriptorHandler->UpdateTextureArrayDescriptors(
+                                    binding.descriptorSetID,
+                                    binding.bindingIndex,
+                                    textureIDs,
+                                    startIndex,
+                                    newTexturesCount);
+                            }
+                        });
+
+                    textureArray.lastFlushedCount = currentCount;
+                    
+                });
         }
 
         TextureID TextureHandlerVK::CreateDataTexture(const DataTextureDesc& desc)
@@ -362,8 +494,8 @@ namespace Renderer
                 for (i32 i = 0; i < desc.mipLevels; ++i)
                 {
                     // For each mip level, calculate the reduced dimensions.
-                    u32 mipWidth = Math::Max(1u, desc.width >> i);
-                    u32 mipHeight = Math::Max(1u, desc.height >> i);
+                    u32 mipWidth = Math::Max(1, desc.width >> i);
+                    u32 mipHeight = Math::Max(1, desc.height >> i);
                     mipUploadSize += static_cast<u64>(static_cast<f64>(mipWidth) * static_cast<f64>(mipHeight) * FormatTexelSize(FormatConverterVK::ToVkFormat(texture->desc.format)));
                 }
                 texture->uploadSize = mipUploadSize;

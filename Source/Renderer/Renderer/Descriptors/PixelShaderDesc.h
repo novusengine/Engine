@@ -10,7 +10,7 @@ namespace Renderer
     struct PixelShaderDesc
     {
         // Load already in memory
-        ShaderEntry shaderEntry;
+        const ShaderEntry* shaderEntry = nullptr;
 
         // Load by file
         void AddPermutationField(const std::string& key, const std::string& value)

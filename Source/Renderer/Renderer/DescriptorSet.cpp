@@ -1,143 +1,240 @@
 #include "DescriptorSet.h"
-#include "RenderGraphResources.h"
+#include "DescriptorType.h"
 #include "Renderer.h"
+#include "RenderGraphResources.h"
+
+#include <tracy/Tracy.hpp>
 
 namespace Renderer
 {
+    void VerifyDescriptorMatch(const FileFormat::DescriptorReflection& a, const FileFormat::DescriptorReflection& b)
+    {
+        if (a.name != b.name)
+        {
+            NC_LOG_CRITICAL("Descriptor name mismatch in combined descriptor set reflection: '{}' != '{}'", a.name, b.name);
+        }
+        if (a.type != b.type)
+        {
+            NC_LOG_CRITICAL("Descriptor type mismatch in combined descriptor set reflection for descriptor '{}'", a.name);
+        }
+        if (a.subType != b.subType)
+        {
+            NC_LOG_CRITICAL("Descriptor subType mismatch in combined descriptor set reflection for descriptor '{}'", a.name);
+        }
+        if (a.count != b.count)
+        {
+            NC_LOG_CRITICAL("Descriptor count mismatch in combined descriptor set reflection for descriptor '{}'", a.name);
+        }
+    }
+
     void DescriptorSet::RegisterPipeline(Renderer* renderer, ComputePipelineID pipelineID)
     {
-        renderer->GetDescriptorMetaFromPipeline(_metaInfo, pipelineID, _slot);
+        ZoneScoped;
+        u32 slotIndex = static_cast<u32>(_slot);
+
+        const ComputePipelineDesc& pipelineDesc = renderer->GetDesc(pipelineID);
+        const ComputeShaderDesc& shaderDesc = renderer->GetDesc(pipelineDesc.computeShader);
+
+        const FileFormat::ShaderReflection& reflection = shaderDesc.shaderEntry->reflection;
+
+        if (!reflection.descriptorSets.contains(slotIndex))
+        {
+            return;
+        }
+
+        const FileFormat::DescriptorSetReflection& descriptorSet = reflection.descriptorSets.at(slotIndex);
+        for(const auto& [bindingIndex, descriptor] : descriptorSet.descriptors)
+        {
+            if (_combinedReflection.descriptors.contains(bindingIndex))
+            {
+                VerifyDescriptorMatch(_combinedReflection.descriptors[bindingIndex], descriptor);
+            }
+            else
+            {
+                _combinedReflection.descriptors[bindingIndex] = descriptor;
+                u32 nameHash = StringUtils::fnv1a_32(descriptor.name.c_str(), descriptor.name.size());
+                _nameHashToBindingIndex[nameHash] = bindingIndex;
+            }
+        }
     }
 
     void DescriptorSet::RegisterPipeline(Renderer* renderer, GraphicsPipelineID pipelineID)
     {
-        renderer->GetDescriptorMetaFromPipeline(_metaInfo, pipelineID, _slot);
-    }
+        ZoneScoped;
+        u32 slotIndex = static_cast<u32>(_slot);
 
-    void DescriptorSet::Bind(StringUtils::StringHash nameHash, BufferID bufferID)
-    {
-        NC_ASSERT(!_locked, "DescriptorSet : Tried to Bind a BufferID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+        const GraphicsPipelineDesc& pipelineDesc = renderer->GetDesc(pipelineID);
 
-        for (u32 i = 0; i < _boundDescriptors.size(); i++)
+        // Vertex
         {
-            if (nameHash == _boundDescriptors[i].nameHash)
+            const VertexShaderDesc& shaderDesc = renderer->GetDesc(pipelineDesc.states.vertexShader);
+            const FileFormat::ShaderReflection& reflection = shaderDesc.shaderEntry->reflection;
+            if (reflection.descriptorSets.contains(slotIndex))
             {
-                _boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_BUFFER;
-                _boundDescriptors[i].bufferID = bufferID;
-                return;
+                const FileFormat::DescriptorSetReflection& descriptorSet = reflection.descriptorSets.at(slotIndex);
+                for (const auto& [bindingIndex, descriptor] : descriptorSet.descriptors)
+                {
+                    if (_combinedReflection.descriptors.contains(bindingIndex))
+                    {
+                        VerifyDescriptorMatch(_combinedReflection.descriptors[bindingIndex], descriptor);
+                    }
+                    else
+                    {
+                        _combinedReflection.descriptors[bindingIndex] = descriptor;
+                        u32 nameHash = StringUtils::fnv1a_32(descriptor.name.c_str(), descriptor.name.size());
+                        _nameHashToBindingIndex[nameHash] = bindingIndex;
+                    }
+                }
             }
         }
-
-        Descriptor& boundDescriptor = _boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_BUFFER;
-        boundDescriptor.bufferID = bufferID;
-    }
-
-    void DescriptorSet::BindArray(StringUtils::StringHash nameHash, BufferID bufferID, u32 arrayIndex)
-    {
-        NC_ASSERT(!_locked, "DescriptorSet : Tried to BindArray a BufferID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
-
-        for (u32 i = 0; i < _boundDescriptors.size(); i++)
+        
+        // Pixel
+        if (pipelineDesc.states.pixelShader != PixelShaderID::Invalid())
         {
-            if (nameHash == _boundDescriptors[i].nameHash && arrayIndex == _boundDescriptors[i].arrayIndex)
+            const PixelShaderDesc& shaderDesc = renderer->GetDesc(pipelineDesc.states.pixelShader);
+            const FileFormat::ShaderReflection& reflection = shaderDesc.shaderEntry->reflection;
+            if (reflection.descriptorSets.contains(slotIndex))
             {
-                _boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_BUFFER_ARRAY;
-                _boundDescriptors[i].bufferID = bufferID;
-                _boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
+                const FileFormat::DescriptorSetReflection& descriptorSet = reflection.descriptorSets.at(slotIndex);
+                for (const auto& [bindingIndex, descriptor] : descriptorSet.descriptors)
+                {
+                    if (_combinedReflection.descriptors.contains(bindingIndex))
+                    {
+                        VerifyDescriptorMatch(_combinedReflection.descriptors[bindingIndex], descriptor);
+                    }
+                    else
+                    {
+                        _combinedReflection.descriptors[bindingIndex] = descriptor;
+                        u32 nameHash = StringUtils::fnv1a_32(descriptor.name.c_str(), descriptor.name.size());
+                        _nameHashToBindingIndex[nameHash] = bindingIndex;
+                    }
+                }
             }
         }
-
-        Descriptor& boundDescriptor = _boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_BUFFER_ARRAY;
-        boundDescriptor.bufferID = bufferID;
-        boundDescriptor.arrayIndex = arrayIndex;
     }
 
-    void DescriptorSet::Bind(StringUtils::StringHash nameHash, SamplerID samplerID)
+    void DescriptorSet::Init(Renderer* renderer)
     {
-        NC_ASSERT(!_locked, "DescriptorSet : Tried to Bind a SamplerID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
+        ZoneScoped;
+        _renderer = renderer;
 
-        for (u32 i = 0; i < _boundDescriptors.size(); i++)
-        {
-            if (nameHash == _boundDescriptors[i].nameHash)
-            {
-                _boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_SAMPLER;
-                _boundDescriptors[i].samplerID = samplerID;
-                return;
-            }
-        }
+        DescriptorSetDesc desc;
+        desc.reflection = &_combinedReflection;
 
-        Descriptor& boundDescriptor = _boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_SAMPLER;
-        boundDescriptor.samplerID = samplerID;
+        _descriptorSetID = renderer->CreateDescriptorSet(desc);
+        _initialized = true;
     }
 
-    void DescriptorSet::BindArray(StringUtils::StringHash nameHash, SamplerID samplerID, u32 arrayIndex)
+    void DescriptorSet::Bind(StringUtils::StringHash nameHash, BufferID bufferID, bool optional)
     {
-        NC_ASSERT(!_locked, "DescriptorSet : Tried to BindArray a SamplerID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
-
-        for (u32 i = 0; i < _boundDescriptors.size(); i++)
+        ZoneScoped;
+        if (!_initialized)
         {
-            if (nameHash == _boundDescriptors[i].nameHash && arrayIndex == _boundDescriptors[i].arrayIndex)
-            {
-                _boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_SAMPLER_ARRAY;
-                _boundDescriptors[i].samplerID = samplerID;
-                _boundDescriptors[i].arrayIndex = arrayIndex;
-
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = _boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_SAMPLER_ARRAY;
-        boundDescriptor.samplerID = samplerID;
-        boundDescriptor.arrayIndex = arrayIndex;
+        if (optional && !HasBinding(nameHash))
+        {
+            return;
+        }
+
+        u32 bindingIndex = GetBindingIndex(nameHash);
+        FileFormat::DescriptorReflection& descriptorReflection = GetDescriptorReflection(bindingIndex); // TODO: Add verification stuff
+
+        u32 frameIndexCount = _renderer->GetFrameIndexCount();
+        for(u32 i = 0; i < frameIndexCount; i++)
+        {
+            _renderer->BindDescriptor(_descriptorSetID, bindingIndex, bufferID, DescriptorType::StorageBuffer, i);
+        }
     }
 
-    void DescriptorSet::Bind(StringUtils::StringHash nameHash, TextureID textureID)
+    void DescriptorSet::Bind(StringUtils::StringHash nameHash, SamplerID samplerID, bool optional)
     {
-        NC_ASSERT(!_locked, "DescriptorSet : Tried to Bind a TextureID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
-
-        for (u32 i = 0; i < _boundDescriptors.size(); i++)
+        ZoneScoped;
+        if (!_initialized)
         {
-            if (nameHash == _boundDescriptors[i].nameHash)
-            {
-                _boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_TEXTURE;
-                _boundDescriptors[i].textureID = textureID;
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = _boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_TEXTURE;
-        boundDescriptor.textureID = textureID;
+        if (optional && !HasBinding(nameHash))
+        {
+            return;
+        }
+
+        u32 bindingIndex = GetBindingIndex(nameHash);
+        //FileFormat::DescriptorReflection& descriptorReflection = GetDescriptorReflection(bindingIndex); // TODO: Add verification stuff
+
+        u32 frameIndexCount = _renderer->GetFrameIndexCount();
+        for (u32 i = 0; i < frameIndexCount; i++)
+        {
+            _renderer->BindDescriptor(_descriptorSetID, bindingIndex, samplerID, i);
+        }
     }
 
-    void DescriptorSet::Bind(StringUtils::StringHash nameHash, TextureArrayID textureArrayID)
+    void DescriptorSet::BindArray(StringUtils::StringHash nameHash, SamplerID samplerID, u32 arrayIndex, bool optional)
     {
-        NC_ASSERT(!_locked, "DescriptorSet : Tried to Bind a TextureArrayID to a DescriptorSet that is currently in use by a RenderPass. Please use the DescriptorSetResource");
-
-        for (u32 i = 0; i < _boundDescriptors.size(); i++)
+        ZoneScoped;
+        if (!_initialized)
         {
-            if (nameHash == _boundDescriptors[i].nameHash)
-            {
-                _boundDescriptors[i].descriptorType = DescriptorType::DESCRIPTOR_TYPE_TEXTURE_ARRAY;
-                _boundDescriptors[i].textureArrayID = textureArrayID;
-
-                return;
-            }
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
         }
 
-        Descriptor& boundDescriptor = _boundDescriptors.emplace_back();
-        boundDescriptor.nameHash = nameHash;
-        boundDescriptor.descriptorType = DESCRIPTOR_TYPE_TEXTURE_ARRAY;
-        boundDescriptor.textureArrayID = textureArrayID;
+        if (optional && !HasBinding(nameHash))
+        {
+            return;
+        }
+
+        u32 bindingIndex = GetBindingIndex(nameHash);
+        //FileFormat::DescriptorReflection& descriptorReflection = GetDescriptorReflection(bindingIndex); // TODO: Add verification stuff
+
+        u32 frameIndexCount = _renderer->GetFrameIndexCount();
+        for (u32 i = 0; i < frameIndexCount; i++)
+        {
+            _renderer->BindDescriptorArray(_descriptorSetID, bindingIndex, samplerID, arrayIndex, i);
+        }
+    }
+
+    void DescriptorSet::Bind(StringUtils::StringHash nameHash, TextureArrayID textureArrayID, bool optional)
+    {
+        ZoneScoped;
+        if (!_initialized)
+        {
+            NC_LOG_CRITICAL("DescriptorSet : Tried to Bind to a DescriptorSet that has not been initialized yet.");
+        }
+
+        if (optional && !HasBinding(nameHash))
+        {
+            return;
+        }
+
+        u32 bindingIndex = GetBindingIndex(nameHash);
+        FileFormat::DescriptorReflection& descriptorReflection = GetDescriptorReflection(bindingIndex); // TODO: Add verification stuff
+
+        _renderer->BindDescriptor(_descriptorSetID, bindingIndex, textureArrayID);
+    }
+
+    bool DescriptorSet::HasBinding(StringUtils::StringHash nameHash) const
+    {
+        return _nameHashToBindingIndex.find(nameHash.computedHash) != _nameHashToBindingIndex.end();
+    }
+
+    u32 DescriptorSet::GetBindingIndex(StringUtils::StringHash nameHash) const
+    {
+        if (!HasBinding(nameHash))
+        {
+            NC_LOG_CRITICAL("DescriptorSet::Bind: Tried to bind to a descriptor namehash '{}' that does not exist in the combined reflection for this DescriptorSet, are you trying to bind to a non existing binding in the shader?", nameHash.computedHash);
+        }
+
+        return _nameHashToBindingIndex.at(nameHash.computedHash);
+    }
+
+    FileFormat::DescriptorReflection& DescriptorSet::GetDescriptorReflection(u32 bindingIndex)
+    {
+        if (_combinedReflection.descriptors.find(bindingIndex) == _combinedReflection.descriptors.end())
+        {
+            NC_LOG_CRITICAL("DescriptorSet::GetDescriptorReflection: Tried to get descriptor reflection for binding index '{}' that does not exist in the combined reflection for this DescriptorSet", bindingIndex);
+        }
+
+        return _combinedReflection.descriptors[bindingIndex];
     }
 }

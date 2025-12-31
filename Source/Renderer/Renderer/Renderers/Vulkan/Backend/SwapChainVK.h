@@ -112,8 +112,8 @@ namespace Renderer
                 {
                     VkExtent2D actualExtent = { (uint32_t)windowSize.x, (uint32_t)windowSize.y };
 
-                    actualExtent.width = Math::Max(capabilities.minImageExtent.width, Math::Min((int)capabilities.maxImageExtent.width, (int)actualExtent.width));
-                    actualExtent.height = Math::Max(capabilities.minImageExtent.height, Math::Min((int)capabilities.maxImageExtent.height, (int)actualExtent.height));
+                    actualExtent.width = Math::Max(capabilities.minImageExtent.width, Math::Min(capabilities.maxImageExtent.width, actualExtent.width));
+                    actualExtent.height = Math::Max(capabilities.minImageExtent.height, Math::Min(capabilities.maxImageExtent.height, actualExtent.height));
 
                     return actualExtent;
                 }

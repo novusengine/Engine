@@ -1,4 +1,5 @@
 #pragma once
+#include "Renderer/Descriptors/DescriptorSetDesc.h"
 #include "Renderer/Descriptors/SamplerDesc.h"
 #include "Renderer/Descriptors/TextureDesc.h"
 #include "Renderer/Descriptors/TextureArrayDesc.h"
@@ -19,6 +20,7 @@ namespace Renderer
         class BufferHandlerVK;
         class UploadBufferHandlerVK;
         class SamplerHandlerVK;
+        class DescriptorHandlerVK;
         struct Texture;
 
         struct ITextureHandlerVKData {};
@@ -26,10 +28,13 @@ namespace Renderer
         class TextureHandlerVK
         {
         public:
-            void Init(RenderDeviceVK* device, BufferHandlerVK* bufferHandler, UploadBufferHandlerVK* uploadBufferHandler, SamplerHandlerVK* samplerHandler);
+            void Init(RenderDeviceVK* device, BufferHandlerVK* bufferHandler, DescriptorHandlerVK* descriptorHandler, UploadBufferHandlerVK* uploadBufferHandler, SamplerHandlerVK* samplerHandler);
             void InitDebugTexture();
 
             void FlipFrame(u32 frameIndex);
+
+            void RegisterTextureArrayBinding(TextureArrayID textureArrayID, DescriptorSetID descriptorSetID, u32 bindingIndex);
+            void FlushTextureArrayDescriptors(TextureArrayID textureArrayID);
 
             TextureID LoadTexture(const TextureDesc& desc);
             TextureID LoadTextureIntoArray(const TextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates);
@@ -85,6 +90,7 @@ namespace Renderer
 
             RenderDeviceVK* _device;
             BufferHandlerVK* _bufferHandler;
+            DescriptorHandlerVK* _descriptorHandler = nullptr;
             UploadBufferHandlerVK* _uploadBufferHandler;
             SamplerHandlerVK* _samplerHandler;
 

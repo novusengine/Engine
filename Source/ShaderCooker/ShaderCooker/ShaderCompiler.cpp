@@ -164,7 +164,7 @@ namespace ShaderCooker
                     std::string path = itr->make_preferred().string();
                     if (fs::exists(*itr))
                     {
-                        if (fs::is_regular_file(*itr) && itr->extension() == ".hlsl")
+                        if (fs::is_regular_file(*itr) && itr->extension() == ".slang")
                         {
                             //std::transform(path.begin(), path.end(), path.begin(), ::tolower);
                             u32 strHash = StringUtils::fnv1a_32(path.c_str(), path.length());
@@ -195,7 +195,10 @@ namespace ShaderCooker
                                 shader.fileBufferSize = shader.source.length();
 
                                 if (!Lexer::Process(shader) || !Parser::CheckSyntax(shader) || !Parser::ResolveIncludes(this, shader))
+                                {
                                     _shaders.pop_back();
+                                    _numFailedShaders++;
+                                }
                                 else
                                     _shaderHashToIndex[strHash] = static_cast<u32>(_shaders.size() - 1);
                             }
@@ -260,7 +263,7 @@ namespace ShaderCooker
                     if (!shader.hasResolvedIncludes)
                         continue;
 
-                    if (StringUtils::EndsWith(shader.name, ".inc.hlsl"))
+                    if (StringUtils::EndsWith(shader.name, ".inc.slang"))
                     {
                         _shaderCache->Touch(shader.path);
                         continue;
@@ -415,21 +418,26 @@ namespace ShaderCooker
     void ShaderCompiler::GetPermutationFilename(const Shader& shader, u32 permutationID, const std::string& inputFileName, std::string& filename)
     {
         filename = inputFileName;
-        size_t offset = filename.find_first_of('.');
 
+        // Strip .slang from the extension
+        size_t offset = filename.find_last_of('.');
+        filename = filename.substr(0, offset); 
+
+        // Extract the .ps/.vs/.cs into its own string
+        offset = filename.find_first_of('.');
         std::string extension = filename.substr(offset);
         filename = filename.substr(0, offset);
 
+        // Add permutation data to the filename
         const Permutation& permutation = shader.permutations[permutationID];
-
         for (u32 i = 0; i < permutation.defines.size(); i++)
         {
             const Define& define = permutation.defines[i];
             filename += "-" + define.name + define.value;
         }
 
+        // Add back the extension (without .slang)
         filename += extension;
         std::replace(filename.begin(), filename.end(), '\\', '/');
     }
-
 }

@@ -100,7 +100,7 @@ namespace Renderer
         BufferID GetBuffer(BufferResource resource);
         BufferID GetBuffer(BufferMutableResource resource);
 
-        DescriptorSet* GetDescriptorSet(DescriptorSetID resource);
+        DescriptorSet* GetDescriptorSet(DescriptorSetResourceID resource);
 
         ImageResource GetResource(ImageID id);
         DepthImageResource GetResource(DepthImageID id);
@@ -131,7 +131,7 @@ namespace Renderer
 
         const TrackedBufferBitSets& GetBufferPermissions(u32 passIndex);
 
-        const DynamicArray<DescriptorSetID>& GetUsedDescriptorSetIDs(u32 passIndex);
+        const DynamicArray<DescriptorSetResourceID>& GetUsedDescriptorSetIDs(u32 passIndex);
 
         const DynamicArray<TrackedImagePassAccess>& GetPassAccesses(ImageID imageID);
         const DynamicArray<TrackedImagePassAccess>& GetPassAccesses(DepthImageID imageID);

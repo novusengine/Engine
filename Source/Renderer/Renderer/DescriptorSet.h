@@ -4,6 +4,7 @@
 #include "Descriptors/BufferDesc.h"
 #include "Descriptors/ComputePipelineDesc.h"
 #include "Descriptors/DepthImageDesc.h"
+#include "Descriptors/DescriptorSetDesc.h"
 #include "Descriptors/GraphicsPipelineDesc.h"
 #include "Descriptors/ImageDesc.h"
 #include "Descriptors/SamplerDesc.h"
@@ -13,50 +14,18 @@
 #include <Base/Types.h>
 #include <Base/Util/StringUtils.h>
 
+#include <FileFormat/Novus/ShaderPack/ShaderPack.h>
+
 namespace Renderer
 {
     class Renderer;
     class RenderGraphResources;
 
-    enum DescriptorType
-    {
-        DESCRIPTOR_TYPE_BUFFER,
-        DESCRIPTOR_TYPE_BUFFER_ARRAY,
-        DESCRIPTOR_TYPE_SAMPLER,
-        DESCRIPTOR_TYPE_SAMPLER_ARRAY,
-        DESCRIPTOR_TYPE_TEXTURE,
-        DESCRIPTOR_TYPE_TEXTURE_ARRAY,
-        DESCRIPTOR_TYPE_TEXTURE_WRITE,
-        DESCRIPTOR_TYPE_TEXTURE_READ_WRITE,
-        DESCRIPTOR_TYPE_IMAGE,
-        DESCRIPTOR_TYPE_IMAGE_ARRAY,
-        DESCRIPTOR_TYPE_DEPTH_IMAGE,
-        DESCRIPTOR_TYPE_DEPTH_IMAGE_ARRAY,
-        DESCRIPTOR_TYPE_STORAGE_IMAGE,
-        DESCRIPTOR_TYPE_STORAGE_IMAGE_ARRAY,
-    };
-
-    struct Descriptor
-    {
-        u32 nameHash;
-        u32 imageMipLevel;
-        u32 count = 1;
-        u32 arrayIndex = 0;
-        DescriptorType descriptorType;
-
-        TextureID textureID;
-        ImageID imageID;
-        DepthImageID depthImageID;
-        SamplerID samplerID;
-        TextureArrayID textureArrayID;
-        BufferID bufferID;
-    };
-
     enum DescriptorSetSlot
     {
-        DEBUG,
+        // 1 indexed because we let 0 be the push constants, it's not technically correct but we get nice error checking if we do this
+        DEBUG = 1,
         GLOBAL,
-        TILES,
         LIGHT,
         TERRAIN,
         MODEL,
@@ -70,7 +39,6 @@ namespace Renderer
         {
             case DEBUG: return "DEBUG";
             case GLOBAL: return "GLOBAL";
-            case TILES: return "TILES";
             case LIGHT: return "LIGHT";
             case TERRAIN: return "TERRAIN";
             case MODEL: return "MODEL";
@@ -87,34 +55,45 @@ namespace Renderer
     public:
         
     public:
-        DescriptorSet(DescriptorSetSlot slot) : _slot(slot) {};
+        DescriptorSet(DescriptorSetSlot slot) : _slot(slot) 
+        {
+            _combinedReflection.slot = static_cast<u32>(slot);
+        };
 
         void RegisterPipeline(Renderer* renderer, ComputePipelineID pipelineID);
         void RegisterPipeline(Renderer* renderer, GraphicsPipelineID pipelineID);
+        void Init(Renderer* renderer);
+        bool IsInitialized() const { return _initialized; }
 
-        void Bind(StringUtils::StringHash nameHash, BufferID bufferID);
-        void BindArray(StringUtils::StringHash nameHash, BufferID bufferID, u32 arrayIndex);
+        void Bind(StringUtils::StringHash nameHash, BufferID bufferID, bool optional = false);
 
-        void Bind(StringUtils::StringHash nameHash, SamplerID samplerID);
-        void BindArray(StringUtils::StringHash nameHash, SamplerID samplerID, u32 arrayIndex);
+        void Bind(StringUtils::StringHash nameHash, SamplerID samplerID, bool optional = false);
+        void BindArray(StringUtils::StringHash nameHash, SamplerID samplerID, u32 arrayIndex, bool optional = false);
 
-        void Bind(StringUtils::StringHash nameHash, TextureID textureID);
+        void Bind(StringUtils::StringHash nameHash, TextureArrayID textureArrayID, bool optional = false);
 
-        void Bind(StringUtils::StringHash nameHash, TextureArrayID textureArrayID);
-
-        const std::vector<Descriptor>& GetDescriptors() const { return _boundDescriptors; }
+        DescriptorSetID GetID() const { return _descriptorSetID; }
+        DescriptorSetSlot GetSlot() const { return _slot; }
 
     private:
-        std::vector<Descriptor>& GetMutableDescriptors() { return _boundDescriptors; }
+        bool HasBinding(StringUtils::StringHash nameHash) const;
+        u32 GetBindingIndex(StringUtils::StringHash nameHash) const;
+        FileFormat::DescriptorReflection& GetDescriptorReflection(u32 bindingIndex);
 
         void Lock() { _locked = true; }
         void Unlock() { _locked = false; }
 
     private:
+        Renderer* _renderer = nullptr;
+        bool _initialized = false;
+
         DescriptorSetSlot _slot;
         DescriptorMetaInfo _metaInfo;
 
-        std::vector<Descriptor> _boundDescriptors;
+        FileFormat::DescriptorSetReflection _combinedReflection;
+        robin_hood::unordered_map<u32, u32> _nameHashToBindingIndex;
+        DescriptorSetID _descriptorSetID;
+
         bool _locked = false;
 
         friend class DescriptorSetResource;

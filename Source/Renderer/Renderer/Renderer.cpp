@@ -4,24 +4,26 @@
 
 #include <Base/Memory/Allocator.h>
 
+#include <FileFormat/Novus/ShaderPack/ShaderPack.h>
+
 namespace Renderer
 {
     Renderer::~Renderer()
     {
     }
 
-    void Renderer::SetGetShaderEntryCallback(const std::function<const ShaderEntry& (u32)>& callback)
+    void Renderer::SetGetShaderEntryCallback(const std::function<const ShaderEntry* (u32, const std::string&)>& callback)
     {
         _getShaderEntryCallback = callback;
     }
 
-    const ShaderEntry& Renderer::GetShaderEntry(u32 shaderNameHash)
+    const ShaderEntry* Renderer::GetShaderEntry(u32 shaderNameHash, const std::string& debugName)
     {
         if (!_getShaderEntryCallback)
         {
             NC_LOG_CRITICAL("Renderer::GetShaderEntry called but no callback is set!");
         }
-        return _getShaderEntryCallback(shaderNameHash);
+        return _getShaderEntryCallback(shaderNameHash, debugName);
     }
 
     void Renderer::SetGetBlitPipelineCallback(const std::function<GraphicsPipelineID(u32)>& callback)

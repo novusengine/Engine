@@ -246,7 +246,7 @@ namespace Renderer
     {
         ZoneScopedC(tracy::Color::Red3);
         const Commands::BindDescriptorSet* actualData = static_cast<const Commands::BindDescriptorSet*>(data);
-        renderer->BindDescriptorSet(commandList, actualData->slot, actualData->descriptors, actualData->numDescriptors, actualData->bufferPermissions);
+        renderer->BindDescriptorSet(commandList, actualData->set, actualData->bufferPermissions);
     }
 
     void BackendDispatch::SetDepthBias(Renderer* renderer, CommandListID commandList, const void* data)

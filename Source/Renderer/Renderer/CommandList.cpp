@@ -290,23 +290,13 @@ namespace Renderer
         Commands::EndTimeQuery::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
-    
-    void CommandList::BindDescriptorSet(DescriptorSetSlot slot, DescriptorSetResource resource, u32 frameIndex)
+
+    void CommandList::BindDescriptorSet(DescriptorSetResource resource, u32 frameIndex)
     {
         DescriptorSet* descriptorSet = _resources->GetDescriptorSet(resource.GetID());
 
-        const std::vector<Descriptor>& descriptors = descriptorSet->GetDescriptors();
-        size_t numDescriptors = descriptors.size();
-
         Commands::BindDescriptorSet* command = AddCommand<Commands::BindDescriptorSet>();
-        command->slot = slot;
-
-        // Make a copy of the current state of this DescriptorSets descriptors, this uses our per-frame stack allocator so it's gonna be fast and not leak
-        command->descriptors = Memory::Allocator::NewArray<Descriptor>(_allocator, numDescriptors);
-        memcpy(command->descriptors, descriptors.data(), sizeof(Descriptor) * numDescriptors);
-
-        command->numDescriptors = static_cast<u32>(numDescriptors);
-
+        command->set = descriptorSet;
         command->bufferPermissions = &_resources->GetBufferPermissions(_currentPassIndex);
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE

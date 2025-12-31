@@ -2,6 +2,8 @@
 
 #include <Base/Util/DebugHandler.h>
 
+#include <FileFormat/Novus/ShaderPack/ShaderPack.h>
+
 namespace Renderer
 {
     namespace Backend
@@ -547,6 +549,52 @@ namespace Renderer
                     NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more colors?");
             }
             return VkPrimitiveTopology::VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+        }
+
+        VkDescriptorType FormatConverterVK::ToVkDescriptorType(const FileFormat::DescriptorReflection& descriptor)
+        {
+            FileFormat::DescriptorTypeReflection type = descriptor.type;
+            if (type == FileFormat::DescriptorTypeReflection::Array)
+            {
+                type = descriptor.subType;
+            }
+
+            switch (type)
+            {
+            case FileFormat::DescriptorTypeReflection::ByteAddressBuffer:
+            case FileFormat::DescriptorTypeReflection::StructuredBuffer:
+                return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+            case FileFormat::DescriptorTypeReflection::ConstantBuffer:
+                return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+            case FileFormat::DescriptorTypeReflection::SamplerState:
+                return VK_DESCRIPTOR_TYPE_SAMPLER;
+
+            case FileFormat::DescriptorTypeReflection::Texture:
+            case FileFormat::DescriptorTypeReflection::TextureArray:
+                if (descriptor.accessType == FileFormat::DescriptorAccessTypeReflection::Read)
+                    return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                else
+                    return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            }
+
+            NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more descriptor types?");
+            return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+        }
+
+        VkDescriptorType FormatConverterVK::ToVkDescriptorType(DescriptorType type)
+        {
+            switch(type)
+            {
+                case DescriptorType::UniformBuffer:    return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                case DescriptorType::StorageBuffer:    return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                case DescriptorType::SampledImage:     return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                case DescriptorType::StorageImage:     return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                default:
+                    NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more descriptor types?");
+            }
+            return VK_DESCRIPTOR_TYPE_MAX_ENUM;
         }
 
         bool FormatConverterVK::ToAnisotropyEnabled(SamplerFilter filter)

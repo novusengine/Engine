@@ -40,6 +40,9 @@ namespace Renderer
             u32 count;
             u32 stageFlags;
 
+            u32 offset;
+            u32 size;
+
             bool isUsed = false;
             bool isWrite = false;
         };
@@ -72,21 +75,40 @@ namespace Renderer
             PixelShaderID LoadShader(const PixelShaderDesc& desc);
             ComputeShaderID LoadShader(const ComputeShaderDesc& desc);
 
+            const VertexShaderDesc& GetDesc(const VertexShaderID id) { return _vertexShaderStore.descs[static_cast<vsIDType>(id)]; }
+            const PixelShaderDesc& GetDesc(const PixelShaderID id) { return _pixelShaderStore.descs[static_cast<psIDType>(id)]; }
+            const ComputeShaderDesc& GetDesc(const ComputeShaderID id) { return _computeShaderStore.descs[static_cast<csIDType>(id)]; }
+
             VkShaderModule GetShaderModule(const VertexShaderID id) { return _vertexShaderStore.shaders[static_cast<vsIDType>(id)].module; }
             VkShaderModule GetShaderModule(const PixelShaderID id) { return _pixelShaderStore.shaders[static_cast<psIDType>(id)].module; }
             VkShaderModule GetShaderModule(const ComputeShaderID id) { return _computeShaderStore.shaders[static_cast<csIDType>(id)].module; }
 
-            const BindReflection& GetBindReflection(const VertexShaderID id)
+            // Reflection of only what this shader uses
+            const BindReflection& GetUsedBindReflection(const VertexShaderID id)
             {
-                return  _vertexShaderStore.shaders[static_cast<vsIDType>(id)].bindReflection;
+                return  _vertexShaderStore.shaders[static_cast<vsIDType>(id)].usedBindReflection;
             }
-            const BindReflection& GetBindReflection(const PixelShaderID id)
+            const BindReflection& GetUsedBindReflection(const PixelShaderID id)
             { 
-                return _pixelShaderStore.shaders[static_cast<psIDType>(id)].bindReflection;
+                return _pixelShaderStore.shaders[static_cast<psIDType>(id)].usedBindReflection;
             }
-            const BindReflection& GetBindReflection(const ComputeShaderID id)
+            const BindReflection& GetUsedBindReflection(const ComputeShaderID id)
             {
-                return _computeShaderStore.shaders[static_cast<psIDType>(id)].bindReflection;
+                return _computeShaderStore.shaders[static_cast<psIDType>(id)].usedBindReflection;
+            }
+
+            // Full reflection of all descriptors in the shader even if not used
+            const BindReflection& GetFullBindReflection(const VertexShaderID id)
+            {
+                return  _vertexShaderStore.shaders[static_cast<vsIDType>(id)].fullBindReflection;
+            }
+            const BindReflection& GetFullBindReflection(const PixelShaderID id)
+            {
+                return _pixelShaderStore.shaders[static_cast<psIDType>(id)].fullBindReflection;
+            }
+            const BindReflection& GetFullBindReflection(const ComputeShaderID id)
+            {
+                return _computeShaderStore.shaders[static_cast<psIDType>(id)].fullBindReflection;
             }
 
         private:
@@ -101,7 +123,8 @@ namespace Renderer
                 VkShaderModule module;
                 ShaderBinary spirv;
 
-                BindReflection bindReflection;
+                BindReflection usedBindReflection;
+                BindReflection fullBindReflection;
             };
 
             struct ShaderStoreBase
@@ -165,7 +188,9 @@ namespace Renderer
                 shader.module = CreateShaderModule(data, size, shaderPath);
                 shader.permutationFields = permutationFields;
 
-                ReflectShader(data, size, shader.bindReflection, shaderPath);
+                ReflectUsedBindings(data, size, shader.usedBindReflection, shaderPath);
+                // TODO: Somehow get the full reflection if you're not using shaderpacks, because the descriptorsets are gonna need it. This codepath is broken for now.
+                NC_LOG_CRITICAL("ShaderHandlerVK::LoadShaderFromFile - Loading shaders from file without shaderpacks is currently not supported!");
 
                 u32 permutationPathHash = StringUtils::fnv1a_32(permutationPath.c_str(), permutationPath.length());
                 shaderStore.hashToIndex[permutationPathHash] = static_cast<u32>(id);
@@ -175,13 +200,13 @@ namespace Renderer
             }
 
             template <typename T>
-            T LoadShaderFromMemory(const ShaderEntry& shaderEntry, ShaderStoreBase& shaderStore, bool& wasCached)
+            T LoadShaderFromMemory(const ShaderEntry* shaderEntry, ShaderStoreBase& shaderStore, bool& wasCached)
             {
                 size_t id;
                 using idType = type_safe::underlying_type<T>;
 
                 // If shader is already loaded, return ID of already loaded version
-                if (TryFindExistingShader(shaderEntry.permutationNameHash, shaderStore, id))
+                if (TryFindExistingShader(shaderEntry->permutationNameHash, shaderStore, id))
                 {
                     wasCached = true;
                     return T(static_cast<idType>(id));
@@ -191,19 +216,21 @@ namespace Renderer
                 assert(id < T::MaxValue());
 
                 Shader& shader = shaderStore.shaders.emplace_back();
-                u32* data = reinterpret_cast<u32*>(shaderEntry.shaderData);
-                const u32 size = shaderEntry.shaderSize;
-                shader.module = CreateShaderModule(data, size, shaderEntry.debugName);
+                u32* data = reinterpret_cast<u32*>(shaderEntry->shaderData);
+                const u32 size = shaderEntry->shaderSize;
+                shader.module = CreateShaderModule(data, size, shaderEntry->debugName);
 
-                ReflectShader(data, size, shader.bindReflection, shaderEntry.debugName);
+                ReflectUsedBindings(data, size, shader.usedBindReflection, shaderEntry->debugName);
+                ReflectFullBindings(shaderEntry, shader.fullBindReflection);
 
-                shaderStore.hashToIndex[shaderEntry.permutationNameHash] = static_cast<u32>(id);
+                shaderStore.hashToIndex[shaderEntry->permutationNameHash] = static_cast<u32>(id);
 
                 wasCached = false;
                 return T(static_cast<idType>(id));
             }
 
-            void ReflectShader(const uint32_t* shaderData, size_t shaderSize, BindReflection& bindReflection, const std::string& shaderPath);
+            void ReflectUsedBindings(const uint32_t* shaderData, size_t shaderSize, BindReflection& bindReflection, const std::string& shaderPath);
+            void ReflectFullBindings(const ShaderEntry* shaderEntry, BindReflection& bindReflection);
             
             void ReadFile(const std::string& filename, ShaderBinary& binary);
             VkShaderModule CreateShaderModule(const uint32_t* shaderData, size_t shaderSize, const std::string& debugName);

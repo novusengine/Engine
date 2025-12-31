@@ -31,7 +31,7 @@ namespace Renderer
 
         TrackedBufferBitSets bufferPermissions;
 
-        DynamicArray<DescriptorSetID> descriptorSetIDs;
+        DynamicArray<DescriptorSetResourceID> descriptorSetIDs;
     };
 
     struct RenderGraphResourcesData : IRenderGraphResourcesData
@@ -121,22 +121,22 @@ namespace Renderer
     const ImageDesc& RenderGraphResources::GetImageDesc(ImageResource resource)
     {
         ImageID imageID = GetImage(resource);
-        return _renderer->GetImageDesc(imageID);
+        return _renderer->GetDesc(imageID);
     }
     const ImageDesc& RenderGraphResources::GetImageDesc(ImageMutableResource resource)
     {
         ImageID imageID = GetImage(resource);
-        return _renderer->GetImageDesc(imageID);
+        return _renderer->GetDesc(imageID);
     }
     const DepthImageDesc& RenderGraphResources::GetImageDesc(DepthImageResource resource)
     {
         DepthImageID imageID = GetImage(resource);
-        return _renderer->GetImageDesc(imageID);
+        return _renderer->GetDesc(imageID);
     }
     const DepthImageDesc& RenderGraphResources::GetImageDesc(DepthImageMutableResource resource)
     {
         DepthImageID imageID = GetImage(resource);
-        return _renderer->GetImageDesc(imageID);
+        return _renderer->GetDesc(imageID);
     }
 
     uvec2 RenderGraphResources::GetImageDimensions(ImageResource resource, u32 mipLevel)
@@ -204,9 +204,9 @@ namespace Renderer
         return data->trackedBuffers[static_cast<DepthImageMutableResource::type>(resource)];
     }
 
-    DescriptorSet* RenderGraphResources::GetDescriptorSet(DescriptorSetID descriptorSetID)
+    DescriptorSet* RenderGraphResources::GetDescriptorSet(DescriptorSetResourceID descriptorSetID)
     {
-        NC_ASSERT(descriptorSetID != DescriptorSetID::Invalid(), "RenderGraphResources : GetDescriptorSet tried to get image of invalid DescriptorSetResourceID");
+        NC_ASSERT(descriptorSetID != DescriptorSetResourceID::Invalid(), "RenderGraphResources : GetDescriptorSet tried to get image of invalid DescriptorSetResourceID");
 
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
         return data->trackedDescriptorSets[static_cast<DepthImageMutableResource::type>(descriptorSetID)];
@@ -266,21 +266,21 @@ namespace Renderer
     {
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
 
-        DescriptorSetID id = DescriptorSetID::Invalid();
+        DescriptorSetResourceID id = DescriptorSetResourceID::Invalid();
         for (u32 i = 0; i < data->trackedDescriptorSets.Count(); i++)
         {
             DescriptorSet* trackedDescriptorSet = data->trackedDescriptorSets[i];
 
             if (trackedDescriptorSet == &descriptorSet)
             {
-                id = DescriptorSetID(i);
+                id = DescriptorSetResourceID(i);
                 break;
             }
         }
 
-        if (id == DescriptorSetID::Invalid())
+        if (id == DescriptorSetResourceID::Invalid())
         {
-            id = DescriptorSetID(static_cast<DescriptorSetID::type>(data->trackedDescriptorSets.Count()));
+            id = DescriptorSetResourceID(static_cast<DescriptorSetResourceID::type>(data->trackedDescriptorSets.Count()));
             data->trackedDescriptorSets.Insert(&descriptorSet);
         }
 
@@ -616,7 +616,7 @@ namespace Renderer
         return data->trackedPasses[passIndex].bufferPermissions;
     }
 
-    const DynamicArray<DescriptorSetID>& RenderGraphResources::GetUsedDescriptorSetIDs(u32 passIndex)
+    const DynamicArray<DescriptorSetResourceID>& RenderGraphResources::GetUsedDescriptorSetIDs(u32 passIndex)
     {
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
 

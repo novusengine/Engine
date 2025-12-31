@@ -86,7 +86,7 @@ namespace Renderer
         void BeginTimeQuery(TimeQueryID timeQueryID);
         void EndTimeQuery(TimeQueryID timeQueryID);
 
-        void BindDescriptorSet(DescriptorSetSlot slot, DescriptorSetResource resource, u32 frameIndex);
+        void BindDescriptorSet(DescriptorSetResource resource, u32 frameIndex);
 
         void SetDepthBias(f32 constantFactor, f32 clamp, f32 slopeFactor);
         void SetScissorRect(u32 left, u32 right, u32 top, u32 bottom);

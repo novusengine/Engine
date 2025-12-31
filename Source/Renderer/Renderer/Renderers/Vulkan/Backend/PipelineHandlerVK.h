@@ -23,7 +23,6 @@ namespace Renderer
         class ShaderHandlerVK;
         class ImageHandlerVK;
         class BufferHandlerVK;
-        class DescriptorSetBuilderVK;
         struct GraphicsPipeline;
         struct ComputePipeline;
 
@@ -31,6 +30,8 @@ namespace Renderer
         {
             VkDescriptorSetLayoutCreateInfo createInfo;
             std::vector<VkDescriptorSetLayoutBinding> bindings;
+            std::vector<bool> isTextureArray;
+            std::vector<bool> isVariableBinding;
         };
 
         struct IPipelineHandlerVKData {};
@@ -47,12 +48,12 @@ namespace Renderer
             GraphicsPipelineID CreatePipeline(const GraphicsPipelineDesc& desc);
             ComputePipelineID CreatePipeline(const ComputePipelineDesc& desc);
 
-            const GraphicsPipelineDesc& GetDescriptor(GraphicsPipelineID id);
-            const ComputePipelineDesc& GetDescriptor(ComputePipelineID id);
+            const GraphicsPipelineDesc& GetDesc(GraphicsPipelineID id);
+            const ComputePipelineDesc& GetDesc(ComputePipelineID id);
 
             // Be careful with these
-            GraphicsPipelineDesc& GetMutableDescriptor(GraphicsPipelineID id);
-            ComputePipelineDesc& GetMutableDescriptor(ComputePipelineID id);
+            GraphicsPipelineDesc& GetMutableDesc(GraphicsPipelineID id);
+            ComputePipelineDesc& GetMutableDesc(ComputePipelineID id);
 
             VkPipeline GetPipeline(GraphicsPipelineID id);
             VkPipeline GetPipeline(ComputePipelineID id);
@@ -76,12 +77,6 @@ namespace Renderer
 
             VkPipelineLayout& GetPipelineLayout(GraphicsPipelineID id);
             VkPipelineLayout& GetPipelineLayout(ComputePipelineID id);
-
-            DescriptorSetBuilderVK& GetDescriptorSetBuilder(GraphicsPipelineID id);
-            DescriptorSetBuilderVK& GetDescriptorSetBuilder(ComputePipelineID id);
-
-            void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot);
-            void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot);
 
         private:
             u64 CalculateCacheDescHash(const GraphicsPipelineDesc& desc);

@@ -31,7 +31,6 @@ namespace Renderer
         struct SwapChainVK;
         class ImageHandlerVK;
         class SemaphoreHandlerVK;
-        struct DescriptorMegaPoolVK;
 
         struct QueueFamilyIndices
         {
@@ -72,6 +71,8 @@ namespace Renderer
 
             const std::string& GetGPUName() { return _gpuName; }
             ImageFormat GetSwapChainImageFormat() { return _swapChainFormats[0]; }
+
+            static const u32 FRAME_INDEX_COUNT = 2;
 
         private:
             void InitOnce();
@@ -128,7 +129,6 @@ namespace Renderer
             uvec2 _mainWindowSize;
             vec2 _renderSize = vec2(1, 1);
 
-            static const u32 FRAME_INDEX_COUNT = 2;
             static bool _initialized;
             u32 _frameIndex;
 
@@ -157,26 +157,25 @@ namespace Renderer
 
             VmaAllocator _allocator;
 
-            DescriptorMegaPoolVK* _descriptorMegaPool;
-
             tracy::VkCtx* _tracyContext = nullptr;
             ImguiContext* _imguiContext = nullptr;
-            friend class ::Renderer::RendererVK;
             friend class BufferHandlerVK;
-            friend class ImageHandlerVK;
-            friend class TextureHandlerVK;
-            friend class ModelHandlerVK;
-            friend class ShaderHandlerVK;
-            friend class PipelineHandlerVK;
             friend class CommandListHandlerVK;
-            friend class SamplerHandlerVK;
-            friend class SemaphoreHandlerVK;
-            friend class TimeQueryHandlerVK;
-            friend class UploadBufferHandlerVK;
             friend struct DescriptorAllocatorHandleVK;
             friend class DescriptorAllocatorPoolVKImpl;
             friend class DescriptorSetBuilderVK;
+            friend class DescriptorHandlerVK;
             friend class FidelityFXHandlerVK;
+            friend class ImageHandlerVK;
+            friend class ModelHandlerVK;
+            friend class PipelineHandlerVK;
+            friend class ::Renderer::RendererVK;
+            friend class SamplerHandlerVK;
+            friend class SemaphoreHandlerVK;
+            friend class ShaderHandlerVK;
+            friend class TextureHandlerVK;
+            friend class TimeQueryHandlerVK;
+            friend class UploadBufferHandlerVK;
         };
     }
 }

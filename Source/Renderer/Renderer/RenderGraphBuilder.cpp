@@ -64,7 +64,7 @@ namespace Renderer
             for (ImageMutableResource resource : colorClears)
             {
                 ImageID imageID = _resources.GetImage(resource);
-                const ImageDesc& imageDesc = _renderer->GetImageDesc(imageID);
+                const ImageDesc& imageDesc = _renderer->GetDesc(imageID);
 
                 ImageComponentType imageComponentType = ToImageComponentType(imageDesc.format);
 
@@ -94,7 +94,7 @@ namespace Renderer
             {
                 DepthImageID imageID = _resources.GetImage(resource);
 
-                const DepthImageDesc& imageDesc = _renderer->GetImageDesc(imageID);
+                const DepthImageDesc& imageDesc = _renderer->GetDesc(imageID);
                 commandList.Clear(resource, imageDesc.depthClearValue);
 
                 commandList.ImageBarrier(resource);
@@ -296,8 +296,8 @@ namespace Renderer
         }
 
         // Lock the DescriptorSets so we have to go through the DescriptorSetResource
-        const DynamicArray<DescriptorSetID>& usedDescriptorSets = _resources.GetUsedDescriptorSetIDs(currentPassIndex);
-        for (DescriptorSetID descriptorSetID : usedDescriptorSets)
+        const DynamicArray<DescriptorSetResourceID>& usedDescriptorSets = _resources.GetUsedDescriptorSetIDs(currentPassIndex);
+        for (DescriptorSetResourceID descriptorSetID : usedDescriptorSets)
         {
             DescriptorSet* descriptorSet = _resources.GetDescriptorSet(descriptorSetID);
             descriptorSet->Lock();
@@ -309,8 +309,8 @@ namespace Renderer
     void RenderGraphBuilder::PostPass(CommandList& /*commandList*/, u32 currentPassIndex, const std::string& passName)
     {
         // Unlock the DescriptorSets so we can use them again
-        const DynamicArray<DescriptorSetID>& usedDescriptorSets = _resources.GetUsedDescriptorSetIDs(currentPassIndex);
-        for (DescriptorSetID descriptorSetID : usedDescriptorSets)
+        const DynamicArray<DescriptorSetResourceID>& usedDescriptorSets = _resources.GetUsedDescriptorSetIDs(currentPassIndex);
+        for (DescriptorSetResourceID descriptorSetID : usedDescriptorSets)
         {
             DescriptorSet* descriptorSet = _resources.GetDescriptorSet(descriptorSetID);
             descriptorSet->Unlock();

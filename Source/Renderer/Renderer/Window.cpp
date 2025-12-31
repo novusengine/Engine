@@ -2,6 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
+#include <tracy/Tracy.hpp>
 #include <cassert>
 
 namespace Novus
@@ -59,7 +60,11 @@ namespace Novus
 
     bool Window::Update(f32 deltaTime)
     {
-        glfwPollEvents();
+        {
+            ZoneScopedN("glfwPollEvents");
+            glfwPollEvents();
+        }
+        
 
         if (glfwWindowShouldClose(_window))
         {
