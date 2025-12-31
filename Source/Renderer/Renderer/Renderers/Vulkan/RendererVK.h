@@ -1,5 +1,5 @@
 #pragma once
-#include <Renderer/Renderer.h>
+#include "Renderer/Renderer.h"
 
 #include <Base/Memory/StackAllocator.h>
 
@@ -12,21 +12,21 @@ namespace Renderer
 {
     namespace Backend
     {
-        class RenderDeviceVK;
+        struct BindInfo;
         class BufferHandlerVK;
-        class ImageHandlerVK;
-        class TextureHandlerVK;
-        class ShaderHandlerVK;
-        class PipelineHandlerVK;
         class CommandListHandlerVK;
+        class DescriptorHandlerVK;
+        class DescriptorSetBuilderVK;
+        class ImageHandlerVK;
+        class PipelineHandlerVK;
+        class RenderDeviceVK;
         class SamplerHandlerVK;
         class SemaphoreHandlerVK;
-        class UploadBufferHandlerVK;
-        class TimeQueryHandlerVK;
-        struct BindInfo;
-        class DescriptorSetBuilderVK;
+        class ShaderHandlerVK;
         struct SwapChainVK;
-        class DescriptorSetBuilderVK;
+        class TextureHandlerVK;
+        class TimeQueryHandlerVK;
+        class UploadBufferHandlerVK;
     }
     
     class RendererVK : public Renderer
@@ -60,6 +60,8 @@ namespace Renderer
         [[nodiscard]] SamplerID CreateSampler(SamplerDesc& desc) override;
         [[nodiscard]] SemaphoreID CreateNSemaphore() override;
 
+        [[nodiscard]] DescriptorSetID CreateDescriptorSet(const DescriptorSetDesc& desc) override;
+
         [[nodiscard]] GraphicsPipelineID CreatePipeline(GraphicsPipelineDesc& desc) override;
         [[nodiscard]] ComputePipelineID CreatePipeline(ComputePipelineDesc& desc) override;
 
@@ -81,9 +83,22 @@ namespace Renderer
         // Unloading
         void UnloadTexture(TextureID textureID) override;
         void UnloadTexturesInArray(TextureArrayID textureArrayID, u32 unloadStartIndex) override;
+
+        // Descriptor binding
+        void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, BufferID bufferID, DescriptorType type, u32 frameIndex) override;
+        void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, DescriptorType type, u32 frameIndex) override;
+        void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) override;
+        void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, DepthImageID imageID, DescriptorType type, u32 frameIndex) override;
+        void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, DepthImageID imageID, u32 arrayIndex, DescriptorType type, u32 frameIndex) override;
+        void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, SamplerID samplerID, u32 frameIndex) override;
+        void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, SamplerID samplerID, u32 arrayIndex, u32 frameIndex) override;
+        void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, DescriptorType type, u32 frameIndex) override;
+        void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) override;
+        void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) override;
         
         // Misc
         u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) override;
+        void FlushTextureArrayDescriptors(TextureArrayID textureArrayID) override;
 
         // Command List Functions
         [[nodiscard]] CommandListID BeginCommandList() override;
@@ -129,7 +144,7 @@ namespace Renderer
         void SetIndexBuffer(CommandListID commandListID, BufferID bufferID, IndexFormat indexFormat) override;
         void SetBuffer(CommandListID commandListID, u32 slot, BufferID buffer) override;
 
-        void BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors, const TrackedBufferBitSets* bufferPermissions) override;
+        void BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions) override;
 
         void MarkFrameStart(CommandListID commandListID, u32 frameIndex) override;
         void BeginTrace(CommandListID commandListID, const tracy::SourceLocationData* sourceLocation) override;
@@ -173,18 +188,30 @@ namespace Renderer
         [[nodiscard]] const std::string& GetTimeQueryName(TimeQueryID id) override;
         [[nodiscard]] f32 GetLastTimeQueryDuration(TimeQueryID id) override;
 
+        // ID to Descriptor
+        [[nodiscard]] TextureBaseDesc GetDesc(TextureID textureID);
+
+        [[nodiscard]] const ImageDesc& GetDesc(ImageID ID);
+        [[nodiscard]] const DepthImageDesc& GetDesc(DepthImageID ID);
+
+        [[nodiscard]] const ComputePipelineDesc& GetDesc(ComputePipelineID ID);
+        [[nodiscard]] const GraphicsPipelineDesc& GetDesc(GraphicsPipelineID ID);
+
+        [[nodiscard]] const ComputeShaderDesc& GetDesc(ComputeShaderID ID);
+        [[nodiscard]] const VertexShaderDesc& GetDesc(VertexShaderID ID);
+        [[nodiscard]] const PixelShaderDesc& GetDesc(PixelShaderID ID);
+
         // Utils
         // Flush will wait until any in-flight frames are done
         void FlushGPU() override;
 
         f32 FlipFrame(u32 frameIndex) override;
+        [[nodiscard]] u32 GetCurrentFrameIndex() override;
+        [[nodiscard]] u32 GetFrameIndexCount() override;
+
         void ResetTimeQueries(u32 frameIndex) override;
 
         [[nodiscard]] TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) override;
-        [[nodiscard]] TextureBaseDesc GetTextureDesc(TextureID textureID) override;
-
-        [[nodiscard]] const ImageDesc& GetImageDesc(ImageID ID) override;
-        [[nodiscard]] const DepthImageDesc& GetImageDesc(DepthImageID ID) override;
 
         [[nodiscard]] uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) override;
         [[nodiscard]] uvec2 GetImageDimensions(const DepthImageID id) override;
@@ -208,12 +235,8 @@ namespace Renderer
 
         bool HasExtendedTextureSupport() override;
 
-        void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot) override;
-        void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot) override;
-
     private:
         [[nodiscard]] bool ReflectDescriptorSet(const std::string& name, u32 nameHash, u32 type, i32& set, const std::vector<Backend::BindInfo>& bindInfos, u32& outBindInfoIndex, VkDescriptorSetLayoutBinding* outDescriptorLayoutBinding);
-        void BindDescriptor(Backend::DescriptorSetBuilderVK& builder, Descriptor& descriptor);
 
         void RecreateSwapChain(Backend::SwapChainVK* swapChain);
         void CreateDummyPipeline();
@@ -221,20 +244,22 @@ namespace Renderer
     private:
         Backend::RenderDeviceVK* _device = nullptr;
         Backend::BufferHandlerVK* _bufferHandler = nullptr;
-        Backend::ImageHandlerVK* _imageHandler = nullptr;
-        Backend::TextureHandlerVK* _textureHandler = nullptr;
-        Backend::ShaderHandlerVK* _shaderHandler = nullptr;
-        Backend::PipelineHandlerVK* _pipelineHandler = nullptr;
+        Backend::DescriptorHandlerVK* _descriptorHandler = nullptr;
         Backend::CommandListHandlerVK* _commandListHandler = nullptr;
+        Backend::ImageHandlerVK* _imageHandler = nullptr;
+        Backend::PipelineHandlerVK* _pipelineHandler = nullptr;
         Backend::SamplerHandlerVK* _samplerHandler = nullptr;
         Backend::SemaphoreHandlerVK* _semaphoreHandler = nullptr;
-        Backend::UploadBufferHandlerVK* _uploadBufferHandler = nullptr;
+        Backend::ShaderHandlerVK* _shaderHandler = nullptr;
+        Backend::TextureHandlerVK* _textureHandler = nullptr;
         Backend::TimeQueryHandlerVK* _timeQueryHandler = nullptr;
+        Backend::UploadBufferHandlerVK* _uploadBufferHandler = nullptr;
 
         Memory::StackAllocator _frameAllocator;
+        u32 _frameIndex = 0;
 
         GraphicsPipelineID _globalDummyPipeline = GraphicsPipelineID::Invalid();
-        //Backend::DescriptorSetBuilderVK* _descriptorSetBuilder = nullptr;
+        DescriptorSet _presentDescriptorSet;
 
         Viewport _lastViewport;
         ScissorRect _lastScissorRect;

@@ -4,7 +4,6 @@
 #include "ShaderHandlerVK.h"
 #include "ImageHandlerVK.h"
 #include "SpirvReflect.h"
-#include "DescriptorSetBuilderVK.h"
 #include "DebugMarkerUtilVK.h"
 
 #include <Base/Util/DebugHandler.h>
@@ -39,8 +38,6 @@ namespace Renderer
             std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 
             std::vector<VkPushConstantRange> pushConstantRanges;
-
-            DescriptorSetBuilderVK* descriptorSetBuilder;
         };
 
         struct ComputePipelineCacheDesc
@@ -60,8 +57,6 @@ namespace Renderer
             std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 
             std::vector<VkPushConstantRange> pushConstantRanges;
-
-            DescriptorSetBuilderVK* descriptorSetBuilder;
         };
 
         struct PipelineHandlerVKData : IPipelineHandlerVKData
@@ -100,12 +95,7 @@ namespace Renderer
                 pipeline.descriptorSetLayoutDatas.clear();
                 pipeline.pushConstantRanges.clear();
 
-                delete pipeline.descriptorSetBuilder;
-
                 CreatePipelineInternal(pipeline, pipeline.desc, pipeline.numRenderTargets);
-
-                pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, GraphicsPipelineID(i), this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
-                pipeline.descriptorSetBuilder->InitReflectData();
             }
 
             for (u32 i = 0; i < data.computePipelines.size(); i++)
@@ -123,12 +113,7 @@ namespace Renderer
                 pipeline.descriptorSetLayoutDatas.clear();
                 pipeline.pushConstantRanges.clear();
 
-                delete pipeline.descriptorSetBuilder;
-
                 CreatePipelineInternal(pipeline, pipeline.desc);
-
-                pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, ComputePipelineID(i), this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
-                pipeline.descriptorSetBuilder->InitReflectData();
             }
         }
 
@@ -169,11 +154,7 @@ namespace Renderer
             CreatePipelineInternal(pipeline, desc, numAttachments);
 
             GraphicsPipelineID pipelineID = GraphicsPipelineID(static_cast<gIDType>(nextID));
-            pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, pipelineID, this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
-
             data.graphicsPipelines.push_back(pipeline);
-
-            pipeline.descriptorSetBuilder->InitReflectData(); // Needs to happen after push_back
 
             return pipelineID;
         }
@@ -198,34 +179,30 @@ namespace Renderer
             CreatePipelineInternal(pipeline, desc);
 
             ComputePipelineID pipelineID = ComputePipelineID(static_cast<cIDType>(nextID));
-            pipeline.descriptorSetBuilder = new DescriptorSetBuilderVK(_allocator, pipelineID, this, _shaderHandler, _bufferHandler, _device->_descriptorMegaPool);
-
             data.computePipelines.push_back(pipeline);
-
-            pipeline.descriptorSetBuilder->InitReflectData(); // Needs to happen after push_back
 
             return pipelineID;
         }
 
-        const GraphicsPipelineDesc& PipelineHandlerVK::GetDescriptor(GraphicsPipelineID id)
+        const GraphicsPipelineDesc& PipelineHandlerVK::GetDesc(GraphicsPipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
             return data.graphicsPipelines[static_cast<gIDType>(id)].desc;
         }
 
-        const ComputePipelineDesc& PipelineHandlerVK::GetDescriptor(ComputePipelineID id)
+        const ComputePipelineDesc& PipelineHandlerVK::GetDesc(ComputePipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
             return data.computePipelines[static_cast<cIDType>(id)].desc;
         }
 
-        GraphicsPipelineDesc& PipelineHandlerVK::GetMutableDescriptor(GraphicsPipelineID id)
+        GraphicsPipelineDesc& PipelineHandlerVK::GetMutableDesc(GraphicsPipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
             return data.graphicsPipelines[static_cast<gIDType>(id)].desc;
         }
 
-        ComputePipelineDesc& PipelineHandlerVK::GetMutableDescriptor(ComputePipelineID id)
+        ComputePipelineDesc& PipelineHandlerVK::GetMutableDesc(ComputePipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
             return data.computePipelines[static_cast<cIDType>(id)].desc;
@@ -321,108 +298,6 @@ namespace Renderer
             return data.computePipelines[static_cast<cIDType>(id)].pipelineLayout;
         }
 
-        DescriptorSetBuilderVK& PipelineHandlerVK::GetDescriptorSetBuilder(GraphicsPipelineID id)
-        {
-            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            return *data.graphicsPipelines[static_cast<gIDType>(id)].descriptorSetBuilder;
-        }
-
-        DescriptorSetBuilderVK& PipelineHandlerVK::GetDescriptorSetBuilder(ComputePipelineID id)
-        {
-            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            return *data.computePipelines[static_cast<cIDType>(id)].descriptorSetBuilder;
-        }
-
-        void AddDescriptorMetaEntry(DescriptorMetaInfo& metaInfo, Backend::BindInfo bindInfo, DescriptorSetSlot slot)
-        {
-            u32 nameHash = bindInfo.nameHash;
-            u32 bindingIndex = bindInfo.binding;
-            DescriptorMetaType type = FormatConverterVK::ToDescriptorMetaType(bindInfo.descriptorType);
-            u32 setSlot = bindInfo.set;
-
-            if (setSlot != static_cast<u32>(slot))
-            {
-                return;
-            }
-
-            NC_ASSERT(type != DescriptorMetaType::UNIFORM_BUFFER_DYNAMIC, "Shader is using useless Uniform Buffer Dynamic descriptor");
-            NC_ASSERT(type != DescriptorMetaType::STORAGE_BUFFER_DYNAMIC, "Shader is using useless Storage Buffer Dynamic descriptor");
-            NC_ASSERT(type != DescriptorMetaType::INPUT_ATTACHMENT, "Shader is using useless Input Attachment descriptor");
-
-            // If we already have a binding with this name, we need to make sure it matches
-            if (metaInfo.nameHashToDescriptorIndex.contains(nameHash))
-            {
-                u32 existingIndex = metaInfo.nameHashToDescriptorIndex[nameHash];
-                DescriptorMeta& existingMeta = metaInfo.descriptors[existingIndex];
-                NC_ASSERT(existingMeta.nameHash == nameHash, "DescriptorMeta nameHash mismatch");
-                NC_ASSERT(existingMeta.bindingIndex == bindingIndex, "DescriptorMeta bindingIndex mismatch");
-                return;
-            }
-
-            // If we already have a binding with this binding index, we need to make sure it matches
-            if (metaInfo.bindingIndexToDescriptorIndex.contains(bindingIndex))
-            {
-                u32 existingIndex = metaInfo.bindingIndexToDescriptorIndex[bindingIndex];
-                DescriptorMeta& existingMeta = metaInfo.descriptors[existingIndex];
-                NC_ASSERT(existingMeta.nameHash == nameHash, "DescriptorMeta nameHash mismatch");
-                NC_ASSERT(existingMeta.bindingIndex == bindingIndex, "DescriptorMeta bindingIndex mismatch");
-                return;
-            }
-
-            // If we didn't have it yet, add it
-            DescriptorMeta meta = {
-                .name = bindInfo.name,
-                .nameHash = nameHash,
-                .bindingIndex = bindingIndex,
-                .type = type
-            };
-            u32 descriptorIndex = static_cast<u32>(metaInfo.descriptors.size());
-            metaInfo.descriptors.push_back(meta);
-            metaInfo.nameHashToDescriptorIndex[meta.nameHash] = descriptorIndex;
-            metaInfo.bindingIndexToDescriptorIndex[meta.bindingIndex] = descriptorIndex;
-        }
-
-        void PipelineHandlerVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipelineID, DescriptorSetSlot slot)
-        {
-            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            auto& pipeline = data.graphicsPipelines[static_cast<gIDType>(pipelineID)];
-
-            if (pipeline.desc.states.vertexShader != VertexShaderID::Invalid())
-            {
-                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(pipeline.desc.states.vertexShader);
-
-                for(auto& bindInfo : bindReflection.dataBindings)
-                {
-                    AddDescriptorMetaEntry(metaInfo, bindInfo, slot);
-                }
-            }
-            if (pipeline.desc.states.pixelShader != PixelShaderID::Invalid())
-            {
-                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(pipeline.desc.states.pixelShader);
-
-                for (auto& bindInfo : bindReflection.dataBindings)
-                {
-                    AddDescriptorMetaEntry(metaInfo, bindInfo, slot);
-                }
-            }
-        }
-
-        void PipelineHandlerVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipelineID, DescriptorSetSlot slot)
-        {
-            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
-            auto& pipeline = data.computePipelines[static_cast<cIDType>(pipelineID)];
-            
-            if (pipeline.desc.computeShader != ComputeShaderID::Invalid())
-            {
-                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(pipeline.desc.computeShader);
-
-                for (auto& bindInfo : bindReflection.dataBindings)
-                {
-                    AddDescriptorMetaEntry(metaInfo, bindInfo, slot);
-                }
-            }
-        }
-
         u64 PipelineHandlerVK::CalculateCacheDescHash(const GraphicsPipelineDesc& desc)
         {
             GraphicsPipelineCacheDesc cacheDesc = {};
@@ -494,18 +369,20 @@ namespace Renderer
 
         void PipelineHandlerVK::CreatePipelineInternal(GraphicsPipeline& pipeline, const GraphicsPipelineDesc& desc, u32 numAttachments)
         {
+            u32 numSupportedTextures = _device->HasExtendedTextureSupport() ? 8192 : 4096;
+
             // -- Get Reflection data from shader --
             std::vector<BindInfo> bindInfos;
             std::vector<BindInfoPushConstant> bindInfoPushConstants;
             if (desc.states.vertexShader != VertexShaderID::Invalid())
             {
-                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(desc.states.vertexShader);
+                const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.states.vertexShader);
                 bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
                 bindInfoPushConstants.insert(bindInfoPushConstants.end(), bindReflection.pushConstants.begin(), bindReflection.pushConstants.end());
             }
             if (desc.states.pixelShader != PixelShaderID::Invalid())
             {
-                const BindReflection& bindReflection = _shaderHandler->GetBindReflection(desc.states.pixelShader);
+                const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.states.pixelShader);
 
                 // Loop over all new databindings
                 for (const BindInfo& dataBinding : bindReflection.dataBindings)
@@ -555,10 +432,16 @@ namespace Renderer
 
                 layoutBinding.binding = bindInfo.binding;
                 layoutBinding.descriptorType = bindInfo.descriptorType;
-                layoutBinding.descriptorCount = bindInfo.count;
+                layoutBinding.descriptorCount = (bindInfo.count == 0) ? numSupportedTextures : bindInfo.count;
                 layoutBinding.stageFlags = bindInfo.stageFlags;
 
                 layout.bindings.push_back(layoutBinding);
+
+                bool isTextureType = bindInfo.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+                    bindInfo.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                bool isTextureArray = isTextureType && (bindInfo.count == 0 || bindInfo.count > 1);
+                layout.isTextureArray.push_back(isTextureArray);
+                layout.isVariableBinding.push_back(bindInfo.count == 0);
             }
 
             size_t numDescriptorSets = pipeline.descriptorSetLayoutDatas.size();
@@ -566,10 +449,31 @@ namespace Renderer
 
             for (size_t i = 0; i < numDescriptorSets; i++)
             {
-                pipeline.descriptorSetLayoutDatas[i].createInfo.bindingCount = static_cast<u32>(pipeline.descriptorSetLayoutDatas[i].bindings.size());
-                pipeline.descriptorSetLayoutDatas[i].createInfo.pBindings = pipeline.descriptorSetLayoutDatas[i].bindings.data();
+                DescriptorSetLayoutData& layoutData = pipeline.descriptorSetLayoutDatas[i];
 
-                if (vkCreateDescriptorSetLayout(_device->_device, &pipeline.descriptorSetLayoutDatas[i].createInfo, nullptr, &pipeline.descriptorSetLayouts[i]) != VK_SUCCESS)
+                std::vector<VkDescriptorBindingFlags> bindingFlags(layoutData.bindings.size(), VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+                for (size_t j = 0; j < layoutData.bindings.size(); j++)
+                {
+                    if (layoutData.isTextureArray[j])
+                    {
+                        bindingFlags[j] |= VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+                    }
+                    if (layoutData.isVariableBinding[j])
+                    {
+                        bindingFlags[j] |= VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+                    }
+                }
+
+                VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO };
+                flagsInfo.bindingCount = static_cast<u32>(bindingFlags.size());
+                flagsInfo.pBindingFlags = bindingFlags.data();
+
+                layoutData.createInfo.pNext = &flagsInfo;
+                layoutData.createInfo.bindingCount = static_cast<u32>(layoutData.bindings.size());
+                layoutData.createInfo.pBindings = layoutData.bindings.data();
+                layoutData.createInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+
+                if (vkCreateDescriptorSetLayout(_device->_device, &layoutData.createInfo, nullptr, &pipeline.descriptorSetLayouts[i]) != VK_SUCCESS)
                 {
                     NC_LOG_CRITICAL("Failed to create descriptor set layout!");
                 }
@@ -856,26 +760,29 @@ namespace Renderer
 
         void PipelineHandlerVK::CreatePipelineInternal(ComputePipeline& pipeline, const ComputePipelineDesc& desc)
         {
+            u32 numSupportedTextures = _device->HasExtendedTextureSupport() ? 8192 : 4096;
+
             std::vector<BindInfo> bindInfos;
             std::vector<BindInfoPushConstant> bindInfoPushConstants;
-
-            const BindReflection& bindReflection = _shaderHandler->GetBindReflection(desc.computeShader);
+            const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.computeShader);
             bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
             bindInfoPushConstants.insert(bindInfoPushConstants.end(), bindReflection.pushConstants.begin(), bindReflection.pushConstants.end());
-
             for (BindInfo& bindInfo : bindInfos)
             {
                 DescriptorSetLayoutData& layout = GetDescriptorSet(bindInfo.set, pipeline.descriptorSetLayoutDatas);
                 VkDescriptorSetLayoutBinding layoutBinding = {};
-
                 layoutBinding.binding = bindInfo.binding;
                 layoutBinding.descriptorType = bindInfo.descriptorType;
-                layoutBinding.descriptorCount = bindInfo.count;
+                layoutBinding.descriptorCount = (bindInfo.count == 0) ? numSupportedTextures : bindInfo.count;
                 layoutBinding.stageFlags = bindInfo.stageFlags;
-
                 layout.bindings.push_back(layoutBinding);
-            }
 
+                bool isTextureType = bindInfo.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+                    bindInfo.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                bool isTextureArray = isTextureType && (bindInfo.count == 0 || bindInfo.count > 1);
+                layout.isTextureArray.push_back(isTextureArray);
+                layout.isVariableBinding.push_back(bindInfo.count == 0);
+            }
             for (BindInfoPushConstant& pushConstant : bindInfoPushConstants)
             {
                 VkPushConstantRange& range = pipeline.pushConstantRanges.emplace_back();
@@ -883,29 +790,47 @@ namespace Renderer
                 range.size = pushConstant.size;
                 range.stageFlags = pushConstant.stageFlags;
             }
-
             size_t numDescriptorSets = pipeline.descriptorSetLayoutDatas.size();
             pipeline.descriptorSetLayouts.resize(numDescriptorSets);
-
             for (size_t i = 0; i < numDescriptorSets; i++)
             {
-                pipeline.descriptorSetLayoutDatas[i].createInfo.bindingCount = static_cast<u32>(pipeline.descriptorSetLayoutDatas[i].bindings.size());
-                pipeline.descriptorSetLayoutDatas[i].createInfo.pBindings = pipeline.descriptorSetLayoutDatas[i].bindings.data();
+                DescriptorSetLayoutData& layoutData = pipeline.descriptorSetLayoutDatas[i];
 
-                if (vkCreateDescriptorSetLayout(_device->_device, &pipeline.descriptorSetLayoutDatas[i].createInfo, nullptr, &pipeline.descriptorSetLayouts[i]) != VK_SUCCESS)
+                // Build binding flags
+                std::vector<VkDescriptorBindingFlags> bindingFlags(layoutData.bindings.size(), VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+                for (size_t j = 0; j < layoutData.bindings.size(); j++)
+                {
+                    if (layoutData.isTextureArray[j])
+                    {
+                        bindingFlags[j] |= VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+                    }
+                    if (layoutData.isVariableBinding[j])
+                    {
+                        bindingFlags[j] |= VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+                    }
+                }
+
+                VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO };
+                flagsInfo.bindingCount = static_cast<u32>(bindingFlags.size());
+                flagsInfo.pBindingFlags = bindingFlags.data();
+
+                layoutData.createInfo.pNext = &flagsInfo;
+                layoutData.createInfo.bindingCount = static_cast<u32>(layoutData.bindings.size());
+                layoutData.createInfo.pBindings = layoutData.bindings.data();
+                layoutData.createInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+
+                if (vkCreateDescriptorSetLayout(_device->_device, &layoutData.createInfo, nullptr, &pipeline.descriptorSetLayouts[i]) != VK_SUCCESS)
                 {
                     NC_LOG_CRITICAL("Failed to create descriptor set layout!");
                 }
                 DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.descriptorSetLayouts[i], VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, desc.debugName.c_str());
             }
-
             VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
             pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             pipelineLayoutInfo.setLayoutCount = static_cast<u32>(pipeline.descriptorSetLayouts.size());
             pipelineLayoutInfo.pSetLayouts = pipeline.descriptorSetLayouts.data();
             pipelineLayoutInfo.pushConstantRangeCount = static_cast<u32>(pipeline.pushConstantRanges.size()); // Optional
             pipelineLayoutInfo.pPushConstantRanges = pipeline.pushConstantRanges.data();
-
             if (vkCreatePipelineLayout(_device->_device, &pipelineLayoutInfo, nullptr, &pipeline.pipelineLayout) != VK_SUCCESS)
             {
                 NC_LOG_CRITICAL("Failed to create pipeline layout!");

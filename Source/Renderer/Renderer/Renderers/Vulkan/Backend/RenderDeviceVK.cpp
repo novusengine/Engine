@@ -1,7 +1,6 @@
 #include "RenderDeviceVK.h"
 
 #include "DebugMarkerUtilVK.h"
-#include "DescriptorSetBuilderVK.h"
 #include "ImageHandlerVK.h"
 #include "SemaphoreHandlerVK.h"
 #include "SwapChainVK.h"
@@ -79,7 +78,6 @@ namespace Renderer
         {
             // TODO: All cleanup
 
-            delete _descriptorMegaPool;
             delete _imguiContext;
         }
 
@@ -165,9 +163,6 @@ namespace Renderer
             CreateAllocator();
             CreateCommandPool();
             CreateTracyContext();
-
-            _descriptorMegaPool = new DescriptorMegaPoolVK();
-            _descriptorMegaPool->Init(FRAME_INDEX_COUNT, this);
 
             fnVkCmdDrawIndirectCountKHR = (PFN_vkCmdDrawIndirectCountKHR)vkGetDeviceProcAddr(_device, "vkCmdDrawIndirectCountKHR");
             fnVkCmdDrawIndexedIndirectCountKHR = (PFN_vkCmdDrawIndexedIndirectCountKHR)vkGetDeviceProcAddr(_device, "vkCmdDrawIndexedIndirectCountKHR");
@@ -407,6 +402,11 @@ namespace Renderer
             descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
             descriptorIndexingFeatures.runtimeDescriptorArray = true;
             descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true;
+            descriptorIndexingFeatures.descriptorBindingPartiallyBound = true;
+            descriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind = true;
+            descriptorIndexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = true;
+            descriptorIndexingFeatures.descriptorBindingStorageImageUpdateAfterBind = true;
+            descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = true;
             descriptorIndexingFeatures.pNext = &shaderSubgroupFeatures;
 
             VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = {};
@@ -1426,8 +1426,8 @@ namespace Renderer
                     NC_LOG_CRITICAL("Tried to use a format that wasn't uncompressed or used BC compression, what is this? id: {}", static_cast<std::underlying_type<VkFormat>::type>(format));
                 }
 
-                curWidth = Math::Max(1, curWidth / 2);
-                curHeight = Math::Max(1, curHeight / 2);
+                curWidth = Math::Max(1u, curWidth / 2);
+                curHeight = Math::Max(1u, curHeight / 2);
             }
 
             vkCmdCopyBufferToImage(

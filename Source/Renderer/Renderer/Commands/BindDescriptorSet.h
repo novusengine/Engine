@@ -13,9 +13,7 @@ namespace Renderer
         {
             static const BackendDispatchFunction DISPATCH_FUNCTION;
 
-            DescriptorSetSlot slot;
-            Descriptor* descriptors;
-            u32 numDescriptors;
+            DescriptorSet* set;
 
             const TrackedBufferBitSets* bufferPermissions;
         };

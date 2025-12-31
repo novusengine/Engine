@@ -231,6 +231,206 @@ namespace ShaderCooker
         return StringUtils::fnv1a_32(shaderPath.string().c_str(), shaderPath.string().length());
     }
 
+    FileFormat::DescriptorTypeReflection GetDescriptorTypeReflection(slang::TypeLayoutReflection* typeLayout, u32& count)
+    {
+        slang::TypeReflection::Kind kind = typeLayout->getKind();
+        switch (kind)
+        {
+            case slang::TypeReflection::Kind::ConstantBuffer:
+            {
+                return FileFormat::DescriptorTypeReflection::ConstantBuffer;
+            }
+            case slang::TypeReflection::Kind::SamplerState:
+            {
+                return FileFormat::DescriptorTypeReflection::SamplerState;
+            }
+            case slang::TypeReflection::Kind::Resource:
+            {
+                SlangResourceShape shape = typeLayout->getResourceShape();
+
+                switch (shape)
+                {
+                    case SlangResourceShape::SLANG_BYTE_ADDRESS_BUFFER:
+                        return FileFormat::DescriptorTypeReflection::ByteAddressBuffer;
+                    case SlangResourceShape::SLANG_STRUCTURED_BUFFER:
+                        return FileFormat::DescriptorTypeReflection::StructuredBuffer;
+                    case SlangResourceShape::SLANG_TEXTURE_1D:
+                    case SlangResourceShape::SLANG_TEXTURE_2D:
+                    case SlangResourceShape::SLANG_TEXTURE_3D:
+                    case SlangResourceShape::SLANG_TEXTURE_CUBE:
+                        return FileFormat::DescriptorTypeReflection::Texture;
+                    case SlangResourceShape::SLANG_TEXTURE_1D_ARRAY:
+                    case SlangResourceShape::SLANG_TEXTURE_2D_ARRAY:
+                    case SlangResourceShape::SLANG_TEXTURE_CUBE_ARRAY:
+                        return FileFormat::DescriptorTypeReflection::TextureArray;
+                    default:
+                        NC_LOG_CRITICAL("Unsupported resource shape {0} in GetDescriptorTypeReflection", static_cast<u32>(shape));
+                }
+                break;
+            }
+            case slang::TypeReflection::Kind::Array:
+            {
+                size_t elementCount = typeLayout->getElementCount();
+                if (elementCount == ~size_t(0))
+                {
+                    // Unbounded array
+                    count = 0; // 0 means it's gonna be unbounded
+                }
+                else
+                {
+                    count = static_cast<u32>(elementCount);
+                }
+                return FileFormat::DescriptorTypeReflection::Array;
+            }
+        }
+
+        NC_LOG_CRITICAL("Unsupported type kind {0} in GetDescriptorTypeReflection", static_cast<u32>(kind));
+        return FileFormat::DescriptorTypeReflection::Unknown;
+    }
+
+    FileFormat::DescriptorAccessTypeReflection ToAccessType(SlangResourceAccess access)
+    {
+        switch(access)
+        {
+            case SLANG_RESOURCE_ACCESS_NONE:
+                return FileFormat::DescriptorAccessTypeReflection::None;
+            case SLANG_RESOURCE_ACCESS_READ:
+                return FileFormat::DescriptorAccessTypeReflection::Read;
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                return FileFormat::DescriptorAccessTypeReflection::ReadWrite;
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                return FileFormat::DescriptorAccessTypeReflection::RasterOrdered;
+            case SLANG_RESOURCE_ACCESS_APPEND:
+                return FileFormat::DescriptorAccessTypeReflection::Append;
+            case SLANG_RESOURCE_ACCESS_CONSUME:
+                return FileFormat::DescriptorAccessTypeReflection::Consume;
+            case SLANG_RESOURCE_ACCESS_WRITE:
+                return FileFormat::DescriptorAccessTypeReflection::Write;
+            case SLANG_RESOURCE_ACCESS_FEEDBACK:
+                return FileFormat::DescriptorAccessTypeReflection::Feedback;
+        }
+
+        return FileFormat::DescriptorAccessTypeReflection::None;
+    }
+
+    bool ReflectDescriptors(slang::ProgramLayout* programLayout, Slang::ComPtr<slang::IMetadata> entryPointMetadata, FileFormat::ShaderReflection& out)
+    {
+        SlangResult result;
+        bool success = true;
+
+        u32 parameterCount = programLayout->getParameterCount();
+
+        for (u32 i = 0; i < parameterCount; i++)
+        {
+            slang::VariableLayoutReflection* variableLayout = programLayout->getParameterByIndex(i);
+            slang::TypeLayoutReflection* typeLayout = variableLayout->getTypeLayout();
+
+            u32 slot = variableLayout->getBindingSpace();
+            const char* name = variableLayout->getName();
+            u32 binding = variableLayout->getBindingIndex();
+            FileFormat::DescriptorAccessTypeReflection accessType = ToAccessType(typeLayout->getResourceAccess());
+            bool isUsed;
+            u32 byteOffset = 0;
+            u32 byteSize = 0;
+
+            if (slot == 4)
+            {
+                volatile int asd = 123;
+            }
+
+            SlangParameterCategory category = static_cast<SlangParameterCategory>(variableLayout->getCategory());
+            result = entryPointMetadata->isParameterLocationUsed(category, slot, binding, isUsed);
+            NC_ASSERT(SLANG_SUCCEEDED(result), "Failed to get parameter usage from metadata");
+
+            u32 count = 1;
+            FileFormat::DescriptorTypeReflection type = GetDescriptorTypeReflection(typeLayout, count);
+            FileFormat::DescriptorTypeReflection subType = FileFormat::DescriptorTypeReflection::Unknown;
+
+            // Get byteOffset and byteSize for ConstantBuffer types (push constants)
+            if (type == FileFormat::DescriptorTypeReflection::ConstantBuffer)
+            {
+                byteOffset = static_cast<u32>(variableLayout->getOffset(slang::ParameterCategory::Uniform));
+                slang::TypeLayoutReflection* elementTypeLayout = typeLayout->getElementTypeLayout();
+                if (elementTypeLayout)
+                {
+                    byteSize = static_cast<u32>(elementTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+                }
+            }
+
+            if (slot == 0)
+            {
+                if (type != FileFormat::DescriptorTypeReflection::ConstantBuffer)
+                {
+                    // Slot 0 is reserved for push constants
+                    NC_LOG_ERROR("Descriptor found in slot 0 which is reserved for push constants: {0} (binding {1})\n You probably wanted to use the PER_PASS or PER_DRAW macros", name, binding);
+                    success = false;
+                    continue;
+                }
+                if (byteSize == 0)
+                {
+                    // Slot 0 is reserved for push constants
+                    NC_LOG_ERROR("Push constant buffer has size 0: {0} (binding {1})", name, binding);
+                    success = false;
+                    continue;
+                }
+            }
+
+            // Get the subtype if this is an array
+            if (type == FileFormat::DescriptorTypeReflection::Array)
+            {
+                slang::TypeLayoutReflection* elementTypeLayout = typeLayout->getElementTypeLayout();
+                subType = GetDescriptorTypeReflection(elementTypeLayout, count);
+            }
+
+            FileFormat::DescriptorSetReflection& descriptorSet = out.GetDescriptorSetBySlot(slot);
+            if (descriptorSet.descriptors.contains(binding))
+            {
+                // Make sure the existing descriptor matches
+                FileFormat::DescriptorReflection& existingDescriptor = descriptorSet.descriptors[binding];
+                
+                if (existingDescriptor.name != name ||
+                    existingDescriptor.type != type ||
+                    existingDescriptor.subType != subType ||
+                    existingDescriptor.count != count ||
+                    existingDescriptor.accessType != accessType ||
+                    existingDescriptor.isUsed != isUsed ||
+                    existingDescriptor.byteOffset != byteOffset ||
+                    existingDescriptor.byteSize != byteSize)
+                {
+                    std::string existingDescriptorStr = existingDescriptor.ToString();
+                    std::string newDescriptorStr = FileFormat::DescriptorReflection{ .binding = binding, .name = name, .type = type, .subType = subType, .count = count }.ToString();
+                    NC_LOG_ERROR("Descriptor binding conflict at slot {0}, binding {1}:\nExisting: {2}\nNew: {3}",
+                        slot,
+                        binding,
+                        existingDescriptorStr.c_str(),
+                        newDescriptorStr.c_str());
+
+                    success = false;
+                }
+            }
+            else
+            {
+                // New binding
+                FileFormat::DescriptorReflection descriptor;
+                descriptor.binding = binding;
+                descriptor.name = name;
+                descriptor.type = type;
+                descriptor.subType = subType;
+                descriptor.count = count;
+                descriptor.accessType = accessType;
+                descriptor.isUsed = isUsed;
+                descriptor.byteOffset = byteOffset;
+                descriptor.byteSize = byteSize;
+
+                // TODO: Check so we don't have implicit padding (explicit padding is fine)
+                
+                descriptorSet.descriptors[binding] = descriptor;
+            }
+        }
+
+        return success;
+    }
+
     bool SlangBridge::Compile(std::filesystem::path path, const std::string& source, FileFormat::ShaderInMemory& shaderInMemory)
     {
         SlangBridgeData* data = static_cast<SlangBridgeData*>(_data);
@@ -246,9 +446,9 @@ namespace ShaderCooker
         // Set up defines
         std::vector<slang::PreprocessorMacroDesc> defines;
         defines.reserve(32);
-        defines.push_back({ "DEBUG", "0" });
-        defines.push_back({ "GLOBAL", "1" });
-        defines.push_back({ "TILES", "2" });
+        // 1 indexed because we let 0 be the push constants, it's not technically correct but we get nice error checking if we do this
+        defines.push_back({ "DEBUG", "1" });
+        defines.push_back({ "GLOBAL", "2" });
         defines.push_back({ "LIGHT", "3" });
         defines.push_back({ "TERRAIN", "4" });
         defines.push_back({ "MODEL", "5" });
@@ -359,6 +559,25 @@ namespace ShaderCooker
             return false;
         }
 
+        Slang::ComPtr<slang::IMetadata> entryPointMetadata;
+        result = linkedProgram->getEntryPointMetadata(0, 0, entryPointMetadata.writeRef(), data->diagnostics.writeRef());
+        if (data->diagnostics)
+        {
+            std::string diagStr = { (char*)data->diagnostics->getBufferPointer(), data->diagnostics->getBufferSize() };
+            NC_LOG_ERROR("[Slang] Get Entrypoint metadata: {0} ({1})", diagStr.c_str(), path.string().c_str());
+        }
+        if (!SLANG_SUCCEEDED(result))
+        {
+            NC_LOG_ERROR("[Slang] Failed to get entrypoint metadata ({0})", path.string().c_str());
+            return false;
+        }
+
+        // Reflect descriptors
+        if (!ReflectDescriptors(programLayout, entryPointMetadata, shaderInMemory.reflection))
+        {
+            return false;
+        }
+
         // Copy to output blob
         shaderInMemory.data = new u8[kernelBlob->getBufferSize()];
         memcpy(shaderInMemory.data, kernelBlob->getBufferPointer(), kernelBlob->getBufferSize());
@@ -386,22 +605,22 @@ namespace ShaderCooker
             }
         }
 
-        // We expect filename to end with .XX.hlsl where XX is the profile of the shader, for example vs for vertex shader, ps for pixel shader, cs for compute etc
-        // First we remove the .hlsl part of the name
-        fs::path withoutHlsl = filename.replace_extension();
+        // We expect filename to end with .XX.slang where XX is the profile of the shader, for example vs for vertex shader, ps for pixel shader, cs for compute etc
+        // First we remove the .slang part of the name
+        fs::path withoutSlang = filename.replace_extension();
 
-        if (!withoutHlsl.has_extension())
+        if (!withoutSlang.has_extension())
         {
-            NC_LOG_ERROR("Filename \"{0}\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
+            NC_LOG_ERROR("Filename \"{0}\" should end with .XX.slang where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
 
             return false;
         }
 
-        std::string extension = withoutHlsl.extension().string().substr(1); // Get the extension (.vs) as a string, then remove the first char which will be the "."
+        std::string extension = withoutSlang.extension().string().substr(1); // Get the extension (.vs) as a string, then remove the first char which will be the "."
 
         if (extension.length() != 2 && extension.length() != 3)
         {
-            NC_LOG_ERROR("Filename \"{0}\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
+            NC_LOG_ERROR("Filename \"{0}\" should end with .XX.slang where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
 
             return false;
         }
@@ -419,7 +638,7 @@ namespace ShaderCooker
 
         if (!isValidProfile)
         {
-            NC_LOG_ERROR("Filename \"{0}\" should end with .XX.hlsl where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
+            NC_LOG_ERROR("Filename \"{0}\" should end with .XX.slang where XX is one of these valid profiles depending on shader type: {1}", filename.string(), validProfiles);
             return false;
         }
 

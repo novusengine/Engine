@@ -1,10 +1,16 @@
 #pragma once
 #include "Renderer/DescriptorMeta.h"
+#include "Renderer/DescriptorType.h"
 #include "Renderer/RenderStates.h"
 
 #include <Base/Types.h>
 
 #include <vulkan/vulkan_core.h>
+
+namespace FileFormat
+{
+    struct DescriptorReflection;
+}
 
 namespace Renderer
 {
@@ -33,6 +39,8 @@ namespace Renderer
             static VkBorderColor ToVkBorderColor(StaticBorderColor borderColor);
             static VkIndexType ToVkIndexType(IndexFormat indexFormat);
             static VkPrimitiveTopology ToVkPrimitiveTopology(PrimitiveTopology topology);
+            static VkDescriptorType ToVkDescriptorType(const FileFormat::DescriptorReflection& descriptor);
+            static VkDescriptorType ToVkDescriptorType(DescriptorType type);
 
             static bool ToAnisotropyEnabled(SamplerFilter filter);
             static u32 ToByteSize(const InputFormat format);

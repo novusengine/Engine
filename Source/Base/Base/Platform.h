@@ -68,5 +68,11 @@ static_assert(false, "Please add PRAGMA_ENABLE_OPTIMIZATION/PRAGMA_DISABLE_OPTIM
 #ifndef strcpy_s
 #define strcpy_s(dest, count)  strcpy((dest), (count))
 #endif // strcpy_s
-#define ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 #endif
+
+#ifndef ARRAY_COUNT
+#define ARRAY_COUNT(arr) (sizeof(arr)/sizeof(arr[0]))
+#endif
+
+#define STATIC_ASSERT_MATCHING_ARRAY(arrA, arrB) static_assert(ARRAY_COUNT(arrA) == ARRAY_COUNT(arrB), "Array count mismatch: " #arrA " and " #arrB)
+#define STATIC_ASSERT_MATCHING_ENUM_ARRAY(enumType, arr) static_assert((static_cast<u32>(enumType::COUNT) + 1) == ARRAY_COUNT(arr), "Enum and array count mismatch: " #enumType " and " #arr)

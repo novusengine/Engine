@@ -1,22 +1,21 @@
 #include "RendererVK.h"
 #include "Renderer/Window.h"
 
-#include "Backend/RenderDeviceVK.h"
 #include "Backend/BufferHandlerVK.h"
-#include "Backend/ImageHandlerVK.h"
-#include "Backend/TextureHandlerVK.h"
-#include "Backend/ShaderHandlerVK.h"
-#include "Backend/PipelineHandlerVK.h"
 #include "Backend/CommandListHandlerVK.h"
+#include "Backend/DebugMarkerUtilVK.h"
+#include "Backend/DescriptorHandlerVK.h"
+#include "Backend/FormatConverterVK.h"
+#include "Backend/ImageHandlerVK.h"
+#include "Backend/PipelineHandlerVK.h"
+#include "Backend/RenderDeviceVK.h"
 #include "Backend/SamplerHandlerVK.h"
 #include "Backend/SemaphoreHandlerVK.h"
-#include "Backend/UploadBufferHandlerVK.h"
+#include "Backend/ShaderHandlerVK.h"
 #include "Backend/SwapChainVK.h"
-#include "Backend/DebugMarkerUtilVK.h"
-#include "Backend/DescriptorSetBuilderVK.h"
-#include "Backend/FormatConverterVK.h"
-#include "Backend/DebugMarkerUtilVK.h"
+#include "Backend/TextureHandlerVK.h"
 #include "Backend/TimeQueryHandlerVK.h"
+#include "Backend/UploadBufferHandlerVK.h"
 
 #include <Base/Container/SafeVector.h>
 #include <Base/Util/StringUtils.h>
@@ -31,32 +30,36 @@ namespace Renderer
 {
     RendererVK::RendererVK(Novus::Window* window)
         : _device(new Backend::RenderDeviceVK(window))
+        , _presentDescriptorSet(DescriptorSetSlot::PER_PASS)
     {
         _frameAllocator.Init(64 * 1024 * 1024, "Renderer Allocator");
 
         // Create handlers
         _bufferHandler = new Backend::BufferHandlerVK();
-        _imageHandler = new Backend::ImageHandlerVK();
-        _textureHandler = new Backend::TextureHandlerVK();
-        _shaderHandler = new Backend::ShaderHandlerVK();
-        _pipelineHandler = new Backend::PipelineHandlerVK();
         _commandListHandler = new Backend::CommandListHandlerVK();
+        _descriptorHandler = new Backend::DescriptorHandlerVK();
+        _imageHandler = new Backend::ImageHandlerVK();
+        _pipelineHandler = new Backend::PipelineHandlerVK();
         _samplerHandler = new Backend::SamplerHandlerVK();
         _semaphoreHandler = new Backend::SemaphoreHandlerVK();
-        _uploadBufferHandler = new Backend::UploadBufferHandlerVK();
+        _shaderHandler = new Backend::ShaderHandlerVK();
+        _textureHandler = new Backend::TextureHandlerVK();
         _timeQueryHandler = new Backend::TimeQueryHandlerVK();
+        _uploadBufferHandler = new Backend::UploadBufferHandlerVK();
 
         // Init
         _device->Init();
+
         _bufferHandler->Init(_device);
-        _imageHandler->Init(_device, _samplerHandler);
-        _textureHandler->Init(_device, _bufferHandler, _uploadBufferHandler, _samplerHandler);
-        _shaderHandler->Init(_device);
-        _timeQueryHandler->Init(_device);
-        _pipelineHandler->Init(&_frameAllocator, _device, _shaderHandler, _imageHandler, _bufferHandler);
+        _descriptorHandler->Init(_device, _textureHandler);
         _commandListHandler->Init(_device);
         _samplerHandler->Init(_device);
         _semaphoreHandler->Init(_device);
+        _shaderHandler->Init(_device);
+        _timeQueryHandler->Init(_device);
+        _imageHandler->Init(_device, _samplerHandler);
+        _pipelineHandler->Init(&_frameAllocator, _device, _shaderHandler, _imageHandler, _bufferHandler);
+        _textureHandler->Init(_device, _bufferHandler, _descriptorHandler, _uploadBufferHandler, _samplerHandler);
         _uploadBufferHandler->Init(this, _device, _bufferHandler, _textureHandler, _semaphoreHandler, _commandListHandler);
     }
 
@@ -174,6 +177,11 @@ namespace Renderer
         return _semaphoreHandler->CreateNSemaphore();
     }
 
+    DescriptorSetID RendererVK::CreateDescriptorSet(const DescriptorSetDesc& desc)
+    {
+        return _descriptorHandler->CreateDescriptorSet(desc);
+    }
+
     GraphicsPipelineID RendererVK::CreatePipeline(GraphicsPipelineDesc& desc)
     {
         return _pipelineHandler->CreatePipeline(desc);
@@ -243,9 +251,126 @@ namespace Renderer
         _textureHandler->UnloadTexturesInArray(textureArrayID, unloadStartIndex);
     }
 
+    void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, BufferID bufferID, DescriptorType type, u32 frameIndex)
+    {
+        VkBuffer buffer = _bufferHandler->GetBuffer(bufferID);
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, buffer, type, frameIndex);
+    }
+
+    void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, DescriptorType type, u32 frameIndex)
+    {
+        VkImageView imageView = _imageHandler->GetColorView(imageID, mipLevel);
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, imageView, type, true, frameIndex);
+    }
+
+    void RendererVK::BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex)
+    {
+        std::vector<VkImageView> imageViews;
+        for (u32 i = 0; i < mipCount; i++)
+        {
+            u32 mip = mipLevel + i;
+            VkImageView imageView = _imageHandler->GetColorView(imageID, mip);
+            imageViews.push_back(imageView);
+        }
+        _descriptorHandler->BindDescriptorArray(descriptorSetID, bindingIndex, imageViews, 0, type, true, frameIndex);
+    }
+
+    void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, DepthImageID imageID, DescriptorType type, u32 frameIndex)
+    {
+        VkImageView imageView = _imageHandler->GetDepthView(imageID);
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, imageView, type, true, frameIndex);
+    }
+
+    void RendererVK::BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, DepthImageID imageID, u32 arrayIndex, DescriptorType type, u32 frameIndex)
+    {
+        VkImageView imageView = _imageHandler->GetDepthView(imageID);
+        _descriptorHandler->BindDescriptorArray(descriptorSetID, bindingIndex, imageView, arrayIndex, type, true, frameIndex);
+    }
+
+    void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, SamplerID samplerID, u32 frameIndex)
+    {
+        VkSampler sampler = _samplerHandler->GetSampler(samplerID);
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, sampler, frameIndex);
+    }
+
+    void RendererVK::BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, SamplerID samplerID, u32 arrayIndex, u32 frameIndex)
+    {
+        VkSampler sampler = _samplerHandler->GetSampler(samplerID);
+        _descriptorHandler->BindDescriptorArray(descriptorSetID, bindingIndex, sampler, arrayIndex, frameIndex);
+    }
+
+    void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, DescriptorType type, u32 frameIndex)
+    {
+        VkImageView imageView = _textureHandler->GetImageView(textureID, mipLevel);
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, imageView, type, false, frameIndex);
+    }
+
+    void RendererVK::BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex)
+    {
+        std::vector<VkImageView> imageViews;
+        for (u32 i = 0; i < mipCount; i++)
+        {
+            u32 mip = mipLevel + i;
+            VkImageView imageView = _textureHandler->GetImageView(textureID, mip);
+            imageViews.push_back(imageView);
+        }
+
+        _descriptorHandler->BindDescriptorArray(descriptorSetID, bindingIndex, imageViews, 0, type, false, frameIndex);
+    }
+
+    void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID)
+    {
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, textureArrayID);
+    }
+
     u32 RendererVK::AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID)
     {
         return _textureHandler->AddTextureToArray(textureID, textureArrayID);
+    }
+
+    void RendererVK::FlushTextureArrayDescriptors(TextureArrayID textureArrayID)
+    {
+        _textureHandler->FlushTextureArrayDescriptors(textureArrayID);
+    }
+
+    TextureBaseDesc RendererVK::GetDesc(TextureID textureID)
+    {
+        return _textureHandler->GetTextureDesc(textureID);
+    }
+
+    const ImageDesc& RendererVK::GetDesc(ImageID ID)
+    {
+        return _imageHandler->GetImageDesc(ID);
+    }
+
+    const DepthImageDesc& RendererVK::GetDesc(DepthImageID ID)
+    {
+        return _imageHandler->GetImageDesc(ID);
+    }
+
+    const ComputePipelineDesc& RendererVK::GetDesc(ComputePipelineID ID)
+    {
+        return _pipelineHandler->GetDesc(ID);
+    }
+
+    const GraphicsPipelineDesc& RendererVK::GetDesc(GraphicsPipelineID ID)
+    {
+        return _pipelineHandler->GetDesc(ID);
+    }
+
+    const ComputeShaderDesc& RendererVK::GetDesc(ComputeShaderID ID)
+    {
+        return _shaderHandler->GetDesc(ID);
+    }
+
+    const VertexShaderDesc& RendererVK::GetDesc(VertexShaderID ID)
+    {
+        return _shaderHandler->GetDesc(ID);
+    }
+
+    const PixelShaderDesc& RendererVK::GetDesc(PixelShaderID ID)
+    {
+        return _shaderHandler->GetDesc(ID);
     }
 
     static VmaBudget sBudgets[16] = { { 0 } };
@@ -258,6 +383,7 @@ namespace Renderer
     f32 RendererVK::FlipFrame(u32 frameIndex)
     {
         ZoneScopedC(tracy::Color::Red3);
+        _frameIndex = frameIndex;
 
         // Reset old commandbuffers
         _commandListHandler->FlipFrame();
@@ -311,6 +437,16 @@ namespace Renderer
         return timeWaited;
     }
 
+    u32 RendererVK::GetCurrentFrameIndex()
+    {
+        return _frameIndex;
+    }
+
+    u32 RendererVK::GetFrameIndexCount()
+    {
+        return _device->FRAME_INDEX_COUNT;
+    }
+
     void RendererVK::ResetTimeQueries(u32 frameIndex)
     {
         _frameTimeQueries.clear();
@@ -319,21 +455,6 @@ namespace Renderer
     TextureID RendererVK::GetTextureID(TextureArrayID textureArrayID, u32 index)
     {
         return _textureHandler->GetTextureIDInArray(textureArrayID, index);
-    }
-
-    TextureBaseDesc RendererVK::GetTextureDesc(TextureID textureID)
-    {
-        return _textureHandler->GetTextureDesc(textureID);
-    }
-
-    const ImageDesc& RendererVK::GetImageDesc(ImageID ID)
-    {
-        return _imageHandler->GetImageDesc(ID);
-    }
-
-    const DepthImageDesc& RendererVK::GetImageDesc(DepthImageID ID)
-    {
-        return _imageHandler->GetImageDesc(ID);
     }
 
     uvec2 RendererVK::GetImageDimensions(const ImageID id, u32 mipLevel)
@@ -668,7 +789,7 @@ namespace Renderer
         }
 
         uvec2 extent = desc.extent;
-        if (extent == uvec2(0))
+        if (extent == uvec2(0) && desc.renderTargets[0] != ImageMutableResource::Invalid())
         {
             extent = _imageHandler->GetDimensions(desc.MutableResourceToImageID(desc.renderTargets[0]), 0);
         }
@@ -1233,243 +1354,6 @@ namespace Renderer
         return false;
     }
 
-    void RendererVK::BindDescriptor(Backend::DescriptorSetBuilderVK& builder, Descriptor& descriptor)
-    {
-        if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_BUFFER)
-        {
-            ZoneScopedN("Buffer");
-            VkDescriptorBufferInfo bufferInfo = {};
-            bufferInfo.buffer = _bufferHandler->GetBuffer(descriptor.bufferID);
-            bufferInfo.range = _bufferHandler->GetBufferSize(descriptor.bufferID);
-
-            builder.BindBuffer(descriptor.nameHash, bufferInfo, descriptor.bufferID);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_BUFFER_ARRAY)
-        {
-            ZoneScopedN("BufferArray");
-            VkDescriptorBufferInfo bufferInfo = {};
-            bufferInfo.buffer = _bufferHandler->GetBuffer(descriptor.bufferID);
-            bufferInfo.range = _bufferHandler->GetBufferSize(descriptor.bufferID);
-
-            builder.BindBufferArrayIndex(descriptor.nameHash, bufferInfo, descriptor.arrayIndex, descriptor.bufferID);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_SAMPLER)
-        {
-            ZoneScopedN("Sampler");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.sampler = _samplerHandler->GetSampler(descriptor.samplerID);
-
-            builder.BindSampler(descriptor.nameHash, imageInfo);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_SAMPLER_ARRAY)
-        {
-            ZoneScopedN("SamplerArray");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.sampler = _samplerHandler->GetSampler(descriptor.samplerID);
-
-            builder.BindSamplerArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE)
-        {
-            ZoneScopedN("Texture");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID);
-
-            builder.BindImage(descriptor.nameHash, imageInfo);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE_ARRAY)
-        {
-            ZoneScopedN("TextureArray");
-            const SafeVector<TextureID>& textureIDs = _textureHandler->GetTextureIDsInArray(descriptor.textureArrayID);
-
-            u32 textureArraySize = _textureHandler->GetTextureArraySize(descriptor.textureArrayID);
-            
-            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, textureArraySize);
-            u32 numImageInfos = 0;
-            
-            u32 numTextures = static_cast<u32>(textureIDs.Size());
-
-            // From 0 to numTextures, add our actual textures
-            bool texturesAreOnionTextures = false;
-
-            textureIDs.ReadLock(
-                [&](const std::vector<TextureID> textures)
-                {
-                    for (auto textureID : textures)
-                    {
-                        VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                        imageInfo.imageView = _textureHandler->GetImageView(textureID);
-                        imageInfo.sampler = VK_NULL_HANDLE;
-
-                        texturesAreOnionTextures = _textureHandler->IsOnionTexture(textureID);
-                    }
-                });
-
-            // from numTextures to textureArraySize, add debug texture
-            VkDescriptorImageInfo imageInfoDebugTexture;
-            imageInfoDebugTexture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-            if (texturesAreOnionTextures)
-            {
-                imageInfoDebugTexture.imageView = _textureHandler->GetDebugOnionTextureImageView();
-            }
-            else
-            {
-                imageInfoDebugTexture.imageView = _textureHandler->GetDebugTextureImageView();
-            }
-            
-            imageInfoDebugTexture.sampler = VK_NULL_HANDLE;
-
-            for (u32 i = numTextures; i < textureArraySize; i++)
-            {
-                VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                imageInfo = imageInfoDebugTexture;
-            }
-            
-            builder.BindImageArray(descriptor.nameHash, imageInfos, textureArraySize);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE_WRITE)
-        {
-            ZoneScopedN("TextureWrite");
-            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, descriptor.count);
-            u32 numImageInfos = 0;
-
-            TextureBaseDesc textureDesc = _textureHandler->GetTextureDesc(descriptor.textureID);
-
-            for (u32 i = 0; i < descriptor.count; i++)
-            {
-                u32 mipLevel = descriptor.imageMipLevel + i;
-
-                if ((i32)mipLevel < textureDesc.mipLevels)
-                {
-                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID, mipLevel);
-                    imageInfo.sampler = VK_NULL_HANDLE;
-                }
-                else
-                {
-                    // Any imageInfos pointing to mips we don't have should point to the last mip
-                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID, textureDesc.mipLevels - 1);
-                    imageInfo.sampler = VK_NULL_HANDLE;
-                }
-            }
-
-            builder.BindStorageImage(descriptor.nameHash, imageInfos, static_cast<i32>(descriptor.count));
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_TEXTURE_READ_WRITE)
-        {
-            ZoneScopedN("TextureReadWrite");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            imageInfo.imageView = _textureHandler->GetImageView(descriptor.textureID);
-
-            builder.BindImage(descriptor.nameHash, imageInfo);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_IMAGE)
-        {
-            ZoneScopedN("Image");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID,descriptor.imageMipLevel);
-
-            builder.BindImage(descriptor.nameHash, imageInfo);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_IMAGE_ARRAY)
-        {
-            ZoneScopedN("ImageArray");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID, descriptor.imageMipLevel);
-
-            builder.BindImageArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE)
-        {
-            ZoneScopedN("DepthImage");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = _imageHandler->GetDepthView(descriptor.depthImageID);
-
-            builder.BindImage(descriptor.nameHash, imageInfo);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_DEPTH_IMAGE_ARRAY)
-        {
-            ZoneScopedN("DepthImageArray");
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = _imageHandler->GetDepthView(descriptor.depthImageID);
-
-            builder.BindImageArrayIndex(descriptor.nameHash, imageInfo, descriptor.arrayIndex);
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_STORAGE_IMAGE)
-        {
-            ZoneScopedN("StorageImage");
-            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, descriptor.count);
-            u32 numImageInfos = 0;
-
-            const ImageDesc& imageDesc = _imageHandler->GetImageDesc(descriptor.imageID);
-
-            for (u32 i = 0; i < descriptor.count; i++)
-            {
-                u32 mipLevel = descriptor.imageMipLevel + i;
-
-                if (mipLevel < imageDesc.mipLevels)
-                {
-                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID, mipLevel);
-                    imageInfo.sampler = VK_NULL_HANDLE;
-                }
-                else
-                {
-                    // Any imageInfos pointing to mips we don't have should point to the last mip
-                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    imageInfo.imageView = _imageHandler->GetColorView(descriptor.imageID, imageDesc.mipLevels - 1);
-                    imageInfo.sampler = VK_NULL_HANDLE;
-                }
-            }
-
-            builder.BindStorageImage(descriptor.nameHash, imageInfos, static_cast<i32>(descriptor.count));
-        }
-        else if (descriptor.descriptorType == DescriptorType::DESCRIPTOR_TYPE_STORAGE_IMAGE_ARRAY)
-        {
-            ZoneScopedN("StorageImageArray");
-            VkDescriptorImageInfo* imageInfos = Memory::Allocator::NewArray<VkDescriptorImageInfo>(&_frameAllocator, descriptor.count);
-            u32 numImageInfos = 0;
-
-            const ImageDesc& imageDesc = _imageHandler->GetImageDesc(descriptor.imageID);
-
-            for (u32 i = 0; i < descriptor.count; i++)
-            {
-                u32 mipLevel = descriptor.imageMipLevel + i;
-
-                if (mipLevel < imageDesc.mipLevels)
-                {
-                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    imageInfo.imageView = _imageHandler->GetColorArrayView(descriptor.imageID, mipLevel);
-                    imageInfo.sampler = VK_NULL_HANDLE;
-                }
-                else
-                {
-                    // Any imageInfos pointing to mips we don't have should point to the last mip
-                    VkDescriptorImageInfo& imageInfo = imageInfos[numImageInfos++];
-                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    imageInfo.imageView = _imageHandler->GetColorArrayView(descriptor.imageID, imageDesc.mipLevels - 1);
-                    imageInfo.sampler = VK_NULL_HANDLE;
-                }
-            }
-
-            builder.BindStorageImageArray(descriptor.nameHash, imageInfos, static_cast<i32>(descriptor.count));
-        }
-    }
-
     void RendererVK::RecreateSwapChain(Backend::SwapChainVK* swapChain)
     {
         _device->RecreateSwapChain(_imageHandler, _semaphoreHandler, swapChain);
@@ -1502,7 +1386,7 @@ namespace Renderer
         destroyList.buffers.clear();
     }
 
-    void RendererVK::BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors, const TrackedBufferBitSets* bufferPermissions)
+    void RendererVK::BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions)
     {
         ZoneScopedNC("RendererVK::BindDescriptorSet", tracy::Color::Red3);
 
@@ -1510,55 +1394,38 @@ namespace Renderer
         GraphicsPipelineID graphicsPipelineID = _commandListHandler->GetBoundGraphicsPipeline(commandListID);
         ComputePipelineID computePipelineID = _commandListHandler->GetBoundComputePipeline(commandListID);
 
+        DescriptorSetID descriptorSetID = descriptorSet->GetID();
+
+        VkDescriptorSet vkDescriptorSet = _descriptorHandler->GetVkDescriptorSet(descriptorSetID, _frameIndex);
+        u32 slot = static_cast<u32>(descriptorSet->GetSlot());
+
         if (graphicsPipelineID != GraphicsPipelineID::Invalid())
         {
-            if (_pipelineHandler->GetNumDescriptorSetLayouts(graphicsPipelineID) <= static_cast<u32>(slot))
+            /*if (_pipelineHandler->GetNumDescriptorSetLayouts(graphicsPipelineID) <= slot)
             {
                 return;
-            }
+            }*/
 
-            Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(graphicsPipelineID);
-            builder.SetBufferPermissions(bufferPermissions);
-
-            for (u32 i = 0; i < numDescriptors; i++)
-            {
-                ZoneScopedNC("BindDescriptor", tracy::Color::Red3);
-                Descriptor& descriptor = descriptors[i];
-                BindDescriptor(builder, descriptor);
-            }
-
-            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
-            Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_OBJECT_TYPE_DESCRIPTOR_SET, DescriptorSetToName(slot));
+            // TODO: Validate buffer permissions
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(graphicsPipelineID);
 
             // Bind descriptor set
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, slot, 1, &descriptorSet, 0, nullptr);
-        } 
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, slot, 1, &vkDescriptorSet, 0, nullptr);
+        }
         else if (computePipelineID != ComputePipelineID::Invalid())
         {
-            if (_pipelineHandler->GetNumDescriptorSetLayouts(computePipelineID) <= static_cast<u32>(slot))
+            /*if (_pipelineHandler->GetNumDescriptorSetLayouts(computePipelineID) <= slot)
             {
                 return;
-            }
+            }*/
 
-            Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(computePipelineID);
-            builder.SetBufferPermissions(bufferPermissions);
-
-            for (u32 i = 0; i < numDescriptors; i++)
-            {
-                ZoneScopedNC("BindDescriptor", tracy::Color::Red3);
-                Descriptor& descriptor = descriptors[i];
-                BindDescriptor(builder, descriptor);
-            }
-
-            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(static_cast<i32>(slot), Backend::DescriptorLifetime::PerFrame);
-            Backend::DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)descriptorSet, VK_OBJECT_TYPE_DESCRIPTOR_SET, DescriptorSetToName(slot));
+            // TODO: Validate buffer permissions
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(computePipelineID);
 
             // Bind descriptor set
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, slot, 1, &descriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, slot, 1, &vkDescriptorSet, 0, nullptr);
         }
     }
 
@@ -1572,9 +1439,6 @@ namespace Renderer
         // Add a marker specifying the frameIndex
         Backend::DebugMarkerUtilVK::PushMarker(commandBuffer, Color(1,1,1,1), std::to_string(frameIndex));
         Backend::DebugMarkerUtilVK::PopMarker(commandBuffer);
-
-        // Free up any old descriptors
-        _device->_descriptorMegaPool->SetFrame(frameIndex);
     }
 
 #if !TRACY_ENABLE
@@ -1799,36 +1663,27 @@ namespace Renderer
 
         GraphicsPipelineID graphicsPipelineID = _commandListHandler->GetBoundGraphicsPipeline(commandListID);
 
+        VkShaderStageFlags shaderStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+        VkPipelineLayout layout;
+
         if (graphicsPipelineID != GraphicsPipelineID::Invalid())
         {
-            VkShaderStageFlags shaderStageFlags = 0;
-
-            u32 numPushConstantRanges = _pipelineHandler->GetNumPushConstantRanges(graphicsPipelineID);
-            for (u32 i = 0; i < numPushConstantRanges; i++)
-            {
-                const VkPushConstantRange& constantRange = _pipelineHandler->GetPushConstantRange(graphicsPipelineID, i);
-
-                if (offset >= constantRange.offset && offset < constantRange.offset + constantRange.size)
-                {
-                    shaderStageFlags |= constantRange.stageFlags;
-                }
-            }
-
-            if (shaderStageFlags == 0)
-            {
-                NC_LOG_CRITICAL("RendererVK::PushConstant : shaderStageFlags was 0, did we try to push a constant that doesn't exist?");
-            }
-
-            VkPipelineLayout layout = _pipelineHandler->GetPipelineLayout(graphicsPipelineID);
-            vkCmdPushConstants(commandBuffer, layout, shaderStageFlags, offset, size, data);
+            layout = _pipelineHandler->GetPipelineLayout(graphicsPipelineID);
         }
-
-        ComputePipelineID computePipelineID = _commandListHandler->GetBoundComputePipeline(commandListID);
-        if (computePipelineID != ComputePipelineID::Invalid())
+        else
         {
-            VkPipelineLayout layout = _pipelineHandler->GetPipelineLayout(computePipelineID);
-            vkCmdPushConstants(commandBuffer, layout, VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT, offset, size, data);
+            ComputePipelineID computePipelineID = _commandListHandler->GetBoundComputePipeline(commandListID);
+            if (computePipelineID != ComputePipelineID::Invalid())
+            {
+                layout = _pipelineHandler->GetPipelineLayout(computePipelineID);
+            }
+            else
+            {
+                NC_LOG_CRITICAL("Tried to push constants without a bound graphics or compute pipeline");
+                return;
+            }
         }
+        vkCmdPushConstants(commandBuffer, layout, shaderStageFlags, offset, size, data);
     }
 
     void RendererVK::Present(Novus::Window* window, ImageID imageID, SemaphoreID semaphoreID)
@@ -1943,55 +1798,32 @@ namespace Renderer
             BeginRenderPass(commandListID, renderPassDesc);
 
             ImageDesc imageDesc = _imageHandler->GetImageDesc(imageID);
-            ImageComponentType componentType = ToImageComponentType(imageDesc.format);
-            std::string componentTypeName = "";
-
-            switch (componentType)
-            {
-                case ImageComponentType::FLOAT:
-                case ImageComponentType::SNORM:
-                case ImageComponentType::UNORM:
-                    componentTypeName = "float";
-                    break;
-                case ImageComponentType::SINT:
-                    componentTypeName = "int";
-                    break;
-                case ImageComponentType::UINT:
-                    componentTypeName = "uint";
-                    break;
-
-                default:
-                    break;
-            }
-
-            u8 componentCount = ToImageComponentCount(imageDesc.format);
-            if (componentCount > 1)
-            {
-                componentTypeName += std::to_string(componentCount);
-            }
+            
+            std::string componentTypeName = GetTextureTypeName(imageDesc.format);
             u32 componentTypeNameHash = StringUtils::fnv1a_32(componentTypeName.c_str(), componentTypeName.size());
             GraphicsPipelineID pipelineID = GetBlitPipeline(componentTypeNameHash);
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(pipelineID);
-            Backend::DescriptorSetBuilderVK& builder = _pipelineHandler->GetDescriptorSetBuilder(pipelineID);
+
+            if (!_presentDescriptorSet.IsInitialized())
+            {
+                _presentDescriptorSet.RegisterPipeline(this, pipelineID);
+                _presentDescriptorSet.Init(this);
+            }
 
             BeginPipeline(commandListID, pipelineID);
 
             SetViewport(commandListID, _lastViewport);
             SetScissorRect(commandListID, _lastScissorRect);
 
-            // Set descriptors
-            VkDescriptorImageInfo samplerInfo = {};
-            samplerInfo.sampler = _samplerHandler->GetSampler(samplerID);
-            builder.BindSampler("_sampler"_h, samplerInfo);
+            VkSampler vkSampler = _samplerHandler->GetSampler(samplerID);
+            VkImageView vkImageView = _imageHandler->GetColorView(imageID);
 
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            imageInfo.imageView = _imageHandler->GetColorView(imageID);
-            builder.BindImage("_texture"_h, imageInfo);
-
-            VkDescriptorSet descriptorSet = builder.BuildDescriptorSet(DescriptorSetSlot::PER_PASS, Backend::DescriptorLifetime::PerFrame);
-
+            DescriptorSetID descriptorSetID = _presentDescriptorSet.GetID();
+            _descriptorHandler->BindDescriptor(descriptorSetID, 0, vkSampler, frameIndex);
+            _descriptorHandler->BindDescriptor(descriptorSetID, 1, vkImageView, DescriptorType::SampledImage, false, frameIndex);
+            
+            VkDescriptorSet descriptorSet = _descriptorHandler->GetVkDescriptorSet(descriptorSetID, _frameIndex);
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, DescriptorSetSlot::PER_PASS, 1, &descriptorSet, 0, nullptr);
 
             struct BlitConstant
@@ -2009,7 +1841,7 @@ namespace Renderer
             blitConstant.channelRedirectors |= (2 << 16);
             blitConstant.channelRedirectors |= (3 << 24);
 
-            vkCmdPushConstants(commandBuffer, pipelineLayout, VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BlitConstant), &blitConstant);
+            vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BlitConstant), &blitConstant);
 
             vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
@@ -2223,15 +2055,5 @@ namespace Renderer
     bool RendererVK::HasExtendedTextureSupport()
     {
         return _device->HasExtendedTextureSupport();
-    }
-
-    void RendererVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot)
-    {
-        _pipelineHandler->GetDescriptorMetaFromPipeline(metaInfo, pipeline, slot);
-    }
-
-    void RendererVK::GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot)
-    {
-        _pipelineHandler->GetDescriptorMetaFromPipeline(metaInfo, pipeline, slot);
     }
 }

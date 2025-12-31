@@ -3,6 +3,7 @@
 
 #include "DescriptorMeta.h"
 #include "DescriptorSet.h"
+#include "DescriptorType.h"
 #include "RenderStates.h"
 #include "ShaderEntry.h"
 
@@ -12,6 +13,7 @@
 #include "Descriptors/ComputePipelineDesc.h"
 #include "Descriptors/ComputeShaderDesc.h"
 #include "Descriptors/DepthImageDesc.h"
+#include "Descriptors/DescriptorSetDesc.h"
 #include "Descriptors/GraphicsPipelineDesc.h"
 #include "Descriptors/ImageDesc.h"
 #include "Descriptors/PixelShaderDesc.h"
@@ -24,6 +26,16 @@
 #include "Descriptors/UploadBuffer.h"
 #include "Descriptors/VertexShaderDesc.h"
 
+namespace FileFormat
+{
+    struct ShaderReflection;
+}
+
+namespace Memory
+{
+    class Allocator;
+}
+
 namespace Novus
 {
     class Window;
@@ -32,11 +44,6 @@ namespace Novus
 namespace tracy
 {
     struct SourceLocationData;
-}
-
-namespace Memory
-{
-    class Allocator;
 }
 
 struct FfxInterface;
@@ -58,7 +65,7 @@ namespace Renderer
         virtual void Deinit() = 0;
 
         virtual void SetShaderSourceDirectory(const std::string& path) = 0;
-        virtual void SetGetShaderEntryCallback(const std::function<const ShaderEntry& (u32)>& callback);
+        virtual void SetGetShaderEntryCallback(const std::function<const ShaderEntry* (u32, const std::string&)>& callback);
         virtual void SetGetBlitPipelineCallback(const std::function<GraphicsPipelineID(u32)>& callback);
         virtual void ReloadShaders(bool forceRecompileAll) = 0;
         virtual void ClearUploadBuffers() = 0;
@@ -84,6 +91,8 @@ namespace Renderer
         virtual SamplerID CreateSampler(SamplerDesc& sampler) = 0;
         virtual SemaphoreID CreateNSemaphore() = 0;
 
+        virtual DescriptorSetID CreateDescriptorSet(const DescriptorSetDesc& desc) = 0;
+
         virtual GraphicsPipelineID CreatePipeline(GraphicsPipelineDesc& desc) = 0;
         virtual ComputePipelineID CreatePipeline(ComputePipelineDesc& desc) = 0;
 
@@ -106,8 +115,21 @@ namespace Renderer
         virtual void UnloadTexture(TextureID textureID) = 0;
         virtual void UnloadTexturesInArray(TextureArrayID textureArrayID, u32 unloadStartIndex) = 0;
 
+        // Descriptor binding
+        virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, BufferID bufferID, DescriptorType type, u32 frameIndex) = 0;
+        virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, DescriptorType type, u32 frameIndex) = 0;
+        virtual void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) = 0;
+        virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, DepthImageID imageID, DescriptorType type, u32 frameIndex) = 0;
+        virtual void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, DepthImageID imageID, u32 arrayIndex, DescriptorType type, u32 frameIndex) = 0;
+        virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, SamplerID samplerID, u32 frameIndex) = 0;
+        virtual void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, SamplerID samplerID, u32 arrayIndex, u32 frameIndex) = 0;
+        virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, DescriptorType type, u32 frameIndex) = 0;
+        virtual void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) = 0;
+        virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) = 0;
+
         // Misc
         virtual u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;
+        virtual void FlushTextureArrayDescriptors(TextureArrayID textureArrayID) = 0;
 
         // Command List Functions
         virtual CommandListID BeginCommandList() = 0;
@@ -154,7 +176,7 @@ namespace Renderer
         virtual void SetIndexBuffer(CommandListID commandListID, BufferID bufferID, IndexFormat indexFormat) = 0;
         virtual void SetBuffer(CommandListID commandListID, u32 slot, BufferID buffer) = 0;
 
-        virtual void BindDescriptorSet(CommandListID commandListID, DescriptorSetSlot slot, Descriptor* descriptors, u32 numDescriptors, const TrackedBufferBitSets* bufferPermissions) = 0;
+        virtual void BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions) = 0;
 
         virtual void MarkFrameStart(CommandListID commandListID, u32 frameIndex) = 0;
         virtual void BeginTrace(CommandListID commandListID, const tracy::SourceLocationData* sourceLocation) = 0;
@@ -207,17 +229,29 @@ namespace Renderer
 
         const std::vector<TimeQueryID>& GetFrameTimeQueries() { return _frameTimeQueries; }
 
+        // ID to Descriptor
+        virtual TextureBaseDesc GetDesc(TextureID textureID) = 0;
+
+        virtual const ImageDesc& GetDesc(ImageID ID) = 0;
+        virtual const DepthImageDesc& GetDesc(DepthImageID ID) = 0;
+
+        virtual const ComputePipelineDesc& GetDesc(ComputePipelineID ID) = 0;
+        virtual const GraphicsPipelineDesc& GetDesc(GraphicsPipelineID ID) = 0;
+
+        virtual const ComputeShaderDesc& GetDesc(ComputeShaderID ID) = 0;
+        virtual const VertexShaderDesc& GetDesc(VertexShaderID ID) = 0;
+        virtual const PixelShaderDesc& GetDesc(PixelShaderID ID) = 0;
+
         // Utils
         virtual void FlushGPU() = 0;
 
         virtual f32 FlipFrame(u32 frameIndex) = 0; // Returns time waited in seconds
+        virtual u32 GetCurrentFrameIndex() = 0;
+        virtual u32 GetFrameIndexCount() = 0;
+
         virtual void ResetTimeQueries(u32 frameIndex) = 0;
 
         virtual TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) = 0;
-        virtual TextureBaseDesc GetTextureDesc(TextureID textureID) = 0;
-
-        virtual const ImageDesc& GetImageDesc(ImageID ID) = 0;
-        virtual const DepthImageDesc& GetImageDesc(DepthImageID ID) = 0;
 
         virtual uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) = 0;
         virtual uvec2 GetImageDimensions(const DepthImageID id) = 0;
@@ -241,13 +275,11 @@ namespace Renderer
 
         virtual bool HasExtendedTextureSupport() = 0;
 
-        virtual void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, GraphicsPipelineID pipeline, DescriptorSetSlot slot) = 0;
-        virtual void GetDescriptorMetaFromPipeline(DescriptorMetaInfo& metaInfo, ComputePipelineID pipeline, DescriptorSetSlot slot) = 0;
+        const ShaderEntry* GetShaderEntry(u32 shaderNameHash, const std::string& debugName);
 
     protected:
         Renderer() {}; // Pure virtual class, disallow creation of it
 
-        const ShaderEntry& GetShaderEntry(u32 shaderNameHash);
         const GraphicsPipelineID GetBlitPipeline(u32 shaderNameHash);
 
         void BeginExecutingCommandlist() { _isExecutingCommandlist = true; };
@@ -258,7 +290,7 @@ namespace Renderer
         std::vector<TimeQueryID> _frameTimeQueries;
         std::vector<std::function<void(const vec2&)>> _onRenderSizeChangedCallbacks;
 
-        std::function<const ShaderEntry& (u32)> _getShaderEntryCallback;
+        std::function<const ShaderEntry* (u32, const std::string&)> _getShaderEntryCallback;
         std::function<GraphicsPipelineID(u32)> _getBlitPipelineCallback;
 
         friend class RenderGraph;

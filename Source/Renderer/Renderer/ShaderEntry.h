@@ -4,6 +4,8 @@
 #include <Base/Types.h>
 #include <Base/Util/StringUtils.h>
 
+#include <FileFormat/Novus/ShaderPack/ShaderPack.h>
+
 #include <filesystem>
 
 namespace Renderer
@@ -33,7 +35,10 @@ namespace Renderer
     {
         std::string debugName;
         u32 permutationNameHash;
+
         u8* shaderData = nullptr;
         u32 shaderSize = 0;
+
+        FileFormat::ShaderReflection reflection;
     };
 }

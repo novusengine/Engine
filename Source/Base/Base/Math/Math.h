@@ -123,6 +123,16 @@ namespace Math
         return (a >= b) ? a : b;
     }
 
+    inline u32 Min(u32 a, u32 b)
+    {
+        return (a <= b) ? a : b;
+    }
+
+    inline u32 Max(u32 a, u32 b)
+    {
+        return (a >= b) ? a : b;
+    }
+
     inline size_t Min(size_t a, size_t b)
     {
         return (a <= b) ? a : b;
@@ -139,6 +149,11 @@ namespace Math
     }
 
     inline i32 Clamp(i32 x, i32 min, i32 max)
+    {
+        return Max(Min(x, max), min);
+    }
+
+    inline u32 Clamp(u32 x, u32 min, u32 max)
     {
         return Max(Min(x, max), min);
     }
