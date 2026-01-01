@@ -38,12 +38,11 @@ namespace StringUtils
     {
         i32 length = -1;
 
-    #ifdef _WIN32
-        length = sprintf_s(buffer, bufferSize, format, args...);
-    #else
-        (void)bufferSize; // Get rid of warning
-        length = sprintf(buffer, format, args...);
-    #endif
+        if constexpr (sizeof...(Args) == 0) {
+            length = std::snprintf(buffer, bufferSize, "%s", format);
+        } else {
+            length = std::snprintf(buffer, bufferSize, format, args...);
+        }
 
         assert(length > -1);
         return length;

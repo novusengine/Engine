@@ -2,6 +2,8 @@
 
 #include <Base/Util/DebugHandler.h>
 
+#include <cinttypes>
+
 namespace Scripting
 {
     void Zenith::SetState(lua_State* newState)
@@ -366,7 +368,7 @@ namespace Scripting
     {
         f64 value = luaL_checknumber(zenith->state, index);
         if (value < min || value > max)
-            luaL_error(zenith->state, "signed integer expected, got %f (Must be between %u...%u)", value, min, max);
+            luaL_error(zenith->state, "signed integer expected, got %f (Must be between %" PRId64 "...%" PRId64 ")", value, min, max);
 
         i64 result = static_cast<i64>(value);
         return result;
@@ -376,7 +378,7 @@ namespace Scripting
     {
         f64 value = luaL_checknumber(zenith->state, index);
         if (value < 0 || value > max)
-            luaL_error(zenith->state, "unsigned integer expected, got %f (Must be between 0...%u)", value, max);
+            luaL_error(zenith->state, "unsigned integer expected, got %f (Must be between 0...%" PRId64 ")", value, max);
 
         u64 result = static_cast<u64>(value);
         return result;
