@@ -9,7 +9,7 @@ Solution.Util.CreateDep(dep.Name, dep.Dependencies, function()
         Solution.Util.SetLibDirs(libPath)
         Solution.Util.SetLinks(lib)
     else
-        Solution.Util.SetLinks("libsodium")
+        Solution.Util.SetLinks("sodium")
     end
 
     Solution.Util.SetIncludes(dep.Path)
