@@ -69,6 +69,11 @@ namespace Renderer
         {
             std::vector<Image> images;
             std::vector<DepthImage> depthImages;
+
+            std::vector<VkImage> imagesToDestroy;
+            std::vector<VmaAllocation> allocationsToDestroy;
+
+            std::vector<VkImageView> imageViewsToDestroy;
         };
 
         void ImageHandlerVK::Init(RenderDeviceVK* device, SamplerHandlerVK* samplerHandler)
@@ -91,6 +96,25 @@ namespace Renderer
             _imguiSampler = _samplerHandler->CreateSampler(samplerDesc);
         }
 
+        void ImageHandlerVK::FlipFrame(u32 frameIndex)
+        {
+            ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
+
+            for (u32 i = 0; i < data.imageViewsToDestroy.size(); i++)
+            {
+                vkDestroyImageView(_device->_device, data.imageViewsToDestroy[i], nullptr);
+            }
+
+            for(u32 i = 0; i < data.imagesToDestroy.size(); i++)
+            {
+                vmaDestroyImage(_device->_allocator, data.imagesToDestroy[i], data.allocationsToDestroy[i]);
+            }
+
+            data.imageViewsToDestroy.clear();
+            data.imagesToDestroy.clear();
+            data.allocationsToDestroy.clear();
+        }
+
         void ImageHandlerVK::OnResize(bool windowResize)
         {
             ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
@@ -110,15 +134,16 @@ namespace Renderer
                 {
                     descriptorsToFree.push_back(image.imguiTextureHandle);
 
-                    // Destroy old image
-                    vkDestroyImageView(_device->_device, image.colorView, nullptr);
-                    vmaDestroyImage(_device->_allocator, image.image, image.allocation);
+                    // Queue up old image for destruction
+                    data.imagesToDestroy.push_back(image.image);
+                    data.allocationsToDestroy.push_back(image.allocation);
+                    data.imageViewsToDestroy.push_back(image.colorView);
 
                     for (u32 i = 0; i < image.desc.mipLevels; i++)
                     {
-                        vkDestroyImageView(_device->_device, image.mipViews[i], nullptr);
+                        data.imageViewsToDestroy.push_back(image.mipViews[i]);
                     }
-                    
+
                     // Create new
                     VkFormat format;
                     CreateImage(image, format);
@@ -134,9 +159,10 @@ namespace Renderer
             {
                 if (image.desc.dimensionType == resizeType || image.desc.dimensionType == resizePyramidType)
                 {
-                    // Destroy old image
-                    vkDestroyImageView(_device->_device, image.depthView, nullptr);
-                    vmaDestroyImage(_device->_allocator, image.image, image.allocation);
+                    // Queue up old image for destruction
+                    data.imagesToDestroy.push_back(image.image);
+                    data.allocationsToDestroy.push_back(image.allocation);
+                    data.imageViewsToDestroy.push_back(image.depthView);
 
                     // Create new
                     CreateImage(image);
@@ -784,8 +810,6 @@ namespace Renderer
 
         void ImageHandlerVK::CreateImageViews(Image& image, VkFormat format)
         {
-            // ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
-
             // Create Color View for individual mips
             VkImageViewCreateInfo colorViewInfo = {};
             colorViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;

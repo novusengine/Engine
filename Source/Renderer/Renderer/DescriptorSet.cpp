@@ -87,7 +87,7 @@ namespace Renderer
                 }
             }
         }
-        
+
         // Pixel
         if (pipelineDesc.states.pixelShader != PixelShaderID::Invalid())
         {

@@ -9,8 +9,10 @@
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/XXHash64.h>
 #include <Base/Memory/Allocator.h>
+#include <Base/Container/PersistentBitSet.h>
 
 #include <vulkan/vulkan.h>
+#include <unordered_set>
 
 namespace Renderer
 {
@@ -38,6 +40,9 @@ namespace Renderer
             std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 
             std::vector<VkPushConstantRange> pushConstantRanges;
+
+            std::unordered_set<u32> setsUsed;
+            std::unordered_map<u32, PersistentBitSet> usedBindingsPerSlot;
         };
 
         struct ComputePipelineCacheDesc
@@ -57,6 +62,9 @@ namespace Renderer
             std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 
             std::vector<VkPushConstantRange> pushConstantRanges;
+
+            std::unordered_set<u32> setsUsed;
+            std::unordered_map<u32, PersistentBitSet> usedBindingsPerSlot;
         };
 
         struct PipelineHandlerVKData : IPipelineHandlerVKData
@@ -262,6 +270,34 @@ namespace Renderer
             return static_cast<u32>(data.computePipelines[static_cast<cIDType>(id)].descriptorSetLayoutDatas.size());
         }
 
+        bool PipelineHandlerVK::UsesDescriptorSet(GraphicsPipelineID id, u32 setNumber)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            return static_cast<u32>(data.graphicsPipelines[static_cast<gIDType>(id)].setsUsed.contains(setNumber));
+        }
+
+        bool PipelineHandlerVK::UsesDescriptorSet(ComputePipelineID id, u32 setNumber)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            return static_cast<u32>(data.computePipelines[static_cast<cIDType>(id)].setsUsed.contains(setNumber));
+        }
+
+        const PersistentBitSet* PipelineHandlerVK::GetUsedBindings(GraphicsPipelineID id, u32 slot)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            auto& map = data.graphicsPipelines[static_cast<gIDType>(id)].usedBindingsPerSlot;
+            auto it = map.find(slot);
+            return (it != map.end()) ? &it->second : nullptr;
+        }
+
+        const PersistentBitSet* PipelineHandlerVK::GetUsedBindings(ComputePipelineID id, u32 slot)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            auto& map = data.computePipelines[static_cast<cIDType>(id)].usedBindingsPerSlot;
+            auto it = map.find(slot);
+            return (it != map.end()) ? &it->second : nullptr;
+        }
+
         DescriptorSetLayoutData& PipelineHandlerVK::GetDescriptorSetLayoutData(GraphicsPipelineID id, u32 index)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
@@ -376,12 +412,28 @@ namespace Renderer
             std::vector<BindInfoPushConstant> bindInfoPushConstants;
             if (desc.states.vertexShader != VertexShaderID::Invalid())
             {
+                // Find which sets are used by the shader
+                const BindReflection& usedBindReflection = _shaderHandler->GetUsedBindReflection(desc.states.vertexShader);
+                for (const BindInfo& bindInfo : usedBindReflection.dataBindings)
+                {
+                    pipeline.setsUsed.insert(bindInfo.set);
+                    pipeline.usedBindingsPerSlot[bindInfo.set].Set(bindInfo.binding);
+                }
+
                 const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.states.vertexShader);
                 bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
                 bindInfoPushConstants.insert(bindInfoPushConstants.end(), bindReflection.pushConstants.begin(), bindReflection.pushConstants.end());
             }
             if (desc.states.pixelShader != PixelShaderID::Invalid())
             {
+                // Find which sets are used by the shader
+                const BindReflection& usedBindReflection = _shaderHandler->GetUsedBindReflection(desc.states.pixelShader);
+                for (const BindInfo& bindInfo : usedBindReflection.dataBindings)
+                {
+                    pipeline.setsUsed.insert(bindInfo.set);
+                    pipeline.usedBindingsPerSlot[bindInfo.set].Set(bindInfo.binding);
+                }
+
                 const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.states.pixelShader);
 
                 // Loop over all new databindings
@@ -762,11 +814,20 @@ namespace Renderer
         {
             u32 numSupportedTextures = _device->HasExtendedTextureSupport() ? 8192 : 4096;
 
+            // Find which sets are used by the shader
+            const BindReflection& usedBindReflection = _shaderHandler->GetUsedBindReflection(desc.computeShader);
+            for(const BindInfo& bindInfo : usedBindReflection.dataBindings)
+            {
+                pipeline.setsUsed.insert(bindInfo.set);
+                pipeline.usedBindingsPerSlot[bindInfo.set].Set(bindInfo.binding);
+            }
+
             std::vector<BindInfo> bindInfos;
             std::vector<BindInfoPushConstant> bindInfoPushConstants;
             const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.computeShader);
             bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
             bindInfoPushConstants.insert(bindInfoPushConstants.end(), bindReflection.pushConstants.begin(), bindReflection.pushConstants.end());
+
             for (BindInfo& bindInfo : bindInfos)
             {
                 DescriptorSetLayoutData& layout = GetDescriptorSet(bindInfo.set, pipeline.descriptorSetLayoutDatas);
@@ -783,6 +844,7 @@ namespace Renderer
                 layout.isTextureArray.push_back(isTextureArray);
                 layout.isVariableBinding.push_back(bindInfo.count == 0);
             }
+
             for (BindInfoPushConstant& pushConstant : bindInfoPushConstants)
             {
                 VkPushConstantRange& range = pipeline.pushConstantRanges.emplace_back();
@@ -790,6 +852,7 @@ namespace Renderer
                 range.size = pushConstant.size;
                 range.stageFlags = pushConstant.stageFlags;
             }
+
             size_t numDescriptorSets = pipeline.descriptorSetLayoutDatas.size();
             pipeline.descriptorSetLayouts.resize(numDescriptorSets);
             for (size_t i = 0; i < numDescriptorSets; i++)
@@ -825,12 +888,14 @@ namespace Renderer
                 }
                 DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.descriptorSetLayouts[i], VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, desc.debugName.c_str());
             }
+
             VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
             pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             pipelineLayoutInfo.setLayoutCount = static_cast<u32>(pipeline.descriptorSetLayouts.size());
             pipelineLayoutInfo.pSetLayouts = pipeline.descriptorSetLayouts.data();
             pipelineLayoutInfo.pushConstantRangeCount = static_cast<u32>(pipeline.pushConstantRanges.size()); // Optional
             pipelineLayoutInfo.pPushConstantRanges = pipeline.pushConstantRanges.data();
+
             if (vkCreatePipelineLayout(_device->_device, &pipelineLayoutInfo, nullptr, &pipeline.pipelineLayout) != VK_SUCCESS)
             {
                 NC_LOG_CRITICAL("Failed to create pipeline layout!");

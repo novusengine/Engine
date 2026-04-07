@@ -1,4 +1,5 @@
 #pragma once
+#include "Renderer/Descriptors/BufferDesc.h"
 #include "Renderer/Descriptors/DescriptorSetDesc.h"
 #include "Renderer/Descriptors/TextureDesc.h"
 #include "Renderer/Descriptors/TextureArrayDesc.h"
@@ -9,12 +10,18 @@
 
 #include <vulkan/vulkan_core.h>
 
+class PersistentBitSet;
+class BitSet;
+
 namespace Renderer
 {
+    class TrackedBufferBitSets;
+
     namespace Backend
     {
         class RenderDeviceVK;
         class TextureHandlerVK;
+        class BufferHandlerVK;
         struct DescriptorSet;
 
         struct IDescriptorHandlerData {};
@@ -22,11 +29,11 @@ namespace Renderer
         class DescriptorHandlerVK
         {
         public:
-            void Init(RenderDeviceVK* device, TextureHandlerVK* textureHandler);
+            void Init(RenderDeviceVK* device, TextureHandlerVK* textureHandler, BufferHandlerVK* bufferHandler);
 
             DescriptorSetID CreateDescriptorSet(const DescriptorSetDesc& desc);
 
-            void BindDescriptor(DescriptorSetID setID, u32 binding, VkBuffer buffer, DescriptorType type, u32 frameIndex);
+            void BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, VkBuffer buffer, DescriptorType type, u32 frameIndex);
             void BindDescriptor(DescriptorSetID setID, u32 binding, VkImageView image, DescriptorType type, bool isRT, u32 frameIndex);
             void BindDescriptorArray(DescriptorSetID setID, u32 binding, VkImageView image, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex);
             void BindDescriptorArray(DescriptorSetID setID, u32 binding, std::vector<VkImageView>& images, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex);
@@ -37,17 +44,19 @@ namespace Renderer
             // Updates only a range of descriptors in a texture array binding (for incremental updates)
             void UpdateTextureArrayDescriptors(DescriptorSetID setID, u32 binding, const TextureID* textureIDs, u32 startIndex, u32 count);
 
+            void ValidatePermissions(u32 slot, DescriptorSetID descriptorSetID, const TrackedBufferBitSets* bufferPermissions, bool isGraphicsPipeline, const PersistentBitSet* usedBindings = nullptr);
             VkDescriptorSet GetVkDescriptorSet(DescriptorSetID descriptorSetID, u32 frameIndex);
             VkDescriptorSetLayout GetVkDescriptorSetLayout(DescriptorSetID descriptorSetID);
 
         private:
             void CreateDescriptorPool();
-
             void CreateDescriptorSet(DescriptorSet& descriptorSet);
+            bool ValidatePermissionViolations(u32 slot, const DescriptorSet& descriptorSet, const PersistentBitSet& accesses, const BitSet& permissions, const char* permissionName, const PersistentBitSet* usedBindings = nullptr);
 
         private:
             RenderDeviceVK* _device;
             TextureHandlerVK* _textureHandler;
+            BufferHandlerVK* _bufferHandler;
 
             IDescriptorHandlerData* _data;
         };
