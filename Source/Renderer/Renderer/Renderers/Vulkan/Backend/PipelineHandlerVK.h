@@ -10,6 +10,8 @@
 
 #include <vector>
 
+class PersistentBitSet;
+
 namespace Memory
 {
     class Allocator;
@@ -68,6 +70,12 @@ namespace Renderer
 
             u32 GetNumDescriptorSetLayouts(GraphicsPipelineID id);
             u32 GetNumDescriptorSetLayouts(ComputePipelineID id);
+
+            bool UsesDescriptorSet(GraphicsPipelineID id, u32 setNumber);
+            bool UsesDescriptorSet(ComputePipelineID id, u32 setNumber);
+
+            const PersistentBitSet* GetUsedBindings(GraphicsPipelineID id, u32 slot);
+            const PersistentBitSet* GetUsedBindings(ComputePipelineID id, u32 slot);
 
             DescriptorSetLayoutData& GetDescriptorSetLayoutData(GraphicsPipelineID id, u32 index);
             DescriptorSetLayoutData& GetDescriptorSetLayoutData(ComputePipelineID id, u32 index);

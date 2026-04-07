@@ -1,12 +1,18 @@
 #include "DescriptorHandlerVK.h"
 #include "TextureHandlerVK.h"
+#include "BufferHandlerVK.h"
 #include "RenderDeviceVK.h"
 #include "FormatConverterVK.h"
+#include "Renderer/TrackedBufferBitSets.h"
 
 #include <Base/Container/SafeVector.h>
+#include <Base/Container/PersistentBitSet.h>
 #include <Base/Util/DebugHandler.h>
 
+#include <FileFormat/Novus/ShaderPack/ShaderPack.h>
+
 #include <tracy/Tracy.hpp>
+#include <unordered_map>
 
 namespace Renderer
 {
@@ -28,6 +34,22 @@ namespace Renderer
 
             VkDescriptorSet sets[RenderDeviceVK::FRAME_INDEX_COUNT];
             VkDescriptorSetLayout layout;
+
+            PersistentBitSet bufferAccesses;      // All accessed buffers (for pipeline stage check)
+            PersistentBitSet bufferReadAccesses;  // Buffers read from
+            PersistentBitSet bufferWriteAccesses; // Buffers written to
+            
+            // Bitset to show which bindings are write access
+            PersistentBitSet writeBindings;
+            
+            // Bitset to track unbound bindings - set on create, unset on bind
+            PersistentBitSet unboundBindings;
+            
+            // Track which buffer is bound to each binding so we can unset the bit when rebound
+            std::unordered_map<u32, BufferID> bindingToBuffer;
+
+            // Reverse map: buffer -> binding (for fast lookup during validation)
+            std::unordered_map<BufferID::type, u32> bufferToBinding;
         };
 
         struct DescriptorHandlerData : public IDescriptorHandlerData
@@ -39,11 +61,33 @@ namespace Renderer
             std::vector<DescriptorSet> descriptorSets;
         };
 
-        void DescriptorHandlerVK::Init(RenderDeviceVK* device, TextureHandlerVK* textureHandler)
+        std::string GetBindingName(const DescriptorSet& descriptorSet, u32 binding)
+        {
+            for (const auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
+            {
+                if (descriptor.binding == binding)
+                    return descriptor.name;
+            }
+            return "Unknown";
+        }
+
+        std::string BindingSlotNames[] = { 
+            "INVALID", 
+            "DEBUG",
+            "GLOBAL",
+            "LIGHT",
+            "TERRAIN",
+            "MODEL",
+            "PER_PASS",
+            "PER_DRAW" 
+        };
+
+        void DescriptorHandlerVK::Init(RenderDeviceVK* device, TextureHandlerVK* textureHandler, BufferHandlerVK* bufferHandler)
         {
             ZoneScoped;
             _device = device;
             _textureHandler = textureHandler;
+            _bufferHandler = bufferHandler;
             _data = new DescriptorHandlerData();
 
             CreateDescriptorPool();
@@ -61,6 +105,96 @@ namespace Renderer
             CreateDescriptorSet(descriptorSet);
 
             return id;
+        }
+
+        bool DescriptorHandlerVK::ValidatePermissionViolations(u32 slot, const DescriptorSet& descriptorSet, const PersistentBitSet& accesses, const BitSet& permissions, const char* permissionName, const PersistentBitSet* usedBindings)
+        {
+            if (accesses.IsEmpty())
+                return false;
+
+            if (accesses.IsSubsetOf(permissions))
+                return false;
+
+            // Compute violations: accesses & ~permissions
+            PersistentBitSet violations;
+            violations.SetEquals(accesses);
+            violations.BitwiseUnset(permissions);
+
+            bool didError = false;
+            violations.ForEachSetBit([&](u32 setIndex, u32 bitIndex)
+            {
+                u32 bufferIndex = setIndex * 64 + bitIndex;
+
+                auto it = descriptorSet.bufferToBinding.find(bufferIndex);
+                i32 binding = (it != descriptorSet.bufferToBinding.end()) ? static_cast<i32>(it->second) : -1;
+
+                // Skip buffers at bindings the current pipeline doesn't use
+                if (usedBindings && binding >= 0 && !usedBindings->Has(static_cast<u32>(binding)))
+                    return;
+
+                if (!didError)
+                {
+                    NC_LOG_ERROR("--- {} ACCESS VIOLATIONS ---", permissionName);
+                    didError = true;
+                }
+
+                BufferID bufferID = BufferID(bufferIndex);
+                const std::string& bufferName = _bufferHandler->GetBufferName(bufferID);
+                std::string bindingName = (binding >= 0) ? GetBindingName(descriptorSet, static_cast<u32>(binding)) : "Unknown";
+
+                NC_LOG_ERROR(" ({}) Set {} Buffer {} '{}' at binding {} '{}' needs {} permission", BindingSlotNames[slot], bufferIndex, bufferName, binding, bindingName, permissionName);
+            });
+
+            return didError;
+        }
+
+        void DescriptorHandlerVK::ValidatePermissions(u32 slot, DescriptorSetID descriptorSetID, const TrackedBufferBitSets* bufferPermissions, bool isGraphicsPipeline, const PersistentBitSet* usedBindings)
+        {
+            ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+
+            DescriptorSetID::type id = static_cast<DescriptorSetID::type>(descriptorSetID);
+            if (id >= data.descriptorSets.size())
+                return;
+
+            DescriptorSet& descriptorSet = data.descriptorSets[id];
+            bool didError = false;
+
+            // Check for unbound bindings
+            if (descriptorSet.unboundBindings.HasAnyBitSet())
+            {
+                bool hasUnbound = false;
+                descriptorSet.unboundBindings.ForEachSetBit([&](u32 setIndex, u32 bitIndex)
+                {
+                    u32 binding = setIndex * 64 + bitIndex;
+                    if (usedBindings && !usedBindings->Has(binding))
+                        return;
+
+                    if (!hasUnbound)
+                    {
+                        NC_LOG_ERROR("--- UNBOUND BINDINGS ---");
+                        hasUnbound = true;
+                    }
+                    std::string bindingName = GetBindingName(descriptorSet, binding);
+                    NC_LOG_ERROR(" ({}) Binding {} '{}' was never bound", BindingSlotNames[slot], binding, bindingName);
+                });
+                didError |= hasUnbound;
+            }
+
+            // Check read accesses
+            didError |= ValidatePermissionViolations(slot, descriptorSet, descriptorSet.bufferReadAccesses, bufferPermissions->GetReadBitSet(), "READ", usedBindings);
+
+            // Check write accesses
+            didError |= ValidatePermissionViolations(slot, descriptorSet, descriptorSet.bufferWriteAccesses, bufferPermissions->GetWriteBitSet(), "WRITE", usedBindings);
+
+            // Check pipeline stage permissions
+            const BitSet& stagePermissions = isGraphicsPipeline ? bufferPermissions->GetGraphicsBitSet() : bufferPermissions->GetComputeBitSet();
+            didError |= ValidatePermissionViolations(slot, descriptorSet, descriptorSet.bufferAccesses, stagePermissions, isGraphicsPipeline ? "GRAPHICS" : "COMPUTE", usedBindings);
+
+            if (didError)
+            {
+                NC_LOG_CRITICAL("ValidatePermissions failed for DescriptorSet {}", id);
+            }
         }
 
         VkDescriptorSet DescriptorHandlerVK::GetVkDescriptorSet(DescriptorSetID descriptorSetID, u32 frameIndex)
@@ -189,11 +323,70 @@ namespace Renderer
                     NC_LOG_CRITICAL("DescriptorHandlerVK::CreateDescriptorSet: Failed to allocate descriptor set! You probably need to increase maxDescriptorSets.");
                 }
             }
+
+            // Store binding info from reflection
+            for (auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
+            {
+                // Track which bindings need to be bound
+                descriptorSet.unboundBindings.Set(descriptor.binding);
+                
+                // Track which bindings are write access
+                if (descriptor.accessType == FileFormat::DescriptorAccessTypeReflection::ReadWrite ||
+                    descriptor.accessType == FileFormat::DescriptorAccessTypeReflection::Write)
+                {
+                    descriptorSet.writeBindings.Set(descriptor.binding);
+                }
+            }
         }
 
-        void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, VkBuffer buffer, DescriptorType type, u32 frameIndex)
+        void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, VkBuffer buffer, DescriptorType type, u32 frameIndex)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+
+            BufferID::type newBufferIndex = static_cast<BufferID::type>(bufferID);
+            
+            // Check if this binding already has a buffer bound
+            auto it = descriptorSet.bindingToBuffer.find(binding);
+            if (it != descriptorSet.bindingToBuffer.end())
+            {
+                BufferID oldBufferID = it->second;
+                
+                // Only unset if it's a different buffer
+                if (oldBufferID != bufferID)
+                {
+                    BufferID::type oldBufferIndex = static_cast<BufferID::type>(oldBufferID);
+
+                    // Unset the old buffer's bits
+                    descriptorSet.bufferAccesses.Unset(oldBufferIndex);
+                    descriptorSet.bufferReadAccesses.Unset(oldBufferIndex);
+                    if (descriptorSet.writeBindings.Has(binding))
+                    {
+                        descriptorSet.bufferWriteAccesses.Unset(oldBufferIndex);
+                    }
+                    descriptorSet.bufferToBinding.erase(oldBufferIndex);
+                }
+            }
+            
+            // Set the new buffer's bits
+            descriptorSet.bufferAccesses.Set(newBufferIndex);
+            descriptorSet.bufferReadAccesses.Set(newBufferIndex);
+            
+            // Pure bitwise check - no hash lookup
+            if (descriptorSet.writeBindings.Has(binding))
+            {
+                descriptorSet.bufferWriteAccesses.Set(newBufferIndex);
+            }
+            
+            // Update the binding <-> buffer mappings
+            descriptorSet.bindingToBuffer[binding] = bufferID;
+            descriptorSet.bufferToBinding[newBufferIndex] = binding;
+            
+            // Mark binding as bound
+            descriptorSet.unboundBindings.Unset(binding);
+            
+            // Vulkan descriptor update
             VkDescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = buffer;
             bufferInfo.offset = 0;
@@ -212,6 +405,10 @@ namespace Renderer
         void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, VkImageView image, DescriptorType type, bool isRT, u32 frameIndex)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            descriptorSet.unboundBindings.Unset(binding);
+            
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageView = image;
             imageInfo.imageLayout = (!isRT && type == DescriptorType::SampledImage) ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_GENERAL;
@@ -229,6 +426,10 @@ namespace Renderer
         void DescriptorHandlerVK::BindDescriptorArray(DescriptorSetID setID, u32 binding, VkImageView image, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            descriptorSet.unboundBindings.Unset(binding);
+            
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageView = image;
             imageInfo.imageLayout = (!isRT && type == DescriptorType::SampledImage) ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_GENERAL;
@@ -247,6 +448,10 @@ namespace Renderer
         void DescriptorHandlerVK::BindDescriptorArray(DescriptorSetID setID, u32 binding, std::vector<VkImageView>& images, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            descriptorSet.unboundBindings.Unset(binding);
+            
             u32 count = static_cast<u32>(images.size());
 
             VkImageLayout layout = (!isRT && type == DescriptorType::SampledImage)
@@ -275,6 +480,10 @@ namespace Renderer
         void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, VkSampler sampler, u32 frameIndex)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            descriptorSet.unboundBindings.Unset(binding);
+            
             VkDescriptorImageInfo samplerInfo{};
             samplerInfo.sampler = sampler;
 
@@ -291,6 +500,10 @@ namespace Renderer
         void DescriptorHandlerVK::BindDescriptorArray(DescriptorSetID setID, u32 binding, VkSampler sampler, u32 arrayIndex, u32 frameIndex)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            descriptorSet.unboundBindings.Unset(binding);
+            
             VkDescriptorImageInfo samplerInfo{};
             samplerInfo.sampler = sampler;
 
@@ -308,6 +521,10 @@ namespace Renderer
         void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, TextureArrayID textureArrayID)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            descriptorSet.unboundBindings.Unset(binding);
+            
             // Register this binding so future texture array updates can propagate to this descriptor set
             _textureHandler->RegisterTextureArrayBinding(textureArrayID, setID, binding);
 
@@ -352,6 +569,10 @@ namespace Renderer
         void DescriptorHandlerVK::UpdateTextureArrayDescriptors(DescriptorSetID setID, u32 binding, const TextureID* textureIDs, u32 startIndex, u32 count)
         {
             ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            descriptorSet.unboundBindings.Unset(binding);
+            
             if (count == 0)
             {
                 return;

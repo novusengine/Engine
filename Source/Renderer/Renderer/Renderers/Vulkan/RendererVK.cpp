@@ -51,7 +51,7 @@ namespace Renderer
         _device->Init();
 
         _bufferHandler->Init(_device);
-        _descriptorHandler->Init(_device, _textureHandler);
+        _descriptorHandler->Init(_device, _textureHandler, _bufferHandler);
         _commandListHandler->Init(_device);
         _samplerHandler->Init(_device);
         _semaphoreHandler->Init(_device);
@@ -254,7 +254,7 @@ namespace Renderer
     void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, BufferID bufferID, DescriptorType type, u32 frameIndex)
     {
         VkBuffer buffer = _bufferHandler->GetBuffer(bufferID);
-        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, buffer, type, frameIndex);
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, bufferID, buffer, type, frameIndex);
     }
 
     void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, DescriptorType type, u32 frameIndex)
@@ -409,14 +409,12 @@ namespace Renderer
             timeWaited = timer.GetLifeTime();
         }
 
+        _imageHandler->FlipFrame(frameIndex);
         if (_renderSizeChanged)
         {
             _device->FlushGPU();
 
             _device->SetRenderSize(_renderSize);
-
-            //_pipelineHandler->DiscardPipelines();
-            //CreateDummyPipeline();
 
             _imageHandler->OnResize(false);
 
@@ -1020,9 +1018,10 @@ namespace Renderer
         }
         renderPassOpenCount--;
         _commandListHandler->SetRenderPassOpenCount(commandListID, renderPassOpenCount);
-
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         vkCmdEndRendering(commandBuffer);
+
+        std::vector<VkImageMemoryBarrier> imageBarriers;
 
         for (int i = 0; i < MAX_RENDER_TARGETS; i++)
         {
@@ -1030,9 +1029,8 @@ namespace Renderer
                 break;
 
             TextureBaseDesc textureDesc = _textureHandler->GetTextureDesc(desc.renderTargets[i]);
-
-            // Manual transition for color attachment back to original layout
             VkImage image = _textureHandler->GetImage(desc.renderTargets[i]);
+
             VkImageMemoryBarrier barrier = {};
             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             barrier.pNext = nullptr;
@@ -1040,7 +1038,8 @@ namespace Renderer
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             barrier.oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
             barrier.newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             barrier.image = image;
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             barrier.subresourceRange.baseMipLevel = 0;
@@ -1048,13 +1047,18 @@ namespace Renderer
             barrier.subresourceRange.baseArrayLayer = 0;
             barrier.subresourceRange.layerCount = 1;
 
+            imageBarriers.push_back(barrier);
+        }
+
+        if (!imageBarriers.empty())
+        {
             vkCmdPipelineBarrier(commandBuffer,
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 0,
                 0, nullptr,
                 0, nullptr,
-                1, &barrier);
+                static_cast<u32>(imageBarriers.size()), imageBarriers.data());
         }
     }
 
@@ -1401,12 +1405,16 @@ namespace Renderer
 
         if (graphicsPipelineID != GraphicsPipelineID::Invalid())
         {
-            /*if (_pipelineHandler->GetNumDescriptorSetLayouts(graphicsPipelineID) <= slot)
+            if (!_pipelineHandler->UsesDescriptorSet(graphicsPipelineID, slot))
             {
-                return;
-            }*/
+                if (slot == DescriptorSetSlot::DEBUG)
+                    return;
 
-            // TODO: Validate buffer permissions
+                NC_LOG_CRITICAL("Tried to bind a descriptor set to a graphics pipeline that doesn't use it (slot {})", slot);
+                return;
+            }
+            const PersistentBitSet* usedBindings = _pipelineHandler->GetUsedBindings(graphicsPipelineID, slot);
+            _descriptorHandler->ValidatePermissions(slot, descriptorSetID, bufferPermissions, true, usedBindings);
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(graphicsPipelineID);
 
@@ -1415,12 +1423,16 @@ namespace Renderer
         }
         else if (computePipelineID != ComputePipelineID::Invalid())
         {
-            /*if (_pipelineHandler->GetNumDescriptorSetLayouts(computePipelineID) <= slot)
+            if (!_pipelineHandler->UsesDescriptorSet(computePipelineID, slot))
             {
-                return;
-            }*/
+                if (slot == DescriptorSetSlot::DEBUG)
+                    return;
 
-            // TODO: Validate buffer permissions
+                NC_LOG_CRITICAL("Tried to bind a descriptor set to a compute pipeline that doesn't use it (slot {})", slot);
+                return;
+            }
+            const PersistentBitSet* usedBindings = _pipelineHandler->GetUsedBindings(computePipelineID, slot);
+            _descriptorHandler->ValidatePermissions(slot, descriptorSetID, bufferPermissions, false, usedBindings);
 
             VkPipelineLayout pipelineLayout = _pipelineHandler->GetPipelineLayout(computePipelineID);
 

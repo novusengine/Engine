@@ -25,6 +25,7 @@ namespace Renderer
             void Init(RenderDeviceVK* device, SamplerHandlerVK* samplerHandler);
             void PostInit();
 
+            void FlipFrame(u32 frameIndex);
             void OnResize(bool windowResize);
 
             ImageID CreateImage(const ImageDesc& desc);
