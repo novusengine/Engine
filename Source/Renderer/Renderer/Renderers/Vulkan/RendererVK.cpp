@@ -601,6 +601,39 @@ namespace Renderer
         _device->TransitionImageLayout(commandBuffer, image, range.aspectMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, 1);
     }
 
+    namespace
+    {
+        const char* DescriptorSetSlotToString(u32 slot)
+        {
+            switch (slot)
+            {
+                case DescriptorSetSlot::DEBUG:    return "DEBUG";
+                case DescriptorSetSlot::GLOBAL:   return "GLOBAL";
+                case DescriptorSetSlot::LIGHT:    return "LIGHT";
+                case DescriptorSetSlot::TERRAIN:  return "TERRAIN";
+                case DescriptorSetSlot::MODEL:    return "MODEL";
+                case DescriptorSetSlot::PER_PASS: return "PER_PASS";
+                case DescriptorSetSlot::PER_DRAW: return "PER_DRAW";
+                default:                          return "UNKNOWN";
+            }
+        }
+    }
+
+    void RendererVK::ValidateBoundDescriptorSets(CommandListID commandListID, const char* opName)
+    {
+        u8 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
+        if (mask == 0)
+            return;
+
+        for (u32 slot = 0; slot < 8; slot++)
+        {
+            if ((mask & (1u << slot)) == 0)
+                continue;
+
+            NC_LOG_CRITICAL("{} called with descriptor set slot {} ({}) statically used by the bound pipeline but never bound on this command list", opName, slot, DescriptorSetSlotToString(slot));
+        }
+    }
+
     void RendererVK::Draw(CommandListID commandListID, u32 numVertices, u32 numInstances, u32 vertexOffset, u32 instanceOffset)
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
@@ -609,6 +642,7 @@ namespace Renderer
         {
             NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDraw");
 
         vkCmdDraw(commandBuffer, numVertices, numInstances, vertexOffset, instanceOffset);
     }
@@ -621,6 +655,7 @@ namespace Renderer
         {
             NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDrawIndirect");
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
 
@@ -635,6 +670,7 @@ namespace Renderer
         {
             NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDrawIndirectCount");
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
         VkBuffer vkDrawCountBuffer = _bufferHandler->GetBuffer(drawCountBuffer);
@@ -650,6 +686,7 @@ namespace Renderer
         {
             NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDrawIndexed");
 
         vkCmdDrawIndexed(commandBuffer, numIndices, numInstances, indexOffset, vertexOffset, instanceOffset);
     }
@@ -662,6 +699,7 @@ namespace Renderer
         {
             NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDrawIndexedIndirect");
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
 
@@ -676,6 +714,7 @@ namespace Renderer
         {
             NC_LOG_CRITICAL("You tried to draw without first calling BeginPipeline!");
         }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDrawIndexedIndirectCount");
 
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
         VkBuffer vkDrawCountBuffer = _bufferHandler->GetBuffer(drawCountBuffer);
@@ -687,6 +726,8 @@ namespace Renderer
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
 
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDispatch");
+
         vkCmdDispatch(commandBuffer, threadGroupCountX, threadGroupCountY, threadGroupCountZ);
     }
 
@@ -694,6 +735,8 @@ namespace Renderer
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
+
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDispatchIndirect");
 
         vkCmdDispatchIndirect(commandBuffer, vkArgumentBuffer, argumentBufferOffset);
     }
@@ -1174,6 +1217,7 @@ namespace Renderer
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
         _commandListHandler->SetBoundGraphicsPipeline(commandListID, pipelineID);
+        _commandListHandler->SetUnboundDescriptorSets(commandListID, _pipelineHandler->GetUsedDescriptorSetMask(pipelineID));
     }
 
     void RendererVK::EndPipeline(CommandListID commandListID, GraphicsPipelineID pipelineID)
@@ -1194,6 +1238,7 @@ namespace Renderer
 
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         _commandListHandler->SetBoundGraphicsPipeline(commandListID, GraphicsPipelineID::Invalid());
+        _commandListHandler->SetUnboundDescriptorSets(commandListID, 0);
     }
 
     void RendererVK::BeginPipeline(CommandListID commandListID, ComputePipelineID pipelineID)
@@ -1217,6 +1262,7 @@ namespace Renderer
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
         _commandListHandler->SetBoundComputePipeline(commandListID, pipelineID);
+        _commandListHandler->SetUnboundDescriptorSets(commandListID, _pipelineHandler->GetUsedDescriptorSetMask(pipelineID));
     }
 
     void RendererVK::EndPipeline(CommandListID commandListID, ComputePipelineID pipelineID)
@@ -1236,6 +1282,7 @@ namespace Renderer
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
         _commandListHandler->SetBoundComputePipeline(commandListID, ComputePipelineID::Invalid());
+        _commandListHandler->SetUnboundDescriptorSets(commandListID, 0);
     }
 
     void RendererVK::BeginTimeQuery(CommandListID commandListID, TimeQueryID timeQueryID)
@@ -1420,6 +1467,11 @@ namespace Renderer
 
             // Bind descriptor set
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, slot, 1, &vkDescriptorSet, 0, nullptr);
+
+            // Clear this slot from the "still required to be bound" mask
+            u8 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
+            mask &= ~static_cast<u8>(1u << slot);
+            _commandListHandler->SetUnboundDescriptorSets(commandListID, mask);
         }
         else if (computePipelineID != ComputePipelineID::Invalid())
         {
@@ -1438,6 +1490,11 @@ namespace Renderer
 
             // Bind descriptor set
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, slot, 1, &vkDescriptorSet, 0, nullptr);
+
+            // Clear this slot from the "still required to be bound" mask
+            u8 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
+            mask &= ~static_cast<u8>(1u << slot);
+            _commandListHandler->SetUnboundDescriptorSets(commandListID, mask);
         }
     }
 
