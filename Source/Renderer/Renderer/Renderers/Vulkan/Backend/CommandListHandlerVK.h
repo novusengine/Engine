@@ -56,6 +56,11 @@ namespace Renderer
             i8 GetPipelineOpenCount(CommandListID id);
             void SetPipelineOpenCount(CommandListID id, i8 count);
 
+            // Bitmask of descriptor set slots the currently bound pipeline statically uses but which haven't been bound on this command list yet.
+            // Initialized in BeginPipeline from the pipeline's used-set mask, cleared bit-by-bit by BindDescriptorSet, validated by Draw / Dispatch, reset on EndPipeline.
+            u8 GetUnboundDescriptorSets(CommandListID id);
+            void SetUnboundDescriptorSets(CommandListID id, u8 mask);
+
             tracy::VkCtxManualScope*& GetTracyScope(CommandListID id);
 
             VkFence GetCurrentFence();

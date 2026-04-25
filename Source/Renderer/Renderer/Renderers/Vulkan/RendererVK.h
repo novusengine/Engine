@@ -241,6 +241,9 @@ namespace Renderer
         void RecreateSwapChain(Backend::SwapChainVK* swapChain);
         void CreateDummyPipeline();
 
+        // Logs an NC_LOG_CRITICAL for every descriptor set slot the bound pipeline statically uses but which has not been bound on this command list. Called from every Draw* / Dispatch* variant.
+        void ValidateBoundDescriptorSets(CommandListID commandListID, const char* opName);
+
     private:
         Backend::RenderDeviceVK* _device = nullptr;
         Backend::BufferHandlerVK* _bufferHandler = nullptr;

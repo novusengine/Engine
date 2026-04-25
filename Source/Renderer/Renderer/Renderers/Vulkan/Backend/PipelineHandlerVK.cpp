@@ -43,6 +43,7 @@ namespace Renderer
 
             std::unordered_set<u32> setsUsed;
             std::unordered_map<u32, PersistentBitSet> usedBindingsPerSlot;
+            u8 usedDescriptorSetMask = 0; // bit `slot` set for each statically-used descriptor set slot (including DEBUG)
         };
 
         struct ComputePipelineCacheDesc
@@ -65,6 +66,7 @@ namespace Renderer
 
             std::unordered_set<u32> setsUsed;
             std::unordered_map<u32, PersistentBitSet> usedBindingsPerSlot;
+            u8 usedDescriptorSetMask = 0; // bit `slot` set for each statically-used descriptor set slot (including DEBUG)
         };
 
         struct PipelineHandlerVKData : IPipelineHandlerVKData
@@ -282,6 +284,18 @@ namespace Renderer
             return static_cast<u32>(data.computePipelines[static_cast<cIDType>(id)].setsUsed.contains(setNumber));
         }
 
+        u8 PipelineHandlerVK::GetUsedDescriptorSetMask(GraphicsPipelineID id)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            return data.graphicsPipelines[static_cast<gIDType>(id)].usedDescriptorSetMask;
+        }
+
+        u8 PipelineHandlerVK::GetUsedDescriptorSetMask(ComputePipelineID id)
+        {
+            PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
+            return data.computePipelines[static_cast<cIDType>(id)].usedDescriptorSetMask;
+        }
+
         const PersistentBitSet* PipelineHandlerVK::GetUsedBindings(GraphicsPipelineID id, u32 slot)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
@@ -474,6 +488,15 @@ namespace Renderer
 
                 //bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
                 bindInfoPushConstants.insert(bindInfoPushConstants.end(), bindReflection.pushConstants.begin(), bindReflection.pushConstants.end());
+            }
+
+            // Build the used-set bitmask from reflection. DEBUG is included: if a shader actively uses the DEBUG set we want
+            // the draw validator to flag a missing bind. The asymmetric "binding DEBUG that the pipeline doesn't use" case
+            // is still tolerated because BindDescriptorSet silently early-returns for DEBUG when the pipeline doesn't use it.
+            pipeline.usedDescriptorSetMask = 0;
+            for (u32 slot : pipeline.setsUsed)
+            {
+                pipeline.usedDescriptorSetMask |= static_cast<u8>(1u << slot);
             }
 
             // -- Create Descriptor Set Layout from reflected SPIR-V --
@@ -820,6 +843,15 @@ namespace Renderer
             {
                 pipeline.setsUsed.insert(bindInfo.set);
                 pipeline.usedBindingsPerSlot[bindInfo.set].Set(bindInfo.binding);
+            }
+
+            // Build the used-set bitmask from reflection. DEBUG is included: if a shader actively uses the DEBUG set we want
+            // the draw validator to flag a missing bind. The asymmetric "binding DEBUG that the pipeline doesn't use" case
+            // is still tolerated because BindDescriptorSet silently early-returns for DEBUG when the pipeline doesn't use it.
+            pipeline.usedDescriptorSetMask = 0;
+            for (u32 slot : pipeline.setsUsed)
+            {
+                pipeline.usedDescriptorSetMask |= static_cast<u8>(1u << slot);
             }
 
             std::vector<BindInfo> bindInfos;

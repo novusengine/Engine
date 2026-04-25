@@ -39,12 +39,9 @@ public:
     {
         assert(_count > index);
 
-        for (int i = index; index < _count; i++)
+        for (size_t i = index; i + 1 < _count; i++)
         {
-            if (i + 1 < _count)
-            {
-                _data[i] = _data[i + 1];
-            }
+            _data[i] = _data[i + 1];
         }
 
         _count--;

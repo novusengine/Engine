@@ -74,6 +74,10 @@ namespace Renderer
             bool UsesDescriptorSet(GraphicsPipelineID id, u32 setNumber);
             bool UsesDescriptorSet(ComputePipelineID id, u32 setNumber);
 
+            // Returns a bitmask where bit `slot` is set for each descriptor set slot the pipeline statically uses (including DEBUG).
+            u8 GetUsedDescriptorSetMask(GraphicsPipelineID id);
+            u8 GetUsedDescriptorSetMask(ComputePipelineID id);
+
             const PersistentBitSet* GetUsedBindings(GraphicsPipelineID id, u32 slot);
             const PersistentBitSet* GetUsedBindings(ComputePipelineID id, u32 slot);
 
