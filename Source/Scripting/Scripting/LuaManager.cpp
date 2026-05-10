@@ -381,6 +381,9 @@ namespace Scripting
             if (StringUtils::BeginsWith(relativePathAsString, "API/") || StringUtils::BeginsWith(relativePathAsString, "Bootstrap/"))
                 continue;
 
+            if (!_developerMode && StringUtils::BeginsWith(relativePathAsString, "Editor/"))
+                continue;
+
             std::string pathStr = path.string();
             u32 depth = GetPathDepth(scriptBootstrapDirectoryAsString, pathStr);
             paths.push_back({ depth, path });

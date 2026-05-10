@@ -12,12 +12,33 @@
 
 namespace Scripting
 {
+    // Per-entry filter for LuaMethodTable::Set: entries overlapping excludeFlags are skipped.
+    enum class LuaMethodFlags : u32
+    {
+        None          = 0,
+        DeveloperOnly = 1 << 0,
+    };
+
+    inline constexpr LuaMethodFlags operator|(LuaMethodFlags a, LuaMethodFlags b)
+    {
+        return static_cast<LuaMethodFlags>(static_cast<u32>(a) | static_cast<u32>(b));
+    }
+    inline constexpr LuaMethodFlags operator&(LuaMethodFlags a, LuaMethodFlags b)
+    {
+        return static_cast<LuaMethodFlags>(static_cast<u32>(a) & static_cast<u32>(b));
+    }
+    inline constexpr bool HasAnyFlag(LuaMethodFlags value, LuaMethodFlags mask)
+    {
+        return (value & mask) != LuaMethodFlags::None;
+    }
+
     template <typename UserDataType = void>
     struct LuaRegister
     {
     public:
         const char* name;
         typename std::conditional<std::is_same_v<UserDataType, void>, i32(*)(Zenith*), i32(*)(Zenith*, UserDataType*)>::type func;
+        LuaMethodFlags flags = LuaMethodFlags::None;
     };
 
     template <typename UserDataType>
@@ -112,7 +133,7 @@ namespace Scripting
         }
 
         template <class MethodTableUserDataType, size_t N>
-        static void Set(Zenith* zenith, const LuaRegister<MethodTableUserDataType> (&methodTable)[N], const char* globalName = nullptr)
+        static void Set(Zenith* zenith, const LuaRegister<MethodTableUserDataType> (&methodTable)[N], const char* globalName = nullptr, LuaMethodFlags excludeFlags = LuaMethodFlags::None)
         {
             static_assert(std::is_same_v<UserDataType, void> || std::is_same_v<UserDataType, MethodTableUserDataType> || std::is_base_of_v<MethodTableUserDataType, UserDataType>, "LuaMetaTable::Set - LuaRegister's UserDataType must either match LuaMetaTable's UserDataType, be derived from it or be void");
             constexpr bool isGlobal = std::is_same_v<UserDataType, void>;
@@ -146,6 +167,9 @@ namespace Scripting
             for (size_t i = 0; i < N; ++i)
             {
                 const auto& method = methodTable[i];
+
+                if (HasAnyFlag(method.flags, excludeFlags))
+                    continue;
 
                 lua_pushstring(zenith->state, method.name);
 
