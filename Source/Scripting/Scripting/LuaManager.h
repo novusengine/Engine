@@ -30,6 +30,16 @@ namespace Scripting
         void SetDirty() { _isDirty = true; }
         void ClearDirty() { _isDirty = false; }
 
+        // When false, scripts under {scriptDir}/Editor/ are excluded from the load.
+        bool IsDeveloperMode() const { return _developerMode; }
+        void SetDeveloperMode(bool enabled)
+        {
+            if (enabled == _developerMode)
+                return;
+            _developerMode = enabled;
+            SetDirty();
+        }
+
         ZenithStateManager& GetZenithStateManager()
         {
             return _zenithStateManager;
@@ -57,6 +67,7 @@ namespace Scripting
 
     private:
         bool _isDirty = false;
+        bool _developerMode = true;
 
         u64 _currentTick = 0;
         u64 _lastRecompiledTick = 0;
