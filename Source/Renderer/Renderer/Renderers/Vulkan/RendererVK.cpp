@@ -1997,6 +1997,11 @@ namespace Renderer
         return _uploadBufferHandler->GetUploadFinishedSemaphore();
     }
 
+    void RendererVK::UnlockUploads()
+    {
+        _uploadBufferHandler->UnlockUploads();
+    }
+
     void RendererVK::CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range)
     {
         _uploadBufferHandler->CopyBufferToBuffer(dstBuffer, dstOffset, srcBuffer, srcOffset, range);

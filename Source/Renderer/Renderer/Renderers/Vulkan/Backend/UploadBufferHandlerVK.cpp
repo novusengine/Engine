@@ -115,6 +115,11 @@ namespace Renderer
             std::mutex submitMutex;
             SemaphoreID uploadFinishedSemaphore;
 
+            // An upload on the render-loop thread while locked would land a frame late, so it asserts.
+            // Worker-thread (async streaming) uploads are exempt.
+            std::atomic<bool> uploadsLocked = false;
+            std::thread::id renderThreadID;
+
             // These are copies of the barriers which needs to run on the main commandlist
             moodycamel::ConcurrentQueue<VkBufferMemoryBarrier> bufferMemoryBarriers;
         };
@@ -167,6 +172,11 @@ namespace Renderer
         void UploadBufferHandlerVK::ExecuteUploadTasks()
         {
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+
+            // Per-frame submit point: lock until UnlockUploads() at the end of Render, and capture the
+            // render-loop thread so the assert is scoped to it.
+            data->renderThreadID = std::this_thread::get_id();
+            data->uploadsLocked = true;
 
             for (u32 i = 0; i < data->stagingBuffers.Num; i++)
             {
@@ -293,6 +303,10 @@ namespace Renderer
 
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
 
+            // Thread check first so worker-thread (async streaming) uploads short-circuit out.
+            NC_ASSERT(!(std::this_thread::get_id() == data->renderThreadID && data->uploadsLocked),
+                "UploadBufferHandlerVK : Staging upload requested after this frame's uploads were submitted (FlipFrame). Move it to the Update phase, before Render.");
+
             void* mappedMemory = nullptr;
             StagingBufferID stagingBufferID;
 
@@ -355,6 +369,10 @@ namespace Renderer
             }
 
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+
+            // Thread check first so worker-thread (async streaming) uploads short-circuit out.
+            NC_ASSERT(!(std::this_thread::get_id() == data->renderThreadID && data->uploadsLocked),
+                "UploadBufferHandlerVK : Staging upload requested after this frame's uploads were submitted (FlipFrame). Move it to the Update phase, before Render.");
 
             void* mappedMemory = nullptr;
             StagingBufferID stagingBufferID;
@@ -481,6 +499,13 @@ namespace Renderer
         {
             UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
             data->needsWait = false;
+        }
+
+        void UploadBufferHandlerVK::UnlockUploads()
+        {
+            // Called at the end of Render; the next frame's Update phase may upload again.
+            UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+            data->uploadsLocked = false;
         }
 
         size_t UploadBufferHandlerVK::Allocate(size_t size, StagingBufferID& stagingBufferID, void*& mappedMemory)

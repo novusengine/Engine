@@ -175,6 +175,7 @@ namespace Renderer
         [[nodiscard]] bool ShouldWaitForUpload() override;
         void SetHasWaitedForUpload() override;
         [[nodiscard]] SemaphoreID GetUploadFinishedSemaphore() override;
+        void UnlockUploads() override;
 
         // Uses the upload handler to schedule it for next frames command list
         void CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;

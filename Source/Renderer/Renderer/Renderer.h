@@ -207,6 +207,9 @@ namespace Renderer
         virtual bool ShouldWaitForUpload() = 0;
         virtual void SetHasWaitedForUpload() = 0;
         virtual SemaphoreID GetUploadFinishedSemaphore() = 0;
+        // Re-opens staging uploads for the new frame's Update phase. Call before any uploads, after
+        // the previous frame's FlipFrame locked them. Uploads requested while locked assert.
+        virtual void UnlockUploads() = 0;
 
         [[nodiscard]] BufferID CreateBuffer(BufferID bufferID, BufferDesc& desc);
         [[nodiscard]] BufferID CreateAndFillBuffer(BufferID bufferID, BufferDesc desc, void* data, size_t dataSize); // Deletes the current BufferID if it's not invalid
