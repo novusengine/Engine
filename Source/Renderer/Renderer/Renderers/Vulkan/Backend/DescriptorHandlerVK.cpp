@@ -28,6 +28,14 @@ namespace Renderer
         };
         constexpr u32 maxDescriptorSets = 128;
 
+        // [Frame-safe descriptor rebind] A buffer descriptor write that must wait until its target frame
+        // slot is no longer being read by an in-flight frame before it can safely be applied.
+        struct PendingBufferWrite
+        {
+            BufferID bufferID;
+            DescriptorType type;
+        };
+
         struct DescriptorSet
         {
             DescriptorSetDesc desc;
@@ -50,6 +58,11 @@ namespace Renderer
 
             // Reverse map: buffer -> binding (for fast lookup during validation)
             std::unordered_map<BufferID::type, u32> bufferToBinding;
+
+            // [Frame-safe descriptor rebind] Buffer-binding writes recorded per frame-copy and applied in
+            // FlushPendingBufferWrites once that slot's fence has been waited (its previous frame is done),
+            // so we never rewrite a descriptor copy an in-flight frame is still reading.
+            std::unordered_map<u32, PendingBufferWrite> pendingBufferWritesPerSlot[RenderDeviceVK::FRAME_INDEX_COUNT];
         };
 
         struct DescriptorHandlerData : public IDescriptorHandlerData
@@ -339,7 +352,7 @@ namespace Renderer
             }
         }
 
-        void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, VkBuffer buffer, DescriptorType type, u32 frameIndex)
+        void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, DescriptorType type, u32 frameIndex)
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
@@ -385,21 +398,49 @@ namespace Renderer
             
             // Mark binding as bound
             descriptorSet.unboundBindings.Unset(binding);
-            
-            // Vulkan descriptor update
+
+            // [Frame-safe descriptor rebind] A GPUVector resize swaps in a NEW VkBuffer, BufferIDs are
+            // recycled, and two frames are in flight sharing this set's per-frame descriptor copies. The only
+            // moment at which writing a slot's copy is both safe (the slot's previous frame is fully done, so
+            // no in-flight read races the write under UPDATE_AFTER_BIND) and current is right after that slot's
+            // fence has been waited. So record the desired buffer per (slot, binding) here and apply it in
+            // FlushPendingBufferWrites, which runs in FlipFrame immediately after that fence wait. The actual
+            // VkBuffer is resolved from bufferID at flush time, so it always reflects the latest generation.
+            descriptorSet.pendingBufferWritesPerSlot[frameIndex][binding] = PendingBufferWrite{ bufferID, type };
+        }
+
+        void DescriptorHandlerVK::WriteBufferDescriptor(DescriptorSet& descriptorSet, u32 binding, VkBuffer buffer, DescriptorType type, u32 frameIndex)
+        {
             VkDescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = buffer;
             bufferInfo.offset = 0;
             bufferInfo.range = VK_WHOLE_SIZE;
 
             VkWriteDescriptorSet descriptorWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-            descriptorWrite.dstSet = GetVkDescriptorSet(setID, frameIndex);
+            descriptorWrite.dstSet = descriptorSet.sets[frameIndex];
             descriptorWrite.dstBinding = binding;
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.descriptorType = FormatConverterVK::ToVkDescriptorType(type);
             descriptorWrite.pBufferInfo = &bufferInfo;
 
             vkUpdateDescriptorSets(_device->_device, 1, &descriptorWrite, 0, nullptr);
+        }
+
+        void DescriptorHandlerVK::FlushPendingBufferWrites(u32 frameIndex)
+        {
+            ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+
+            for (DescriptorSet& descriptorSet : data.descriptorSets)
+            {
+                auto& pending = descriptorSet.pendingBufferWritesPerSlot[frameIndex];
+                for (auto& [binding, write] : pending)
+                {
+                    VkBuffer buffer = _bufferHandler->GetBuffer(write.bufferID);
+                    WriteBufferDescriptor(descriptorSet, binding, buffer, write.type, frameIndex);
+                }
+                pending.clear();
+            }
         }
 
         void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, VkImageView image, DescriptorType type, bool isRT, u32 frameIndex)

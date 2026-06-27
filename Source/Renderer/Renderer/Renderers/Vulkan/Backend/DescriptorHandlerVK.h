@@ -33,7 +33,11 @@ namespace Renderer
 
             DescriptorSetID CreateDescriptorSet(const DescriptorSetDesc& desc);
 
-            void BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, VkBuffer buffer, DescriptorType type, u32 frameIndex);
+            void BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, DescriptorType type, u32 frameIndex);
+
+            // [Frame-safe descriptor rebind] Apply buffer descriptor writes that were deferred while their
+            // frame slot was in flight. Call once per frame, right after that slot's fence has been waited.
+            void FlushPendingBufferWrites(u32 frameIndex);
             void BindDescriptor(DescriptorSetID setID, u32 binding, VkImageView image, DescriptorType type, bool isRT, u32 frameIndex);
             void BindDescriptorArray(DescriptorSetID setID, u32 binding, VkImageView image, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex);
             void BindDescriptorArray(DescriptorSetID setID, u32 binding, std::vector<VkImageView>& images, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex);
@@ -51,6 +55,7 @@ namespace Renderer
         private:
             void CreateDescriptorPool();
             void CreateDescriptorSet(DescriptorSet& descriptorSet);
+            void WriteBufferDescriptor(DescriptorSet& descriptorSet, u32 binding, VkBuffer buffer, DescriptorType type, u32 frameIndex);
             bool ValidatePermissionViolations(u32 slot, const DescriptorSet& descriptorSet, const PersistentBitSet& accesses, const BitSet& permissions, const char* permissionName, const PersistentBitSet* usedBindings = nullptr);
 
         private:
