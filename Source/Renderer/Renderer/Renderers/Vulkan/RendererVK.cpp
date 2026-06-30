@@ -253,8 +253,10 @@ namespace Renderer
 
     void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, BufferID bufferID, DescriptorType type, u32 frameIndex)
     {
-        VkBuffer buffer = _bufferHandler->GetBuffer(bufferID);
-        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, bufferID, buffer, type, frameIndex);
+        // [Frame-safe descriptor rebind] The handler records this write per frame-copy and applies it in
+        // FlushPendingBufferWrites (FlipFrame), after that slot's fence has been waited. The VkBuffer is
+        // resolved from bufferID at that point, so it always reflects the latest GPUVector generation.
+        _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, bufferID, type, frameIndex);
     }
 
     void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, DescriptorType type, u32 frameIndex)
@@ -408,6 +410,11 @@ namespace Renderer
             vkResetFences(_device->_device, 1, &frameFence);
             timeWaited = timer.GetLifeTime();
         }
+
+        // [Frame-safe descriptor rebind] This slot's previous frame has now completed (fence waited above),
+        // so it is finally safe to apply any buffer descriptor writes that were deferred while it was in
+        // flight. Done before any of this frame's command lists record/use the descriptor sets.
+        _descriptorHandler->FlushPendingBufferWrites(_frameIndex);
 
         _imageHandler->FlipFrame(frameIndex);
         if (_renderSizeChanged)
@@ -1995,6 +2002,11 @@ namespace Renderer
     SemaphoreID RendererVK::GetUploadFinishedSemaphore()
     {
         return _uploadBufferHandler->GetUploadFinishedSemaphore();
+    }
+
+    void RendererVK::UnlockUploads()
+    {
+        _uploadBufferHandler->UnlockUploads();
     }
 
     void RendererVK::CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range)
