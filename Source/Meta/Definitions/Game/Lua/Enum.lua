@@ -17,6 +17,15 @@ M.LuaHandlerTypeEnum =
         Field("UI"),
         Field("Game"),
         Field("Unit"),
+        Field("Time"),
+        Field("Camera"),
+        Field("Map"),
+        Field("Scene"),
+        Field("Editor"),
+        Field("Asset"),
+        Field("Skybox"),
+        Field("Network"),
+        Field("Perf"),
         Field("Count")
     }
 }
