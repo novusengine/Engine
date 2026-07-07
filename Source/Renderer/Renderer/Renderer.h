@@ -178,6 +178,12 @@ namespace Renderer
 
         virtual void BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions) = 0;
 
+        // [Temp descriptor sets] Snapshots the set's current contents into a transient descriptor set that
+        // lives for this frame only, so a bind recorded now is unaffected by later rewrites of the set.
+        // Called at record time by CommandList::BindTempDescriptorSet.
+        virtual u32 SnapshotTempDescriptorSet(DescriptorSetID descriptorSetID) = 0;
+        virtual void BindTempDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, u32 transientSetIndex, const TrackedBufferBitSets* bufferPermissions) = 0;
+
         virtual void MarkFrameStart(CommandListID commandListID, u32 frameIndex) = 0;
         virtual void BeginTrace(CommandListID commandListID, const tracy::SourceLocationData* sourceLocation) = 0;
         virtual void EndTrace(CommandListID commandListID) = 0;

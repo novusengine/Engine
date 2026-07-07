@@ -46,6 +46,7 @@ namespace Renderer
         static void EndTimeQuery(Renderer* renderer, CommandListID commandList, const void* data);
 
         static void BindDescriptorSet(Renderer* renderer, CommandListID commandList, const void* data);
+        static void BindTempDescriptorSet(Renderer* renderer, CommandListID commandList, const void* data);
 
         static void SetDepthBias(Renderer* renderer, CommandListID commandList, const void* data);
         static void SetScissorRect(Renderer* renderer, CommandListID commandList, const void* data);

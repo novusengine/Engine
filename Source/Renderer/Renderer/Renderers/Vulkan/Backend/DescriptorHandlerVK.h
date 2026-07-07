@@ -38,6 +38,17 @@ namespace Renderer
             // [Frame-safe descriptor rebind] Apply buffer descriptor writes that were deferred while their
             // frame slot was in flight. Call once per frame, right after that slot's fence has been waited.
             void FlushPendingBufferWrites(u32 frameIndex);
+
+            // [Temp descriptor sets] Snapshot the set's current contents (canonical frame copy plus this
+            // frame's pending buffer binds) into a fresh set from a per-frame transient pool, so a bind
+            // recorded now is unaffected by later rewrites of the set. Transient sets live until the
+            // frame slot's next FlipFrame.
+            u32 SnapshotTempDescriptorSet(DescriptorSetID setID, u32 frameIndex);
+            VkDescriptorSet GetTransientVkDescriptorSet(u32 transientSetIndex, u32 frameIndex);
+
+            void MarkBound(DescriptorSetID setID);
+            void FlipFrame(u32 frameIndex);
+            void OnFrameEnd();
             void BindDescriptor(DescriptorSetID setID, u32 binding, VkImageView image, DescriptorType type, bool isRT, u32 frameIndex);
             void BindDescriptorArray(DescriptorSetID setID, u32 binding, VkImageView image, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex);
             void BindDescriptorArray(DescriptorSetID setID, u32 binding, std::vector<VkImageView>& images, u32 arrayOffset, DescriptorType type, bool isRT, u32 frameIndex);
@@ -55,7 +66,9 @@ namespace Renderer
         private:
             void CreateDescriptorPool();
             void CreateDescriptorSet(DescriptorSet& descriptorSet);
+            void WriteBufferDescriptor(VkDescriptorSet dstSet, u32 binding, VkBuffer buffer, DescriptorType type);
             void WriteBufferDescriptor(DescriptorSet& descriptorSet, u32 binding, VkBuffer buffer, DescriptorType type, u32 frameIndex);
+            void WarnIfBoundThisFrame(DescriptorSet& descriptorSet, u32 binding);
             bool ValidatePermissionViolations(u32 slot, const DescriptorSet& descriptorSet, const PersistentBitSet& accesses, const BitSet& permissions, const char* permissionName, const PersistentBitSet* usedBindings = nullptr);
 
         private:
@@ -64,6 +77,9 @@ namespace Renderer
             BufferHandlerVK* _bufferHandler;
 
             IDescriptorHandlerData* _data;
+
+            u64 _frameGeneration = 0;
+            bool _inFrameRecording = false;
         };
     }
 }

@@ -413,7 +413,9 @@ namespace Renderer
 
         // [Frame-safe descriptor rebind] This slot's previous frame has now completed (fence waited above),
         // so it is finally safe to apply any buffer descriptor writes that were deferred while it was in
-        // flight. Done before any of this frame's command lists record/use the descriptor sets.
+        // flight, and to recycle the slot's transient descriptor sets. Done before any of this frame's
+        // command lists record/use the descriptor sets.
+        _descriptorHandler->FlipFrame(_frameIndex);
         _descriptorHandler->FlushPendingBufferWrites(_frameIndex);
 
         _imageHandler->FlipFrame(frameIndex);
@@ -1448,13 +1450,32 @@ namespace Renderer
     {
         ZoneScopedNC("RendererVK::BindDescriptorSet", tracy::Color::Red3);
 
+        _descriptorHandler->MarkBound(descriptorSet->GetID());
+        BindDescriptorSetInternal(commandListID, descriptorSet, false, 0, bufferPermissions);
+    }
+
+    u32 RendererVK::SnapshotTempDescriptorSet(DescriptorSetID descriptorSetID)
+    {
+        return _descriptorHandler->SnapshotTempDescriptorSet(descriptorSetID, _frameIndex);
+    }
+
+    void RendererVK::BindTempDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, u32 transientSetIndex, const TrackedBufferBitSets* bufferPermissions)
+    {
+        ZoneScopedNC("RendererVK::BindTempDescriptorSet", tracy::Color::Red3);
+
+        BindDescriptorSetInternal(commandListID, descriptorSet, true, transientSetIndex, bufferPermissions);
+    }
+
+    void RendererVK::BindDescriptorSetInternal(CommandListID commandListID, DescriptorSet* descriptorSet, bool isTransient, u32 transientSetIndex, const TrackedBufferBitSets* bufferPermissions)
+    {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
         GraphicsPipelineID graphicsPipelineID = _commandListHandler->GetBoundGraphicsPipeline(commandListID);
         ComputePipelineID computePipelineID = _commandListHandler->GetBoundComputePipeline(commandListID);
 
         DescriptorSetID descriptorSetID = descriptorSet->GetID();
 
-        VkDescriptorSet vkDescriptorSet = _descriptorHandler->GetVkDescriptorSet(descriptorSetID, _frameIndex);
+        VkDescriptorSet vkDescriptorSet = isTransient ? _descriptorHandler->GetTransientVkDescriptorSet(transientSetIndex, _frameIndex)
+                                                      : _descriptorHandler->GetVkDescriptorSet(descriptorSetID, _frameIndex);
         u32 slot = static_cast<u32>(descriptorSet->GetSlot());
 
         if (graphicsPipelineID != GraphicsPipelineID::Invalid())
@@ -1976,6 +1997,8 @@ namespace Renderer
 
             std::scoped_lock lock(_destroyListMutex);
             DestroyObjects(_destroyLists[_destroyListIndex]);
+
+            _descriptorHandler->OnFrameEnd();
         }
     }
 

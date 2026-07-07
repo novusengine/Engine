@@ -17,5 +17,15 @@ namespace Renderer
 
             const TrackedBufferBitSets* bufferPermissions;
         };
+
+        struct BindTempDescriptorSet
+        {
+            static const BackendDispatchFunction DISPATCH_FUNCTION;
+
+            DescriptorSet* set;
+            u32 transientSetIndex;
+
+            const TrackedBufferBitSets* bufferPermissions;
+        };
     }
 }

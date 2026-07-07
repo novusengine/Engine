@@ -304,6 +304,22 @@ namespace Renderer
 #endif
     }
 
+    void CommandList::BindTempDescriptorSet(DescriptorSetResource resource, u32 frameIndex)
+    {
+        DescriptorSet* descriptorSet = _resources->GetDescriptorSet(resource.GetID());
+
+        Commands::BindTempDescriptorSet* command = AddCommand<Commands::BindTempDescriptorSet>();
+        command->set = descriptorSet;
+        // Snapshot at record time: descriptor writes issued so far must be captured before later
+        // writes overwrite the canonical per-frame copy
+        command->transientSetIndex = _renderer->SnapshotTempDescriptorSet(descriptorSet->GetID());
+        command->bufferPermissions = &_resources->GetBufferPermissions(_currentPassIndex);
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::BindTempDescriptorSet::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
     void CommandList::SetDepthBias(f32 constantFactor, f32 clamp, f32 slopeFactor)
     {
         Commands::SetDepthBias* command = AddCommand<Commands::SetDepthBias>();

@@ -23,9 +23,6 @@ M.LuaHandlerTypeEnum =
         Field("Scene"),
         Field("Editor"),
         Field("Asset"),
-        Field("Skybox"),
-        Field("Network"),
-        Field("Perf"),
         Field("Count")
     }
 }

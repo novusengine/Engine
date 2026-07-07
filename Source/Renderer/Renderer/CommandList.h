@@ -88,6 +88,10 @@ namespace Renderer
 
         void BindDescriptorSet(DescriptorSetResource resource, u32 frameIndex);
 
+        // Binds a snapshot of the set's current contents, so descriptor writes made after this call
+        // don't affect this bind. Use when rebinding descriptors between dispatches/draws in one pass.
+        void BindTempDescriptorSet(DescriptorSetResource resource, u32 frameIndex);
+
         void SetDepthBias(f32 constantFactor, f32 clamp, f32 slopeFactor);
         void SetScissorRect(u32 left, u32 right, u32 top, u32 bottom);
         void SetViewport(f32 topLeftX, f32 topLeftY, f32 width, f32 height, f32 minDepth, f32 maxDepth);

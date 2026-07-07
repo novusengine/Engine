@@ -145,6 +145,8 @@ namespace Renderer
         void SetBuffer(CommandListID commandListID, u32 slot, BufferID buffer) override;
 
         void BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions) override;
+        u32 SnapshotTempDescriptorSet(DescriptorSetID descriptorSetID) override;
+        void BindTempDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, u32 transientSetIndex, const TrackedBufferBitSets* bufferPermissions) override;
 
         void MarkFrameStart(CommandListID commandListID, u32 frameIndex) override;
         void BeginTrace(CommandListID commandListID, const tracy::SourceLocationData* sourceLocation) override;
@@ -244,6 +246,8 @@ namespace Renderer
 
         // Logs an NC_LOG_CRITICAL for every descriptor set slot the bound pipeline statically uses but which has not been bound on this command list. Called from every Draw* / Dispatch* variant.
         void ValidateBoundDescriptorSets(CommandListID commandListID, const char* opName);
+
+        void BindDescriptorSetInternal(CommandListID commandListID, DescriptorSet* descriptorSet, bool isTransient, u32 transientSetIndex, const TrackedBufferBitSets* bufferPermissions);
 
     private:
         Backend::RenderDeviceVK* _device = nullptr;

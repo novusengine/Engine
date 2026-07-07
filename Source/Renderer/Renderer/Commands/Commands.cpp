@@ -51,6 +51,7 @@ namespace Renderer
         const BackendDispatchFunction BeginTimeQuery::DISPATCH_FUNCTION = &BackendDispatch::BeginTimeQuery;
         const BackendDispatchFunction BeginTrace::DISPATCH_FUNCTION = &BackendDispatch::BeginTrace;
         const BackendDispatchFunction BindDescriptorSet::DISPATCH_FUNCTION = &BackendDispatch::BindDescriptorSet;
+        const BackendDispatchFunction BindTempDescriptorSet::DISPATCH_FUNCTION = &BackendDispatch::BindTempDescriptorSet;
         const BackendDispatchFunction BufferBarrier::DISPATCH_FUNCTION = &BackendDispatch::BufferBarrier;
         const BackendDispatchFunction ClearDepthImage::DISPATCH_FUNCTION = &BackendDispatch::ClearDepthImage;
         const BackendDispatchFunction ClearImageColor::DISPATCH_FUNCTION = &BackendDispatch::ClearImageColor;

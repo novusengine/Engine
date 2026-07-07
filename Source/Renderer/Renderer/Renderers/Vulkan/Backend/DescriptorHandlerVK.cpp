@@ -12,13 +12,14 @@
 #include <FileFormat/Novus/ShaderPack/ShaderPack.h>
 
 #include <tracy/Tracy.hpp>
+#include <algorithm>
 #include <unordered_map>
 
 namespace Renderer
 {
     namespace Backend
     {
-        VkDescriptorPoolSize poolSizes[] = 
+        VkDescriptorPoolSize poolSizes[] =
         {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
             { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 40000 },
@@ -27,6 +28,18 @@ namespace Renderer
             { VK_DESCRIPTOR_TYPE_SAMPLER, 100 }
         };
         constexpr u32 maxDescriptorSets = 128;
+
+        // [Temp descriptor sets] Per-frame transient pools, reset in FlipFrame once the slot's fence
+        // guarantees the GPU is done with the previous frame's transient sets
+        VkDescriptorPoolSize framePoolSizes[] =
+        {
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024 },
+            { VK_DESCRIPTOR_TYPE_SAMPLER, 128 }
+        };
+        constexpr u32 maxTempDescriptorSetsPerFrame = 256;
 
         // [Frame-safe descriptor rebind] A buffer descriptor write that must wait until its target frame
         // slot is no longer being read by an in-flight frame before it can safely be applied.
@@ -63,13 +76,24 @@ namespace Renderer
             // FlushPendingBufferWrites once that slot's fence has been waited (its previous frame is done),
             // so we never rewrite a descriptor copy an in-flight frame is still reading.
             std::unordered_map<u32, PendingBufferWrite> pendingBufferWritesPerSlot[RenderDeviceVK::FRAME_INDEX_COUNT];
+
+            // [Temp descriptor sets] Highest written element end per fixed-size array binding, so a
+            // snapshot only copies descriptors that have actually been written
+            std::unordered_map<u32, u32> bindingWrittenCounts;
+
+            bool hasVariableBinding = false;
+
+            // Rebind-after-bind detection, see WarnIfBoundThisFrame
+            u64 lastBoundGeneration = 0;
+            u64 lastWarnGeneration = 0;
         };
 
         struct DescriptorHandlerData : public IDescriptorHandlerData
         {
              // Pool data
             VkDescriptorPool permanentPool;
-            //VkDescriptorPool framePools[RenderDeviceVK::FRAME_INDEX_COUNT]; // TODO
+            VkDescriptorPool framePools[RenderDeviceVK::FRAME_INDEX_COUNT];
+            std::vector<VkDescriptorSet> transientSets[RenderDeviceVK::FRAME_INDEX_COUNT];
 
             std::vector<DescriptorSet> descriptorSets;
         };
@@ -248,6 +272,17 @@ namespace Renderer
             poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT;
 
             vkCreateDescriptorPool(_device->_device, &poolInfo, nullptr, &data.permanentPool);
+
+            VkDescriptorPoolCreateInfo framePoolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+            framePoolInfo.maxSets = maxTempDescriptorSetsPerFrame;
+            framePoolInfo.poolSizeCount = ARRAY_COUNT(framePoolSizes);
+            framePoolInfo.pPoolSizes = framePoolSizes;
+            framePoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT;
+
+            for (u32 i = 0; i < RenderDeviceVK::FRAME_INDEX_COUNT; i++)
+            {
+                vkCreateDescriptorPool(_device->_device, &framePoolInfo, nullptr, &data.framePools[i]);
+            }
         }
 
         void DescriptorHandlerVK::CreateDescriptorSet(DescriptorSet& descriptorSet)
@@ -337,6 +372,8 @@ namespace Renderer
                 }
             }
 
+            descriptorSet.hasVariableBinding = hasVariableBinding;
+
             // Store binding info from reflection
             for (auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
             {
@@ -359,9 +396,14 @@ namespace Renderer
             DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
 
             BufferID::type newBufferIndex = static_cast<BufferID::type>(bufferID);
-            
+
             // Check if this binding already has a buffer bound
             auto it = descriptorSet.bindingToBuffer.find(binding);
+            bool contentChanged = it == descriptorSet.bindingToBuffer.end() || it->second != bufferID;
+            if (contentChanged)
+            {
+                WarnIfBoundThisFrame(descriptorSet, binding);
+            }
             if (it != descriptorSet.bindingToBuffer.end())
             {
                 BufferID oldBufferID = it->second;
@@ -409,7 +451,7 @@ namespace Renderer
             descriptorSet.pendingBufferWritesPerSlot[frameIndex][binding] = PendingBufferWrite{ bufferID, type };
         }
 
-        void DescriptorHandlerVK::WriteBufferDescriptor(DescriptorSet& descriptorSet, u32 binding, VkBuffer buffer, DescriptorType type, u32 frameIndex)
+        void DescriptorHandlerVK::WriteBufferDescriptor(VkDescriptorSet dstSet, u32 binding, VkBuffer buffer, DescriptorType type)
         {
             VkDescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = buffer;
@@ -417,13 +459,18 @@ namespace Renderer
             bufferInfo.range = VK_WHOLE_SIZE;
 
             VkWriteDescriptorSet descriptorWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-            descriptorWrite.dstSet = descriptorSet.sets[frameIndex];
+            descriptorWrite.dstSet = dstSet;
             descriptorWrite.dstBinding = binding;
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.descriptorType = FormatConverterVK::ToVkDescriptorType(type);
             descriptorWrite.pBufferInfo = &bufferInfo;
 
             vkUpdateDescriptorSets(_device->_device, 1, &descriptorWrite, 0, nullptr);
+        }
+
+        void DescriptorHandlerVK::WriteBufferDescriptor(DescriptorSet& descriptorSet, u32 binding, VkBuffer buffer, DescriptorType type, u32 frameIndex)
+        {
+            WriteBufferDescriptor(descriptorSet.sets[frameIndex], binding, buffer, type);
         }
 
         void DescriptorHandlerVK::FlushPendingBufferWrites(u32 frameIndex)
@@ -443,13 +490,128 @@ namespace Renderer
             }
         }
 
+        u32 DescriptorHandlerVK::SnapshotTempDescriptorSet(DescriptorSetID setID, u32 frameIndex)
+        {
+            ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+
+            NC_ASSERT(!descriptorSet.hasVariableBinding, "DescriptorHandlerVK::SnapshotTempDescriptorSet: Sets with variable-count bindings are not supported");
+
+            VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+            allocInfo.descriptorPool = data.framePools[frameIndex];
+            allocInfo.descriptorSetCount = 1;
+            allocInfo.pSetLayouts = &descriptorSet.layout;
+
+            VkDescriptorSet tempSet;
+            VkResult result = vkAllocateDescriptorSets(_device->_device, &allocInfo, &tempSet);
+            if (result != VK_SUCCESS)
+            {
+                NC_LOG_CRITICAL("DescriptorHandlerVK::SnapshotTempDescriptorSet: Failed to allocate temp descriptor set! You probably need to increase maxTempDescriptorSetsPerFrame or the frame pool sizes.");
+            }
+
+            // Copy every written binding from the canonical frame copy. Pending buffer binds are skipped
+            // here (their canonical descriptor may never have been written) and applied directly below.
+            auto& pendingBufferWrites = descriptorSet.pendingBufferWritesPerSlot[frameIndex];
+
+            std::vector<VkCopyDescriptorSet> copies;
+            copies.reserve(descriptorSet.desc.reflection->descriptors.size());
+
+            for (auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
+            {
+                if (descriptorSet.unboundBindings.Has(descriptor.binding))
+                    continue;
+
+                if (pendingBufferWrites.find(descriptor.binding) != pendingBufferWrites.end())
+                    continue;
+
+                u32 count = 1;
+                if (descriptor.count != 1)
+                {
+                    // Fixed-size array, only copy the elements that have been written
+                    auto countIt = descriptorSet.bindingWrittenCounts.find(descriptor.binding);
+                    count = countIt != descriptorSet.bindingWrittenCounts.end() ? countIt->second : 1;
+                }
+
+                VkCopyDescriptorSet& copy = copies.emplace_back();
+                copy = { VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET };
+                copy.srcSet = descriptorSet.sets[frameIndex];
+                copy.srcBinding = descriptor.binding;
+                copy.dstSet = tempSet;
+                copy.dstBinding = descriptor.binding;
+                copy.descriptorCount = count;
+            }
+
+            if (!copies.empty())
+            {
+                vkUpdateDescriptorSets(_device->_device, 0, nullptr, static_cast<u32>(copies.size()), copies.data());
+            }
+
+            // A temp set is never in flight, so buffer binds recorded this frame (which the canonical copy
+            // only receives at its next flush) can be applied immediately
+            for (auto& [binding, write] : pendingBufferWrites)
+            {
+                VkBuffer buffer = _bufferHandler->GetBuffer(write.bufferID);
+                WriteBufferDescriptor(tempSet, binding, buffer, write.type);
+            }
+
+            u32 transientSetIndex = static_cast<u32>(data.transientSets[frameIndex].size());
+            data.transientSets[frameIndex].push_back(tempSet);
+            return transientSetIndex;
+        }
+
+        VkDescriptorSet DescriptorHandlerVK::GetTransientVkDescriptorSet(u32 transientSetIndex, u32 frameIndex)
+        {
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            return data.transientSets[frameIndex][transientSetIndex];
+        }
+
+        void DescriptorHandlerVK::MarkBound(DescriptorSetID setID)
+        {
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            data.descriptorSets[static_cast<DescriptorSetID::type>(setID)].lastBoundGeneration = _frameGeneration;
+        }
+
+        // Rewriting a descriptor that a set bound earlier in this frame's recording still references means
+        // the earlier bind sees the new contents when the GPU executes (UPDATE_AFTER_BIND reads at
+        // execution time). Warn once per set per frame and point at the safe alternative.
+        void DescriptorHandlerVK::WarnIfBoundThisFrame(DescriptorSet& descriptorSet, u32 binding)
+        {
+            if (!_inFrameRecording || descriptorSet.lastBoundGeneration != _frameGeneration || descriptorSet.lastWarnGeneration == _frameGeneration)
+                return;
+
+            descriptorSet.lastWarnGeneration = _frameGeneration;
+            NC_LOG_ERROR("DescriptorHandlerVK: Binding {} ({}) was rewritten after its descriptor set was already bound this frame, the earlier bind will see the new contents. Use CommandList::BindTempDescriptorSet for per-dispatch descriptor state.", binding, GetBindingName(descriptorSet, binding));
+        }
+
+        void DescriptorHandlerVK::FlipFrame(u32 frameIndex)
+        {
+            ZoneScoped;
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+
+            _frameGeneration++;
+            _inFrameRecording = true;
+
+            if (!data.transientSets[frameIndex].empty())
+            {
+                vkResetDescriptorPool(_device->_device, data.framePools[frameIndex], 0);
+                data.transientSets[frameIndex].clear();
+            }
+        }
+
+        void DescriptorHandlerVK::OnFrameEnd()
+        {
+            _inFrameRecording = false;
+        }
+
         void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, VkImageView image, DescriptorType type, bool isRT, u32 frameIndex)
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
             DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
-            
+            WarnIfBoundThisFrame(descriptorSet, binding);
+
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageView = image;
             imageInfo.imageLayout = (!isRT && type == DescriptorType::SampledImage) ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_GENERAL;
@@ -470,7 +632,11 @@ namespace Renderer
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
             DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
-            
+            WarnIfBoundThisFrame(descriptorSet, binding);
+
+            u32& writtenCount = descriptorSet.bindingWrittenCounts[binding];
+            writtenCount = std::max(writtenCount, arrayOffset + 1);
+
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageView = image;
             imageInfo.imageLayout = (!isRT && type == DescriptorType::SampledImage) ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_GENERAL;
@@ -492,8 +658,12 @@ namespace Renderer
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
             DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
-            
+            WarnIfBoundThisFrame(descriptorSet, binding);
+
             u32 count = static_cast<u32>(images.size());
+
+            u32& writtenCount = descriptorSet.bindingWrittenCounts[binding];
+            writtenCount = std::max(writtenCount, arrayOffset + count);
 
             VkImageLayout layout = (!isRT && type == DescriptorType::SampledImage)
                 ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
@@ -544,7 +714,10 @@ namespace Renderer
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
             DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
-            
+
+            u32& writtenCount = descriptorSet.bindingWrittenCounts[binding];
+            writtenCount = std::max(writtenCount, arrayIndex + 1);
+
             VkDescriptorImageInfo samplerInfo{};
             samplerInfo.sampler = sampler;
 
