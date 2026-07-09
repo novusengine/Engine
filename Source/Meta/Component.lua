@@ -329,7 +329,7 @@ M.EnumMetaData =
         system =
         {
             "Base/Types.h",
-            "Array"
+            "array"
         }
     },
 

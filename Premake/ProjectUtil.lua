@@ -44,8 +44,8 @@ end
 
 systemToExecutableExtensionMap =
 {
-    windows = "exe",
-    linux = "sh"
+    windows = ".exe",
+    linux = ""
 }
 
 systemToDynamicLibExtensionMap =
