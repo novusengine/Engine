@@ -839,9 +839,16 @@ namespace Renderer
         }
 
         uvec2 extent = desc.extent;
-        if (extent == uvec2(0) && desc.renderTargets[0] != ImageMutableResource::Invalid())
+        if (extent == uvec2(0))
         {
-            extent = _imageHandler->GetDimensions(desc.MutableResourceToImageID(desc.renderTargets[0]), 0);
+            if (desc.renderTargets[0] != ImageMutableResource::Invalid())
+            {
+                extent = _imageHandler->GetDimensions(desc.MutableResourceToImageID(desc.renderTargets[0]), 0);
+            }
+            else if (desc.depthStencil != DepthImageMutableResource::Invalid())
+            {
+                extent = _imageHandler->GetDimensions(desc.MutableResourceToDepthImageID(desc.depthStencil));
+            }
         }
 
         VkRenderingInfo renderInfo = {};
