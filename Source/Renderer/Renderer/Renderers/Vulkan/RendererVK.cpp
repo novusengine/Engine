@@ -217,9 +217,19 @@ namespace Renderer
         return _textureHandler->LoadTexture(desc);
     }
 
+    TextureID RendererVK::LoadDataTexture(DataTextureDesc& desc)
+    {
+        return _textureHandler->LoadDataTexture(desc);
+    }
+
     TextureID RendererVK::LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates)
     {
         return _textureHandler->LoadTextureIntoArray(desc, textureArray, arrayIndex, allowDuplicates);
+    }
+
+    TextureID RendererVK::LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates)
+    {
+        return _textureHandler->LoadDataTextureIntoArray(desc, textureArray, arrayIndex, allowDuplicates);
     }
 
     VertexShaderID RendererVK::LoadShader(VertexShaderDesc& desc)

@@ -5,8 +5,11 @@
 #include "Ubuntu-Regular.h"
 
 #include <Base/Memory/FileReader.h>
-#include <Base/Util/XXHash64.h>
 #include <Base/Util/DebugHandler.h>
+
+#include <xxhash/xxhash64.h>
+
+#include <tracy/Tracy.hpp>
 
 #include <filesystem>
 #include <utfcpp/utf8.h>
@@ -39,6 +42,7 @@ namespace Renderer
 
     Font* Font::GetDefaultFont(Renderer* renderer)
     {
+        ZoneScoped;
         // Hash the fontPath
         u64 hash = XXHash64::hash("DEFAULT", 8, 42);
 
@@ -77,10 +81,10 @@ namespace Renderer
                 }
             }
 
-            std::shared_ptr<Bytebuffer> buffer = Bytebuffer::Borrow<209715200>();
-            file.Read(buffer.get(), file.Length());
+            Bytebuffer buffer = Bytebuffer(nullptr, file.Length());
+            file.Read(&buffer, file.Length());
 
-            Font* font = InitFont(renderer, fontPath, buffer->GetDataPointer(), file.Length());
+            Font* font = InitFont(renderer, fontPath, buffer.GetDataPointer(), file.Length());
             font->desc.path = fontPath;
             _fonts[hash] = font;
         }
@@ -174,7 +178,7 @@ namespace Renderer
         font->_texture = renderer->CreateDataTexture(fontTextureDesc);
 
        
-        for(u32 i = 0; i < font->_glyphs.size(); i++)
+        for (u32 i = 0; i < font->_glyphs.size(); i++)
         {
             u32 codepoint = font->_glyphs[i].getCodepoint();
             font->_codepointToGlyphIndex[codepoint] = i;

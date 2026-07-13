@@ -1,56 +1,52 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.CheatCommandEnum =
+return D.Definitions
 {
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("CheatCommandEnum", Type.U8,
     {
-        Field("None"),
-        Field("Damage"),
-        Field("Heal"),
-        Field("Kill"),
-        Field("Resurrect"),
-        Field("UnitMorph"),
-        Field("UnitDemorph"),
-        Field("Teleport"),
-        Field("CharacterAdd"),
-        Field("CharacterRemove"),
-        Field("UnitSetRace"),
-        Field("UnitSetGender"),
-        Field("UnitSetClass"),
-        Field("UnitSetLevel"),
-        Field("ItemSetTemplate"),
-        Field("ItemSetStatTemplate"),
-        Field("ItemSetArmorTemplate"),
-        Field("ItemSetWeaponTemplate"),
-        Field("ItemSetShieldTemplate"),
-        Field("ItemAdd"),
-        Field("ItemRemove"),
-        Field("CreatureAdd"),
-        Field("CreatureRemove"),
-        Field("CreatureInfo"),
-        Field("MapAdd"),
-        Field("GotoAdd"),
-        Field("GotoAddHere"),
-        Field("GotoRemove"),
-        Field("GotoMap"),
-        Field("GotoLocation"),
-        Field("GotoXYZ"),
-        Field("TriggerAdd"),
-        Field("TriggerRemove"),
-        Field("SpellSet"),
-        Field("SpellEffectSet"),
-        Field("SpellProcDataSet"),
-        Field("SpellProcLinkSet"),
-        Field("CreatureAddScript"),
-        Field("CreatureRemoveScript")
-    }
+        D.Field("None"),
+        D.Field("Damage"),
+        D.Field("Heal"),
+        D.Field("Kill"),
+        D.Field("Resurrect"),
+        D.Field("UnitMorph"),
+        D.Field("UnitDemorph"),
+        D.Field("Teleport"),
+        D.Field("CharacterAdd"),
+        D.Field("CharacterRemove"),
+        D.Field("UnitSetRace"),
+        D.Field("UnitSetGender"),
+        D.Field("UnitSetClass"),
+        D.Field("UnitSetLevel"),
+        D.Field("ItemSetTemplate"),
+        D.Field("ItemSetStatTemplate"),
+        D.Field("ItemSetArmorTemplate"),
+        D.Field("ItemSetWeaponTemplate"),
+        D.Field("ItemSetShieldTemplate"),
+        D.Field("ItemAdd"),
+        D.Field("ItemRemove"),
+        D.Field("CreatureAdd"),
+        D.Field("CreatureRemove"),
+        D.Field("CreatureInfo"),
+        D.Field("MapAdd"),
+        D.Field("GotoAdd"),
+        D.Field("GotoAddHere"),
+        D.Field("GotoRemove"),
+        D.Field("GotoMap"),
+        D.Field("GotoLocation"),
+        D.Field("GotoXYZ"),
+        D.Field("TriggerAdd"),
+        D.Field("TriggerRemove"),
+        D.Field("SpellSet"),
+        D.Field("SpellEffectSet"),
+        D.Field("SpellProcDataSet"),
+        D.Field("SpellProcLinkSet"),
+        D.Field("CreatureAddScript"),
+        D.Field("CreatureRemoveScript"),
+        D.Field("CreatureMove"),
+        D.Field("CreatureFollow"),
+        D.Field("CreatureWander"),
+        D.Field("CreatureStop")
+    })
 }
-
-return M

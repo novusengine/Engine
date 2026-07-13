@@ -3,7 +3,7 @@
 const Color Color::Black = Color(0, 0, 0, 1);
 const Color Color::Blue = Color(0, 0, 1, 1);
 const Color Color::Clear = Color(0, 0, 0, 0);
-const Color Color::Cyan = Color(0, 1, 1, 0);
+const Color Color::Cyan = Color(0, 1, 1, 1);
 const Color Color::Gray = Color(0.5f, 0.5f, 0.5f, 1.0f);
 const Color Color::Green = Color(0, 1, 0, 1);
 const Color Color::Grey = Color(0.5f, 0.5f, 0.5f, 1.0f);

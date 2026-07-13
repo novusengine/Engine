@@ -201,6 +201,8 @@ namespace Scripting
             for (u32 i = 0; i < numHandlers; i++)
             {
                 LuaHandlerBase* luaHandler = _luaHandlers[i];
+                if (!luaHandler)
+                    continue;
 
                 if (isDirty)
                     luaHandler->PostLoad(zenith.get());
@@ -216,6 +218,9 @@ namespace Scripting
         for (u32 i = 0; i < numHandlers; i++)
         {
             LuaHandlerBase* luaHandler = _luaHandlers[i];
+            if (!luaHandler)
+                continue;
+
             luaHandler->Clear(zenith);
         }
 
@@ -314,6 +319,9 @@ namespace Scripting
         for (u32 i = 0; i < _luaHandlers.size(); i++)
         {
             LuaHandlerBase* base = _luaHandlers[i];
+            if (!base)
+                continue;
+
             base->Register(&zenith);
         }
 
@@ -585,6 +593,9 @@ namespace Scripting
         for (u32 i = 0; i < _luaHandlers.size(); i++)
         {
             LuaHandlerBase* base = _luaHandlers[i];
+            if (!base)
+                continue;
+
             base->Register(tmpZenith);
         }
 

@@ -79,8 +79,8 @@ namespace GameDefine
             u32 shieldTemplateID;
             
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, ItemTemplate& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const ItemTemplate& data);
+            static bool Read(Bytebuffer* buffer, ItemTemplate& result);
+            static bool Write(Bytebuffer* buffer, const ItemTemplate& data);
         };
 
         struct ItemStatTemplate
@@ -91,8 +91,8 @@ namespace GameDefine
             i32 statValues[8];
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, ItemStatTemplate& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const ItemStatTemplate& data);
+            static bool Read(Bytebuffer* buffer, ItemStatTemplate& result);
+            static bool Write(Bytebuffer* buffer, const ItemStatTemplate& data);
         };
 
         struct ItemArmorTemplate
@@ -103,8 +103,8 @@ namespace GameDefine
             u32 bonusArmor;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, ItemArmorTemplate& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const ItemArmorTemplate& data);
+            static bool Read(Bytebuffer* buffer, ItemArmorTemplate& result);
+            static bool Write(Bytebuffer* buffer, const ItemArmorTemplate& data);
         };
 
         struct ItemWeaponTemplate
@@ -117,8 +117,8 @@ namespace GameDefine
             f32 speed;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, ItemWeaponTemplate& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const ItemWeaponTemplate& data);
+            static bool Read(Bytebuffer* buffer, ItemWeaponTemplate& result);
+            static bool Write(Bytebuffer* buffer, const ItemWeaponTemplate& data);
         };
 
         struct ItemShieldTemplate
@@ -129,8 +129,8 @@ namespace GameDefine
             u32 block;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, ItemShieldTemplate& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const ItemShieldTemplate& data);
+            static bool Read(Bytebuffer* buffer, ItemShieldTemplate& result);
+            static bool Write(Bytebuffer* buffer, const ItemShieldTemplate& data);
         };
 
         struct CreatureTemplate
@@ -155,8 +155,8 @@ namespace GameDefine
             std::string scriptName;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, CreatureTemplate& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const CreatureTemplate& data);
+            static bool Read(Bytebuffer* buffer, CreatureTemplate& result);
+            static bool Write(Bytebuffer* buffer, const CreatureTemplate& data);
         };
 
         struct Map
@@ -172,8 +172,8 @@ namespace GameDefine
             u16 maxPlayers;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, Map& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const Map& data);
+            static bool Read(Bytebuffer* buffer, Map& result);
+            static bool Write(Bytebuffer* buffer, const Map& data);
         };
 
         struct MapLocation
@@ -189,8 +189,8 @@ namespace GameDefine
             f32 orientation;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapLocation& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const MapLocation& data);
+            static bool Read(Bytebuffer* buffer, MapLocation& result);
+            static bool Write(Bytebuffer* buffer, const MapLocation& data);
         };
 
         struct Spell
@@ -208,8 +208,8 @@ namespace GameDefine
             f32 duration;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, Spell& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const Spell& data);
+            static bool Read(Bytebuffer* buffer, Spell& result);
+            static bool Write(Bytebuffer* buffer, const Spell& data);
         };
 
         struct SpellEffect
@@ -230,8 +230,8 @@ namespace GameDefine
             i32 effectMiscValue3;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, SpellEffect& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const SpellEffect& data);
+            static bool Read(Bytebuffer* buffer, SpellEffect& result);
+            static bool Write(Bytebuffer* buffer, const SpellEffect& data);
         };
 
         struct SpellProcData
@@ -250,8 +250,8 @@ namespace GameDefine
             i32 charges;
 
         public:
-            static bool Read(std::shared_ptr<Bytebuffer>& buffer, SpellProcData& result);
-            static bool Write(std::shared_ptr<Bytebuffer>& buffer, const SpellProcData& data);
+            static bool Read(Bytebuffer* buffer, SpellProcData& result);
+            static bool Write(Bytebuffer* buffer, const SpellProcData& data);
         };
     }
 }

@@ -125,7 +125,7 @@ CVarParameter* CVarSystemImpl::GetCVar(StringUtils::StringHash hash)
     std::shared_lock lock(mutex_);
     auto it = savedCVars.find(hash);
 
-    if (it != savedCVars.end())
+    if (it != savedCVars.end() && it->second.isActive)
     {
         return &(*it).second;
     }
@@ -449,6 +449,9 @@ bool CVarSystemImpl::InitCVar(CVarCategory category, const char* name, const cha
     std::unique_lock lock(mutex_);
     if (outParam)
     {
+        if (!_isLoadingPersistedCVars)
+            outParam->registeredThisRun = true;
+
         CVarCategory existingCategory = outParam->category;
         if (category != existingCategory)
         {
@@ -475,6 +478,8 @@ bool CVarSystemImpl::InitCVar(CVarCategory category, const char* name, const cha
     newParam.category = category;
     newParam.name = name;
     newParam.description = description;
+    newParam.registeredThisRun = !_isLoadingPersistedCVars;
+    newParam.isActive = true;
 
     if (!cvarCategoryLookupTable.contains(category))
     {
@@ -485,6 +490,48 @@ bool CVarSystemImpl::InitCVar(CVarCategory category, const char* name, const cha
 
     outParam = &newParam;
     return true;
+}
+
+i32 CVarSystemImpl::RemoveUnregisteredCVars()
+{
+    std::unique_lock lock(mutex_);
+    i32 removedCount = 0;
+
+    auto removeFromArray = [&](auto* cvars)
+    {
+        for (i32 i = 0; i < cvars->lastCVar; ++i)
+        {
+            auto& storage = cvars->cvars[i];
+            CVarParameter* parameter = storage.parameter;
+            if (!parameter || parameter->registeredThisRun)
+                continue;
+
+            const u32 nameHash = StringUtils::StringHash{ parameter->name };
+            auto categoryIt = cvarCategoryLookupTable.find(parameter->category);
+            if (categoryIt != cvarCategoryLookupTable.end())
+                categoryIt->second.erase(nameHash);
+
+            // Keep the map entry as an inactive tombstone. Erasing from robin_hood::unordered_map
+            // could relocate parameters still referenced by AutoCVar storage slots.
+            parameter->isActive = false;
+            storage = {};
+            ++removedCount;
+        }
+
+        while (cvars->lastCVar > 0 && cvars->cvars[cvars->lastCVar - 1].parameter == nullptr)
+            --cvars->lastCVar;
+    };
+
+    removeFromArray(GetCVarArray<i32>());
+    removeFromArray(GetCVarArray<f64>());
+    removeFromArray(GetCVarArray<std::string>());
+    removeFromArray(GetCVarArray<vec4>());
+    removeFromArray(GetCVarArray<ivec4>());
+    removeFromArray(GetCVarArray<ShowFlag>());
+
+    if (removedCount > 0)
+        MarkDirty();
+    return removedCount;
 }
 
 bool CVarSystemImpl::LookupCVar(CVarCategory category, StringUtils::StringHash nameHash, u32& outHash)

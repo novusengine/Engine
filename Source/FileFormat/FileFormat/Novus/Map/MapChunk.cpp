@@ -11,22 +11,16 @@ using namespace Adt;
 
 namespace Map
 {
-    bool Chunk::Save(const std::string& path, const std::vector<Terrain::Placement>& modelPlacements, const LiquidInfo& liquidInfo, const std::vector<u8>& physicsData)
+    bool Chunk::Save(std::shared_ptr<Bytebuffer>& buffer, const std::vector<Terrain::Placement>& modelPlacements, const LiquidInfo& liquidInfo, const std::vector<u8>& physicsData)
     {
-        std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
-        if (!output)
-        {
-            NC_LOG_ERROR("Failed to create Map Chunk file. Check admin permissions {0}", path);
-            return false;
-        }
+        bool failed = false;
 
-        // Write the Chunk to file
-        output.write(reinterpret_cast<char const*>(&header), sizeof(header));
-        output.write(reinterpret_cast<char const*>(&heightHeader), sizeof(heightHeader));
-        output.write(reinterpret_cast<char const*>(&heightBox), sizeof(heightBox));
-        output.write(reinterpret_cast<char const*>(&cellsData), sizeof(cellsData));
+        failed |= !buffer->Put(header);
+        failed |= !buffer->Put(heightHeader);
+        failed |= !buffer->Put(heightBox);
+        failed |= !buffer->Put(cellsData);
 
-        output.write(reinterpret_cast<char const*>(&chunkAlphaMapTextureHash), sizeof(u64)); // Write alpha map string index
+        failed |= !buffer->PutU64(chunkAlphaMapTextureHash); // Write alpha map string index
 
         // Headers
         {
@@ -47,56 +41,54 @@ namespace Map
                 liquidHeader.numBitmapBytes * sizeof(u8) +
                 liquidHeader.numVertexBytes * sizeof(u8);
 
-            placementHeader.dataOffset = static_cast<u64>(output.tellp()) + sizeof(placementHeader) + sizeof(liquidHeader) + sizeof(physicsHeader);
+            placementHeader.dataOffset = static_cast<u64>(buffer->writtenData) + sizeof(placementHeader) + sizeof(liquidHeader) + sizeof(physicsHeader);
             liquidHeader.dataOffset = placementHeader.dataOffset + numPlacementBytes;
             physicsHeader.dataOffset = liquidHeader.dataOffset + numLiquidBytes;
 
-            output.write(reinterpret_cast<char const*>(&placementHeader), sizeof(Map::Chunk::PlacementHeader)); // Write number of model placements
-            output.write(reinterpret_cast<char const*>(&liquidHeader), sizeof(Map::Chunk::LiquidHeader)); // Write liquid header
-            output.write(reinterpret_cast<char const*>(&physicsHeader), sizeof(Map::Chunk::PhysicsHeader)); // Write physics header
+            failed |= !buffer->Put(placementHeader); // Write number of model placements
+            failed |= !buffer->Put(liquidHeader); // Write liquid header
+            failed |= !buffer->Put(physicsHeader); // Write physics header
 
             // Placements
             if (placementHeader.numPlacements > 0)
             {
-                output.write(reinterpret_cast<char const*>(modelPlacements.data()), placementHeader.numPlacements * sizeof(Terrain::Placement)); // Write map object placements
+                failed |= !buffer->PutBytes(modelPlacements.data(), placementHeader.numPlacements * sizeof(Terrain::Placement)); // Write map object placements
             }
 
             // Liquid
             if (liquidHeader.numHeaders > 0)
             {
-                output.write(reinterpret_cast<char const*>(liquidInfo.headers.data()), liquidHeader.numHeaders * sizeof(CellLiquidHeader)); // Write liquid headers
+                failed |= !buffer->PutBytes(liquidInfo.headers.data(), liquidHeader.numHeaders * sizeof(CellLiquidHeader)); // Write liquid headers
             }
 
             if (liquidHeader.numInstances > 0)
             {
-                output.write(reinterpret_cast<char const*>(liquidInfo.instances.data()), liquidHeader.numInstances * sizeof(CellLiquidInstance)); // Write liquid instances
+                failed |= !buffer->PutBytes(liquidInfo.instances.data(), liquidHeader.numInstances * sizeof(CellLiquidInstance)); // Write liquid instances
             }
 
             if (liquidHeader.numAttributes > 0)
             {
-                output.write(reinterpret_cast<char const*>(liquidInfo.attributes.data()), liquidHeader.numAttributes * sizeof(CellLiquidAttributes)); // Write liquid attributes
+                failed |= !buffer->PutBytes(liquidInfo.attributes.data(), liquidHeader.numAttributes * sizeof(CellLiquidAttributes)); // Write liquid attributes
             }
 
             if (liquidHeader.numBitmapBytes > 0)
             {
-                output.write(reinterpret_cast<char const*>(liquidInfo.bitmapData.data()), liquidHeader.numBitmapBytes * sizeof(u8)); // Write liquid bitmap data bytes
+                failed |= !buffer->PutBytes(liquidInfo.bitmapData.data(), liquidHeader.numBitmapBytes * sizeof(u8)); // Write liquid bitmap data bytes
             }
 
             if (liquidHeader.numVertexBytes > 0)
             {
-                output.write(reinterpret_cast<char const*>(liquidInfo.vertexData.data()), liquidHeader.numVertexBytes * sizeof(u8)); // Write liquid vertex data bytes
+                failed |= !buffer->PutBytes(liquidInfo.vertexData.data(), liquidHeader.numVertexBytes * sizeof(u8)); // Write liquid vertex data bytes
             }
 
             // Physics
             if (physicsHeader.numBytes > 0)
             {
-                output.write(reinterpret_cast<char const*>(physicsData.data()), physicsHeader.numBytes * sizeof(u8)); // Write physics bytes
+                failed |= !buffer->PutBytes(physicsData.data(), physicsHeader.numBytes * sizeof(u8)); // Write physics bytes
             }
         }
 
-        output.close();
-
-        return true;
+        return !failed;
     }
 
     bool Chunk::Read(std::shared_ptr<Bytebuffer>& buffer, Chunk& out)

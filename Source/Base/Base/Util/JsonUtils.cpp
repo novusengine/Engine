@@ -59,6 +59,23 @@ namespace nlohmann
 
 namespace JsonUtils
 {
+    class PersistedCVarLoadScope
+    {
+    public:
+        explicit PersistedCVarLoadScope(CVarSystemImpl* cvarSystem) : _cvarSystem(cvarSystem)
+        {
+            _cvarSystem->SetLoadingPersistedCVars(true);
+        }
+
+        ~PersistedCVarLoadScope()
+        {
+            _cvarSystem->SetLoadingPersistedCVars(false);
+        }
+
+    private:
+        CVarSystemImpl* _cvarSystem;
+    };
+
     bool LoadFromPath(nlohmann::json& json, const std::filesystem::path& path)
     {
         std::ifstream fileStream(path, std::ifstream::in);
@@ -148,6 +165,12 @@ namespace JsonUtils
     void SaveCVarsToJson(nlohmann::json& json)
     {
         CVarSystemImpl* cvarSystem = CVarSystemImpl::Get();
+        json["integer"] = nlohmann::json::object();
+        json["double"] = nlohmann::json::object();
+        json["string"] = nlohmann::json::object();
+        json["vec4"] = nlohmann::json::object();
+        json["ivec4"] = nlohmann::json::object();
+        json["showflag"] = nlohmann::json::object();
 
         // Save Integers
         {
@@ -157,7 +180,7 @@ namespace JsonUtils
                 CVarStorage<i32>& cvar = cvarSystem->GetCVarArray<i32>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -184,7 +207,7 @@ namespace JsonUtils
                 CVarStorage<f64>& cvar = cvarSystem->GetCVarArray<f64>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -211,7 +234,7 @@ namespace JsonUtils
                 CVarStorage<std::string>& cvar = cvarSystem->GetCVarArray<std::string>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -238,7 +261,7 @@ namespace JsonUtils
                 CVarStorage<vec4>& cvar = cvarSystem->GetCVarArray<vec4>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -265,7 +288,7 @@ namespace JsonUtils
                 CVarStorage<ivec4>& cvar = cvarSystem->GetCVarArray<ivec4>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -292,7 +315,7 @@ namespace JsonUtils
                 CVarStorage<ShowFlag>& cvar = cvarSystem->GetCVarArray<ShowFlag>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -315,6 +338,7 @@ namespace JsonUtils
     void LoadCVarsFromJson(nlohmann::json& json)
     {
         CVarSystemImpl* cvarSystem = CVarSystemImpl::Get();
+        PersistedCVarLoadScope loadScope(cvarSystem);
 
         // Load Integers
         {
@@ -626,6 +650,12 @@ namespace JsonUtils
     void SaveCVarsToJson(nlohmann::ordered_json& json)
     {
         CVarSystemImpl* cvarSystem = CVarSystemImpl::Get();
+        json["integer"] = nlohmann::ordered_json::object();
+        json["double"] = nlohmann::ordered_json::object();
+        json["string"] = nlohmann::ordered_json::object();
+        json["vec4"] = nlohmann::ordered_json::object();
+        json["ivec4"] = nlohmann::ordered_json::object();
+        json["showflag"] = nlohmann::ordered_json::object();
 
         // Save Integers
         {
@@ -635,7 +665,7 @@ namespace JsonUtils
                 CVarStorage<i32>& cvar = cvarSystem->GetCVarArray<i32>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -662,7 +692,7 @@ namespace JsonUtils
                 CVarStorage<f64>& cvar = cvarSystem->GetCVarArray<f64>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -689,7 +719,7 @@ namespace JsonUtils
                 CVarStorage<std::string>& cvar = cvarSystem->GetCVarArray<std::string>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -716,7 +746,7 @@ namespace JsonUtils
                 CVarStorage<vec4>& cvar = cvarSystem->GetCVarArray<vec4>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -743,7 +773,7 @@ namespace JsonUtils
                 CVarStorage<ivec4>& cvar = cvarSystem->GetCVarArray<ivec4>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -770,7 +800,7 @@ namespace JsonUtils
                 CVarStorage<ShowFlag>& cvar = cvarSystem->GetCVarArray<ShowFlag>()->cvars[i];
                 CVarParameter* parameter = cvar.parameter;
 
-                if ((parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
+                if (!parameter || (parameter->flags & CVarFlags::DoNotSave) != CVarFlags::None)
                     continue;
 
                 nlohmann::json object = nlohmann::json::object();
@@ -793,6 +823,7 @@ namespace JsonUtils
     void LoadCVarsFromJson(nlohmann::ordered_json& json)
     {
         CVarSystemImpl* cvarSystem = CVarSystemImpl::Get();
+        PersistedCVarLoadScope loadScope(cvarSystem);
 
         // Load Integers
         {

@@ -142,8 +142,8 @@ namespace Model
     struct MapObject
     {
     public:
-        static constexpr u32 CURRENT_VERSION = 1;
-        static constexpr u32 INVALID_TEXTURE_ID = std::numeric_limits<u32>().max();
+        static constexpr u32 CURRENT_VERSION = 2;
+        static constexpr u64 INVALID_TEXTURE_ID = std::numeric_limits<u64>().max();
 
         struct Material
         {
@@ -164,13 +164,13 @@ namespace Model
             u16 materialType = 0;
             u16 blendMode = 0;
             Flags flags = { };
-            u32 textureID[3] = { INVALID_TEXTURE_ID, INVALID_TEXTURE_ID, INVALID_TEXTURE_ID };
+            u64 textureID[3] = { INVALID_TEXTURE_ID, INVALID_TEXTURE_ID, INVALID_TEXTURE_ID };
         };
 
         struct Decoration
         {
         public:
-            u32 nameID = 0;
+            u64 nameID = 0;
             vec3 position = vec3(0.0f, 0.0f, 0.0f);
             quat rotation = quat(1.0f, 0.0f, 0.0f, 0.0f);
             f32 scale = 0.0f;

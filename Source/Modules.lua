@@ -11,6 +11,7 @@ Solution.Util.SetGroup(Solution.ModuleGroup)
 local modules =
 {
     "Base/Base.lua",
+    "Filesystem/Filesystem.lua",
     "FileFormat/FileFormat.lua",
     "Scripting/Scripting.lua",
     "Meta/Meta.lua",

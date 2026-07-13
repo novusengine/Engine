@@ -30,7 +30,9 @@
 *.out
 *.app
 
-Source/Meta/MetaGen
+Source/Meta/MetaGen/
+Source/Meta/MetaGen.staging/
+Source/Meta/MetaGen.previous/
 !Dependencies/libsodium/libsodium/lib/windows/*.lib
 build*/
 Build*/

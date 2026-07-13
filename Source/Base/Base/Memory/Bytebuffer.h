@@ -7,13 +7,16 @@
 
 #include <cassert>
 #include <cstring>
+#include <utility>
 
 class Bytebuffer
 {
 public:
-    Bytebuffer(void* inData = nullptr, size_t inSize = 128)
+    Bytebuffer() = default;
+
+    Bytebuffer(void* inData, size_t inSize)
     {
-        if (inData == nullptr)
+        if (inData == nullptr && inSize > 0)
         {
             _data = new u8[inSize];
             _hasOwnership = true;
@@ -25,14 +28,31 @@ public:
 
         size = inSize;
     }
-    ~Bytebuffer()
+
+    static Bytebuffer CreateReadOnlyView(const void* inData, size_t inSize)
     {
-        if (_hasOwnership)
-        {
-            delete[] _data;
-            _data = nullptr;
-        }
+        Bytebuffer buffer(const_cast<void*>(inData), inSize);
+        buffer.writtenData = inSize;
+        buffer._isReadOnly = true;
+        return buffer;
     }
+    Bytebuffer(const Bytebuffer&) = delete;
+    Bytebuffer& operator=(const Bytebuffer&) = delete;
+
+    Bytebuffer(Bytebuffer&& other) noexcept
+    {
+        MoveFrom(std::move(other));
+    }
+    Bytebuffer& operator=(Bytebuffer&& other) noexcept
+    {
+        if (this == &other)
+            return *this;
+
+        Release();
+        MoveFrom(std::move(other));
+        return *this;
+    }
+    ~Bytebuffer() { Release(); }
 
     template <typename T>
     inline bool Get(T& val)
@@ -500,11 +520,11 @@ public:
     }
     inline bool CanPerformWrite(size_t inSize)
     {
-        return writtenData + inSize <= size;
+        return !_isReadOnly && writtenData + inSize <= size;
     }
     inline bool CanPerformWrite(size_t inSize, size_t offset)
     {
-        return offset + inSize <= size;
+        return !_isReadOnly && offset + inSize <= size;
     }
 
     // Special function, can be used on types with a "Serialize" function to write them to the buffer
@@ -712,9 +732,40 @@ public:
     static std::shared_ptr<Bytebuffer> BorrowRuntime(size_t size);
 
 private:
+    void Release() noexcept
+    {
+        if (_hasOwnership)
+            delete[] _data;
+
+        _data = nullptr;
+        _hasOwnership = false;
+        _isReadOnly = false;
+        writtenData = 0;
+        readData = 0;
+        size = 0;
+    }
+    void MoveFrom(Bytebuffer&& other) noexcept
+    {
+        _data = other._data;
+        _hasOwnership = other._hasOwnership;
+        _isReadOnly = other._isReadOnly;
+        writtenData = other.writtenData;
+        readData = other.readData;
+        size = other.size;
+
+        other._data = nullptr;
+        other._hasOwnership = false;
+        other._isReadOnly = false;
+        other.writtenData = 0;
+        other.readData = 0;
+        other.size = 0;
+    }
+
+private:
     friend class RuntimePool;
     u8* _data = nullptr;
     bool _hasOwnership = false;
+    bool _isReadOnly = false;
 
     static SharedPool<Bytebuffer> _byteBuffer128;
     static SharedPool<Bytebuffer> _byteBuffer512;
@@ -729,7 +780,7 @@ private:
     static SharedPool<Bytebuffer> _byteBuffer524288;
     static SharedPool<Bytebuffer> _byteBuffer1048576;
     static SharedPool<Bytebuffer> _byteBuffer8388608;
-    static SharedPool<Bytebuffer> _byteBuffer16777216; 
+    static SharedPool<Bytebuffer> _byteBuffer16777216;
     static SharedPool<Bytebuffer> _byteBuffer67108864;
     static SharedPool<Bytebuffer> _byteBuffer209715200;
 

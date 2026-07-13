@@ -17,6 +17,7 @@ local dependencies =
     "json/json.lua",
     "refl-cpp/refl-cpp.lua",
     "robinhood/robinhood.lua",
+    "xxhash/xxhash.lua",
     "tracyprofiler/tracy.lua",
     "typesafe/typesafe.lua",
     "utfcpp/utfcpp.lua",

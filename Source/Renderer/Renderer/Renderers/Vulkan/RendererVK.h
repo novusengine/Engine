@@ -74,7 +74,9 @@ namespace Renderer
 
         // Loading
         [[nodiscard]] TextureID LoadTexture(TextureDesc& desc) override;
+        [[nodiscard]] TextureID LoadDataTexture(DataTextureDesc& desc) override;
         [[nodiscard]] TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) override;
+        [[nodiscard]] TextureID LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) override;
 
         [[nodiscard]] VertexShaderID LoadShader(VertexShaderDesc& desc) override;
         [[nodiscard]] PixelShaderID LoadShader(PixelShaderDesc& desc) override;

@@ -7,7 +7,7 @@
 #include "DebugMarkerUtilVK.h"
 
 #include <Base/Util/DebugHandler.h>
-#include <Base/Util/XXHash64.h>
+#include <xxhash/xxhash64.h>
 #include <Base/Memory/Allocator.h>
 #include <Base/Container/PersistentBitSet.h>
 

@@ -161,7 +161,7 @@ namespace ClientDB
         return _stringTable.GetString(strIndex);
     }
 
-    u32 Data::GetStringHash(u32 index)
+    u64 Data::GetStringHash(u32 index)
     {
         NC_ASSERT(_header.Flags.IsInitialized, "ClientDB::Data - Storage must be initialized before calling GetStringHash");
 
@@ -174,9 +174,9 @@ namespace ClientDB
     void Data::Sort()
     {
         std::sort(_idList.begin(), _idList.end(), [](const IDListEntry& a, const IDListEntry& b)
-        {
-            return a.id < b.id;
-        });
+            {
+                return a.id < b.id;
+            });
     }
 
     void Data::Compact()
@@ -278,6 +278,7 @@ namespace ClientDB
         {
             result += fieldInfo.name.size() + 1;
         }
+
         result += (sizeof(FieldType) + sizeof(u8)) * _fieldInfo.size(); // Field Info Types
         result += sizeof(u32) * _fieldInfo.size(); // Field Offsets
 
@@ -293,103 +294,80 @@ namespace ClientDB
         return result;
     }
 
-    bool Data::Save(const std::string& path)
+    bool Data::Save(std::shared_ptr<Bytebuffer>& buffer)
     {
         Compact();
 
-        size_t size = GetSerializedSize();
-        std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(size);
+        bool failed = false;
 
         // Headers
         {
             if (_fileHeader.version != CURRENT_VERSION)
                 _fileHeader.version = CURRENT_VERSION;
 
-            if (!buffer->Put(_fileHeader))
-                return false;
-
-            if (!buffer->Put(_header))
-                return false;
+            failed |= !buffer->Put(_fileHeader);
+            failed |= !buffer->Put(_header);
         }
 
         // Field Info
         {
             u32 numFieldInfos = static_cast<u32>(_fieldInfo.size());
-            if (!buffer->PutU32(numFieldInfos))
-                return false;
+            failed |= !buffer->PutU32(numFieldInfos);
 
             if (numFieldInfos > 0)
             {
                 for (const auto& fieldInfo : _fieldInfo)
                 {
-                    if (!buffer->PutString(fieldInfo.name))
-                        return false;
-
-                    if (!buffer->Put(fieldInfo.type))
-                        return false;
-
-                    if (!buffer->PutU8(fieldInfo.count))
-                        return false;
+                    failed |= !buffer->PutString(fieldInfo.name);
+                    failed |= !buffer->Put(fieldInfo.type);
+                    failed |= !buffer->PutU8(fieldInfo.count);
                 }
 
                 u32 numFieldOffsetBytes = numFieldInfos * sizeof(u32);
-                if (!buffer->PutBytes(&_fieldOffset[0], numFieldOffsetBytes))
-                    return false;
+                failed |= !buffer->PutBytes(&_fieldOffset[0], numFieldOffsetBytes);
             }
         }
 
         // Rows & ID List
         {
             u32 numRows = GetNumRows();
-            if (!buffer->PutU32(numRows))
-                return false;
-
             u32 numIDListBytes = numRows * sizeof(IDListEntry);
-            if (!buffer->PutBytes(&_idList[0], numIDListBytes))
-                return false;
+
+            failed |= !buffer->PutU32(numRows);
+            failed |= !buffer->PutBytes(&_idList[0], numIDListBytes);
         }
 
         // Data
         {
             u32 numDataBytes = static_cast<u32>(_data.size());
-            if (!buffer->PutU32(numDataBytes))
-                return false;
-
-            if (!buffer->PutBytes(&_data[0], numDataBytes))
-                return false;
+            failed |= !buffer->PutU32(numDataBytes);
+            failed |= !buffer->PutBytes(&_data[0], numDataBytes);
         }
 
         // Stringtable
         {
-            if (!buffer->Serialize(_stringTable))
-                return false;
+            failed |= !buffer->Serialize(_stringTable);
         }
 
-        FileWriter fileWriter(path, buffer);
-        if (!fileWriter.Write())
-            return false;
-
-        return true;
+        return !failed;
     }
 
     bool Data::Read(std::shared_ptr<Bytebuffer>& buffer)
     {
         Clear();
 
+        bool failed = false;
+
         // Headers
         {
-            if (!buffer->Get(_fileHeader))
-                return false;
-
-            if (!buffer->Get(_header))
-                return false;
+            failed |= !buffer->Get(_fileHeader);
+            failed |= !buffer->Get(_header);
         }
 
         // Field Info
         {
             u32 numFieldInfos = 0;
-            if (!buffer->GetU32(numFieldInfos))
-                return false;
+            failed |= !buffer->GetU32(numFieldInfos);
 
             if (numFieldInfos > 0)
             {
@@ -398,33 +376,25 @@ namespace ClientDB
 
                 for (auto& fieldInfo : _fieldInfo)
                 {
-                    if (!buffer->GetString(fieldInfo.name))
-                        return false;
-
-                    if (!buffer->Get(fieldInfo.type))
-                        return false;
+                    failed |= !buffer->GetString(fieldInfo.name);
+                    failed |= !buffer->Get(fieldInfo.type);
 
                     if (_fileHeader.version > 2)
                     {
-                        if (!buffer->Get(fieldInfo.count))
-                            return false;
+                        failed |= !buffer->Get(fieldInfo.count);
                     }
                 }
 
                 u32 numFieldOffsetBytes = numFieldInfos * sizeof(u32);
-                if (!buffer->GetBytes(&_fieldOffset[0], numFieldOffsetBytes))
-                    return false;
+                failed |= !buffer->GetBytes(&_fieldOffset[0], numFieldOffsetBytes);
             }
         }
 
         // Rows & ID List
         {
             u32 numRows = 0;
-            if (!buffer->GetU32(numRows))
-                return false;
-
-            if (!buffer->GetVector(_idList, numRows))
-                return false;
+            failed |= !buffer->GetU32(numRows);
+            failed |= !buffer->GetVector(_idList, numRows);
 
             _idToIndex.reserve(numRows);
 
@@ -437,20 +407,16 @@ namespace ClientDB
         // Data
         {
             u32 numDataBytes = static_cast<u32>(_data.size());
-            if (!buffer->GetU32(numDataBytes))
-                return false;
-
-            if (!buffer->GetVector(_data, numDataBytes))
-                return false;
+            failed |= !buffer->GetU32(numDataBytes);
+            failed |= !buffer->GetVector(_data, numDataBytes);
         }
 
         // Stringtable
         {
-            if (!buffer->Deserialize(_stringTable))
-                return false;
+            failed |= !buffer->Deserialize(_stringTable);
         }
 
-        return true;
+        return !failed;
     }
 
     bool Data::IsInitialized()
@@ -523,40 +489,40 @@ namespace ClientDB
         index = _idToIndex[id];
         return true;
     }
-    
+
     u32 Data::GetSizeForField(const FieldInfo& fieldInfo)
     {
         u32 fieldSize = 0;
 
         switch (fieldInfo.type)
         {
-            case FieldType::i8:
-            case FieldType::u8: fieldSize = 1; break;
+        case FieldType::i8:
+        case FieldType::u8: fieldSize = 1; break;
 
-            case FieldType::i16:
-            case FieldType::u16: fieldSize = 2; break;
+        case FieldType::i16:
+        case FieldType::u16: fieldSize = 2; break;
 
-            case FieldType::i32:
-            case FieldType::u32:
-            case FieldType::f32:
-            case FieldType::StringRef: fieldSize = 4; break;
+        case FieldType::i32:
+        case FieldType::u32:
+        case FieldType::f32:
+        case FieldType::StringRef: fieldSize = 4; break;
 
-            case FieldType::i64:
-            case FieldType::u64:
-            case FieldType::f64:
-            case FieldType::vec2:
-            case FieldType::ivec2:
-            case FieldType::uvec2: fieldSize = 8; break;
+        case FieldType::i64:
+        case FieldType::u64:
+        case FieldType::f64:
+        case FieldType::vec2:
+        case FieldType::ivec2:
+        case FieldType::uvec2: fieldSize = 8; break;
 
-            case FieldType::vec3:
-            case FieldType::ivec3:
-            case FieldType::uvec3: fieldSize = 12; break;
+        case FieldType::vec3:
+        case FieldType::ivec3:
+        case FieldType::uvec3: fieldSize = 12; break;
 
-            case FieldType::vec4:
-            case FieldType::ivec4:
-            case FieldType::uvec4: fieldSize = 16; break;
+        case FieldType::vec4:
+        case FieldType::ivec4:
+        case FieldType::uvec4: fieldSize = 16; break;
 
-            default: break;
+        default: break;
         }
 
         fieldSize *= fieldInfo.count;
@@ -567,31 +533,31 @@ namespace ClientDB
     {
         switch (fieldInfo.type)
         {
-            case FieldType::i8:
-            case FieldType::u8: return 1;
+        case FieldType::i8:
+        case FieldType::u8: return 1;
 
-            case FieldType::i16:
-            case FieldType::u16: return 2;
+        case FieldType::i16:
+        case FieldType::u16: return 2;
 
-            case FieldType::i32:
-            case FieldType::u32:
-            case FieldType::f32:
-            case FieldType::StringRef:
-            case FieldType::vec2:
-            case FieldType::ivec2:
-            case FieldType::uvec2:
-            case FieldType::vec3:
-            case FieldType::ivec3:
-            case FieldType::uvec3:
-            case FieldType::vec4:
-            case FieldType::ivec4:
-            case FieldType::uvec4: return 4;
+        case FieldType::i32:
+        case FieldType::u32:
+        case FieldType::f32:
+        case FieldType::StringRef:
+        case FieldType::vec2:
+        case FieldType::ivec2:
+        case FieldType::uvec2:
+        case FieldType::vec3:
+        case FieldType::ivec3:
+        case FieldType::uvec3:
+        case FieldType::vec4:
+        case FieldType::ivec4:
+        case FieldType::uvec4: return 4;
 
-            case FieldType::i64:
-            case FieldType::u64:
-            case FieldType::f64: return 8;
+        case FieldType::i64:
+        case FieldType::u64:
+        case FieldType::f64: return 8;
 
-            default: break;
+        default: break;
         }
 
         return 0;

@@ -1,21 +1,13 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.CombatLogEventEnum =
+return D.Definitions
 {
-    archetype = Archetype.Enum,
-    type = Type.U16,
-
-    fields = 
+    D.Enum("CombatLogEventEnum", Type.U16,
     {
-        Field("DamageDealt"),
-        Field("HealingDone"),
-        Field("Resurrected"),
-        Field("Count")
-    }
+        "DamageDealt",
+        "HealingDone",
+        "Resurrected",
+        "Count"
+    })
 }
-
-return M
