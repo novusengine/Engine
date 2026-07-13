@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <mutex>
 #include <system_error>
 
 namespace fs = std::filesystem;
@@ -177,6 +178,8 @@ namespace PACT
     }
     bool PactStorage::Shutdown()
     {
+        std::unique_lock mountTableLock(_mountTableMutex);
+
         {
             std::scoped_lock lock(_residentFilesMutex);
             for (const auto& [key, residentFile] : _fileKeyToResidentFile)
@@ -202,7 +205,7 @@ namespace PACT
             _fileKeyToResidentFile.clear();
         }
 
-        UnmountAll();
+        UnmountAllInternal();
         _mountTable.currentGeneration.store(0, std::memory_order_release);
 
         _manifestTable.handleToManifest.clear();
@@ -221,11 +224,13 @@ namespace PACT
         fs::path absolutePath = fs::absolute(relativeRootDir);
         absolutePath = fs::weakly_canonical(absolutePath);
 
+        std::unique_lock lock(_mountTableMutex);
+
         auto itr = _manifestTable.overlayPathToHandle.find(absolutePath);
         if (itr != _manifestTable.overlayPathToHandle.end())
         {
             if (mountImmediately && !_mountTable.mountIDSet.contains(itr->second))
-                Mount(itr->second);
+                MountInternal(itr->second, {});
 
             return itr->second;
         }
@@ -243,13 +248,19 @@ namespace PACT
 
         if (mountImmediately)
         {
-            Mount(handle);
+            MountInternal(handle, {});
         }
 
         return handle;
     }
 
     bool PactStorage::ReloadOverlay(PactManifestHandle handle)
+    {
+        std::unique_lock lock(_mountTableMutex);
+        return ReloadOverlayInternal(handle);
+    }
+
+    bool PactStorage::ReloadOverlayInternal(PactManifestHandle handle)
     {
         auto manifestItr = _manifestTable.handleToManifest.find(handle);
         if (manifestItr == _manifestTable.handleToManifest.end())
@@ -310,15 +321,25 @@ namespace PACT
         fs::path absolutePath = fs::absolute(relativeRootDir);
         absolutePath = fs::weakly_canonical(absolutePath);
 
+        std::unique_lock lock(_mountTableMutex);
+
         auto itr = _manifestTable.overlayPathToHandle.find(absolutePath);
         if (itr == _manifestTable.overlayPathToHandle.end())
             return false;
 
-        return ReloadOverlay(itr->second);
+        return ReloadOverlayInternal(itr->second);
     }
 
     bool PactStorage::Mount(PactManifestHandle handle, const PactMountOptions& options)
     {
+        std::unique_lock lock(_mountTableMutex);
+        return MountInternal(handle, options);
+    }
+
+    bool PactStorage::MountInternal(PactManifestHandle handle, const PactMountOptions& options)
+    {
+        (void)options;
+
         auto manifestItr = _manifestTable.handleToManifest.find(handle);
         bool manifestIsMissing = manifestItr == _manifestTable.handleToManifest.end();
         if (manifestIsMissing)
@@ -344,6 +365,8 @@ namespace PACT
     }
     bool PactStorage::Unmount(const PactManifestHandle handle)
     {
+        std::unique_lock lock(_mountTableMutex);
+
         bool manifestIsMissing = !_manifestTable.handleToManifest.contains(handle);
         if (manifestIsMissing)
             return false;
@@ -366,6 +389,7 @@ namespace PACT
 
     bool PactStorage::FileExists(const u64 hash)
     {
+        std::shared_lock lock(_mountTableMutex);
         auto pathItr = _mountTable.pathTable.find(hash);
         return pathItr != _mountTable.pathTable.end();
     }
@@ -375,8 +399,26 @@ namespace PACT
         return FileExists(hash);
     }
 
+    bool PactStorage::GetFilePath(const u64 hash, std::string& outPath)
+    {
+        std::shared_lock lock(_mountTableMutex);
+
+        auto pathItr = _mountTable.pathTable.find(hash);
+        if (pathItr == _mountTable.pathTable.end())
+            return false;
+
+        const PactFileRuntimeRecord& runtimeRecord = pathItr->second;
+        if (!runtimeRecord.entry || !runtimeRecord.source || !runtimeRecord.source->manifest)
+            return false;
+
+        outPath = runtimeRecord.source->manifest->stringTable.GetString(runtimeRecord.entry->pathIndex);
+        return true;
+    }
+
     const std::string* PactStorage::GetFilePath(const u64 hash)
     {
+        std::shared_lock lock(_mountTableMutex);
+
         auto pathItr = _mountTable.pathTable.find(hash);
         if (pathItr == _mountTable.pathTable.end())
             return nullptr;
@@ -392,7 +434,7 @@ namespace PACT
         return &path;
     }
 
-    PactReadResult PactStorage::ReadFileRecord(const PactFileRuntimeRecord& record, const u64 fileKeyValue, PactFileHandle& outHandle, const PactFileOpenOption option)
+    PactReadResult PactStorage::ReadFileRecordInternal(const PactFileRuntimeRecord& record, const u64 fileKeyValue, PactFileHandle& outHandle, const PactFileOpenOption option)
     {
         PactFileKey fileKey =
         {
@@ -413,12 +455,29 @@ namespace PACT
     }
     PactReadResult PactStorage::ReadFile(const u64 hash, PactFileHandle& outHandle, const PactFileOpenOption option)
     {
+        std::shared_lock lock(_mountTableMutex);
+
         auto pathItr = _mountTable.pathTable.find(hash);
         if (pathItr == _mountTable.pathTable.end())
             return PactReadResult::FileNotFound;
 
         const PactFileRuntimeRecord& record = pathItr->second;
-        return ReadFileRecord(record, hash, outHandle, option);
+        return ReadFileRecordInternal(record, hash, outHandle, option);
+    }
+    PactReadResult PactStorage::ReadFile(const u64 hash, PactFileHandle& outHandle, std::string& outPath, const PactFileOpenOption option)
+    {
+        std::shared_lock lock(_mountTableMutex);
+
+        auto pathItr = _mountTable.pathTable.find(hash);
+        if (pathItr == _mountTable.pathTable.end())
+            return PactReadResult::FileNotFound;
+
+        const PactFileRuntimeRecord& record = pathItr->second;
+        if (!record.entry || !record.source || !record.source->manifest)
+            return PactReadResult::FileNotFound;
+
+        outPath = record.source->manifest->stringTable.GetString(record.entry->pathIndex);
+        return ReadFileRecordInternal(record, hash, outHandle, option);
     }
     PactReadResult PactStorage::ReadFile(const std::string& path, PactFileHandle& outHandle, const PactFileOpenOption option)
     {
@@ -482,11 +541,18 @@ namespace PACT
 
     void PactStorage::MountAll()
     {
+        std::unique_lock lock(_mountTableMutex);
         BuildMountList();
         BuildGlobalLookup();
     }
 
     void PactStorage::UnmountAll()
+    {
+        std::unique_lock lock(_mountTableMutex);
+        UnmountAllInternal();
+    }
+
+    void PactStorage::UnmountAllInternal()
     {
         _mountTable.currentGeneration.fetch_add(1, std::memory_order_release);
         _mountTable.currentMountIndex = 0;

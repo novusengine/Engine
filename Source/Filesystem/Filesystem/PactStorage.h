@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <limits>
+#include <shared_mutex>
 #include <vector>
 
 namespace PACT
@@ -35,10 +36,13 @@ namespace PACT
 
         bool FileExists(const u64 hash);
         bool FileExists(const std::string& path);
+        bool GetFilePath(const u64 hash, std::string& outPath);
+        // The returned pointer is only valid until the next mount-table mutation.
+        // Prefer the copy-out overload for access that crosses thread boundaries.
         const std::string* GetFilePath(const u64 hash);
 
-        PactReadResult ReadFileRecord(const PactFileRuntimeRecord& record, const u64 fileKeyValue, PactFileHandle& outHandle, const PactFileOpenOption option = PactFileOpenOption::None);
         PactReadResult ReadFile(const u64 hash, PactFileHandle& outHandle, const PactFileOpenOption option = PactFileOpenOption::None);
+        PactReadResult ReadFile(const u64 hash, PactFileHandle& outHandle, std::string& outPath, const PactFileOpenOption option = PactFileOpenOption::None);
         PactReadResult ReadFile(const std::string& path, PactFileHandle& outHandle, const PactFileOpenOption option = PactFileOpenOption::None);
 #if 0 // The asynchronous PACT pipeline is not ready to expose yet.
         PactReadResult ReadFileRecordAsync(const PactFileRuntimeRecord& record, const u64 fileKeyValue, PactFileHandle& outHandle, const PactFileOpenOption option = PactFileOpenOption::None);
@@ -49,9 +53,6 @@ namespace PACT
     public:
         void MountAll();
         void UnmountAll();
-        void BuildMountList();
-        void SortMountList();
-        void BuildGlobalLookup();
 
         PactResidentFile* FindOrCreateResidentFile(PactFileKey key);
         PactFileHandle CreateHandle(PactFileKey key);
@@ -62,6 +63,13 @@ namespace PACT
         void IOThreadMain();
 #endif
         bool InitAtRoot(const std::filesystem::path& rootDir, PactOpenOptions options);
+        bool ReloadOverlayInternal(PactManifestHandle handle);
+        bool MountInternal(PactManifestHandle handle, const PactMountOptions& options);
+        PactReadResult ReadFileRecordInternal(const PactFileRuntimeRecord& record, u64 fileKeyValue, PactFileHandle& outHandle, PactFileOpenOption option);
+        void UnmountAllInternal();
+        void BuildMountList();
+        void SortMountList();
+        void BuildGlobalLookup();
         PactManifestHandle GenerateManifestHandle();
         bool BuildOverlayManifest(PactManifest& manifest, const std::filesystem::path& absolutePath, PactManifestHandle handle, u32 priority);
         void EvictResidentFile(PactFileKey key);
@@ -74,6 +82,7 @@ namespace PACT
         PactRoot _root;
         PactManifestTable _manifestTable;
         PactMountTable _mountTable;
+        mutable std::shared_mutex _mountTableMutex;
 
 #if 0 // The asynchronous PACT pipeline is not ready to expose yet.
         std::thread _ioThread;
