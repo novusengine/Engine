@@ -12,6 +12,7 @@ local CppEmitter = require("CppEmitter")
 local Postgres = require("Postgres")
 local PostgresBackend = require("PostgresBackend")
 local PostgresModel = require("PostgresModel")
+local PostgresSql = require("PostgresSql")
 local PostgresManifest = require("PostgresManifest")
 local PostgresMigration = require("PostgresMigration")
 local PostgresHistory = require("PostgresHistory")
@@ -173,6 +174,13 @@ local function ValidDefinitions()
 end
 
 local function Run()
+    assert(PostgresSql.ColumnDefinition {
+        columnName = "policy",
+        postgresType = { name = "smallint", sql = "smallint" },
+        hasDefault = true,
+        defaultValue = 1,
+        nullable = false
+    } == '"policy" smallint DEFAULT 1 NOT NULL')
     assert(Sha256.Hash("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
     assert(Sha256.Hash("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
     local validModel, postgresModel = Build(ValidDefinitions())

@@ -55,6 +55,12 @@ return D.Definitions
         D.Field("AuraRemove"),
         D.Field("AuraPeriodicDamage"),
         D.Field("AuraPeriodicHeal"),
+        D.Field("AuraFactionOverride"),
+        D.Field("AuraFactionStandingOverride"),
+        D.Field("AuraFactionReactionOverride"),
+        D.Field("AuraFactionPlayerReactionMinOverride"),
+        D.Field("AuraFactionPlayerReactionMaxOverride"),
+        D.Field("AuraFactionUnitReactionOverride"),
         D.Field("Count")
     }),
 

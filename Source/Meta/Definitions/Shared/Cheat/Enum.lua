@@ -47,6 +47,14 @@ return D.Definitions
         D.Field("CreatureMove"),
         D.Field("CreatureFollow"),
         D.Field("CreatureWander"),
-        D.Field("CreatureStop")
+        D.Field("CreatureStop"),
+        D.Field("FactionReaction"),
+        D.Field("FactionReputationInfo"),
+        D.Field("FactionReputationSet"),
+        D.Field("FactionReputationModify"),
+        D.Field("FactionReputationRemove"),
+        D.Field("FactionReputationSetFlags"),
+        D.Field("FactionReputationLock"),
+        D.Field("UnitSetFaction")
     })
 }

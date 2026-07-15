@@ -111,6 +111,31 @@ return D.Definitions
         D.Field("texture", Type.STRINGREF)
     }),
 
+    D.ClientDB("Faction",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("flags", Type.U16),
+        D.Field("defaultReactionToOthers", Type.U8),
+        D.Field("defaultPlayerReactionMin", Type.U8),
+        D.Field("defaultPlayerReactionMax", Type.U8),
+        D.Field("defaultReputationValue", Type.I32)
+    }),
+
+    D.ClientDB("FactionRelation",
+    {
+        D.Field("sourceFactionID", Type.U16),
+        D.Field("targetFactionID", Type.U16),
+        D.Field("reaction", Type.U8)
+    }),
+
+    D.ClientDB("FactionStanding",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("minimumValue", Type.I32),
+        D.Field("reaction", Type.U8),
+        D.Field("sortOrder", Type.U16)
+    }),
+
     D.ClientDB("Icon",
     {
         D.Field("texture", Type.STRINGREF)
@@ -358,7 +383,7 @@ return D.Definitions
         D.Field("name", Type.STRINGREF),
 
         D.Field("flags", Type.U8),
-        D.Field("factionID", Type.U32),
+        D.Field("factionID", Type.U16),
 
         D.Field("maleDisplayID", Type.U32),
         D.Field("femaleDisplayID", Type.U32)

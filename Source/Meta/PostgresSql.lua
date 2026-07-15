@@ -32,6 +32,13 @@ local function SqlLiteral(field, value)
     if category == "string" then return "'" .. value:gsub("'", "''") .. "'" end
     if category == "boolean" then return value and "TRUE" or "FALSE" end
     if category == "integer" or category == "float" then return tostring(value) end
+    local name = field.postgresType.name
+    if name == "text" or name:match("^varchar%(") then return "'" .. value:gsub("'", "''") .. "'" end
+    if name == "boolean" then return value and "TRUE" or "FALSE" end
+    if name == "smallint" or name == "integer" or name == "bigint" or name == "real" or
+        name == "double precision" or name:match("^numeric") or name:match("^decimal") then
+        return tostring(value)
+    end
     error("No SQL literal conversion for PostgreSQL type '" .. tostring(field.postgresType.name) .. "'", 0)
 end
 

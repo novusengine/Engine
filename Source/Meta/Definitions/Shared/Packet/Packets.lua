@@ -306,5 +306,28 @@ return D.Definitions
         D.Field("command", Type.U8),
         D.Field("result", Type.U8),
         D.Field("response", Type.STRING)
+    }),
+
+    D.Packet("ServerUnitFactionUpdatePacket",
+    {
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("factionID", Type.U16),
+        D.Field("playerReactionBounds", Type.U8)
+    }),
+
+    D.Packet("ServerReputationUpdatePacket",
+    {
+        D.Field("factionID", Type.U16),
+        D.Field("value", Type.I32),
+        D.Field("flags", Type.U16),
+        D.Field("isPresent", Type.U8)
+    }),
+
+    D.Packet("ServerFactionPerceptionOverrideUpdatePacket",
+    {
+        D.Field("factionID", Type.U16),
+        D.Field("activeFields", Type.U8),
+        D.Field("effectiveStandingValue", Type.I32),
+        D.Field("effectiveReaction", Type.U8)
     })
 }
