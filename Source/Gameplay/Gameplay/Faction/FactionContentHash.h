@@ -64,7 +64,9 @@ namespace Gameplay::Faction
         ContentHashDetail::AddContentHashValue(hasher, runtime.wordsPerRelationRow);
         ContentHashDetail::AddContentHashValue(hasher, static_cast<u64>(runtime.packedRelations.size()));
         for (u64 relations : runtime.packedRelations)
+        {
             ContentHashDetail::AddContentHashValue(hasher, relations);
+        }
 
         ContentHashDetail::AddContentHashValue(hasher, static_cast<u64>(runtime.standingThresholds.size()));
         for (const auto& standing : runtime.standingThresholds)

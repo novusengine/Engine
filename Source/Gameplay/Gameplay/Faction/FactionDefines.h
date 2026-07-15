@@ -55,6 +55,7 @@ namespace Gameplay::Faction
 
     struct ReactionBounds
     {
+    public:
         constexpr bool IsValid() const
         {
             const u8 minimumValue = static_cast<u8>(minimum);
@@ -86,6 +87,7 @@ namespace Gameplay::Faction
             return (packed & 0xF0) == 0 && Unpack(packed).IsValid();
         }
 
+    public:
         Reaction minimum = Reaction::Hostile;
         Reaction maximum = Reaction::Friendly;
     };
