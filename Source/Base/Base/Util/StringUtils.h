@@ -1,6 +1,8 @@
 #pragma once
 #include "Base/Types.h"
 
+#include <xxhash/xxhash64.h>
+
 #include <vector>
 #include <string_view>
 
@@ -114,4 +116,8 @@ constexpr StringUtils::StringHash operator"" _h(char const* s, std::size_t count
 constexpr u32 operator"" _djb2(char const* s, std::size_t count)
 {
     return static_cast<u32>(StringUtils::hash_djb2(s, static_cast<i32>(count)));
+}
+constexpr u64 operator"" _x(char const* s, std::size_t count)
+{
+    return XXHash64::hashConstexpr(s, count, 0);
 }
