@@ -449,6 +449,7 @@ namespace Renderer
             deviceFeatures.features.depthClamp = VK_TRUE;
             deviceFeatures.features.shaderStorageImageReadWithoutFormat = VK_TRUE;
             deviceFeatures.features.shaderImageGatherExtended = VK_TRUE;
+            deviceFeatures.features.shaderClipDistance = VK_TRUE; // SVSM page draws clip to dirty rects via SV_ClipDistance
             deviceFeatures.pNext = &device11Features;
 
             CheckDeviceFeatureSupport(_physicalDevice, deviceFeatures);

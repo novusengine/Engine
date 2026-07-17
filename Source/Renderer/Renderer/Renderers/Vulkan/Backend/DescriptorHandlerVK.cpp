@@ -27,7 +27,7 @@ namespace Renderer
             { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
             { VK_DESCRIPTOR_TYPE_SAMPLER, 100 }
         };
-        constexpr u32 maxDescriptorSets = 128;
+        constexpr u32 maxDescriptorSets = 256;
 
         // [Temp descriptor sets] Per-frame transient pools, reset in FlipFrame once the slot's fence
         // guarantees the GPU is done with the previous frame's transient sets
@@ -179,7 +179,7 @@ namespace Renderer
                 const std::string& bufferName = _bufferHandler->GetBufferName(bufferID);
                 std::string bindingName = (binding >= 0) ? GetBindingName(descriptorSet, static_cast<u32>(binding)) : "Unknown";
 
-                NC_LOG_ERROR(" ({}) Set {} Buffer {} '{}' at binding {} '{}' needs {} permission", BindingSlotNames[slot], bufferIndex, bufferName, binding, bindingName, permissionName);
+                NC_LOG_ERROR(" ({}) Buffer {} '{}' at binding {} '{}' needs {} permission", BindingSlotNames[slot], bufferIndex, bufferName, binding, bindingName, permissionName);
             });
 
             return didError;
