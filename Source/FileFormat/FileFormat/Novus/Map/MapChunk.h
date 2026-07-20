@@ -69,14 +69,14 @@ namespace Map
         u8 normals[Terrain::CHUNK_NUM_CELLS][Terrain::CELL_TOTAL_GRID_SIZE][3];
         u8 colors[Terrain::CHUNK_NUM_CELLS][Terrain::CELL_TOTAL_GRID_SIZE][3];
         u64 holes[Terrain::CHUNK_NUM_CELLS];
-        u32 layerTextureIDs[Terrain::CHUNK_NUM_CELLS][CELL_LAYER_COUNT];
+        u64 layerTextureIDs[Terrain::CHUNK_NUM_CELLS][CELL_LAYER_COUNT];
     };
-    static_assert(sizeof(CellsData) == 379904, "CellsData is not 454144 byte in size");
+    static_assert(sizeof(CellsData) == 384000, "CellsData is not 384000 byte in size");
 
     struct Chunk
     {
     public:
-        static inline constexpr u32 CURRENT_VERSION = 7;
+        static inline constexpr u32 CURRENT_VERSION = 8;
 
         struct HeightHeader
         {
@@ -240,7 +240,7 @@ namespace Map
         PhysicsHeader physicsHeader;
 
     public:
-        bool Save(const std::string& path, const std::vector<Terrain::Placement>& modelPlacements, const LiquidInfo& liquidInfo, const std::vector<u8>& physicsData);
+        bool Save(std::shared_ptr<Bytebuffer>& buffer, const std::vector<Terrain::Placement>& modelPlacements, const LiquidInfo& liquidInfo, const std::vector<u8>& physicsData);
 
         static bool Read(std::shared_ptr<Bytebuffer>& buffer, Chunk& out);
         static bool FromADT(Adt::Layout& layout, Chunk& out, std::vector<Terrain::Placement>& modelPlacements, LiquidInfo& liquidInfo);

@@ -27,6 +27,16 @@ project.Init = function(self, rootDir, buildDir, binDir)
 
     self.DependencyDir = path.getabsolute("Dependencies/", self.RootDir)
     self.ModulesDir = path.getabsolute("Source/", self.RootDir)
+
+    if self.IsRoot then
+        include(path.getabsolute("Source/Meta/Profile.lua", self.RootDir))
+        MetaGen.ConfigureProject {
+            name = self.Name,
+            outputRoot = path.getabsolute("Source/Meta/MetaGen", self.RootDir),
+            providers = { "Engine.ClientDB", "Engine.Protocol" }
+        }
+        MetaGen.RequestFinalization()
+    end
     
     local buildSettings = path.getabsolute("Premake/BuildSettings.lua", self.RootDir)
     local silentFailOnDuplicateSetting = not self.IsRoot
@@ -76,4 +86,5 @@ if projectIsRoot then
     local binDir = path.getabsolute("Bin/", buildDir)
 
     project:Init(rootDir, buildDir, binDir)
+    include(path.getabsolute("Source/Meta/Tests.lua", rootDir))
 end

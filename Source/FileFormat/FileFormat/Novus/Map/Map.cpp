@@ -1,35 +1,50 @@
 #include "Map.h"
 
 #include <Base/Types.h>
+#include <Base/Memory/Bytebuffer.h>
 #include <Base/Util/DebugHandler.h>
 
 #include <fstream>
 
 namespace Map
 {
-    bool MapHeader::Save(const std::string& path)
+    bool MapHeader::Save(std::shared_ptr<Bytebuffer>& buffer)
     {
-        std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
-        if (!output)
+        bool failed = false;
+
+        failed |= !buffer->Put(header);
+        failed |= !buffer->Put(flags);
+        failed |= !buffer->Put(placement);
+
+        u32 numChunks = static_cast<u32>(chunkHashes.size());
+        failed |= !buffer->PutU32(numChunks);
+
+        if (numChunks > 0)
         {
-            NC_LOG_ERROR("Failed to create Map Header file. Check admin permissions {0}", path);
-            return false;
+            failed |= !buffer->PutBytes(chunkHashes.data(), numChunks * sizeof(u64));
         }
 
-        output.write(reinterpret_cast<char const*>(&header), sizeof(header));
-        output.write(reinterpret_cast<char const*>(&flags), sizeof(flags));
-        output.write(reinterpret_cast<char const*>(&placement), sizeof(placement));
-
-        output.close();
-
-        return true;
+        return !failed;
     }
     bool MapHeader::Read(std::shared_ptr<Bytebuffer>& buffer, MapHeader& out)
     {
-        if (!buffer->Get(out))
+        if (!buffer->Get(out.header))
             return false;
 
         if (out.header.type != FileHeader::Type::MapHeader || out.header.version != MapHeader::CURRENT_VERSION)
+            return false;
+
+        if (!buffer->Get(out.flags))
+            return false;
+
+        if (!buffer->Get(out.placement))
+            return false;
+
+        u32 numChunks = 0;
+        if (!buffer->GetU32(numChunks))
+            return false;
+
+        if (!buffer->GetVector(out.chunkHashes, numChunks))
             return false;
 
         return true;

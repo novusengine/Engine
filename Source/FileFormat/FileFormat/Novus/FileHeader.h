@@ -16,7 +16,8 @@ public:
         MapObject,
         MapObjectGroup,
         ComplexModel,
-        ShaderPack
+        ShaderPack,
+        NavMeshTerrainHeight
     };
 
 public:
@@ -27,12 +28,12 @@ public:
         version = inVersion;
     }
 
-    bool operator==(const FileHeader& other)
+    bool operator==(const FileHeader& other) const
     {
         return type == other.type && version == other.version;
     }
 
-    bool operator!=(const FileHeader& other)
+    bool operator!=(const FileHeader& other) const
     {
         return type != other.type || version != other.version;
     }

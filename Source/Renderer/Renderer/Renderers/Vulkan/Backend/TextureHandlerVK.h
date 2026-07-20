@@ -37,7 +37,9 @@ namespace Renderer
             void FlushTextureArrayDescriptors(TextureArrayID textureArrayID);
 
             TextureID LoadTexture(const TextureDesc& desc);
+            TextureID LoadDataTexture(const DataTextureDesc& desc);
             TextureID LoadTextureIntoArray(const TextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates);
+            TextureID LoadDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates);
 
             void UnloadTexture(const TextureID textureID);
             void UnloadTexturesInArray(const TextureArrayID textureArrayID, u32 unloadStartIndex);
@@ -81,6 +83,7 @@ namespace Renderer
             bool TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID);
 
             void LoadFile(const std::string& filename, Texture& texture, TextureID textureID);
+            void LoadFromMemory(const u8* data, size_t size, Texture& texture, TextureID textureID);
             void CreateTexture(Texture& texture);
 
             u32 AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership);

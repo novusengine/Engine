@@ -1,112 +1,74 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.SpellProcPhaseTypeEnum =
+return D.Definitions
 {
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("SpellProcPhaseTypeEnum", Type.U8,
     {
-        Field("OnSpellCast"),
-        Field("OnSpellHandleEffect"),
-        Field("OnSpellFinish"),
-        Field("OnAuraApply"),
-        Field("OnAuraHandleEffect"),
-        Field("OnAuraRemove"),
-        Field("Count")
-    }
-}
+        D.Field("OnSpellCast"),
+        D.Field("OnSpellHandleEffect"),
+        D.Field("OnSpellFinish"),
+        D.Field("OnAuraApply"),
+        D.Field("OnAuraHandleEffect"),
+        D.Field("OnAuraRemove"),
+        D.Field("Count")
+    }),
 
-M.SpellProcPhaseMaskEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U32,
-
-    fields = 
+    D.Enum("SpellProcPhaseMaskEnum", Type.U32,
     {
-        Field("None", 0x0),
-        Field("OnSpellCast", 0x1),
-        Field("OnSpellHandleEffect", 0x2),
-        Field("OnSpellFinish", 0x4),
-        Field("OnAuraApply", 0x8),
-        Field("OnAuraHandleEffect", 0x10),
-        Field("OnAuraRemove", 0x20),
-        Field("All", 0xFFFFFFFF)
-    }
-}
+        D.Field("None", 0x0),
+        D.Field("OnSpellCast", 0x1),
+        D.Field("OnSpellHandleEffect", 0x2),
+        D.Field("OnSpellFinish", 0x4),
+        D.Field("OnAuraApply", 0x8),
+        D.Field("OnAuraHandleEffect", 0x10),
+        D.Field("OnAuraRemove", 0x20),
+        D.Field("All", 0xFFFFFFFF)
+    }),
 
-M.SpellProcTypeMaskEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U32,
-
-    fields = 
+    D.Enum("SpellProcTypeMaskEnum", Type.U32,
     {
-        Field("None", 0x0),
-        Field("All", 0xFFFFFFFF)
-    }
-}
+        D.Field("None", 0x0),
+        D.Field("All", 0xFFFFFFFF)
+    }),
 
-M.SpellProcHitMaskEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U64,
-
-    fields = 
+    D.Enum("SpellProcHitMaskEnum", Type.U64,
     {
-        Field("None", 0x0),
-        Field("Normal", 0x1),
-        Field("All", 0xFFFFFFFF)
-    }
-}
+        D.Field("None", 0x0),
+        D.Field("Normal", 0x1),
+        D.Field("All", 0xFFFFFFFF)
+    }),
 
-M.SpellProcFlagEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U64,
-
-    fields = 
+    D.Enum("SpellProcFlagEnum", Type.U64,
     {
-        Field("None", 0x0),
-        Field("UseUnitICD", 0x1),
-        Field("All", 0xFFFFFFFF)
-    }
-}
+        D.Field("None", 0x0),
+        D.Field("UseUnitICD", 0x1),
+        D.Field("All", 0xFFFFFFFF)
+    }),
 
-M.SpellEffectTypeEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("SpellEffectTypeEnum", Type.U8,
     {
-        Field("Invalid"),
-        Field("Dummy"),
-        Field("WeaponDamage"),
-        Field("AuraApply", 128),
-        Field("AuraRemove"),
-        Field("AuraPeriodicDamage"),
-        Field("AuraPeriodicHeal"),
-        Field("Count")
-    }
-}
+        D.Field("Invalid"),
+        D.Field("Dummy"),
+        D.Field("WeaponDamage"),
+        D.Field("AuraApply", 128),
+        D.Field("AuraRemove"),
+        D.Field("AuraPeriodicDamage"),
+        D.Field("AuraPeriodicHeal"),
+        D.Field("AuraFactionOverride"),
+        D.Field("AuraFactionStandingOverride"),
+        D.Field("AuraFactionReactionOverride"),
+        D.Field("AuraFactionPlayerReactionMinOverride"),
+        D.Field("AuraFactionPlayerReactionMaxOverride"),
+        D.Field("AuraFactionUnitReactionOverride"),
+        D.Field("Count")
+    }),
 
-M.SpellEffectWeaponDamageValueEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("SpellEffectWeaponDamageValueEnum", Type.U8,
     {
-        Field("Invalid"),
-        Field("Base"),
-        Field("Normalized"),
-        Field("Count")
-    }
+        D.Field("Invalid"),
+        D.Field("Base"),
+        D.Field("Normalized"),
+        D.Field("Count")
+    })
 }
-
-return M

@@ -30,7 +30,7 @@ namespace Novus::Container
         u32 AddStringReturnByteIndex(const std::string& string);
 
         const std::string& GetString(u32 index);
-        u32 GetStringHash(u32 index);
+        u64 GetStringHash(u32 index);
 
         size_t GetNumStrings() const { return _strings.size(); }
         size_t GetNumBytes() const { return _numBytes; }
@@ -48,12 +48,12 @@ namespace Novus::Container
         void Clear();
 
         bool TryFindString(const std::string& string, u32& index) const;
-        bool TryFindHashedString(u32 hash, u32& index) const;
-        bool TryFindHashedStringStrict(u32 hash, u32& index) const;
+        bool TryFindHashedString(u64 hash, u32& index) const;
+        bool TryFindHashedStringStrict(u64 hash, u32& index) const;
 
     private:
         std::vector<std::string> _strings;
-        std::vector<u32> _hashes;
+        std::vector<u64> _hashes;
         size_t _numBytes = 0;
 
         std::shared_mutex _mutex;
@@ -71,12 +71,25 @@ namespace Novus::Container
         {
             CopyFrom(other);
         }
+        StringTableUnsafe(StringTableUnsafe&& other) noexcept
+        {
+            CopyFrom(other);
+        }
+
+        StringTableUnsafe& operator=(StringTableUnsafe&& other) noexcept
+        {
+            std::swap(_strings, other._strings);
+            std::swap(_hashes, other._hashes);
+            std::swap(_numBytes, other._numBytes);
+
+            return *this;
+        }
 
         // Add string, return index into table
         u32 AddString(const std::string& string);
 
         const std::string& GetString(u32 index) const;
-        u32 GetStringHash(u32 index) const;
+        u64 GetStringHash(u32 index) const;
 
         size_t GetNumStrings() const { return _strings.size(); }
         size_t GetNumBytes() const { return _numBytes; }
@@ -94,12 +107,12 @@ namespace Novus::Container
         void Clear();
 
         bool TryFindString(const std::string& string, u32& index) const;
-        bool TryFindHashedString(u32 hash, u32& index) const;
-        bool TryFindHashedStringStrict(u32 hash, u32& index) const;
+        bool TryFindHashedString(u64 hash, u32& index) const;
+        bool TryFindHashedStringStrict(u64 hash, u32& index) const;
 
     private:
         std::vector<std::string> _strings;
-        std::vector<u32> _hashes;
+        std::vector<u64> _hashes;
         size_t _numBytes = 0;
     };
 }

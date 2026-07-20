@@ -249,7 +249,7 @@ namespace ClientDB
         bool HasString(const std::string& string);
         u32 AddString(const std::string& string);
         const std::string& GetString(u32 index);
-        u32 GetStringHash(u32 index);
+        u64 GetStringHash(u32 index);
 
         // Documentation
         // When the provided Callback return false, the function will interrupt the iteration.
@@ -359,7 +359,7 @@ namespace ClientDB
         void Compact();
 
         size_t GetSerializedSize();
-        bool Save(const std::string& path);
+        bool Save(std::shared_ptr<Bytebuffer>& buffer);
         bool Read(std::shared_ptr<Bytebuffer>& buffer);
 
         bool IsInitialized();

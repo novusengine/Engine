@@ -189,8 +189,8 @@ namespace Network
     {
         SocketMessageEvent messageEvent;
         messageEvent.socketID = SOCKET_ID_INVALID;
-        messageEvent.message.buffer = std::move(buffer);
-        _messageEvents.enqueue(messageEvent);
+        messageEvent.message.SetOwnedBuffer(std::move(buffer));
+        _messageEvents.enqueue(std::move(messageEvent));
     }
 
     void Client::ClearBuffer(BufferID bufferID)

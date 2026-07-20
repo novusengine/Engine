@@ -1,602 +1,430 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.TextureFileDataRecord =
+return D.Definitions
 {
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("TextureFileData",
     {
-        Field("texture", Type.STRINGREF),
-        Field("materialResourcesID", Type.U32)
-    }
-}
+        D.Field("texture", Type.STRINGREF),
+        D.Field("materialResourcesID", Type.U32)
+    }),
 
-M.ModelFileDataRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ModelFileData",
     {
-        Field("model", Type.STRINGREF),
-        Field("modelResourcesID", Type.U32),
-        Field("flags", Type.U8)
-    }
-}
+        D.Field("model", Type.STRINGREF),
+        D.Field("modelResourcesID", Type.U32),
+        D.Field("flags", Type.U8)
+    }),
 
-M.AnimationDataRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("AnimationData",
     {
-        Field("flags", Type.U64),
-        Field("fallback", Type.U16),
-        Field("behaviorID", Type.U16),
-        Field("behaviorTier", Type.U8)
-    }
-}
+        D.Field("flags", Type.U64),
+        D.Field("fallback", Type.U16),
+        D.Field("behaviorID", Type.U16),
+        D.Field("behaviorTier", Type.U8)
+    }),
 
-M.CameraSaveRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("CameraSave",
     {
-        Field("name", Type.STRINGREF),
-        Field("code", Type.STRINGREF)
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("code", Type.STRINGREF)
+    }),
 
-M.CinematicCameraRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("CinematicCamera",
     {
-        Field("soundID", Type.U32),
-        Field("endPosition", Type.VEC3),
-        Field("rotation", Type.F32),
-        Field("model", Type.STRINGREF)
-    }
-}
+        D.Field("soundID", Type.U32),
+        D.Field("endPosition", Type.VEC3),
+        D.Field("rotation", Type.F32),
+        D.Field("model", Type.STRINGREF)
+    }),
 
-M.CinematicSequenceRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("CinematicSequences",
     {
-        Field("cameraID", Type.U16)
-    }
-}
+        D.Field("cameraID", Type.U16)
+    }, { recordName = "CinematicSequence" }),
 
-M.CreatureModelDataRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("CreatureModelData",
     {
-        Field("model", Type.STRINGREF),
-        Field("flags", Type.U32),
+        D.Field("model", Type.STRINGREF),
+        D.Field("flags", Type.U32),
 
-        Field("boxMin", Type.VEC3),
-        Field("boxMax", Type.VEC3),
+        D.Field("boxMin", Type.VEC3),
+        D.Field("boxMax", Type.VEC3),
 
-        Field("soundID", Type.U16),
-        Field("sizeClass", Type.U8),
-        Field("bloodID", Type.U8),
+        D.Field("soundID", Type.U16),
+        D.Field("sizeClass", Type.U8),
+        D.Field("bloodID", Type.U8),
 
-        Field("footprintTextureID", Type.U8),
-        Field("footprintTextureLength", Type.U8),
-        Field("footprintTextureWidth", Type.U8),
-        Field("footprintParticleScale", Type.U8),
-        Field("footstepCameraEffectID", Type.U16),
-        Field("deathThudCameraEffectID", Type.U16),
+        D.Field("footprintTextureID", Type.U8),
+        D.Field("footprintTextureLength", Type.U8),
+        D.Field("footprintTextureWidth", Type.U8),
+        D.Field("footprintParticleScale", Type.U8),
+        D.Field("footstepCameraEffectID", Type.U16),
+        D.Field("deathThudCameraEffectID", Type.U16),
 
-        Field("collisionBox", Type.VEC2),
-        Field("mountHeight", Type.F32)
-    }
-}
+        D.Field("collisionBox", Type.VEC2),
+        D.Field("mountHeight", Type.F32)
+    }),
 
-M.CreatureDisplayInfoRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("CreatureDisplayInfo",
     {
-        Field("modelID", Type.U32),
-        Field("extendedDisplayInfoID", Type.U32),
+        D.Field("modelID", Type.U32),
+        D.Field("extendedDisplayInfoID", Type.U32),
 
-        Field("soundID", Type.U16),
-        Field("npcSoundID", Type.U16),
+        D.Field("soundID", Type.U16),
+        D.Field("npcSoundID", Type.U16),
 
-        Field("flags", Type.U8),
-        Field("gender", Type.U8),
-        Field("sizeClass", Type.I8),
-        Field("bloodID", Type.U8),
+        D.Field("flags", Type.U8),
+        D.Field("gender", Type.U8),
+        D.Field("sizeClass", Type.I8),
+        D.Field("bloodID", Type.U8),
 
-        Field("unarmedWeaponType", Type.U8),
+        D.Field("unarmedWeaponType", Type.U8),
 
-        Field("creatureModelAlpha", Type.U8),
-        Field("creatureModelScale", Type.F32),
-        Field("creaturePetScale", Type.F32),
+        D.Field("creatureModelAlpha", Type.U8),
+        D.Field("creatureModelScale", Type.F32),
+        D.Field("creaturePetScale", Type.F32),
 
-        Field("textureVariations", Type.ARRAY, { type = Type.STRINGREF, count = 4 })
-    }
-}
+        D.Field("textureVariations", Type.ARRAY, { type = Type.STRINGREF, count = 4 })
+    }),
 
-M.CreatureDisplayInfoExtraRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("CreatureDisplayInfoExtra",
     {
-        Field("flags", Type.U8),
+        D.Field("flags", Type.U8),
 
-        Field("raceID", Type.U8),
-        Field("gender", Type.U8),
-        Field("classID", Type.U8),
+        D.Field("raceID", Type.U8),
+        D.Field("gender", Type.U8),
+        D.Field("classID", Type.U8),
 
-        Field("skinID", Type.U8),
-        Field("faceID", Type.U8),
-        Field("hairStyleID", Type.U8),
-        Field("hairColorID", Type.U8),
-        Field("facialHairID", Type.U8),
+        D.Field("skinID", Type.U8),
+        D.Field("faceID", Type.U8),
+        D.Field("hairStyleID", Type.U8),
+        D.Field("hairColorID", Type.U8),
+        D.Field("facialHairID", Type.U8),
 
-        Field("bakedTexture", Type.STRINGREF)
-    }
-}
+        D.Field("bakedTexture", Type.STRINGREF)
+    }),
 
-M.CursorRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("Cursor",
     {
-        Field("name", Type.STRINGREF),
-        Field("texture", Type.STRINGREF)
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("texture", Type.STRINGREF)
+    }),
 
-M.IconRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("Faction",
     {
-        Field("texture", Type.STRINGREF)
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("flags", Type.U16),
+        D.Field("defaultReactionToOthers", Type.U8),
+        D.Field("defaultPlayerReactionMin", Type.U8),
+        D.Field("defaultPlayerReactionMax", Type.U8),
+        D.Field("defaultReputationValue", Type.I32)
+    }),
 
-M.ItemDisplayInfoRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("FactionRelation",
     {
-        Field("flags", Type.U16),
-        Field("itemRangedDisplayInfoID", Type.U16),
+        D.Field("sourceFactionID", Type.U16),
+        D.Field("targetFactionID", Type.U16),
+        D.Field("reaction", Type.U8)
+    }),
 
-        Field("modelResourcesID", Type.ARRAY, { type = Type.U32, count = 2 }),
-        Field("modelMaterialResourcesID", Type.ARRAY, { type = Type.U32, count = 2 }),
-        Field("modelGeosetGroups", Type.ARRAY, { type = Type.U8, count = 4 }),
-        Field("modelGeosetVisIDs", Type.ARRAY, { type = Type.U16, count = 2 })
-    }
-}
-
-M.ItemDisplayInfoMaterialResourceRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("FactionStanding",
     {
-        Field("displayInfoID", Type.U32),
-        Field("componentSection", Type.U8),
-        Field("materialResourcesID", Type.U32)
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("minimumValue", Type.I32),
+        D.Field("reaction", Type.U8),
+        D.Field("sortOrder", Type.U16)
+    }),
 
-M.ItemDisplayInfoModelMaterialResourceRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("Icon",
     {
-        Field("displayInfoID", Type.U32),
-        Field("modelIndex", Type.U8),
-        Field("textureType", Type.U8),
-        Field("materialResourcesID", Type.U32)
-    }
-}
+        D.Field("texture", Type.STRINGREF)
+    }),
 
-M.ItemRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ItemDisplayInfo",
     {
-        Field("name", Type.STRINGREF),
-        Field("description", Type.STRINGREF),
+        D.Field("flags", Type.U16),
+        D.Field("itemRangedDisplayInfoID", Type.U16),
 
-        Field("iconID", Type.U32),
-        Field("displayID", Type.U32),
+        D.Field("modelResourcesID", Type.ARRAY, { type = Type.U32, count = 2 }),
+        D.Field("modelMaterialResourcesID", Type.ARRAY, { type = Type.U32, count = 2 }),
+        D.Field("modelGeosetGroups", Type.ARRAY, { type = Type.U8, count = 4 }),
+        D.Field("modelGeosetVisIDs", Type.ARRAY, { type = Type.U16, count = 2 })
+    }),
 
-        Field("bind", Type.U8),
-        Field("rarity", Type.U8),
-
-        Field("category", Type.U8),
-        Field("categoryType", Type.U8),
-
-        Field("virtualLevel", Type.U16),
-        Field("requiredLevel", Type.U16),
-
-        Field("durability", Type.U32),
-        Field("armor", Type.U32),
-
-        Field("statTemplateID", Type.U32),
-        Field("armorTemplateID", Type.U32),
-        Field("weaponTemplateID", Type.U32),
-        Field("shieldTemplateID", Type.U32)
-    }
-}
-
-M.ItemStatTypeRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ItemDisplayInfoMaterialRes",
     {
-        Field("name", Type.STRINGREF),
-        Field("description", Type.STRINGREF)
-    }
-}
+        D.Field("displayInfoID", Type.U32),
+        D.Field("componentSection", Type.U8),
+        D.Field("materialResourcesID", Type.U32)
+    }, { recordName = "ItemDisplayInfoMaterialResource" }),
 
-M.ItemStatTemplateRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ItemDisplayInfoModelMatRes",
     {
-        Field("statTypeID", Type.ARRAY, { type = Type.U8, count = 8 }),
-        Field("value", Type.ARRAY, { type = Type.I32, count = 8 })
-    }
-}
+        D.Field("displayInfoID", Type.U32),
+        D.Field("modelIndex", Type.U8),
+        D.Field("textureType", Type.U8),
+        D.Field("materialResourcesID", Type.U32)
+    }, { recordName = "ItemDisplayInfoModelMaterialResource" }),
 
-M.ItemArmorTemplateRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("Item",
     {
-        Field("equipType", Type.U8),
-        Field("bonusArmor", Type.U32)
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("description", Type.STRINGREF),
 
-M.ItemShieldTemplateRecord =
-{
-    archetype = Archetype.ClientDB,
+        D.Field("iconID", Type.U32),
+        D.Field("displayID", Type.U32),
 
-    fields = 
+        D.Field("bind", Type.U8),
+        D.Field("rarity", Type.U8),
+
+        D.Field("category", Type.U8),
+        D.Field("categoryType", Type.U8),
+
+        D.Field("virtualLevel", Type.U16),
+        D.Field("requiredLevel", Type.U16),
+
+        D.Field("durability", Type.U32),
+        D.Field("armor", Type.U32),
+
+        D.Field("statTemplateID", Type.U32),
+        D.Field("armorTemplateID", Type.U32),
+        D.Field("weaponTemplateID", Type.U32),
+        D.Field("shieldTemplateID", Type.U32)
+    }),
+
+    D.ClientDB("ItemStatTypes",
     {
-        Field("bonusArmor", Type.U32),
-        Field("block", Type.U32)
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("description", Type.STRINGREF)
+    }, { recordName = "ItemStatType" }),
 
-M.ItemWeaponTemplateRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ItemStatTemplate",
     {
-        Field("weaponStyle", Type.U8),
-        Field("damageRange", Type.UVEC2),
-        Field("speed", Type.F32)
-    }
-}
+        D.Field("statTypeID", Type.ARRAY, { type = Type.U8, count = 8 }),
+        D.Field("value", Type.ARRAY, { type = Type.I32, count = 8 })
+    }),
 
-M.ItemEffectRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ItemArmorTemplate",
     {
-        Field("itemID", Type.U32),
-        Field("effectSlot", Type.U8),
-        Field("effectType", Type.U8),
-        Field("effectSpellID", Type.U32)
-    }
-}
+        D.Field("equipType", Type.U8),
+        D.Field("bonusArmor", Type.U32)
+    }),
 
-M.LightRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ItemShieldTemplate",
     {
-        Field("mapID", Type.U16),
-        Field("position", Type.VEC3),
-        Field("fallOff", Type.VEC2),
-        Field("paramIDs", Type.ARRAY, { type = Type.U16, count = 8 })
-    }
-}
+        D.Field("bonusArmor", Type.U32),
+        D.Field("block", Type.U32)
+    }),
 
-M.LightDataRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("ItemWeaponTemplate",
     {
-        Field("lightParamID", Type.U16),
-        Field("timestamp", Type.U32),
+        D.Field("weaponStyle", Type.U8),
+        D.Field("damageRange", Type.UVEC2),
+        D.Field("speed", Type.F32)
+    }),
 
-        Field("diffuseColor", Type.U32),
-        Field("ambientColor", Type.U32),
-        Field("skyColors", Type.ARRAY, { type = Type.U32, count = 6 }),
+    D.ClientDB("ItemEffects",
+    {
+        D.Field("itemID", Type.U32),
+        D.Field("effectSlot", Type.U8),
+        D.Field("effectType", Type.U8),
+        D.Field("effectSpellID", Type.U32)
+    }, { recordName = "ItemEffect" }),
+
+    D.ClientDB("Light",
+    {
+        D.Field("mapID", Type.U16),
+        D.Field("position", Type.VEC3),
+        D.Field("fallOff", Type.VEC2),
+        D.Field("paramIDs", Type.ARRAY, { type = Type.U16, count = 8 })
+    }),
+
+    D.ClientDB("LightData",
+    {
+        D.Field("lightParamID", Type.U16),
+        D.Field("timestamp", Type.U32),
+
+        D.Field("diffuseColor", Type.U32),
+        D.Field("ambientColor", Type.U32),
+        D.Field("skyColors", Type.ARRAY, { type = Type.U32, count = 6 }),
         
-        Field("sunColor", Type.U32),
-        Field("sunFogColor", Type.U32),
-        Field("sunFogStrength", Type.F32),
-        Field("sunFogAngle", Type.F32),
+        D.Field("sunColor", Type.U32),
+        D.Field("sunFogColor", Type.U32),
+        D.Field("sunFogStrength", Type.F32),
+        D.Field("sunFogAngle", Type.F32),
         
-        Field("cloudColors", Type.ARRAY, { type = Type.U32, count = 4 }),
-        Field("cloudDensity", Type.F32),
+        D.Field("cloudColors", Type.ARRAY, { type = Type.U32, count = 4 }),
+        D.Field("cloudDensity", Type.F32),
 
-        Field("oceanColors", Type.ARRAY, { type = Type.U32, count = 2 }),
-        Field("riverColors", Type.ARRAY, { type = Type.U32, count = 2 }),
+        D.Field("oceanColors", Type.ARRAY, { type = Type.U32, count = 2 }),
+        D.Field("riverColors", Type.ARRAY, { type = Type.U32, count = 2 }),
 
-        Field("shadowColor", Type.U32),
-        Field("fogEnd", Type.F32),
-        Field("fogEndColor", Type.U32),
-        Field("fogEndHeightColor", Type.U32),
-        Field("fogHeightColor", Type.U32),
-        Field("fogScaler", Type.F32),
-        Field("fogDensity", Type.U8)
-    }
-}
+        D.Field("shadowColor", Type.U32),
+        D.Field("fogEnd", Type.F32),
+        D.Field("fogEndColor", Type.U32),
+        D.Field("fogEndHeightColor", Type.U32),
+        D.Field("fogHeightColor", Type.U32),
+        D.Field("fogScaler", Type.F32),
+        D.Field("fogDensity", Type.U8)
+    }),
 
-M.LightParamRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("LightParams",
     {
-        Field("flags", Type.U8),
-        Field("lightSkyboxID", Type.U16),
+        D.Field("flags", Type.U8),
+        D.Field("lightSkyboxID", Type.U16),
 
-        Field("glow", Type.F32),
+        D.Field("glow", Type.F32),
         
-        Field("oceanAlphas", Type.ARRAY, { type = Type.F32, count = 2 }),
-        Field("riverAlphas", Type.ARRAY, { type = Type.F32, count = 2 })
-    }
-}
+        D.Field("oceanAlphas", Type.ARRAY, { type = Type.F32, count = 2 }),
+        D.Field("riverAlphas", Type.ARRAY, { type = Type.F32, count = 2 })
+    }, { recordName = "LightParam" }),
 
-M.LightSkyboxRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("LightSkybox",
     {
-        Field("name", Type.STRINGREF),
-        Field("model", Type.STRINGREF)
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("model", Type.STRINGREF)
+    }),
 
-M.LiquidTypeRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("LiquidType",
     {
-        Field("name", Type.STRINGREF),
+        D.Field("name", Type.STRINGREF),
 
-        Field("flags", Type.U16),
-        Field("lightID", Type.U16),
-        Field("soundBank", Type.U8),
-        Field("soundID", Type.U16),
-        Field("materialID", Type.U8),
-        Field("particleScale", Type.U8),
-        Field("particleMovement", Type.U8),
-        Field("particleTextureSlot", Type.U8),
+        D.Field("flags", Type.U16),
+        D.Field("lightID", Type.U16),
+        D.Field("soundBank", Type.U8),
+        D.Field("soundID", Type.U16),
+        D.Field("materialID", Type.U8),
+        D.Field("particleScale", Type.U8),
+        D.Field("particleMovement", Type.U8),
+        D.Field("particleTextureSlot", Type.U8),
         
-        Field("minimapColor", Type.U32),
+        D.Field("minimapColor", Type.U32),
         
-        Field("maxDarkenDepth", Type.U32),
-        Field("fogDarkenIntensity", Type.F32),
-        Field("ambDarkenIntensity", Type.F32),
-        Field("dirDarkenIntensity", Type.F32),
+        D.Field("maxDarkenDepth", Type.U32),
+        D.Field("fogDarkenIntensity", Type.F32),
+        D.Field("ambDarkenIntensity", Type.F32),
+        D.Field("dirDarkenIntensity", Type.F32),
         
-        Field("textures", Type.ARRAY, { type = Type.STRINGREF, count = 6 }),
-        Field("frameCounts", Type.ARRAY, { type = Type.U8, count = 6 }),
+        D.Field("textures", Type.ARRAY, { type = Type.STRINGREF, count = 6 }),
+        D.Field("frameCounts", Type.ARRAY, { type = Type.U8, count = 6 }),
         
-        Field("unkFloats", Type.ARRAY, { type = Type.F32, count = 16 }),
-        Field("unkInts", Type.ARRAY, { type = Type.I32, count = 4 })
-    }
-}
+        D.Field("unkFloats", Type.ARRAY, { type = Type.F32, count = 16 }),
+        D.Field("unkInts", Type.ARRAY, { type = Type.I32, count = 4 })
+    }),
 
-M.LiquidMaterialRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("LiquidMaterial",
     {
-        Field("flags", Type.U8),
-        Field("liquidVertexFormat", Type.U8)
-    }
-}
+        D.Field("flags", Type.U8),
+        D.Field("liquidVertexFormat", Type.U8)
+    }),
 
-M.LiquidObjectRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("LiquidObject",
     {
-        Field("liquidTypeID", Type.U16),
-        Field("fishable", Type.U8)
-    }
-}
+        D.Field("liquidTypeID", Type.U16),
+        D.Field("fishable", Type.U8)
+    }),
 
-M.MapRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("Map",
     {
-        Field("nameInternal", Type.STRINGREF),
-        Field("name", Type.STRINGREF),
+        D.Field("nameInternal", Type.STRINGREF),
+        D.Field("name", Type.STRINGREF),
 
-        Field("flags", Type.U32),
-        Field("instanceType", Type.U8),
-        Field("expansionID", Type.U8),
-        Field("maxPlayers", Type.U16)
-    }
-}
+        D.Field("flags", Type.U32),
+        D.Field("instanceType", Type.U8),
+        D.Field("expansionID", Type.U8),
+        D.Field("maxPlayers", Type.U16)
+    }),
 
-M.SpellRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("Spell",
     {
-        Field("name", Type.STRINGREF),
-        Field("description", Type.STRINGREF),
-        Field("auraDescription", Type.STRINGREF),
-        Field("iconID", Type.U32),
+        D.Field("name", Type.STRINGREF),
+        D.Field("description", Type.STRINGREF),
+        D.Field("auraDescription", Type.STRINGREF),
+        D.Field("iconID", Type.U32),
 
-        Field("castTime", Type.F32),
-        Field("cooldown", Type.F32),
-        Field("duration", Type.F32)
-    }
-}
+        D.Field("castTime", Type.F32),
+        D.Field("cooldown", Type.F32),
+        D.Field("duration", Type.F32)
+    }),
 
-M.SpellEffectsRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("SpellEffects",
     {
-        Field("spellID", Type.U32),
-        Field("effectPriority", Type.U8),
-        Field("effectType", Type.U8),
-        Field("effectValues", Type.ARRAY, { type = Type.I32, count = 3 }),
-        Field("effectMiscValues", Type.ARRAY, { type = Type.I32, count = 3 })
-    }
-}
+        D.Field("spellID", Type.U32),
+        D.Field("effectPriority", Type.U8),
+        D.Field("effectType", Type.U8),
+        D.Field("effectValues", Type.ARRAY, { type = Type.I32, count = 3 }),
+        D.Field("effectMiscValues", Type.ARRAY, { type = Type.I32, count = 3 })
+    }),
 
-M.SpellProcDataRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("SpellProcData",
     {
-        Field("phaseMask", Type.U32),
-        Field("typeMask", Type.U64),
-        Field("hitMask", Type.U64),
-        Field("flags", Type.U64),
-        Field("procsPerMinute", Type.F32),
-        Field("chanceToProc", Type.F32),
-        Field("internalCooldownMS", Type.U32),
-        Field("charges", Type.I32),
-    }
-}
+        D.Field("phaseMask", Type.U32),
+        D.Field("typeMask", Type.U64),
+        D.Field("hitMask", Type.U64),
+        D.Field("flags", Type.U64),
+        D.Field("procsPerMinute", Type.F32),
+        D.Field("chanceToProc", Type.F32),
+        D.Field("internalCooldownMS", Type.U32),
+        D.Field("charges", Type.I32),
+    }),
 
-M.SpellProcLinkRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("SpellProcLink",
     {
-        Field("spellID", Type.U32),
-        Field("effectMask", Type.U64),
-        Field("procDataID", Type.U32)
-    }
-}
+        D.Field("spellID", Type.U32),
+        D.Field("effectMask", Type.U64),
+        D.Field("procDataID", Type.U32)
+    }),
 
-M.UnitRaceRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("UnitRace",
     {
-        Field("prefix", Type.STRINGREF),
-        Field("nameInternal", Type.STRINGREF),
-        Field("name", Type.STRINGREF),
+        D.Field("prefix", Type.STRINGREF),
+        D.Field("nameInternal", Type.STRINGREF),
+        D.Field("name", Type.STRINGREF),
 
-        Field("flags", Type.U8),
-        Field("factionID", Type.U32),
+        D.Field("flags", Type.U8),
+        D.Field("factionID", Type.U16),
 
-        Field("maleDisplayID", Type.U32),
-        Field("femaleDisplayID", Type.U32)
-    }
-}
+        D.Field("maleDisplayID", Type.U32),
+        D.Field("femaleDisplayID", Type.U32)
+    }),
 
-M.UnitTextureSectionRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("UnitTextureSection",
     {
-        Field("section", Type.U8),
-        Field("position", Type.UVEC2),
-        Field("size", Type.UVEC2),
-    }
-}
+        D.Field("section", Type.U8),
+        D.Field("position", Type.UVEC2),
+        D.Field("size", Type.UVEC2),
+    }),
 
-M.UnitCustomizationOptionRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("UnitCustomizationOption",
     {
-        Field("name", Type.STRINGREF),
-        Field("flags", Type.U32),
-    }
-}
+        D.Field("name", Type.STRINGREF),
+        D.Field("flags", Type.U32),
+    }),
 
-M.UnitCustomizationMaterialRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("UnitCustomizationMaterial",
     {
-        Field("textureSection", Type.U8),
-        Field("materialResourcesID", Type.U32),
-    }
-}
+        D.Field("textureSection", Type.U8),
+        D.Field("materialResourcesID", Type.U32),
+    }),
 
-M.UnitCustomizationGeosetRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("UnitCustomizationGeoset",
     {
-        Field("geosetType", Type.U8),
-        Field("geosetValue", Type.U8),
-    }
-}
+        D.Field("geosetType", Type.U8),
+        D.Field("geosetValue", Type.U8),
+    }),
 
-M.UnitRaceCustomizationChoiceRecord =
-{
-    archetype = Archetype.ClientDB,
-
-    fields = 
+    D.ClientDB("UnitRaceCustomizationChoice",
     {
-        Field("raceID", Type.U8),
-        Field("gender", Type.U8),
+        D.Field("raceID", Type.U8),
+        D.Field("gender", Type.U8),
 
-        Field("customizationOptionID", Type.U32),
-        Field("customizationOptionData1", Type.U16),
-        Field("customizationOptionData2", Type.U16),
-        Field("customizationGeosetID", Type.U32),
-        Field("customizationMaterialID1", Type.U32),
-        Field("customizationMaterialID2", Type.U32),
-        Field("customizationMaterialID3", Type.U32)
-    }
+        D.Field("customizationOptionID", Type.U32),
+        D.Field("customizationOptionData1", Type.U16),
+        D.Field("customizationOptionData2", Type.U16),
+        D.Field("customizationGeosetID", Type.U32),
+        D.Field("customizationMaterialID1", Type.U32),
+        D.Field("customizationMaterialID2", Type.U32),
+        D.Field("customizationMaterialID3", Type.U32)
+    })
 }
-
-return M

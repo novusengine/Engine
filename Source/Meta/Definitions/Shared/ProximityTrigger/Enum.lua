@@ -1,20 +1,12 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.ProximityTriggerFlagEnum =
+return D.Definitions
 {
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("ProximityTriggerFlagEnum", Type.U8,
     {
-        Field("None"),
-        Field("IsServerAuthorative", 0x1),
-        Field("IsServerSideOnly", 0x2)
-    }
+        "None",
+        { "IsServerAuthorative", 0x1 },
+        { "IsServerSideOnly", 0x2 }
+    })
 }
-
-return M

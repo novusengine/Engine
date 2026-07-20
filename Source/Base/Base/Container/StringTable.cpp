@@ -3,18 +3,20 @@
 #include "Base/Memory/Bytebuffer.h"
 #include "Base/Util/StringUtils.h"
 
+#include <xxhash/xxhash64.h>
+
 namespace Novus::Container
 {
     u32 StringTableSafe::AddString(const std::string& string)
     {
         std::unique_lock<std::shared_mutex> lock(StringTableSafe::_mutex);
 
-        u32 stringHash = 0;
+        u64 stringHash = 0;
 
         if (string.size() > 0)
         {
             // We need the hash of the string
-            stringHash = StringUtils::fnv1a_32(string.c_str(), string.length());
+            stringHash = XXHash64::hash(string.c_str(), string.length(), 0);
 
             // Check if the string already exists in this table, if so return that index
 
@@ -60,7 +62,7 @@ namespace Novus::Container
         return _strings[index];
     }
 
-    u32 StringTableSafe::GetStringHash(u32 index)
+    u64 StringTableSafe::GetStringHash(u32 index)
     {
         std::shared_lock<std::shared_mutex> lock(StringTableSafe::_mutex);
 
@@ -110,7 +112,7 @@ namespace Novus::Container
             if (!bytebuffer->GetString(string))
                 return false;
 
-            u32 hashedString = StringUtils::fnv1a_32(string.c_str(), string.size());
+            u64 hashedString = XXHash64::hash(string.c_str(), string.size(), 0);
             _strings.push_back(string);
             _hashes.push_back(hashedString);
             readSize += static_cast<u32>(string.length() + 1);
@@ -133,16 +135,16 @@ namespace Novus::Container
 
     bool StringTableSafe::TryFindString(const std::string& string, u32& index) const
     {
-        u32 hash = 0;
+        u64 hash = 0;
         if (string.size() > 0)
         {
-            hash = StringUtils::fnv1a_32(string.c_str(), string.size());
+            hash = XXHash64::hash(string.c_str(), string.size(), 0);
         }
 
         return TryFindHashedString(hash, index);
     }
 
-    bool StringTableSafe::TryFindHashedString(u32 hash, u32& index) const
+    bool StringTableSafe::TryFindHashedString(u64 hash, u32& index) const
     {
         for (size_t i = 0; i < _hashes.size(); i++)
         {
@@ -156,14 +158,14 @@ namespace Novus::Container
         return false;
     }
 
-    bool StringTableSafe::TryFindHashedStringStrict(u32 hash, u32& index) const
+    bool StringTableSafe::TryFindHashedStringStrict(u64 hash, u32& index) const
     {
         for (size_t i = 0; i < _strings.size(); i++)
         {
             std::string str = _strings[i];
             std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 
-            u32 newStrHash = StringUtils::fnv1a_32(str.c_str(), str.size());
+            u64 newStrHash = XXHash64::hash(str.c_str(), str.size(), 0);
             if (hash == newStrHash)
             {
                 index = static_cast<u32>(i);
@@ -185,12 +187,12 @@ namespace Novus::Container
 
     u32 StringTableUnsafe::AddString(const std::string& string)
     {
-        u32 stringHash = 0;
+        u64 stringHash = 0;
 
         if (string.size() > 0)
         {
             // We need the hash of the string
-            stringHash = StringUtils::fnv1a_32(string.c_str(), string.length());
+            stringHash = XXHash64::hash(string.c_str(), string.length(), 0);
 
             // Check if the string already exists in this table, if so return that index
 
@@ -225,7 +227,7 @@ namespace Novus::Container
         return _strings[index];
     }
 
-    u32 StringTableUnsafe::GetStringHash(u32 index) const
+    u64 StringTableUnsafe::GetStringHash(u32 index) const
     {
         assert(index < _hashes.size());
         return _hashes[index];
@@ -272,7 +274,7 @@ namespace Novus::Container
             if (!bytebuffer->GetString(string))
                 return false;
 
-            u32 hashedString = StringUtils::fnv1a_32(string.c_str(), string.size());
+            u64 hashedString = XXHash64::hash(string.c_str(), string.size(), 0);
             _strings.push_back(string);
             _hashes.push_back(hashedString);
             readSize += static_cast<u32>(string.length() + 1);
@@ -292,16 +294,16 @@ namespace Novus::Container
 
     bool StringTableUnsafe::TryFindString(const std::string& string, u32& index) const
     {
-        u32 hash = 0;
+        u64 hash = 0;
         if (string.size() > 0)
         {
-            hash = StringUtils::fnv1a_32(string.c_str(), string.size());
+            hash = XXHash64::hash(string.c_str(), string.size(), 0);
         }
 
         return TryFindHashedString(hash, index);
     }
 
-    bool StringTableUnsafe::TryFindHashedString(u32 hash, u32& index) const
+    bool StringTableUnsafe::TryFindHashedString(u64 hash, u32& index) const
     {
         for (size_t i = 0; i < _hashes.size(); i++)
         {
@@ -315,14 +317,14 @@ namespace Novus::Container
         return false;
     }
 
-    bool StringTableUnsafe::TryFindHashedStringStrict(u32 hash, u32& index) const
+    bool StringTableUnsafe::TryFindHashedStringStrict(u64 hash, u32& index) const
     {
         for (size_t i = 0; i < _strings.size(); i++)
         {
             std::string str = _strings[i];
             std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 
-            u32 newStrHash = StringUtils::fnv1a_32(str.c_str(), str.size());
+            u64 newStrHash = XXHash64::hash(str.c_str(), str.size(), 0);
             if (hash == newStrHash)
             {
                 index = static_cast<u32>(i);

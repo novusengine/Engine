@@ -11,21 +11,120 @@
 
 using namespace M2;
 
+namespace
+{
+    template <typename T>
+    size_t GetAnimationDataSerializedSize(const Model::ComplexModel::AnimationData<T>& animationData)
+    {
+        size_t size = sizeof(animationData.interpolationType) + sizeof(animationData.globalLoopIndex) + sizeof(u32);
+
+        for (const Model::ComplexModel::AnimationTrack<T>& track : animationData.tracks)
+        {
+            size += sizeof(u32) + track.timestamps.size() * sizeof(u32);
+            size += sizeof(u32) + track.values.size() * sizeof(T);
+        }
+
+        return size;
+    }
+}
+
 namespace Model
 {
-    bool ComplexModel::Save(const std::string& path)
+    size_t ComplexModel::GetSerializedSize() const
     {
-        // Create a file
-        std::ofstream output(path, std::ofstream::out | std::ofstream::binary);
-        if (!output)
+        size_t size = sizeof(header) + sizeof(modelHeader) + sizeof(flags);
+
+        size += sizeof(u32) + globalLoops.size() * sizeof(u32);
+        size += sequences.size() * sizeof(AnimationSequence);
+
+        for (const Bone& bone : bones)
         {
-            NC_LOG_ERROR("Failed to create CModel file. Check admin permissions");
-            return false;
+            size += sizeof(bone.keyBoneID) + sizeof(bone.flags) + sizeof(bone.parentBoneID) + sizeof(bone.submeshID);
+            size += GetAnimationDataSerializedSize(bone.translation);
+            size += GetAnimationDataSerializedSize(bone.rotation);
+            size += GetAnimationDataSerializedSize(bone.scale);
+            size += sizeof(bone.pivot);
         }
+
+        for (const Attachment& attachment : attachments)
+        {
+            size += sizeof(attachment.id) + sizeof(attachment.bone) + sizeof(attachment.position);
+            size += GetAnimationDataSerializedSize(attachment.isAnimated);
+        }
+
+        size += sizeof(u32) + animationIDToFirstSequenceID.size() * (sizeof(i16) + sizeof(i16));
+        size += sizeof(u32) + keyBoneIDToBoneIndex.size() * (sizeof(i16) + sizeof(i16));
+
+        size += sizeof(u32);
+        for (const auto& [boneIndex, children] : boneIndexToChildren)
+        {
+            size += sizeof(boneIndex) + sizeof(u16) + children.size() * sizeof(u16);
+        }
+
+        size += sizeof(u32) + attachmentIDToIndex.size() * (sizeof(i16) + sizeof(i16));
+
+        size += vertices.size() * sizeof(Vertex);
+        size += textures.size() * (sizeof(Texture::Type) + sizeof(Texture::Flags) + sizeof(u64));
+        size += materials.size() * sizeof(Material);
+
+        for (const TextureTransform& textureTransform : textureTransforms)
+        {
+            size += GetAnimationDataSerializedSize(textureTransform.translation);
+            size += GetAnimationDataSerializedSize(textureTransform.rotation);
+            size += GetAnimationDataSerializedSize(textureTransform.scale);
+        }
+
+        size += sizeof(u32) + textureIndexLookupTable.size() * sizeof(u16);
+        size += sizeof(u32) + textureUnitLookupTable.size() * sizeof(u16);
+        size += sizeof(u32) + textureTransparencyLookupTable.size() * sizeof(u16);
+        size += sizeof(u32) + textureTransformLookupTable.size() * sizeof(u16);
+        size += sizeof(u32) + textureCombinerCombos.size() * sizeof(u16);
+
+        size += sizeof(u32) + collisionVertexPositions.size() * sizeof(vec3);
+        size += sizeof(u32) + collisionIndices.size() * sizeof(u32);
+        size += sizeof(u32) + collisionNormals.size() * sizeof(std::array<u8, 2>);
+
+        for (const Camera& camera : cameras)
+        {
+            size += sizeof(camera.type) + sizeof(camera.farClip) + sizeof(camera.nearClip);
+            size += sizeof(camera.positionBase) + sizeof(camera.targetPositionBase);
+            size += GetAnimationDataSerializedSize(camera.positions);
+            size += GetAnimationDataSerializedSize(camera.targetPositions);
+            size += GetAnimationDataSerializedSize(camera.roll);
+            size += GetAnimationDataSerializedSize(camera.fov);
+        }
+
+        size += decorationSets.size() * sizeof(DecorationSet);
+        size += decorations.size() * sizeof(Decoration);
+        size += sizeof(aabbCenter) + sizeof(aabbExtents) + sizeof(cullingData);
+
+        size += modelData.vertexLookupIDs.size() * sizeof(u16);
+        size += modelData.indices.size() * sizeof(u16);
+
+        for (const RenderBatch& renderBatch : modelData.renderBatches)
+        {
+            size += sizeof(renderBatch.groupID);
+            size += sizeof(renderBatch.vertexStart) + sizeof(renderBatch.vertexCount);
+            size += sizeof(renderBatch.indexStart) + sizeof(renderBatch.indexCount);
+            size += sizeof(u8) + sizeof(u32);
+
+            for (const TextureUnit& textureUnit : renderBatch.textureUnits)
+            {
+                size += sizeof(textureUnit.flags) + 7 * sizeof(u16);
+            }
+        }
+
+        size += sizeof(u32) + physicsData.size() * sizeof(u8);
+        return size;
+    }
+
+    bool ComplexModel::Save(std::shared_ptr<Bytebuffer>& buffer)
+    {
+        bool failed = false;
 
         // Write Header
         {
-            output.write(reinterpret_cast<const char*>(&header), sizeof(FileHeader));
+            failed |= !buffer->Put(header);
         }
 
         // Set Model Header
@@ -34,6 +133,9 @@ namespace Model
             modelHeader.numVertexLookupIDs = static_cast<u32>(modelData.vertexLookupIDs.size());
             modelHeader.numIndices = static_cast<u32>(modelData.indices.size());
             modelHeader.numRenderBatches = static_cast<u32>(modelData.renderBatches.size());
+            modelHeader.numOpaqueRenderBatches = 0;
+            modelHeader.numTransparentRenderBatches = 0;
+            modelHeader.numTextureUnits = 0;
 
             for (u32 i = 0; i < modelHeader.numRenderBatches; i++)
             {
@@ -65,18 +167,18 @@ namespace Model
 
         // Write Model Header
         {
-            output.write(reinterpret_cast<const char*>(&modelHeader), sizeof(ModelHeader));
-            output.write(reinterpret_cast<const char*>(&flags), sizeof(ComplexModel::Flags));
+            failed |= !buffer->Put(modelHeader);
+            failed |= !buffer->Put(flags);
         }
 
         // Write Global Loops
         {
             u32 numElements = static_cast<u32>(globalLoops.size());
-            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+            failed |= !buffer->PutU32(numElements);
 
             if (numElements > 0)
             {
-                output.write(reinterpret_cast<const char*>(&globalLoops[0]), numElements * sizeof(u32));
+                failed |= !buffer->PutBytes(globalLoops.data(), numElements * sizeof(u32));
             }
         }
 
@@ -86,7 +188,7 @@ namespace Model
 
             if (numElements > 0)
             {
-                output.write(reinterpret_cast<const char*>(&sequences[0]), numElements * sizeof(ComplexModel::AnimationSequence));
+                failed |= !buffer->PutBytes(sequences.data(), numElements * sizeof(ComplexModel::AnimationSequence));
             }
         }
 
@@ -100,17 +202,17 @@ namespace Model
                 {
                     const ComplexModel::Bone& bone = bones[i];
 
-                    output.write(reinterpret_cast<const char*>(&bone.keyBoneID), sizeof(i32));
-                    output.write(reinterpret_cast<const char*>(&bone.flags), sizeof(u32));
+                    failed |= !buffer->PutI32(bone.keyBoneID);
+                    failed |= !buffer->Put(bone.flags);
 
-                    output.write(reinterpret_cast<const char*>(&bone.parentBoneID), sizeof(i16));
-                    output.write(reinterpret_cast<const char*>(&bone.submeshID), sizeof(u16));
+                    failed |= !buffer->PutI16(bone.parentBoneID);
+                    failed |= !buffer->PutU16(bone.submeshID);
 
-                    bone.translation.Serialize(output);
-                    bone.rotation.Serialize(output);
-                    bone.scale.Serialize(output);
+                    failed |= !bone.translation.Serialize(buffer.get());
+                    failed |= !bone.rotation.Serialize(buffer.get());
+                    failed |= !bone.scale.Serialize(buffer.get());
 
-                    output.write(reinterpret_cast<const char*>(&bone.pivot), sizeof(vec3));
+                    failed |= !buffer->Put(bone.pivot);
                 }
             }
         }
@@ -125,12 +227,12 @@ namespace Model
                 {
                     const ComplexModel::Attachment& attachment = attachments[i];
 
-                    output.write(reinterpret_cast<const char*>(&attachment.id), sizeof(u32));
-                    output.write(reinterpret_cast<const char*>(&attachment.bone), sizeof(u16));
+                    failed |= !buffer->PutU32(attachment.id);
+                    failed |= !buffer->PutU16(attachment.bone);
 
-                    output.write(reinterpret_cast<const char*>(&attachment.position), sizeof(vec3));
+                    failed |= !buffer->Put(attachment.position);
 
-                    attachment.isAnimated.Serialize(output);
+                    failed |= !attachment.isAnimated.Serialize(buffer.get());
                 }
             }
         }
@@ -138,14 +240,14 @@ namespace Model
         // Write Animation ID to First Sequence ID
         {
             u32 numElements = static_cast<u32>(animationIDToFirstSequenceID.size());
-            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+            failed |= !buffer->PutU32(numElements);
 
             if (numElements > 0)
             {
                 for (auto pair : animationIDToFirstSequenceID)
                 {
-                    output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
-                    output.write(reinterpret_cast<const char*>(&pair.second), sizeof(i16));
+                    failed |= !buffer->PutI16(pair.first);
+                    failed |= !buffer->PutI16(pair.second);
                 }
             }
         }
@@ -153,14 +255,14 @@ namespace Model
         // Write Bone Key ID to Bone Index
         {
             u32 numElements = static_cast<u32>(keyBoneIDToBoneIndex.size());
-            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+            failed |= !buffer->PutU32(numElements);
 
             if (numElements > 0)
             {
                 for (auto pair : keyBoneIDToBoneIndex)
                 {
-                    output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
-                    output.write(reinterpret_cast<const char*>(&pair.second), sizeof(i16));
+                    failed |= !buffer->PutI16(pair.first);
+                    failed |= !buffer->PutI16(pair.second);
                 }
             }
         }
@@ -168,18 +270,18 @@ namespace Model
         // Write Bone Index to Children
         {
             u32 numElements = static_cast<u32>(boneIndexToChildren.size());
-            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+            failed |= !buffer->PutU32(numElements);
 
             for (auto pair : boneIndexToChildren)
             {
-                output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
+                failed |= !buffer->PutI16(pair.first);
 
                 u16 numChildren = static_cast<u16>(pair.second.size());
-                output.write(reinterpret_cast<const char*>(&numChildren), sizeof(u16));
+                failed |= !buffer->PutU16(numChildren);
 
                 for (u16 child : pair.second)
                 {
-                    output.write(reinterpret_cast<const char*>(&child), sizeof(u16));
+                    failed |= !buffer->PutU16(child);
                 }
             }
         }
@@ -187,14 +289,14 @@ namespace Model
         // Write Animation ID to First Sequence ID
         {
             u32 numElements = static_cast<u32>(attachmentIDToIndex.size());
-            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+            failed |= !buffer->PutU32(numElements);
 
             if (numElements > 0)
             {
                 for (auto pair : attachmentIDToIndex)
                 {
-                    output.write(reinterpret_cast<const char*>(&pair.first), sizeof(i16));
-                    output.write(reinterpret_cast<const char*>(&pair.second), sizeof(i16));
+                    failed |= !buffer->PutI16(pair.first);
+                    failed |= !buffer->PutI16(pair.second);
                 }
             }
         }
@@ -205,7 +307,7 @@ namespace Model
 
             if (numVertices > 0)
             {
-                output.write(reinterpret_cast<const char*>(&vertices[0]), numVertices * sizeof(ComplexModel::Vertex));
+                failed |= !buffer->PutBytes(vertices.data(), numVertices * sizeof(ComplexModel::Vertex));
             }
         }
 
@@ -219,9 +321,9 @@ namespace Model
                 {
                     const ComplexModel::Texture& texture = textures[i];
 
-                    output.write(reinterpret_cast<const char*>(&texture.type), sizeof(ComplexModel::Texture::Type));
-                    output.write(reinterpret_cast<const char*>(&texture.flags), sizeof(ComplexModel::Texture::Flags));
-                    output.write(reinterpret_cast<const char*>(&texture.textureHash), sizeof(u32));
+                    failed |= !buffer->Put(texture.type);
+                    failed |= !buffer->Put(texture.flags);
+                    failed |= !buffer->PutU64(texture.textureHash);
                 }
             }
         }
@@ -232,7 +334,7 @@ namespace Model
 
             if (numMaterials > 0)
             {
-                output.write(reinterpret_cast<const char*>(&materials[0]), numMaterials * sizeof(ComplexModel::Material));
+                failed |= !buffer->PutBytes(materials.data(), numMaterials * sizeof(ComplexModel::Material));
             }
         }
 
@@ -246,9 +348,9 @@ namespace Model
                 {
                     const ComplexModel::TextureTransform& textureTransform = textureTransforms[i];
 
-                    textureTransform.translation.Serialize(output);
-                    textureTransform.rotation.Serialize(output);
-                    textureTransform.scale.Serialize(output);
+                    failed |= !textureTransform.translation.Serialize(buffer.get());
+                    failed |= !textureTransform.rotation.Serialize(buffer.get());
+                    failed |= !textureTransform.scale.Serialize(buffer.get());
                 }
             }
         }
@@ -256,55 +358,55 @@ namespace Model
         // Write Texture Index Lookup Table
         {
             u32 numTextureIndexLookupIDs = static_cast<u32>(textureIndexLookupTable.size());
-            output.write(reinterpret_cast<const char*>(&numTextureIndexLookupIDs), sizeof(u32));
+            failed |= !buffer->PutU32(numTextureIndexLookupIDs);
 
             if (numTextureIndexLookupIDs > 0)
             {
-                output.write(reinterpret_cast<const char*>(&textureIndexLookupTable[0]), numTextureIndexLookupIDs * sizeof(u16));
+                failed |= !buffer->PutBytes(textureIndexLookupTable.data(), numTextureIndexLookupIDs * sizeof(u16));
             }
         }
 
         // Write Texture Unit Lookup Table
         {
             u32 numTextureUnitLookupIDs = static_cast<u32>(textureUnitLookupTable.size());
-            output.write(reinterpret_cast<const char*>(&numTextureUnitLookupIDs), sizeof(u32));
+            failed |= !buffer->PutU32(numTextureUnitLookupIDs);
 
             if (numTextureUnitLookupIDs > 0)
             {
-                output.write(reinterpret_cast<const char*>(&textureUnitLookupTable[0]), numTextureUnitLookupIDs * sizeof(u16));
+                failed |= !buffer->PutBytes(textureUnitLookupTable.data(), numTextureUnitLookupIDs * sizeof(u16));
             }
         }
 
         // Write Texture Transparency Lookup Table
         {
             u32 numTextureTransparencyLookupIDs = static_cast<u32>(textureTransparencyLookupTable.size());
-            output.write(reinterpret_cast<const char*>(&numTextureTransparencyLookupIDs), sizeof(u32));
+            failed |= !buffer->PutU32(numTextureTransparencyLookupIDs);
 
             if (numTextureTransparencyLookupIDs > 0)
             {
-                output.write(reinterpret_cast<const char*>(&textureTransparencyLookupTable[0]), numTextureTransparencyLookupIDs * sizeof(u16));
+                failed |= !buffer->PutBytes(textureTransparencyLookupTable.data(), numTextureTransparencyLookupIDs * sizeof(u16));
             }
         }
 
         // Write Texture Transform Lookup Table
         {
             u32 numTextureTransformLookupIDs = static_cast<u32>(textureTransformLookupTable.size());
-            output.write(reinterpret_cast<const char*>(&numTextureTransformLookupIDs), sizeof(u32));
+            failed |= !buffer->PutU32(numTextureTransformLookupIDs);
 
             if (numTextureTransformLookupIDs > 0)
             {
-                output.write(reinterpret_cast<const char*>(&textureTransformLookupTable[0]), numTextureTransformLookupIDs * sizeof(u16));
+                failed |= !buffer->PutBytes(textureTransformLookupTable.data(), numTextureTransformLookupIDs * sizeof(u16));
             }
         }
 
         // Write Texture Combiner Combos
         {
             u32 numTextureCombinerCombos = static_cast<u32>(textureCombinerCombos.size());
-            output.write(reinterpret_cast<const char*>(&numTextureCombinerCombos), sizeof(u32));
+            failed |= !buffer->PutU32(numTextureCombinerCombos);
 
             if (numTextureCombinerCombos > 0)
             {
-                output.write(reinterpret_cast<const char*>(&textureCombinerCombos[0]), numTextureCombinerCombos * sizeof(u16));
+                failed |= !buffer->PutBytes(textureCombinerCombos.data(), numTextureCombinerCombos * sizeof(u16));
             }
         }
 
@@ -313,33 +415,33 @@ namespace Model
             // Collision Vertex Positions
             {
                 u32 numCollisionVertexPositions = static_cast<u32>(collisionVertexPositions.size());
-                output.write(reinterpret_cast<const char*>(&numCollisionVertexPositions), sizeof(u32));
+                failed |= !buffer->PutU32(numCollisionVertexPositions);
 
                 if (numCollisionVertexPositions > 0)
                 {
-                    output.write(reinterpret_cast<const char*>(&collisionVertexPositions[0]), numCollisionVertexPositions * sizeof(vec3));
+                    failed |= !buffer->PutBytes(collisionVertexPositions.data(), numCollisionVertexPositions * sizeof(vec3));
                 }
             }
 
             // Collision Indices
             {
                 u32 numCollisionIndices = static_cast<u32>(collisionIndices.size());
-                output.write(reinterpret_cast<const char*>(&numCollisionIndices), sizeof(u32));
+                failed |= !buffer->PutU32(numCollisionIndices);
 
                 if (numCollisionIndices > 0)
                 {
-                    output.write(reinterpret_cast<const char*>(&collisionIndices[0]), numCollisionIndices * sizeof(u32));
+                    failed |= !buffer->PutBytes(collisionIndices.data(), numCollisionIndices * sizeof(u32));
                 }
             }
 
             // Collision Normals
             {
                 u32 numCollisionNormals = static_cast<u32>(collisionNormals.size());
-                output.write(reinterpret_cast<const char*>(&numCollisionNormals), sizeof(u32));
+                failed |= !buffer->PutU32(numCollisionNormals);
 
                 if (numCollisionNormals > 0)
                 {
-                    output.write(reinterpret_cast<const char*>(&collisionNormals[0]), numCollisionNormals * sizeof(std::array<u8, 2>));
+                    failed |= !buffer->PutBytes(collisionNormals.data(), numCollisionNormals * sizeof(std::array<u8, 2>));
                 }
             }
         }
@@ -354,17 +456,17 @@ namespace Model
                 {
                     const ComplexModel::Camera& camera = cameras[i];
 
-                    output.write(reinterpret_cast<const char*>(&camera.type), sizeof(u32));
-                    output.write(reinterpret_cast<const char*>(&camera.farClip), sizeof(f32));
-                    output.write(reinterpret_cast<const char*>(&camera.nearClip), sizeof(f32));
+                    failed |= !buffer->PutU32(camera.type);
+                    failed |= !buffer->PutF32(camera.farClip);
+                    failed |= !buffer->PutF32(camera.nearClip);
 
-                    output.write(reinterpret_cast<const char*>(&camera.positionBase), sizeof(vec3));
-                    output.write(reinterpret_cast<const char*>(&camera.targetPositionBase), sizeof(vec3));
+                    failed |= !buffer->Put(camera.positionBase);
+                    failed |= !buffer->Put(camera.targetPositionBase);
 
-                    camera.positions.Serialize(output);
-                    camera.targetPositions.Serialize(output);
-                    camera.roll.Serialize(output);
-                    camera.fov.Serialize(output);
+                    failed |= !camera.positions.Serialize(buffer.get());
+                    failed |= !camera.targetPositions.Serialize(buffer.get());
+                    failed |= !camera.roll.Serialize(buffer.get());
+                    failed |= !camera.fov.Serialize(buffer.get());
                 }
             }
         }
@@ -372,32 +474,30 @@ namespace Model
         // Write Decoration Sets
         {
             u32 numElements = modelHeader.numDecorationSets;
-
             if (numElements > 0)
             {
-                output.write(reinterpret_cast<const char*>(&decorationSets[0]), numElements * sizeof(DecorationSet));
+                failed |= !buffer->PutBytes(decorationSets.data(), numElements * sizeof(DecorationSet));
             }
         }
 
         // Write Decorations
         {
             u32 numElements = modelHeader.numDecorations;
-
             if (numElements > 0)
             {
-                output.write(reinterpret_cast<const char*>(&decorations[0]), numElements * sizeof(Decoration));
+                failed |= !buffer->PutBytes(decorations.data(), numElements * sizeof(Decoration));
             }
         }
 
         // Write AABB
         {
-            output.write(reinterpret_cast<const char*>(&aabbCenter), sizeof(vec3));
-            output.write(reinterpret_cast<const char*>(&aabbExtents), sizeof(vec3));
+            failed |= !buffer->Put(aabbCenter);
+            failed |= !buffer->Put(aabbExtents);
         }
 
         // Write CullingData
         {
-            output.write(reinterpret_cast<const char*>(&cullingData), sizeof(CullingData));
+            failed |= !buffer->Put(cullingData);
         }
 
         // Write Model Data
@@ -405,20 +505,18 @@ namespace Model
             // Write Vertex Lookup IDs
             {
                 u32 numVertexLookupIds = modelHeader.numVertexLookupIDs;
-
                 if (numVertexLookupIds > 0)
                 {
-                    output.write(reinterpret_cast<const char*>(&modelData.vertexLookupIDs[0]), numVertexLookupIds * sizeof(u16));
+                    failed |= !buffer->PutBytes(modelData.vertexLookupIDs.data(), numVertexLookupIds * sizeof(u16));
                 }
             }
 
             // Write Indices
             {
                 u32 numIndices = modelHeader.numIndices;
-
                 if (numIndices > 0)
                 {
-                    output.write(reinterpret_cast<const char*>(&modelData.indices[0]), numIndices * sizeof(u16));
+                    failed |= !buffer->PutBytes(modelData.indices.data(), numIndices * sizeof(u16));
                 }
             }
 
@@ -430,30 +528,30 @@ namespace Model
                 {
                     const ComplexModel::RenderBatch& renderBatch = modelData.renderBatches[i];
 
-                    output.write(reinterpret_cast<const char*>(&renderBatch.groupID), sizeof(u16));
-                    output.write(reinterpret_cast<const char*>(&renderBatch.vertexStart), sizeof(u32));
-                    output.write(reinterpret_cast<const char*>(&renderBatch.vertexCount), sizeof(u32));
-                    output.write(reinterpret_cast<const char*>(&renderBatch.indexStart), sizeof(u32));
-                    output.write(reinterpret_cast<const char*>(&renderBatch.indexCount), sizeof(u32));
+                    failed |= !buffer->PutU16(renderBatch.groupID);
+                    failed |= !buffer->PutU32(renderBatch.vertexStart);
+                    failed |= !buffer->PutU32(renderBatch.vertexCount);
+                    failed |= !buffer->PutU32(renderBatch.indexStart);
+                    failed |= !buffer->PutU32(renderBatch.indexCount);
 
                     u8 isTransparent = static_cast<u8>(renderBatch.isTransparent);
-                    output.write(reinterpret_cast<const char*>(&isTransparent), sizeof(u8));
+                    failed |= !buffer->PutU8(isTransparent);
 
                     u32 numTextureUnits = static_cast<u32>(renderBatch.textureUnits.size());
-                    output.write(reinterpret_cast<const char*>(&numTextureUnits), sizeof(u32));
+                    failed |= !buffer->PutU32(numTextureUnits);
 
                     for (u32 j = 0; j < numTextureUnits; j++)
                     {
                         const ComplexModel::TextureUnit& textureUnit = renderBatch.textureUnits[j];
 
-                        output.write(reinterpret_cast<const char*>(&textureUnit.flags), sizeof(ComplexModel::TextureUnit::Flags));
-                        output.write(reinterpret_cast<const char*>(&textureUnit.shaderID), sizeof(u16));
-                        output.write(reinterpret_cast<const char*>(&textureUnit.materialIndex), sizeof(u16));
-                        output.write(reinterpret_cast<const char*>(&textureUnit.materialLayer), sizeof(u16));
-                        output.write(reinterpret_cast<const char*>(&textureUnit.textureCount), sizeof(u16));
-                        output.write(reinterpret_cast<const char*>(&textureUnit.textureIndexStart), sizeof(u16));
-                        output.write(reinterpret_cast<const char*>(&textureUnit.textureTransformIndexStart), sizeof(u16));
-                        output.write(reinterpret_cast<const char*>(&textureUnit.textureUnitLookupID), sizeof(u16));
+                        failed |= !buffer->Put(textureUnit.flags);
+                        failed |= !buffer->PutU16(textureUnit.shaderID);
+                        failed |= !buffer->PutU16(textureUnit.materialIndex);
+                        failed |= !buffer->PutU16(textureUnit.materialLayer);
+                        failed |= !buffer->PutU16(textureUnit.textureCount);
+                        failed |= !buffer->PutU16(textureUnit.textureIndexStart);
+                        failed |= !buffer->PutU16(textureUnit.textureTransformIndexStart);
+                        failed |= !buffer->PutU16(textureUnit.textureUnitLookupID);
                     }
                 }
             }
@@ -462,14 +560,15 @@ namespace Model
         // Write Physics Data
         {
             u32 numElements = static_cast<u32>(physicsData.size());
-            output.write(reinterpret_cast<const char*>(&numElements), sizeof(u32));
+            failed |= !buffer->PutU32(numElements);
 
             if (numElements > 0)
             {
-                output.write(reinterpret_cast<const char*>(&physicsData[0]), numElements * sizeof(u8));
+                failed |= !buffer->PutBytes(physicsData.data(), numElements * sizeof(u8));
             }
         }
-        return true;
+
+        return !failed;
     }
     bool ComplexModel::Read(std::shared_ptr<Bytebuffer>& buffer, ComplexModel& out)
     {
@@ -1096,8 +1195,10 @@ namespace Model
                 sequence.blendTimeStart = m2Sequence->blendTimeIn;
                 sequence.blendTimeEnd = m2Sequence->blendTimeOut;
 
-                vec3 aabbMin = CoordinateSpaces::ModelPosToNovus(m2Sequence->bounds.aabb.min);
-                vec3 aabbMax = CoordinateSpaces::ModelPosToNovus(m2Sequence->bounds.aabb.max);
+                const vec3 convertedBoundA = CoordinateSpaces::ModelPosToNovus(m2Sequence->bounds.aabb.min);
+                const vec3 convertedBoundB = CoordinateSpaces::ModelPosToNovus(m2Sequence->bounds.aabb.max);
+                const vec3 aabbMin = glm::min(convertedBoundA, convertedBoundB);
+                const vec3 aabbMax = glm::max(convertedBoundA, convertedBoundB);
 
                 sequence.aabbCenter = (aabbMin + aabbMax) * 0.5f;
                 sequence.aabbExtents = aabbMax - sequence.aabbCenter;
@@ -1690,11 +1791,11 @@ namespace Model
 
                         textureUnit.materialIndex = materialOffset + mapObjectRenderBatch.materialID;
 
-                        u32 textureIDs[3] = { MapObject::INVALID_TEXTURE_ID, MapObject::INVALID_TEXTURE_ID, MapObject::INVALID_TEXTURE_ID };
+                        u64 textureIDs[3] = { MapObject::INVALID_TEXTURE_ID, MapObject::INVALID_TEXTURE_ID, MapObject::INVALID_TEXTURE_ID };
 
                         for (u32 i = 0; i < 3; i++)
                         {
-                            u32 textureHash = mapObjectMaterial.textureID[i];
+                            u64 textureHash = mapObjectMaterial.textureID[i];
 
                             if (textureHash == MapObject::INVALID_TEXTURE_ID)
                                 continue;
@@ -1702,7 +1803,7 @@ namespace Model
                             textureUnit.textureCount++;
 
                             u32 numTextures = static_cast<u32>(out.textures.size());
-                            u32 textureIndex = MapObject::INVALID_TEXTURE_ID;
+                            u64 textureIndex = MapObject::INVALID_TEXTURE_ID;
 
                             for (u32 j = 0; j < numTextures; j++)
                             {
@@ -1739,7 +1840,7 @@ namespace Model
                         u32 textureOffset = static_cast<u32>(out.textureIndexLookupTable.size());
                         for (u32 i = 0; i < textureUnit.textureCount; i++)
                         {
-                            out.textureIndexLookupTable.push_back(textureIDs[i]);
+                            out.textureIndexLookupTable.push_back(static_cast<u16>(textureIDs[i]));
                         }
 
                         textureUnit.textureIndexStart = textureOffset;
@@ -1963,6 +2064,18 @@ namespace Model
                         if (vertex.position[j] > aabbMax[j])
                             aabbMax[j] = vertex.position[j];
                     }
+                }
+
+                // The vertices are stored in their unskinned pose. Sequence bounds are
+                // prebaked from the skinned vertices and must be included so the model
+                // bounds remain valid for every animation without runtime AABB updates.
+                for (const AnimationSequence& sequence : sequences)
+                {
+                    if (!glm::any(glm::greaterThan(sequence.aabbExtents, vec3(0.0f))))
+                        continue;
+
+                    aabbMin = glm::min(aabbMin, sequence.aabbCenter - sequence.aabbExtents);
+                    aabbMax = glm::max(aabbMax, sequence.aabbCenter + sequence.aabbExtents);
                 }
 
                 aabbCenter = (aabbMin + aabbMax) * 0.5f;

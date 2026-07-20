@@ -6,7 +6,7 @@
 
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/StringUtils.h>
-#include <Base/Util/XXHash64.h>
+#include <xxhash/xxhash64.h>
 
 #include <vulkan/vulkan.h>
 

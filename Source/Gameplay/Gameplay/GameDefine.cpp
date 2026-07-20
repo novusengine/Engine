@@ -10,7 +10,7 @@ namespace GameDefine
 {
     namespace Database
     {
-        bool ItemTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, ItemTemplate& result)
+        bool ItemTemplate::Read(Bytebuffer* buffer, ItemTemplate& result)
         {
             bool didFail = false;
 
@@ -37,7 +37,7 @@ namespace GameDefine
             bool succeeded = !didFail;
             return succeeded;
         }
-        bool ItemTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const ItemTemplate& data)
+        bool ItemTemplate::Write(Bytebuffer* buffer, const ItemTemplate& data)
         {
             bool didFail = false;
 
@@ -65,51 +65,51 @@ namespace GameDefine
             return succeeded;
         }
 
-        bool ItemStatTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, ItemStatTemplate& result)
+        bool ItemStatTemplate::Read(Bytebuffer* buffer, ItemStatTemplate& result)
         {
             bool succeeded = buffer->Get(result);
             return succeeded;
         }
-        bool ItemStatTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const ItemStatTemplate& data)
+        bool ItemStatTemplate::Write(Bytebuffer* buffer, const ItemStatTemplate& data)
         {
             bool succeeded = buffer->Put(data);
             return succeeded;
         }
 
-        bool ItemArmorTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, ItemArmorTemplate& result)
+        bool ItemArmorTemplate::Read(Bytebuffer* buffer, ItemArmorTemplate& result)
         {
             bool succeeded = buffer->Get(result);
             return succeeded;
         }
-        bool ItemArmorTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const ItemArmorTemplate& data)
+        bool ItemArmorTemplate::Write(Bytebuffer* buffer, const ItemArmorTemplate& data)
         {
             bool succeeded = buffer->Put(data);
             return succeeded;
         }
 
-        bool ItemWeaponTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, ItemWeaponTemplate& result)
+        bool ItemWeaponTemplate::Read(Bytebuffer* buffer, ItemWeaponTemplate& result)
         {
             bool succeeded = buffer->Get(result);
             return succeeded;
         }
-        bool ItemWeaponTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const ItemWeaponTemplate& data)
+        bool ItemWeaponTemplate::Write(Bytebuffer* buffer, const ItemWeaponTemplate& data)
         {
             bool succeeded = buffer->Put(data);
             return succeeded;
         }
 
-        bool ItemShieldTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, ItemShieldTemplate& result)
+        bool ItemShieldTemplate::Read(Bytebuffer* buffer, ItemShieldTemplate& result)
         {
             bool succeeded = buffer->Get(result);
             return succeeded;
         }
-        bool ItemShieldTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const ItemShieldTemplate& data)
+        bool ItemShieldTemplate::Write(Bytebuffer* buffer, const ItemShieldTemplate& data)
         {
             bool succeeded = buffer->Put(data);
             return succeeded;
         }
 
-        bool CreatureTemplate::Read(std::shared_ptr<Bytebuffer>& buffer, CreatureTemplate& result)
+        bool CreatureTemplate::Read(Bytebuffer* buffer, CreatureTemplate& result)
         {
             bool didFail = false;
 
@@ -132,7 +132,7 @@ namespace GameDefine
             bool succeeded = !didFail;
             return succeeded;
         }
-        bool CreatureTemplate::Write(std::shared_ptr<Bytebuffer>& buffer, const CreatureTemplate& data)
+        bool CreatureTemplate::Write(Bytebuffer* buffer, const CreatureTemplate& data)
         {
             bool didFail = false;
 
@@ -156,7 +156,7 @@ namespace GameDefine
             return succeeded;
         }
 
-        bool Map::Read(std::shared_ptr<Bytebuffer>& buffer, Map& result)
+        bool Map::Read(Bytebuffer* buffer, Map& result)
         {
             bool didFail = false;
 
@@ -171,7 +171,7 @@ namespace GameDefine
             bool succeeded = !didFail;
             return succeeded;
         }
-        bool Map::Write(std::shared_ptr<Bytebuffer>& buffer, const Map& data)
+        bool Map::Write(Bytebuffer* buffer, const Map& data)
         {
             bool didFail = false;
 
@@ -188,7 +188,7 @@ namespace GameDefine
             return succeeded;
         }
 
-        bool MapLocation::Read(std::shared_ptr<Bytebuffer>& buffer, MapLocation& result)
+        bool MapLocation::Read(Bytebuffer* buffer, MapLocation& result)
         {
             bool didFail = false;
 
@@ -204,7 +204,7 @@ namespace GameDefine
             bool succeeded = !didFail;
             return succeeded;
         }
-        bool MapLocation::Write(std::shared_ptr<Bytebuffer>& buffer, const MapLocation& data)
+        bool MapLocation::Write(Bytebuffer* buffer, const MapLocation& data)
         {
             bool didFail = false;
 
@@ -221,7 +221,7 @@ namespace GameDefine
             return succeeded;
         }
 
-        bool Spell::Read(std::shared_ptr<Bytebuffer>& buffer, Spell& result)
+        bool Spell::Read(Bytebuffer* buffer, Spell& result)
         {
             bool didFail = false;
 
@@ -237,7 +237,7 @@ namespace GameDefine
             bool succeeded = !didFail;
             return succeeded;
         }
-        bool Spell::Write(std::shared_ptr<Bytebuffer>& buffer, const Spell& data)
+        bool Spell::Write(Bytebuffer* buffer, const Spell& data)
         {
             bool didFail = false;
 
@@ -254,7 +254,7 @@ namespace GameDefine
             return succeeded;
         }
 
-        bool SpellEffect::Read(std::shared_ptr<Bytebuffer>& buffer, SpellEffect& result)
+        bool SpellEffect::Read(Bytebuffer* buffer, SpellEffect& result)
         {
             bool didFail = false;
 
@@ -263,7 +263,7 @@ namespace GameDefine
             bool succeeded = !didFail;
             return succeeded;
         }
-        bool SpellEffect::Write(std::shared_ptr<Bytebuffer>& buffer, const SpellEffect& data)
+        bool SpellEffect::Write(Bytebuffer* buffer, const SpellEffect& data)
         {
             bool didFail = false;
 
@@ -273,7 +273,7 @@ namespace GameDefine
             return succeeded;
         }
 
-        bool SpellProcData::Read(std::shared_ptr<Bytebuffer>& buffer, SpellProcData& result)
+        bool SpellProcData::Read(Bytebuffer* buffer, SpellProcData& result)
         {
             bool didFail = false;
 
@@ -282,7 +282,7 @@ namespace GameDefine
             bool succeeded = !didFail;
             return succeeded;
         }
-        bool SpellProcData::Write(std::shared_ptr<Bytebuffer>& buffer, const SpellProcData& data)
+        bool SpellProcData::Write(Bytebuffer* buffer, const SpellProcData& data)
         {
             bool didFail = false;
 

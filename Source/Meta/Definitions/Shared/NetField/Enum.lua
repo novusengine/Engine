@@ -1,54 +1,34 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.ObjectNetFieldEnum =
+return D.Definitions
 {
-    archetype = Archetype.NetField,
-    type = Type.U16,
-
-    fields = 
+    D.NetField("ObjectNetFieldEnum", Type.U16,
     {
-        Field("ObjectGUIDLow", 0x0),
-        Field("ObjectGUIDHigh", 0x1),
-        Field("Scale", 0x2)
-    }
-}
+        D.Field("ObjectGUIDLow", 0x0),
+        D.Field("ObjectGUIDHigh", 0x1),
+        D.Field("Scale", 0x2)
+    }),
 
-M.UnitNetFieldEnum =
-{
-    archetype = Archetype.NetField,
-    type = Type.U16,
-
-    fields = 
+    D.NetField("UnitNetFieldEnum", Type.U16,
     {
-        Field("LevelRaceGenderClassPacked", 0x0),
-        Field("DisplayID", 0x1)
-    }
-}
+        D.Field("LevelRaceGenderClassPacked", 0x0),
+        D.Field("DisplayID", 0x1)
+    }),
 
-M.UnitLevelRaceGenderClassPackedInfoEnum =
-{
-    archetype = Archetype.NetField,
-    type = Type.U8,
-
-    fields = 
+    D.NetField("UnitLevelRaceGenderClassPackedInfoEnum", Type.U8,
     {
-        Field("LevelByteOffset", 0x0),
-        Field("LevelBitOffset", 0x0),
-        Field("RaceBitOffset", 0x0),
-        Field("RaceByteOffset", 0x2),
-        Field("GenderByteOffset", 0x2),
-        Field("ClassByteOffset", 0x2),
-        Field("GenderBitSize", 0x2),
-        Field("GenderBitOffset", 0x7),
-        Field("ClassBitSize", 0x7),
-        Field("RaceBitSize", 0x7),
-        Field("ClassBitOffset", 0x9),
-        Field("LevelBitSize", 0x10),
-    }
+        D.Field("LevelByteOffset", 0x0),
+        D.Field("LevelBitOffset", 0x0),
+        D.Field("RaceBitOffset", 0x0),
+        D.Field("RaceByteOffset", 0x2),
+        D.Field("GenderByteOffset", 0x2),
+        D.Field("ClassByteOffset", 0x2),
+        D.Field("GenderBitSize", 0x2),
+        D.Field("GenderBitOffset", 0x7),
+        D.Field("ClassBitSize", 0x7),
+        D.Field("RaceBitSize", 0x7),
+        D.Field("ClassBitOffset", 0x9),
+        D.Field("LevelBitSize", 0x10),
+    })
 }
-
-return M

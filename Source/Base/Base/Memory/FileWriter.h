@@ -3,34 +3,64 @@
 #include "Base/Memory/Bytebuffer.h"
 #include "Base/Util/DebugHandler.h"
 
-#include <fstream>
 #include <filesystem>
+#include <fstream>
+#include <utility>
 
 class Bytebuffer;
 class FileWriter
 {
 public:
-    FileWriter(std::filesystem::path path, std::shared_ptr<Bytebuffer>& buffer) : _path(path), _buffer(buffer) { }
+    FileWriter() { }
+    ~FileWriter() { Close(); }
 
-    bool Write()
+    const std::filesystem::path& GetPath() { return _path; }
+    void SetPath(std::filesystem::path path)
     {
-        // Create a file
-        std::ofstream output(_path, std::ofstream::out | std::ofstream::binary);
-        if (!output)
+        _path = path;
+    }
+
+    bool Open(std::filesystem::path path, std::ios_base::openmode openmode = std::ofstream::out | std::ofstream::binary)
+    {
+        _path = std::move(path);
+        _stream = std::ofstream(_path, openmode);
+        if (!_stream)
         {
-            NC_LOG_ERROR("[FileWriter] Failed to create file ({0}). Check admin permissions", _path.string());
+            NC_LOG_ERROR("[FileWriter] Failed to create/open file ({0}). Check user permissions", _path.string());
             return false;
         }
 
-        output.write(reinterpret_cast<char const*>(_buffer->GetDataPointer()), _buffer->writtenData);
-
-        output.close();
         return true;
     }
 
-    const std::filesystem::path& GetPath() { return _path; }
+    bool Close()
+    {
+        if (!_stream)
+            return true;
+
+        _stream.close();
+        return true;
+    }
+
+    bool Write(std::shared_ptr<Bytebuffer>& buffer)
+    {
+        if (!_stream)
+            return false;
+
+        _stream.write(reinterpret_cast<char const*>(buffer->GetDataPointer()), buffer->writtenData);
+        return true;
+    }
+
+    bool Write(std::vector<u8>& buffer)
+    {
+        if (!_stream)
+            return false;
+
+        _stream.write(reinterpret_cast<char const*>(buffer.data()), buffer.size());
+        return true;
+    }
 
 private:
     std::filesystem::path _path;
-    std::shared_ptr<Bytebuffer> _buffer;
+    std::ofstream _stream;
 };

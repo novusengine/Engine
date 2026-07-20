@@ -24,7 +24,7 @@ namespace Model
     struct ComplexModel
     {
     public:
-        static const u32 CURRENT_VERSION = 9;
+        static const u32 CURRENT_VERSION = 10;
 
         struct Flags
         {
@@ -168,36 +168,40 @@ namespace Model
                 return *this;
             }
 
-            void Serialize(std::ofstream& stream) const
+            bool Serialize(Bytebuffer* buffer) const
             {
-                stream.write(reinterpret_cast<char const*>(&interpolationType), sizeof(AnimationInterpolationType));
-                stream.write(reinterpret_cast<char const*>(&globalLoopIndex), sizeof(i16));
+                bool failed = false;
+
+                failed |= !buffer->Put(interpolationType);
+                failed |= !buffer->PutI16(globalLoopIndex);
 
                 u32 numTracks = static_cast<u32>(tracks.size());
                 {
-                    stream.write(reinterpret_cast<char const*>(&numTracks), sizeof(u32));
+                    failed |= !buffer->PutU32(numTracks);
 
                     for (u32 i = 0; i < numTracks; i++)
                     {
                         const AnimationTrack<T>& track = tracks[i];
 
                         u32 numTimestamps = static_cast<u32>(track.timestamps.size());
-                        stream.write(reinterpret_cast<char const*>(&numTimestamps), sizeof(u32));
+                        failed |= !buffer->PutU32(numTimestamps);
 
                         if (numTimestamps)
                         {
-                            stream.write(reinterpret_cast<char const*>(track.timestamps.data()), numTimestamps * sizeof(u32));
+                            failed |= !buffer->PutBytes(track.timestamps.data(), numTimestamps * sizeof(u32));
                         }
 
                         u32 numValues = static_cast<u32>(track.values.size());
-                        stream.write(reinterpret_cast<char const*>(&numValues), sizeof(u32));
+                        failed |= !buffer->PutU32(numValues);
 
                         if (numValues)
                         {
-                            stream.write(reinterpret_cast<char const*>(track.values.data()), numValues * sizeof(T));
+                            failed |= !buffer->PutBytes(track.values.data(), numValues * sizeof(T));
                         }
                     }
                 }
+
+                return !failed;
             }
             bool Deserialize(Bytebuffer* buffer)
             {
@@ -322,7 +326,7 @@ namespace Model
             Type type = { };
             Flags flags = { };
 
-            u32 textureHash = 0;
+            u64 textureHash = 0;
         };
         struct Vertex
         {
@@ -525,7 +529,7 @@ namespace Model
         };
         struct Decoration
         {
-            u32 nameID = 0;
+            u64 nameID = 0;
             vec3 position = vec3(0.0f, 0.0f, 0.0f);
             quat rotation = quat(1.0f, 0.0f, 0.0f, 0.0f);
             f32 scale = 0.0f;
@@ -611,7 +615,8 @@ namespace Model
         std::vector<u8> physicsData;
 
     public:
-        bool Save(const std::string& path);
+        size_t GetSerializedSize() const;
+        bool Save(std::shared_ptr<Bytebuffer>& buffer);
 
         static bool Read(std::shared_ptr<Bytebuffer>& buffer, ComplexModel& out);
         static bool ReadHeader(std::shared_ptr<Bytebuffer>& buffer, ModelHeader& out);

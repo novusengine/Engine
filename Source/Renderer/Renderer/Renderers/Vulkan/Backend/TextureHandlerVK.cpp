@@ -22,7 +22,7 @@
 #include <Base/Container/SafeVector.h>
 #include <Base/Util/DebugHandler.h>
 #include <Base/Util/StringUtils.h>
-#include <Base/Util/XXHash64.h>
+#include <xxhash/xxhash64.h>
 
 #include <vulkan/vulkan.h>
 #include <gli/gli.hpp>
@@ -30,9 +30,9 @@
 #include <tracy/Tracy.hpp>
 #include <robinhood/robinhood.h>
 
-#include <vector>
-#include <queue>
 #include <filesystem>
+#include <queue>
+#include <vector>
 
 namespace Renderer
 {
@@ -253,6 +253,67 @@ namespace Renderer
 
             return textureID;
         }
+        TextureID TextureHandlerVK::LoadDataTexture(const DataTextureDesc& desc)
+        {
+            ZoneScoped;
+
+            if (desc.hash == 0 || desc.data == nullptr || desc.size == 0)
+            {
+                NC_LOG_CRITICAL("TextureHandlerVK::LoadDataTexture : Hash, data, and size must be set");
+                return { };
+            }
+
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+
+            // Check the cache, we only want to do this for LOADED textures though, never CREATED data textures
+            size_t nextID;
+            u64 cacheDescHash = desc.hash;
+            if (TryFindExistingTexture(cacheDescHash, nextID))
+            {
+                TextureID::type id = static_cast<TextureID::type>(nextID);
+
+                const Texture* texture = nullptr;
+
+                data.textures.ReadLock(
+                    [&](const std::vector<Texture*>& textures)
+                    {
+                        texture = textures[id];
+                    });
+
+                if (texture->loaded)
+                {
+                    return TextureID(id); // We already loaded this texture
+                }
+            }
+
+            // TODO: Check the clearlist before allocating a new one
+
+            TextureID textureID;
+            Texture* texture = new Texture();
+
+            data.textures.WriteLock(
+                [&](std::vector<Texture*>& textures)
+                {
+                    size_t nextHandle = textures.size();
+
+                    // Make sure we haven't exceeded the limit of the ImageID type, if this hits you need to change type of ImageID to something bigger
+                    if (nextHandle >= TextureID::MaxValue())
+                    {
+                        NC_LOG_CRITICAL("We exceeded the limit of the TextureID type!");
+                    }
+
+                    textures.push_back(texture);
+                    textureID = TextureID(static_cast<TextureID::type>(nextHandle));
+                });
+
+            texture->hash = cacheDescHash;
+            texture->desc.debugName = std::to_string(cacheDescHash);
+
+            texture->textureIndex = static_cast<TextureID::type>(textureID);
+            LoadFromMemory(desc.data, desc.size, *texture, textureID);
+
+            return textureID;
+        }
 
         TextureID TextureHandlerVK::LoadTextureIntoArray(const TextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates)
         {
@@ -261,7 +322,7 @@ namespace Renderer
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
             TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
             
-            if (data.textureArrays.Size() < id)
+            if (id >= data.textureArrays.Size())
             {
                 NC_LOG_CRITICAL("TextureHandlerVK::LoadTextureIntoArray : Tried to load texture into array ({0}) that doesn't exist", id);
             }
@@ -290,6 +351,45 @@ namespace Renderer
 
             arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash, true);
             
+            return textureID;
+        }
+        TextureID TextureHandlerVK::LoadDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates)
+        {
+            ZoneScoped;
+
+            if (desc.hash == 0 || desc.data == nullptr || desc.size == 0)
+            {
+                NC_LOG_CRITICAL("TextureHandlerVK::LoadDataTextureIntoArray : Hash, data, and size must be set");
+                return { };
+            }
+
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
+
+            if (id >= data.textureArrays.Size())
+            {
+                NC_LOG_CRITICAL("TextureHandlerVK::LoadTextureIntoArray : Tried to load texture into array ({0}) that doesn't exist", id);
+            }
+
+            // Check the cache, we only want to do this for LOADED textures though, never CREATED data textures
+            size_t nextID;
+            u64 descHash = desc.hash;
+
+            TextureID textureID;
+
+            if (!allowDuplicates)
+            {
+                if (TryFindExistingTextureInArray(textureArrayID, descHash, nextID, textureID))
+                {
+                    arrayIndex = static_cast<u32>(nextID);
+                    return textureID; // This texture already exists in this array
+                }
+            }
+
+            textureID = LoadDataTexture(desc);
+
+            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash, true);
+
             return textureID;
         }
 
@@ -891,6 +991,7 @@ namespace Renderer
             int channels;
 
             void* pixels = stbi_load(filename.c_str(), &texture.desc.width, &texture.desc.height, &channels, STBI_rgb_alpha);
+            const bool freePixels = pixels != nullptr;
 
             gli::texture gliTexture;
 
@@ -953,6 +1054,89 @@ namespace Renderer
 
                 // Copy data to upload buffer
                 memcpy(uploadBuffer->mappedMemory, pixels, texture.uploadSize);
+            }
+
+            if (freePixels)
+            {
+                stbi_image_free(pixels);
+            }
+        }
+
+        void TextureHandlerVK::LoadFromMemory(const u8* data, size_t size, Texture& texture, TextureID textureID)
+        {
+            ZoneScoped;
+
+            int channels;
+
+            void* pixels = stbi_load_from_memory(data, static_cast<i32>(size), &texture.desc.width, &texture.desc.height, &channels, STBI_rgb_alpha);
+            const bool freePixels = pixels != nullptr;
+
+            gli::texture gliTexture;
+
+            // If stbi could open this file
+            if (pixels != nullptr)
+            {
+                // This is hardcoded to 4 instead of channels since STBI is loading it as STBI_rgb_alpha, making it 4 channels
+                texture.uploadSize = texture.desc.width * texture.desc.height * 4;
+                texture.desc.format = Renderer::ImageFormat::R8G8B8A8_UNORM;
+                texture.desc.layers = 1; // If we are not loading using gli we don't support layers, so don't bother with it
+
+                texture.desc.mipLevels = static_cast<u32>(std::floor(std::log2(std::max(texture.desc.width, texture.desc.height)))) + 1;
+                u32 totalSize = 0;
+
+                u32 width = texture.desc.width;
+                u32 height = texture.desc.height;
+
+                for (size_t i = 0; i < texture.desc.mipLevels; i++)
+                {
+                    u32 size = width * height * 4;
+                    totalSize += size;
+
+                    if (width > 1) width /= 2;
+                    if (height > 1) height /= 2;
+                }
+                texture.totalSize = totalSize;
+                texture.numGeneratedMipLevels = texture.desc.mipLevels - 1;
+            }
+            else
+            {
+                // Try to open it with gli
+                gliTexture = gli::load(reinterpret_cast<const char*>(data), size);
+                if (gliTexture.empty())
+                {
+                    NC_LOG_CRITICAL("Failed to load texture ({0})", "Unknown");
+                }
+
+                gli::gl gl(gli::gl::PROFILE_GL33);
+                gli::gl::format const gliFormat = gl.translate(gliTexture.format(), gliTexture.swizzles());
+
+                texture.desc.width = gliTexture.extent().x;
+                texture.desc.height = gliTexture.extent().y;
+                texture.desc.layers = gliTexture.extent().z;//static_cast<i32>(gliTexture.layers());
+                texture.desc.mipLevels = static_cast<i32>(gliTexture.levels());
+
+                texture.desc.format = FormatConverterVK::ToImageFormat(vkGetFormatFromOpenGLInternalFormat(gliFormat.Internal));
+                texture.uploadSize = gliTexture.size();
+                texture.totalSize = texture.uploadSize; // TODO: Support generating mipmaps for loaded DDSes?
+
+                pixels = gliTexture.data();
+            }
+
+            {
+                ZoneScopedN("CreateTexture");
+                // Create texture
+                CreateTexture(texture);
+
+                // Create upload buffer
+                auto uploadBuffer = _uploadBufferHandler->CreateUploadBuffer(textureID, 0, texture.uploadSize, texture.numGeneratedMipLevels);
+
+                // Copy data to upload buffer
+                memcpy(uploadBuffer->mappedMemory, pixels, texture.uploadSize);
+            }
+
+            if (freePixels)
+            {
+                stbi_image_free(pixels);
             }
         }
 

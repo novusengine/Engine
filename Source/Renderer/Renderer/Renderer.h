@@ -105,7 +105,9 @@ namespace Renderer
 
         // Loading
         virtual TextureID LoadTexture(TextureDesc& desc) = 0;
+        virtual TextureID LoadDataTexture(DataTextureDesc& desc) = 0;
         virtual TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) = 0;
+        virtual TextureID LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) = 0;
 
         virtual VertexShaderID LoadShader(VertexShaderDesc& desc) = 0;
         virtual PixelShaderID LoadShader(PixelShaderDesc& desc) = 0;

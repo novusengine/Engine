@@ -428,8 +428,8 @@ Solution.Util.SetFilter = function(value, callback)
 
     if callback then
         callback()
-        Solution.Util.ClearFilter()
     end
+    Solution.Util.ClearFilter()
 end
 
 Solution.Util.ClearFilter = function()

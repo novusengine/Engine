@@ -1,564 +1,333 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.ClientConnectPacket =
+return D.Definitions
 {
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientConnectPacket",
     {
-        Field("accountName", Type.STRING)
-    }
-}
+        D.Field("accountName", Type.STRING)
+    }),
 
-M.ServerConnectResultPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerConnectResultPacket",
     {
-        Field("result", Type.U8)
-    }
-}
+        D.Field("result", Type.U8)
+    }),
 
-M.ServerAuthChallengePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerAuthChallengePacket",
     {
-        Field("challenge", Type.ARRAY, { type = Type.U8, count = 36 })
-    }
-}
+        D.Field("challenge", Type.ARRAY, { type = Type.U8, count = 36 })
+    }),
 
-M.ClientAuthChallengePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientAuthChallengePacket",
     {
-        Field("challenge", Type.ARRAY, { type = Type.U8, count = 32 })
-    }
-}
+        D.Field("challenge", Type.ARRAY, { type = Type.U8, count = 32 })
+    }),
 
-M.ServerAuthProofPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerAuthProofPacket",
     {
-        Field("proof", Type.ARRAY, { type = Type.U8, count = 64 })
-    }
-}
+        D.Field("proof", Type.ARRAY, { type = Type.U8, count = 64 })
+    }),
 
-M.ClientAuthProofPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientAuthProofPacket",
     {
-        Field("proof", Type.ARRAY, { type = Type.U8, count = 32 })
-    }
-}
+        D.Field("proof", Type.ARRAY, { type = Type.U8, count = 32 })
+    }),
 
-M.ClientPingPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientPingPacket",
     {
-        Field("ping", Type.U16)
-    }
-}
+        D.Field("ping", Type.U16)
+    }),
 
-M.ServerPongPacket =
-{
-    archetype = Archetype.Packet,
+    D.Packet("ServerPongPacket",
+    {}),
 
-    fields = {}
-}
-
-M.ServerUpdateStatsPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUpdateStatsPacket",
     {
-        Field("serverTickTime", Type.U8)
-    }
-}
+        D.Field("serverTickTime", Type.U8)
+    }),
 
-M.ServerCharacterListPacket =
-{
-    archetype = Archetype.Packet,
+    D.Packet("ServerCharacterListPacket",
+    {}),
 
-    fields = {}
-}
-
-M.ClientCharacterSelectPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientCharacterSelectPacket",
     {
-        Field("characterIndex", Type.U8)
-    }
-}
+        D.Field("characterIndex", Type.U8)
+    }),
 
-M.ClientCharacterLogoutPacket =
-{
-    archetype = Archetype.Packet,
+    D.Packet("ClientCharacterLogoutPacket",
+    {}),
 
-    fields = {}
-}
+    D.Packet("ServerCharacterLogoutPacket",
+    {}),
 
-M.ServerCharacterLogoutPacket =
-{
-    archetype = Archetype.Packet,
+    D.Packet("ServerWorldTransferPacket",
+    {}),
 
-    fields = {}
-}
-
-M.ServerWorldTransferPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields = {}
-}
-
-M.ServerLoadMapPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerLoadMapPacket",
     {
-        Field("mapID", Type.U32)
-    }
-}
+        D.Field("mapID", Type.U32)
+    }),
 
-M.ServerUnitAddPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitAddPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("name", Type.STRING),
-        Field("unitClass", Type.U8),
-        Field("position", Type.VEC3),
-        Field("scale", Type.VEC3),
-        Field("pitchYaw", Type.VEC2)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("name", Type.STRING),
+        D.Field("unitClass", Type.U8),
+        D.Field("position", Type.VEC3),
+        D.Field("scale", Type.VEC3),
+        D.Field("pitchYaw", Type.VEC2)
+    }),
 
-M.ServerUnitRemovePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitRemovePacket",
     {
-        Field("guid", Type.OBJECTGUID)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID)
+    }),
 
-M.ServerObjectNetFieldUpdatePacket =
-{
-    archetype = Archetype.Packet,
+    D.Packet("ServerObjectNetFieldUpdatePacket",
+    {}),
 
-    fields = {}
-}
+    D.Packet("ServerUnitNetFieldUpdatePacket",
+    {}),
 
-M.ServerUnitNetFieldUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields = {}
-}
-
-M.ServerUnitStatUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitStatUpdatePacket",
     {
-        Field("kind", Type.U8),
-        Field("base", Type.F64),
-        Field("current", Type.F64)
-    }
-}
+        D.Field("kind", Type.U8),
+        D.Field("base", Type.F64),
+        D.Field("current", Type.F64)
+    }),
 
-M.ServerUnitResistanceUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitResistanceUpdatePacket",
     {
-        Field("kind", Type.U8),
-        Field("base", Type.F64),
-        Field("current", Type.F64),
-        Field("max", Type.F64)
-    }
-}
+        D.Field("kind", Type.U8),
+        D.Field("base", Type.F64),
+        D.Field("current", Type.F64),
+        D.Field("max", Type.F64)
+    }),
 
-M.ServerUnitPowerUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitPowerUpdatePacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("kind", Type.U8),
-        Field("base", Type.F64),
-        Field("current", Type.F64),
-        Field("max", Type.F64)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("kind", Type.U8),
+        D.Field("base", Type.F64),
+        D.Field("current", Type.F64),
+        D.Field("max", Type.F64)
+    }),
 
-M.ServerUnitEquippedItemUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitEquippedItemUpdatePacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("slot", Type.U8),
-        Field("itemID", Type.U32)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("slot", Type.U8),
+        D.Field("itemID", Type.U32)
+    }),
 
-M.ServerUnitVisualItemUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitVisualItemUpdatePacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("slot", Type.U8),
-        Field("itemID", Type.U32)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("slot", Type.U8),
+        D.Field("itemID", Type.U32)
+    }),
 
-M.ServerContainerAddPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerContainerAddPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("index", Type.U16),
-        Field("itemID", Type.U32),
-        Field("numSlots", Type.U16),
-        Field("numFreeSlots", Type.U16)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("index", Type.U16),
+        D.Field("itemID", Type.U32),
+        D.Field("numSlots", Type.U16),
+        D.Field("numFreeSlots", Type.U16)
+    }),
 
-M.ServerContainerAddToSlotPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerContainerAddToSlotPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("index", Type.U16),
-        Field("slot", Type.U16)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("index", Type.U16),
+        D.Field("slot", Type.U16)
+    }),
 
-M.ServerContainerRemoveFromSlotPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerContainerRemoveFromSlotPacket",
     {
-        Field("index", Type.U16),
-        Field("slot", Type.U16)
-    }
-}
+        D.Field("index", Type.U16),
+        D.Field("slot", Type.U16)
+    }),
 
-M.SharedContainerSwapSlotsPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("SharedContainerSwapSlotsPacket",
     {
-        Field("srcContainer", Type.U16),
-        Field("dstContainer", Type.U16),
-        Field("srcSlot", Type.U16),
-        Field("dstSlot", Type.U16)
-    }
-}
+        D.Field("srcContainer", Type.U16),
+        D.Field("dstContainer", Type.U16),
+        D.Field("srcSlot", Type.U16),
+        D.Field("dstSlot", Type.U16)
+    }),
 
-M.ServerItemAddPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerItemAddPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("itemID", Type.U32),
-        Field("count", Type.U16),
-        Field("durability", Type.U16)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("itemID", Type.U32),
+        D.Field("count", Type.U16),
+        D.Field("durability", Type.U16)
+    }),
 
-M.ServerSendCombatEventPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerSendCombatEventPacket",
     {
-        Field("eventID", Type.U16)
-    }
-}
+        D.Field("eventID", Type.U16)
+    }),
 
-M.ClientUnitTargetUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientUnitTargetUpdatePacket",
     {
-        Field("targetGUID", Type.OBJECTGUID)
-    }
-}
+        D.Field("targetGUID", Type.OBJECTGUID)
+    }),
 
-M.ServerUnitTargetUpdatePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitTargetUpdatePacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("targetGUID", Type.OBJECTGUID)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("targetGUID", Type.OBJECTGUID)
+    }),
 
-M.ClientSpellCastPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientSpellCastPacket",
     {
-        Field("spellID", Type.U32)
-    }
-}
+        D.Field("spellID", Type.U32)
+    }),
 
-M.ServerSpellCastResultPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerSpellCastResultPacket",
     {
-        Field("result", Type.U8)
-    }
-}
+        D.Field("result", Type.U8)
+    }),
 
-M.ServerUnitCastSpellPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitCastSpellPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("spellID", Type.U32),
-        Field("castTime", Type.F32),
-        Field("timeToCast", Type.F32)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("spellID", Type.U32),
+        D.Field("castTime", Type.F32),
+        D.Field("timeToCast", Type.F32)
+    }),
 
-M.ServerUnitAddAuraPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitAddAuraPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("auraInstanceID", Type.U32),
-        Field("spellID", Type.U32),
-        Field("duration", Type.F32),
-        Field("stacks", Type.U16)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("auraInstanceID", Type.U32),
+        D.Field("spellID", Type.U32),
+        D.Field("duration", Type.F32),
+        D.Field("stacks", Type.U16)
+    }),
 
-M.ServerUnitUpdateAuraPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitUpdateAuraPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("auraInstanceID", Type.U32),
-        Field("duration", Type.F32),
-        Field("stacks", Type.U16)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("auraInstanceID", Type.U32),
+        D.Field("duration", Type.F32),
+        D.Field("stacks", Type.U16)
+    }),
 
-M.ServerUnitRemoveAuraPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitRemoveAuraPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("auraInstanceID", Type.U32)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("auraInstanceID", Type.U32)
+    }),
 
-M.ServerUnitSetMoverPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitSetMoverPacket",
     {
-        Field("guid", Type.OBJECTGUID)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID)
+    }),
 
-M.ServerUnitMovePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitMovePacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("movementFlags", Type.U32),
-        Field("position", Type.VEC3),
-        Field("pitchYaw", Type.VEC2),
-        Field("verticalVelocity", Type.F32)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("movementFlags", Type.U32),
+        D.Field("position", Type.VEC3),
+        D.Field("pitchYaw", Type.VEC2),
+        D.Field("verticalVelocity", Type.F32)
+    }),
 
-M.SharedUnitMoveStopPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("SharedUnitMoveStopPacket",
     {
-        Field("guid", Type.OBJECTGUID)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID)
+    }),
 
-M.ServerUnitTeleportPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerUnitTeleportPacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("position", Type.VEC3),
-        Field("orientation", Type.F32)
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("position", Type.VEC3),
+        D.Field("orientation", Type.F32)
+    }),
 
-M.ClientUnitMovePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientUnitMovePacket",
     {
-        Field("movementFlags", Type.U32),
-        Field("position", Type.VEC3),
-        Field("pitchYaw", Type.VEC2),
-        Field("verticalVelocity", Type.F32)
-    }
-}
+        D.Field("movementFlags", Type.U32),
+        D.Field("position", Type.VEC3),
+        D.Field("pitchYaw", Type.VEC2),
+        D.Field("verticalVelocity", Type.F32)
+    }),
 
-M.ClientSendChatMessagePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientSendChatMessagePacket",
     {
-        Field("message", Type.STRING)
-    }
-}
+        D.Field("message", Type.STRING)
+    }),
 
-M.ServerSendChatMessagePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerSendChatMessagePacket",
     {
-        Field("guid", Type.OBJECTGUID),
-        Field("message", Type.STRING),
-    }
-}
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("message", Type.STRING),
+    }),
 
-M.ServerTriggerAddPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerTriggerAddPacket",
     {
-        Field("triggerID", Type.U32),
-        Field("name", Type.STRING),
-        Field("flags", Type.U8),
-        Field("mapID", Type.U16),
-        Field("position", Type.VEC3),
-        Field("extents", Type.VEC3)
-    }
-}
+        D.Field("triggerID", Type.U32),
+        D.Field("name", Type.STRING),
+        D.Field("flags", Type.U8),
+        D.Field("mapID", Type.U32),
+        D.Field("position", Type.VEC3),
+        D.Field("extents", Type.VEC3)
+    }),
 
-M.ServerTriggerRemovePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerTriggerRemovePacket",
     {
-        Field("triggerID", Type.U32)
-    }
-}
+        D.Field("triggerID", Type.U32)
+    }),
 
-M.ClientTriggerEnterPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientTriggerEnterPacket",
     {
-        Field("triggerID", Type.U32)
-    }
-}
+        D.Field("triggerID", Type.U32)
+    }),
 
-M.ClientPathGeneratePacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientPathGeneratePacket",
     {
-        Field("start", Type.VEC3),
-        Field("end", Type.VEC3)
-    }
-}
+        D.Field("start", Type.VEC3),
+        D.Field("end", Type.VEC3)
+    }),
 
-M.ServerPathVisualizationPacket =
-{
-    archetype = Archetype.Packet,
+    D.Packet("ServerPathVisualizationPacket",
+    {}),
 
-    fields = {}
-}
-
-M.ClientSendCheatCommandPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ClientSendCheatCommandPacket",
     {
-        Field("command", Type.U8)
-    }
-}
+        D.Field("command", Type.U8)
+    }),
 
-M.ServerCheatCommandResultPacket =
-{
-    archetype = Archetype.Packet,
-
-    fields =
+    D.Packet("ServerCheatCommandResultPacket",
     {
-        Field("command", Type.U8),
-        Field("result", Type.U8),
-        Field("response", Type.STRING)
-    }
-}
+        D.Field("command", Type.U8),
+        D.Field("result", Type.U8),
+        D.Field("response", Type.STRING)
+    }),
 
-return M
+    D.Packet("ServerUnitFactionUpdatePacket",
+    {
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("factionID", Type.U16),
+        D.Field("playerReactionBounds", Type.U8)
+    }),
+
+    D.Packet("ServerReputationUpdatePacket",
+    {
+        D.Field("factionID", Type.U16),
+        D.Field("value", Type.I32),
+        D.Field("flags", Type.U16),
+        D.Field("isPresent", Type.U8)
+    }),
+
+    D.Packet("ServerFactionPerceptionOverrideUpdatePacket",
+    {
+        D.Field("factionID", Type.U16),
+        D.Field("activeFields", Type.U8),
+        D.Field("effectiveStandingValue", Type.I32),
+        D.Field("effectiveReaction", Type.U8)
+    })
+}

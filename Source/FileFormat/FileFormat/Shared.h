@@ -6,7 +6,7 @@
 
 namespace Terrain
 {
-    constexpr u32 TEXTURE_ID_INVALID = std::numeric_limits<u32>().max();
+    constexpr u64 TEXTURE_ID_INVALID = std::numeric_limits<u64>().max();
 
     /*
         - Map     is made up of chunks
@@ -49,7 +49,7 @@ namespace Terrain
     {
     public:
         u32 uniqueID = std::numeric_limits<u32>().max();
-        u32 nameHash = std::numeric_limits<u32>().max();
+        u64 nameHash = std::numeric_limits<u64>().max();
         u16 doodadSet = std::numeric_limits<u16>().max();
         vec3 position = vec3(0.0f, 0.0f, 0.0f);
         quat rotation = quat(1, 0, 0, 0);

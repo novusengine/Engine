@@ -154,6 +154,9 @@ namespace Network
 
         bool SerializeSetFields(Bytebuffer* buffer)
         {
+            if (buffer == nullptr)
+                return false;
+
             constexpr u16 NumMaskQwords = (FIELD_MASK_SIZE + 7) / 8;
 
             const u64* mask64 = reinterpret_cast<const u64*>(setFieldMask);
@@ -183,11 +186,12 @@ namespace Network
             const u16 maskCount = (endByte > FIELD_MASK_SIZE ? FIELD_MASK_SIZE : endByte) - startByte;
 
             // Header: start byte | number of mask bytes written
-            buffer->PutU8(static_cast<u8>(startByte));
-            buffer->PutU8(static_cast<u8>(maskCount));
+            if (!buffer->PutU8(static_cast<u8>(startByte)) || !buffer->PutU8(static_cast<u8>(maskCount)))
+                return false;
 
             // Write only the relevant set mask bytes
-            buffer->PutBytes(&setFieldMask[startByte], maskCount);
+            if (!buffer->PutBytes(&setFieldMask[startByte], maskCount))
+                return false;
 
             // Process 64-bit chunks for set bits
             const u16 startBlock = startByte * 8;
@@ -212,16 +216,17 @@ namespace Network
                     if (fieldIndex >= limit)
                         break;
 
-                    buffer->PutU32(fields[fieldIndex]);
+                    if (!buffer->PutU32(fields[fieldIndex]))
+                        return false;
                 }
             }
 
             return true;
         }
 
-        bool SerializeDirtyFields(Bytebuffer* buffer)
+        bool SerializeDirtyFields(Bytebuffer* buffer, bool clearDirtyMask = true)
         {
-            if (!isDirty)
+            if (buffer == nullptr || !isDirty)
                 return false;
 
             constexpr u16 NumMaskQwords = (FIELD_MASK_SIZE + 7) / 8;
@@ -245,7 +250,8 @@ namespace Network
 
             if (firstQword == NumMaskQwords)
             {
-                ClearDirtyMask();
+                if (clearDirtyMask)
+                    ClearDirtyMask();
                 return false;
             }
 
@@ -254,11 +260,12 @@ namespace Network
             const u16 maskCount = (endByte > FIELD_MASK_SIZE ? FIELD_MASK_SIZE : endByte) - startByte;
 
             // Header: start byte | number of mask bytes written
-            buffer->PutU8(static_cast<u8>(startByte));
-            buffer->PutU8(static_cast<u8>(maskCount));
+            if (!buffer->PutU8(static_cast<u8>(startByte)) || !buffer->PutU8(static_cast<u8>(maskCount)))
+                return false;
 
             // Write only the relevant dirty mask bytes
-            buffer->PutBytes(&dirtyFieldMask[startByte], maskCount);
+            if (!buffer->PutBytes(&dirtyFieldMask[startByte], maskCount))
+                return false;
 
             // Process 64-bit chunks for dirty bits
             const u16 startBlock = startByte * 8;
@@ -283,11 +290,13 @@ namespace Network
                     if (fieldIndex >= limit)
                         break;
 
-                    buffer->PutU32(fields[fieldIndex]);
+                    if (!buffer->PutU32(fields[fieldIndex]))
+                        return false;
                 }
             }
 
-            ClearDirtyMask();
+            if (clearDirtyMask)
+                ClearDirtyMask();
             return true;
         }
 

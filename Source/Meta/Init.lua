@@ -1,7 +1,17 @@
 local _ = require("OrderedTable")
-local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local Model = require("Model")
+local Backend = require("Backend")
+local CppBackend = require("CppBackend")
+local PostgresBackend = require("PostgresBackend")
+local CppEmitter = require("CppEmitter")
+local profile = MetaGen.ResolveProject()
+
+for _, provider in ipairs(profile.providers) do
+    for _, moduleRoot in ipairs(provider.moduleRoots) do
+        if not os.isdir(moduleRoot) then error("MetaGen provider '" .. provider.name .. "' module root does not exist: " .. moduleRoot, 0) end
+        package.path = moduleRoot .. "/?.lua;" .. moduleRoot .. "/?/Init.lua;" .. package.path
+    end
+end
 
 local info = debug.getinfo(1,'S')
 local scriptPath = info.source:sub(2)
@@ -10,428 +20,109 @@ local root = scriptPath:match("(.*/)")
 -- This is restored to the original inside of Meta.lua which includes this file
 package.path = root .. "?.lua;" .. root .. "?/Init.lua;" .. package.path
 
-MetaGen =
-{
-    sourceRootDir = "",
-    binRootDir = "",
-    namespaceBase = "",
+local cppGeneration = CppEmitter.Create()
+local cppWriter = cppGeneration.writer
+local cppEmitter = cppGeneration.cpp
 
-    currentIndent = 0,
-    currentFile = nil
-}
+local CACHE_MAGIC = "MGC1"
 
-function MetaGen:Write(msg, indent)
-    local textIndent = self.currentIndent
-    if type(indent) == "number" then
-        textIndent = textIndent + indent
-    end
-
-    local spacesText = ""
-    for i = 1, textIndent do
-        spacesText = spacesText .. "    "
-    end
-
-    msg = spacesText .. msg
-    self.currentFile:write(msg)
-end
-
-function MetaGen:GetIndent()
-    return self.currentIndent
-end
-
-function MetaGen:AddIndent()
-    self.currentIndent = self.currentIndent + 1
-end
-function MetaGen:SubIndent()
-    self.currentIndent = self.currentIndent - 1
-end
-function MetaGen:NewLine()
-    self.currentFile:write("\n")
-end
-
-function MetaGen:AddFunction(name, returnType, parameters, flags, callback)
-    local retType = returnType or Type.VOID
-    local params = parameters or {}
-    local funcFlags = flags or {}
-
-    local funcText = ""
-    local paramText = ""
-    local numParams = #params
-    for i, v in ipairs(params) do
-        local paramFlags = v.flags or {}
-        local isArray = v.type == Type.ARRAY
-        local isVector = v.type == Type.VECTOR
-        local isPtr = paramFlags.ptr or false
-        local isRef = paramFlags.ref or false
-
-        local typeName = ""
-        if type(v.type) == "string" then
-            typeName = v.type
-        else
-            typeName = v.type.name
+local function GetProfileIdentity(value)
+    local parts = { value.name, value.outputRoot }
+    for _, provider in ipairs(value.providers) do
+        table.insert(parts, provider.name)
+        for _, dependency in ipairs(provider.dependencies) do table.insert(parts, "dep:" .. dependency) end
+        for _, source in ipairs(provider.sources) do
+            table.insert(parts, "source:" .. source.root:gsub("\\", "/") .. "|" .. source.namespace)
         end
-        
-        paramText = paramText .. typeName
-        
-        if isArray or isVector then
-            local subTypeName = ""
-            if type(v.subType) == "string" then
-                subTypeName = v.subType
-            else
-                subTypeName = v.subType.name
+        for _, moduleRoot in ipairs(provider.moduleRoots) do table.insert(parts, "module:" .. moduleRoot:gsub("\\", "/")) end
+        for _, extension in ipairs(provider.extensions) do table.insert(parts, "extension:" .. extension:gsub("\\", "/")) end
+        for _, input in ipairs(provider.inputs) do table.insert(parts, "input:" .. input:gsub("\\", "/")) end
+    end
+    if value.postgres ~= nil and value.postgres.historyByBundle ~= nil then
+        local bundles = {}
+        for bundle in pairs(value.postgres.historyByBundle) do table.insert(bundles, bundle) end
+        table.sort(bundles)
+        for _, bundle in ipairs(bundles) do
+            table.insert(parts, "postgres-history:" .. bundle .. "=" .. value.postgres.historyByBundle[bundle]:gsub("\\", "/"))
+        end
+    end
+    return table.concat(parts, "\n")
+end
+
+local profileIdentity = GetProfileIdentity(profile)
+
+local function WriteBinaryFile(path, callback)
+    local file = assert(io.open(path, "wb"))
+    local succeeded, result = xpcall(function() callback(file) end, debug.traceback)
+    local closed, closeError = pcall(function() file:close() end)
+    if not succeeded then error(result, 0) end
+    if not closed then error("MetaGen failed to close '" .. path .. "': " .. tostring(closeError), 0) end
+end
+
+local function GetFileHash(path)
+    local file = io.open(path, "rb")
+    if file == nil then return nil end
+
+    local hash = 2166136261
+    local prime = 16777619
+    local uintMask = 0xFFFFFFFF
+
+    local succeeded, readError = xpcall(function()
+        while true do
+            local data = file:read(64 * 1024)
+            if data == nil then break end
+
+            for i = 1, #data do
+                hash = ((hash ~ string.byte(data, i)) * prime) & uintMask
             end
-
-            paramText = paramText .. "<" .. subTypeName
-            if isArray then
-                paramText = paramText .. ", " .. tostring(v.count)
-            end
-
-            paramText = paramText .. ">"
         end
+    end, debug.traceback)
 
-        if isPtr then
-            paramText = paramText .. "*"
-        elseif isRef then
-            paramText = paramText .. "&"
-        end
-
-        paramText = paramText .. " " .. v.name
-
-        if i < numParams then
-            paramText = paramText .. ", "
-        end
-    end
-    
-    local isStatic = funcFlags.static or false
-    local isConst = funcFlags.const or false
-
-    if isStatic then
-        funcText = funcText .. "static "
-    end
-
-    funcText = funcText .. retType.name .. " " .. name .. "(" .. paramText .. ")"
-    if isConst then
-        funcText = funcText .. " const"
-    end
-
-    funcText = funcText .. "\n"
-    self:Write(funcText)
-    
-    self:Write("{\n")
-    self:AddIndent()
-
-    if callback then
-        callback()
-    end
-
-    self:SubIndent()
-    MetaGen:Write("}\n")
+    local closed, closeError = pcall(function() file:close() end)
+    if not succeeded then error("MetaGen failed to hash '" .. path .. "': " .. tostring(readError), 0) end
+    if not closed then error("MetaGen failed to close '" .. path .. "': " .. tostring(closeError), 0) end
+    return hash
 end
 
-MetaGenBuilder =
-{
-    result = "",
-    scopeLevel = 0
-}
-function MetaGenBuilder:Write(msg)
-    local textIndent = MetaGen.currentIndent
-
-    for i = 1, textIndent do
-        self.result = self.result .. "    " .. msg
-    end
-end
-function MetaGenBuilder:Name(name)
-    self.result = self.result .. " " .. name
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Type(type)
-    self.result = self.result .. type.name
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Struct(name)
-    self.result = self.result .. "struct " .. name
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Scope(func)
-    self.result = self.result .. "\n{\n"
-    self:Flush()
-    self.scopeLevel = self.scopeLevel + 1
-
-    func()
-    self:Flush()
-    self.scopeLevel = self.scopeLevel - 1
-
-    self.result = self.result .. "}"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:AddIndent()
-    local textIndent = self.scopeLevel
-
-    for i = 1, textIndent do
-        self.result = self.result .. "    "
-    end
-
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:NewLine()
-    self.result = self.result .. "\n"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Unknown(name)
-    self.result = self.result .. name
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Static()
-    self.result = self.result .. "static "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Inline()
-    self.result = self.result .. "inline "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Const()
-    self.result = self.result .. "const "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Constexpr()
-    self.result = self.result .. "constexpr "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Ref()
-    self.result = self.result .. "&"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Ptr()
-    self.result = self.result .. "*"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Add()
-    self.result = self.result .. " + "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Sub()
-    self.result = self.result .. " - "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Mul()
-    self.result = self.result .. " * "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Div()
-    self.result = self.result .. " / "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Assign()
-    self.result = self.result .. " = "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:AddAssign()
-    self.result = self.result .. " += "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:SubAssign()
-    self.result = self.result .. " -= "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:MulAssign()
-    self.result = self.result .. " *= "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:DivAssign()
-    self.result = self.result .. " /= "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:OrAssign()
-    self.result = self.result .. " |= "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Return()
-    self.result = self.result .. "return "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Template(type)
-    self.result = self.result .. "<" .. type .. ">"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:ArrayTemplate(...)
-    local arg = { ... }
-    local numArgs = #arg
-
-    self.result = self.result .. "<"
-    
-    for i, v in ipairs(arg) do
-        self.result = self.result .. tostring(v)
-
-        if i < numArgs then
-            self.result = self.result .. ", "
-        end
-    end
-
-    self.result = self.result .. ">"
-
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:InitList(func)
-    self.result = self.result .. "{ "
-    func()
-    self.result = self.result .. " }"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Comma()
-    self.result = self.result .. ", "
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:SemiColon()
-    self.result = self.result .. ";"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Comment(text)
-    self.result = self.result .. " // " .. text
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Value(val)
-    if type(val) == "number" then
-        self.result = self.result .. tostring(val)
-    elseif type(val) == "string" then
-        self.result = self.result .. val
-    end
-    
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:String(val)
-    if type(val) == "number" then
-        self.result = self.result .. "\"" .. tostring(val) .. "\""
-    elseif type(val) == "string" then
-        self.result = self.result .. "\"" .. val .. "\""
-    end
-    
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Deref()
-    self.result = self.result .. "*"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Arrow()
-    self.result = self.result .. "->"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Dot()
-    self.result = self.result .. "."
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Not()
-    self.result = self.result .. "!"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Parameters(func)
-    self.result = self.result .. "("
-    func()
-    self.result = self.result .. ")"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Call(name, func)
-    self.result = self.result .. "." .. name .. "("
-    func()
-    self.result = self.result .. ")"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:CallPtr(name, func)
-    self.result = self.result .. "->" .. name .. "("
-    func()
-    self.result = self.result .. ")"
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:End()
-    self.result = self.result .. ";\n"
-
-    for line, nl in string.gmatch(self.result, "([^\n]*)(\n?)") do
-        if line ~= "" then
-            MetaGen:Write(line .. nl, self.scopeLevel)
-        else
-            MetaGen:NewLine()
-        end
-    end
-
-    self.result = ""
-    return MetaGenBuilder
-end
-
-function MetaGenBuilder:Flush()
-    for line, nl in string.gmatch(self.result, "([^\n]*)(\n?)") do
-        if line ~= "" then
-            MetaGen:Write(line .. nl, self.scopeLevel)
-        else
-            MetaGen:NewLine()
-        end
-    end
-
-    self.result = ""
-    return MetaGenBuilder
-end
-
-local function GetFileTimestamp(path)
-    local info = os.stat(path)
-    if info == nil then return 0 end
-
-    return info.mtime
-end
-
-local function GetCacheFile(binRoot)
+local function GetCacheFile(binRoot, expectedProfileIdentity)
     local cacheFile =
     {
-        files = {}
+        files = {},
+        outputs = {}
     }
     
     local path = binRoot .. "/Cache.mcache"
     local file = io.open(path, "rb")
     if file == nil then return cacheFile end
 
-    local numFiles = string.unpack("<I4", file:read(4))
-    for i = 1, numFiles do
-        local timestamp = string.unpack("<I8", file:read(8))
-        local pathLength = string.unpack("<I4", file:read(4))
-        local path = file:read(pathLength)
+    local succeeded = pcall(function()
+        if file:read(#CACHE_MAGIC) ~= CACHE_MAGIC then
+            error("Unsupported MetaGen cache version")
+        end
+        local profileLength = string.unpack("<I4", file:read(4))
+        if file:read(profileLength) ~= expectedProfileIdentity then
+            error("MetaGen profile changed")
+        end
 
-        cacheFile.files[path] = timestamp
+        local function ReadEntries(destination)
+            local numEntries = string.unpack("<I4", file:read(4))
+            for _ = 1, numEntries do
+                local hash = string.unpack("<I4", file:read(4))
+                local pathLength = string.unpack("<I4", file:read(4))
+                local entryPath = file:read(pathLength)
+
+                destination[entryPath] = hash
+            end
+        end
+
+        ReadEntries(cacheFile.files)
+        ReadEntries(cacheFile.outputs)
+    end)
+
+    file:close()
+
+    if not succeeded then
+        return { files = {}, outputs = {} }
     end
 
     return cacheFile
@@ -440,29 +131,6 @@ end
 local function FindDefinitionFiles(root)
     local pattern = root .. "/**.lua"
     return os.matchfiles(pattern)
-end
-
-local function GetPathToFileFromNamespace(root, namespace)
-    local parts = {}
-    for p in namespace:gmatch("[^:]+") do
-        table.insert(parts, p)
-    end
-
-    -- Skip base namespace
-    if #parts >= 1 then
-        table.remove(parts, 1)
-    end
-
-    local leaf = parts[#parts] or "MetaGen"
-
-    local folderPath = root
-    for i = 1, #parts do
-        folderPath = folderPath .. "/" .. parts[i]
-    end
-
-    local filePath = folderPath .. "/" .. leaf .. ".h"
-
-    return folderPath, filePath
 end
 
 function PathCompareSort(a, b)
@@ -497,18 +165,6 @@ function PathCompareSort(a, b)
     return aa[#aa] < bb[#bb]
 end
 
-function Warn(text)
-    print("\27[33m** Warn: " .. text .. "\27[39m")
-end
-
-function DeferWarning(list, type, msg)
-    table.insert(list, { type = type, msg = msg })
-end
-
-function Field(name, type, attributes)
-    return { { name = name, type = type }, attributes }
-end
-
 function fnv1a_32(str)
     local hash = 2166136261
     local prime = 16777619
@@ -525,32 +181,73 @@ function fnv1a_32(str)
     return hash
 end
 
-local sourceRootDir = "Definitions"
-local binRootDir = "MetaGen"
-local namespaceBase = "MetaGen"
+local binRootDir = profile.outputRoot
+local stagingRootDir = binRootDir .. ".staging"
+local backupRootDir = binRootDir .. ".previous"
 
-MetaGen.sourceRootDir = sourceRootDir
-MetaGen.binRootDir = binRootDir
-MetaGen.namespaceBase = namespaceBase
-MetaGen.cacheFile = GetCacheFile(binRootDir)
-MetaGen.files = FindDefinitionFiles(sourceRootDir)
-
-local cacheFile = MetaGen.cacheFile
-local files = MetaGen.files
+local cacheFile = GetCacheFile(binRootDir, profileIdentity)
+local sourceSets = {}
+local files = {}
+local inputFiles = {}
+local inputFileSet = {}
 local filePathExist = {}
 
+local function AddInputFile(inputPath)
+    if inputFileSet[inputPath] then return end
+    inputFileSet[inputPath] = true
+    table.insert(inputFiles, inputPath)
+end
+
+for _, provider in ipairs(profile.providers) do
+    for _, source in ipairs(provider.sources) do
+        if not os.isdir(source.root) then
+            error("MetaGen provider '" .. provider.name .. "' definition root does not exist: " .. source.root, 0)
+        end
+        local sourceFiles = FindDefinitionFiles(source.root)
+        table.sort(sourceFiles, PathCompareSort)
+        table.insert(sourceSets, { files = sourceFiles, root = source.root, namespace = source.namespace })
+        for _, sourcePath in ipairs(sourceFiles) do
+            table.insert(files, sourcePath)
+            AddInputFile(sourcePath)
+        end
+    end
+    for _, moduleRoot in ipairs(provider.moduleRoots) do
+        for _, modulePath in ipairs(os.matchfiles(moduleRoot .. "/**.lua")) do AddInputFile(modulePath) end
+    end
+    for _, extensionPath in ipairs(provider.extensions) do
+        if GetFileHash(extensionPath) == nil then error("MetaGen provider '" .. provider.name .. "' extension does not exist: " .. extensionPath, 0) end
+        AddInputFile(extensionPath)
+    end
+    for _, inputPath in ipairs(provider.inputs) do
+        if GetFileHash(inputPath) == nil then error("MetaGen provider '" .. provider.name .. "' input does not exist: " .. inputPath, 0) end
+        AddInputFile(inputPath)
+    end
+end
+
+for _, path in ipairs(os.matchfiles("*.lua")) do
+    AddInputFile(path)
+end
+if profile.postgres ~= nil and profile.postgres.historyByBundle ~= nil then
+    for _, historyRoot in pairs(profile.postgres.historyByBundle) do
+        for _, historyPath in ipairs(os.matchfiles(historyRoot .. "/**.lua")) do AddInputFile(historyPath) end
+    end
+end
+
+table.sort(files, PathCompareSort)
+table.sort(inputFiles, PathCompareSort)
+
 local requiresRebuild = false
-for _, path in ipairs(files) do
+for _, path in ipairs(inputFiles) do
     -- Check if file is not found in the cache
-    local cachedTimestamp = cacheFile.files[path]
-    if cachedTimestamp == nil then
+    local cachedHash = cacheFile.files[path]
+    if cachedHash == nil then
         requiresRebuild = true
         break
     end
 
-    -- Check Timestamp stored
-    local fileTimestamp = GetFileTimestamp(path)
-    if fileTimestamp ~= cachedTimestamp then
+    -- Check content hash stored
+    local fileHash = GetFileHash(path)
+    if fileHash ~= cachedHash then
         requiresRebuild = true
         break
     end
@@ -558,11 +255,21 @@ for _, path in ipairs(files) do
     filePathExist[path] = 1
 end
 
-for k, v in pairs(cacheFile.files) do
+for path, _ in pairs(cacheFile.files) do
     -- Check if cached file have been removed
-    if filePathExist[k] == nil then
+    if filePathExist[path] == nil then
         requiresRebuild = true
         break
+    end
+end
+
+if not requiresRebuild then
+    for relativePath, cachedHash in pairs(cacheFile.outputs) do
+        local outputHash = GetFileHash(binRootDir .. "/" .. relativePath)
+        if outputHash ~= cachedHash then
+            requiresRebuild = true
+            break
+        end
     end
 end
 
@@ -571,403 +278,138 @@ if not requiresRebuild then
     return
 else
     print("MetaGen : Building Files")
-    os.rmdir(binRootDir)
 end
 
-local defineList = OrderedTable()
+Backend.Register("cpp", CppBackend)
+Backend.Register("postgres", PostgresBackend)
+local definitionKinds = {
+    enum = "Engine", struct = "Engine", clientDB = "Engine", packet = "Engine", luaEnum = "Engine",
+    luaEvent = "Engine", netField = "Engine", gameCommand = "Engine", databaseTable = "Engine"
+}
 
-for _, path in ipairs(files) do
-    local chunk = assert(loadfile(path))
-    local defines = chunk()
-    if (not defines) then goto NextFile end
-
-    local relPath = path:sub(#sourceRootDir + 2)
-    local dir = relPath:match("(.*/)")
-    local namespace = namespaceBase
-    if dir then
-        namespace = namespace .. "." .. dir:gsub("/", "."):sub(1, -2) -- remove trailing slash
-    end
-
-    local cppNamespace = namespace:gsub("%.", "::")
-
-    defineList[cppNamespace] = defineList[cppNamespace] or OrderedTable()
-    local namespaceDefineList = defineList[cppNamespace]
-
-    for name, def in pairs(defines) do
-        if namespaceDefineList[name] then
-            error("Duplicate definition in namespace ('" .. cppNamespace .. "') : " .. name)
+for _, provider in ipairs(profile.providers) do
+    for _, extensionPath in ipairs(provider.extensions) do
+        local chunk, loadError = loadfile(extensionPath)
+        if chunk == nil then error("MetaGen failed to load extension '" .. extensionPath .. "': " .. tostring(loadError), 0) end
+        local succeeded, extension = pcall(chunk)
+        if not succeeded then error("MetaGen failed to execute extension '" .. extensionPath .. "': " .. tostring(extension), 0) end
+        if type(extension) ~= "table" or type(extension.backends) ~= "table" then
+            error("MetaGen extension '" .. extensionPath .. "' must return a table with a backends array", 0)
         end
-
-        namespaceDefineList[name] = def
-    end
-    
-    ::NextFile::
-end
-
--- DefineList == All Namespaces (Each have a table of definitions) --
-local warningList = {}
-
-for k, v in pairs(defineList) do
-    local warnings = {}
-    local folderPath, filePath = GetPathToFileFromNamespace(binRootDir, k)
-
-    os.mkdir(folderPath)
-
-    local file = assert(io.open(filePath, "w"))
-    MetaGen.currentFile = file
-
-    local numNamespaceTypes = 0
-    local namespaceTypes = OrderedTable()
-    local namespaceIncludes = OrderedTable()
-
-    namespaceIncludes.project = OrderedTable()
-    namespaceIncludes.numProjectIncludes = 0
-    namespaceIncludes.system = OrderedTable()
-    namespaceIncludes.numSystemIncludes = 0
-
-    for typeName, typeTable in pairs(v) do
-        local skipGen = false
-
-        local baseType = nil
-        local isBaseType = false
-        local archeType = typeTable.archetype
-
-        if archeType == nil then
-            DeferWarning(warnings, typeName, "'archetype' must be set --Skipped")
-            skipGen = true
-        else
-            if type(archeType) == "table" then
-                baseType = archeType.base
-            elseif type(archeType) == "number" then
-                baseType = archeType
-                isBaseType = true
+        for _, kind in ipairs(extension.definitionKinds or {}) do
+            if type(kind) ~= "string" or kind == "" then error("MetaGen extension declared an invalid definition kind", 0) end
+            if definitionKinds[kind] ~= nil then
+                error("MetaGen definition kind '" .. kind .. "' is already registered by " .. definitionKinds[kind], 0)
             end
-
-            if baseType == nil or (baseType ~= Type.ENUM and baseType ~= Type.STRUCT) then
-                DeferWarning(warnings, typeName, "'archetype' or 'archetype.base' must be either Type.Enum or Type.Struct --Skipped")
-                skipGen = true
-            end
+            definitionKinds[kind] = extensionPath
         end
-
-        if typeTable.fields == nil then
-            DeferWarning(warnings, typeName, "'fields' must be set --Skipped")
-            skipGen = true
-        end
-
-        if skipGen then goto NextType end
-
-        typeTable.numComponents = 0
-        typeTable.components = {}
-        local components = {}
-        local componentsSeen = {}
-        
-        if typeTable.components ~= nil then
-            for _, compTable in ipairs(typeTable.components) do
-                if componentsSeen[compTable] == nil then
-                    componentsSeen[compTable] = 1
-
-                    table.insert(components, compTable)
-                end
+        for _, registration in ipairs(extension.backends) do
+            if type(registration) ~= "table" or type(registration.name) ~= "string" or type(registration.backend) ~= "table" then
+                error("MetaGen extension '" .. extensionPath .. "' contains an invalid backend registration", 0)
             end
+            Backend.Register(registration.name, registration.backend)
         end
-
-        if not isBaseType and archeType.components ~= nil then
-            for _, compTable in ipairs(archeType.components) do
-                if componentsSeen[compTable] == nil then
-                    componentsSeen[compTable] = 1
-
-                    table.insert(components, compTable)
-                end
-            end
-
-            typeTable.components = components
-            typeTable.numComponents = #components
-        end
-
-        for i, compTable in ipairs(components) do
-            local includes = compTable.include
-            if includes ~= nil then
-                if includes.project ~= nil then
-                    for _, include in ipairs(includes.project) do
-                        namespaceIncludes.project[include] = 1   
-                        namespaceIncludes.numProjectIncludes = namespaceIncludes.numProjectIncludes + 1
-                    end
-                end
-
-                if includes.system ~= nil then
-                    for _, include in ipairs(includes.system) do
-                        namespaceIncludes.system[include] = 1
-                        namespaceIncludes.numSystemIncludes = namespaceIncludes.numSystemIncludes + 1
-                    end
-                end
-            end
-
-            local componentSupportsBaseType = false
-            local flags = compTable.flags
-
-            if baseType == Type.ENUM and flags.supportsEnum then
-                componentSupportsBaseType = true
-            elseif baseType == Type.STRUCT and flags.supportsStruct then
-                componentSupportsBaseType = true
-            end
-
-            if not componentSupportsBaseType then
-                error("Type '" .. typeName .. "' uses component that is unsupported for its base type")
-            end
-        end
-
-        numNamespaceTypes = numNamespaceTypes + 1
-        namespaceTypes[typeName] = { path = filePath, name = typeName, type = baseType, table = typeTable }
-        ::NextType::
-    end
-
-    MetaGen:Write("#pragma once\n\n")
-
-    -- Write Includes
-    local hasProjectIncludes = namespaceIncludes.numProjectIncludes > 0
-    local hasSystemIncludes = namespaceIncludes.numSystemIncludes > 0
-    local hasIncludes = hasProjectIncludes or hasSystemIncludes
-
-    if hasProjectIncludes then
-        local includes = {}
-        for k, v in pairs(namespaceIncludes.project) do
-            table.insert(includes, k)
-        end
-        table.sort(includes, PathCompareSort)
-
-        for k, v in ipairs(includes) do
-            MetaGen:Write("#include \"" .. v .. "\"\n")
-        end
-
-        if hasSystemIncludes then
-            MetaGen:NewLine()
-        end
-    end
-
-    if hasSystemIncludes then
-        local includes = {}
-        for k, v in pairs(namespaceIncludes.system) do
-            table.insert(includes, k)
-        end
-        table.sort(includes, PathCompareSort)
-
-        for k, v in ipairs(includes) do
-            MetaGen:Write("#include <" .. v .. ">\n")
-        end
-    end
-
-    if hasIncludes then
-        MetaGen:NewLine()
-    end
-
-    MetaGen:Write("namespace " .. k .. "\n{\n")
-    MetaGen:AddIndent()
-    
-    local typeCounter = 1
-    for k, v in pairs(namespaceTypes) do
-        for compIndex, compTable in ipairs(v.table.components) do
-            if compTable.PreGenerate ~= nil then
-                local result = compTable:PreGenerate(v)
-                if result and compIndex < v.table.numComponents then
-                    MetaGen:NewLine()
-                end
-            end
-        end
-
-        local numFields = #v.table.fields
-
-        if v.type == Type.ENUM then
-            MetaGen:Write("enum class " .. k .. " : " .. v.table.type.name .. "\n")
-            MetaGen:Write("{\n")
-            
-            MetaGen:AddIndent()
-
-            v.minVal = v.table.type.min
-            v.maxVal = v.table.type.max
-            v.nextVal = 0
-            local valueSeen = false
-
-            local fieldNameToVal = {}
-
-            for i, fieldTable in ipairs(v.table.fields) do
-                local field = fieldTable[1]
-                local value = field.type or v.nextVal -- Reused field (Type for structs, Value for Enum)
-
-                if type(value) ~= "string" then
-                    if valueSeen and value < v.nextVal - 1 then
-                        error("Enum '" .. k .. "' Field '" .. field.name .. "' is using value '" .. tostring(value) .. "' but next expected value is at least '" .. v.nextVal .. "'")
-                    end
-
-                    v.table.type:Validate(value)
-                    
-                    field.type = value
-                    v.nextVal = value + 1
-                    valueSeen = true
-                end
-
-                fieldNameToVal[field.name] = value
-            end
-
-            for i, fieldTable in ipairs(v.table.fields) do
-                local field = fieldTable[1]
-                local value = field.type
-
-                if type(value) == "string" then
-                    local realValue = fieldNameToVal[value]
-                    if realValue ~= nil then
-                        field.type = fieldNameToVal[value]
-                    end
-                end
-
-                local text = field.name .. " = " .. tostring(value)
-
-                if i < numFields then
-                    text = text .. ",\n"
-                end
-
-                MetaGen:Write(text)
-            end
-
-            if v.table.numComponents then
-                MetaGen:NewLine()
-
-                for compIndex, compTable in ipairs(v.table.components) do
-                    if compTable.Generate ~= nil then
-                        local result = compTable:Generate(v)
-                        if result and compIndex < v.table.numComponents then
-                            MetaGen:NewLine()
-                        end
-                    end
-                end
-            end
-
-            MetaGen:SubIndent()
-            MetaGen:Write("};\n")
-        elseif v.type == Type.STRUCT then
-            MetaGen:Write("struct " .. k .. "\n")
-            MetaGen:Write("{\n")
-            
-            if numFields > 0 then
-                MetaGen:Write("public:\n")
-            end
-
-            MetaGen:AddIndent()
-
-            v.totalSize = 0
-
-            for _, fieldTable in ipairs(v.table.fields) do
-                local field = fieldTable[1]
-                local attributes = fieldTable[2]
-                local hasDefault = attributes ~= nil and attributes.default ~= nil
-
-                v.totalSize = v.totalSize + (field.type.size or 0)
-
-                local text = field.type.name
-
-                if field.type == Type.ARRAY then
-                    text = text .. "<" .. attributes.type.name .. ", " .. attributes.count .. "> " .. field.name
-                elseif field.type == Type.VECTOR then
-                    text = text .. "<" .. attributes.type.name .. "> " .. field.name
-                else
-                    text = text .. " " .. field.name
-                end
-
-                if hasDefault then
-                    local default = attributes.default
-
-                    if field.type == Type.STRING then
-                        text = text .. " = \"" .. tostring(default) .. "\";\n"
-                    else
-                        text = text .. " = " .. default .. ";\n"
-                    end
-
-                    MetaGen:Write(text)
-                else
-                    MetaGen:Write(text .. ";\n")
-                end
-            end
-
-            if v.table.numComponents then
-                MetaGen:SubIndent()
-                
-                if numFields > 0 then
-                    MetaGen:NewLine()
-                end
-
-                MetaGen:Write("public:\n")
-                MetaGen:AddIndent()
-
-                for compIndex, compTable in ipairs(v.table.components) do
-                    if compTable.Generate ~= nil then
-                        local result = compTable:Generate(v)
-                        if result and compIndex < v.table.numComponents then
-                            MetaGen:NewLine()
-                        end
-                    end
-                end
-            end
-
-            MetaGen:SubIndent()
-            MetaGen:Write("};\n")
-        end
-
-        for compIndex, compTable in ipairs(v.table.components) do
-            if compTable.PostGenerate ~= nil then
-                local result = compTable:PostGenerate(v)
-                if result and compIndex < v.table.numComponents then
-                    MetaGen:NewLine()
-                end
-            end
-        end
-
-        if typeCounter < numNamespaceTypes then
-            MetaGen:NewLine()
-        end
-
-        typeCounter = typeCounter + 1
-    end
-
-    MetaGen:SubIndent()
-    file:write("}")
-    
-    file:close()
-    
-    MetaGen.currentFile = nil
-    warningList[k] = warnings
-end
-
-for k, v in pairs(Component) do
-    if v.OnGeneratorComplete ~= nil then
-        v:OnGeneratorComplete(sourceRootDir, binRootDir)
     end
 end
 
-for k, v in pairs(warningList) do
-    for _, warning in ipairs(v) do
-        local text = "Namespace '" .. k .. "'"
-        if warning.type ~= nil then
-            text = text .. " " .. tostring(warning.type)
-        end
-
-        text = text .. " - " .. warning.msg
-        Warn(text)
+local model = Model.LoadSourceSets(sourceSets)
+for _, definition in ipairs(model.definitions) do
+    if definitionKinds[definition.kind] == nil then
+        error("MetaGen definition kind '" .. definition.kind .. "' is not registered (" .. definition.sourcePath .. ")", 0)
     end
 end
+
+local backendContext =
+{
+    sourceSets = sourceSets,
+    stagingRootDir = stagingRootDir,
+    binRootDir = binRootDir,
+    namespaceBase = "MetaGen",
+    pathSort = PathCompareSort,
+    hash = fnv1a_32,
+    writer = cppWriter,
+    cpp = cppEmitter,
+    postgresHistoryByBundle = profile.postgres and profile.postgres.historyByBundle or nil
+}
+
+Backend.ValidateAll(model, backendContext)
+Model.AssertUnchanged(model, "validation")
+local plannedOutputs = Backend.PlanOutputs(model, backendContext)
+Model.AssertUnchanged(model, "output planning")
+
+os.rmdir(stagingRootDir)
+os.mkdir(stagingRootDir)
+
+Backend.EmitAll(model, backendContext)
+Model.AssertUnchanged(model, "emission")
 
 -- Create Cache File
-local filePath = binRootDir .. "/Cache.mcache"
-local file = assert(io.open(filePath, "wb"))
+local outputFiles = {}
+local plannedOutputSet = {}
+for _, relativePath in ipairs(plannedOutputs) do
+    local outputPath = stagingRootDir .. "/" .. relativePath
+    if GetFileHash(outputPath) == nil then
+        error("MetaGen backend did not emit planned output '" .. relativePath .. "'")
+    end
+    plannedOutputSet[relativePath] = true
+    table.insert(outputFiles, outputPath)
+end
+table.sort(outputFiles, PathCompareSort)
 
-local numFiles = #files
-file:write(string.pack("<I4", numFiles))
-
-for _, path in ipairs(files) do
-    local pathLength = #path
-    local fileTimestamp = GetFileTimestamp(path)
-    
-    file:write(string.pack("<I8", fileTimestamp))
-    file:write(string.pack("<I4", pathLength))
-    file:write(path)
+for _, outputPath in ipairs(os.matchfiles(stagingRootDir .. "/**")) do
+    local relativePath = outputPath:sub(#stagingRootDir + 2):gsub("\\", "/")
+    if plannedOutputSet[relativePath] == nil then
+        error("MetaGen backend emitted unplanned output '" .. relativePath .. "'")
+    end
 end
 
-file:close()
+local filePath = stagingRootDir .. "/Cache.mcache"
+WriteBinaryFile(filePath, function(file)
+    local function WriteEntries(entries, root)
+        file:write(string.pack("<I4", #entries))
+
+        for _, path in ipairs(entries) do
+            local entryPath = path
+            if root ~= nil then
+                entryPath = path:sub(#root + 2)
+            end
+
+            local pathLength = #entryPath
+            local fileHash = assert(GetFileHash(path))
+
+            file:write(string.pack("<I4", fileHash))
+            file:write(string.pack("<I4", pathLength))
+            file:write(entryPath)
+        end
+    end
+
+    file:write(CACHE_MAGIC)
+    file:write(string.pack("<I4", #profileIdentity))
+    file:write(profileIdentity)
+    WriteEntries(inputFiles)
+    WriteEntries(outputFiles, stagingRootDir)
+end)
+
+-- Keep the last successful output intact until every new file has been generated.
+os.rmdir(backupRootDir)
+
+local hadPreviousOutput = os.isdir(binRootDir)
+if hadPreviousOutput then
+    local movedPreviousOutput, movePreviousError = os.rename(binRootDir, backupRootDir)
+    if not movedPreviousOutput then
+        error("MetaGen failed to preserve the previous output: " .. tostring(movePreviousError))
+    end
+end
+
+local installedOutput, installError = os.rename(stagingRootDir, binRootDir)
+if not installedOutput then
+    if hadPreviousOutput then
+        os.rename(backupRootDir, binRootDir)
+    end
+
+    error("MetaGen failed to install the generated output: " .. tostring(installError))
+end
+
+if hadPreviousOutput then
+    os.rmdir(backupRootDir)
+end

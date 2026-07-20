@@ -26,7 +26,9 @@ namespace Renderer
 
     struct DataTextureDesc : TextureBaseDesc
     {
+        u64 hash = 0;
         const u8* data = nullptr;
+        size_t size = 0;
     };
 
     // Lets strong-typedef an ID type with the underlying type of u16

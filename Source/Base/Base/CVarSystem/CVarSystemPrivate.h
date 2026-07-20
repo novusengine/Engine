@@ -30,6 +30,10 @@ public:
     CVarFlags flags;
     std::string name;
     std::string description;
+    // Persisted-only CVars start false and are claimed when application code registers them.
+    bool registeredThisRun{ false };
+    // Removed entries remain as map tombstones so other CVarParameter pointers stay stable.
+    bool isActive{ true };
 };
 
 template<typename T>
@@ -168,8 +172,13 @@ public:
         return static_cast<CVarSystemImpl*>(CVarSystem::Get());
     }
 
+    void SetLoadingPersistedCVars(bool loading) { _isLoadingPersistedCVars = loading; }
+    // Removes persisted CVars that no registration call reclaimed during this process run.
+    i32 RemoveUnregisteredCVars();
+
 private:
     std::shared_mutex mutex_;
+    bool _isLoadingPersistedCVars{ false };
 
     // Returns true if the CVar was created, false if it already existed
     bool InitCVar(CVarCategory category, const char* name, const char* description, CVarParameter*& outParam);

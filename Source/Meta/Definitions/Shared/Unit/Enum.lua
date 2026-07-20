@@ -1,124 +1,92 @@
-local M = OrderedTable()
-
 local Type = require("Type")
-local Archetype = require("Archetype")
-local Component = require("Component")
+local D = require("Definition")
 
-M.PowerTypeEnum =
+return D.Definitions
 {
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("PowerTypeEnum", Type.U8,
     {
-        Field("Invalid"),
-        Field("Health"),
-        Field("Mana"),
-        Field("Rage"),
-        Field("Focus"),
-        Field("Energy"),
-        Field("Happiness"),
-        Field("Count")
-    }
-}
+        D.Field("Invalid"),
+        D.Field("Health"),
+        D.Field("Mana"),
+        D.Field("Rage"),
+        D.Field("Focus"),
+        D.Field("Energy"),
+        D.Field("Happiness"),
+        D.Field("Count")
+    }),
 
-M.StatTypeEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("StatTypeEnum", Type.U8,
     {
-        Field("Invalid"),
-        Field("Health"),
-        Field("Stamina"),
-        Field("Strength"),
-        Field("Agility"),
-        Field("Intellect"),
-        Field("Spirit"),
-        Field("Armor"),
-        Field("AttackPower"),
-        Field("SpellPower"),
-        Field("Count")
-    }
-}
+        D.Field("Invalid"),
+        D.Field("Health"),
+        D.Field("Stamina"),
+        D.Field("Strength"),
+        D.Field("Agility"),
+        D.Field("Intellect"),
+        D.Field("Spirit"),
+        D.Field("Armor"),
+        D.Field("AttackPower"),
+        D.Field("SpellPower"),
+        D.Field("Count")
+    }),
 
-M.ResistanceTypeEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("ResistanceTypeEnum", Type.U8,
     {
-        Field("Invalid"),
-        Field("Holy"),
-        Field("Fire"),
-        Field("Nature"),
-        Field("Frost"),
-        Field("Shadow"),
-        Field("Arcane"),
-        Field("Count")
-    }
-}
+        D.Field("Invalid"),
+        D.Field("Holy"),
+        D.Field("Fire"),
+        D.Field("Nature"),
+        D.Field("Frost"),
+        D.Field("Shadow"),
+        D.Field("Arcane"),
+        D.Field("Count")
+    }),
 
-M.ItemEquipSlotEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("ItemEquipSlotEnum", Type.U8,
     {
-        Field("EquipmentStart", 0),
-        Field("Helm", 0),
-        Field("Necklace"),
-        Field("Shoulders"),
-        Field("Cloak"),
-        Field("Chest"),
-        Field("Shirt"),
-        Field("Tabard"),
-        Field("Bracers"),
-        Field("Gloves"),
-        Field("Belt"),
-        Field("Pants"),
-        Field("Boots"),
-        Field("Ring1"),
-        Field("Ring2"),
-        Field("Trinket1"),
-        Field("Trinket2"),
-        Field("MainHand"),
-        Field("OffHand"),
-        Field("Ranged"),
-        Field("EquipmentEnd", 18),
-        Field("MainBag"),
-        Field("BagStart", 19),
-        Field("Bag1"),
-        Field("Bag2"),
-        Field("Bag3"),
-        Field("Bag4"),
-        Field("BagEnd", 23),
-        Field("Count")
-    }
-}
+        D.Field("EquipmentStart", 0),
+        D.Field("Helm", 0),
+        D.Field("Necklace"),
+        D.Field("Shoulders"),
+        D.Field("Cloak"),
+        D.Field("Chest"),
+        D.Field("Shirt"),
+        D.Field("Tabard"),
+        D.Field("Bracers"),
+        D.Field("Gloves"),
+        D.Field("Belt"),
+        D.Field("Pants"),
+        D.Field("Boots"),
+        D.Field("Ring1"),
+        D.Field("Ring2"),
+        D.Field("Trinket1"),
+        D.Field("Trinket2"),
+        D.Field("MainHand"),
+        D.Field("OffHand"),
+        D.Field("Ranged"),
+        D.Field("EquipmentEnd", 18),
+        D.Field("MainBag"),
+        D.Field("BagStart", 19),
+        D.Field("Bag1"),
+        D.Field("Bag2"),
+        D.Field("Bag3"),
+        D.Field("Bag4"),
+        D.Field("BagEnd", 23),
+        D.Field("Count")
+    }),
 
-M.UnitClassEnum =
-{
-    archetype = Archetype.Enum,
-    type = Type.U8,
-
-    fields = 
+    D.Enum("UnitClassEnum", Type.U8,
     {
-        Field("Invalid"),
-        Field("Warrior"),
-        Field("Paladin"),
-        Field("Hunter"),
-        Field("Rogue"),
-        Field("Priest"),
-        Field("Shaman"),
-        Field("Mage"),
-        Field("Warlock"),
-        Field("Druid"),
-        Field("Count")
-    }
+        D.Field("Invalid"),
+        D.Field("Warrior"),
+        D.Field("Paladin"),
+        D.Field("Hunter"),
+        D.Field("Rogue"),
+        D.Field("Priest"),
+        D.Field("Shaman"),
+        D.Field("Mage"),
+        D.Field("Warlock"),
+        D.Field("Druid"),
+        D.Field("Count")
+    })
 }
-
-return M

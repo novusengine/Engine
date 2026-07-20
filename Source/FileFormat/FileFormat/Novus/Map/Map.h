@@ -12,7 +12,7 @@ namespace Map
     struct MapHeader
     {
     public:
-        static const u32 CURRENT_VERSION = 2;
+        static const u32 CURRENT_VERSION = 3;
 
         struct Flags
         {
@@ -24,9 +24,10 @@ namespace Map
 
         Flags flags = { };
         Terrain::Placement placement = { };
+        std::vector<u64> chunkHashes;
 
     public:
-        bool Save(const std::string& path);
+        bool Save(std::shared_ptr<Bytebuffer>& buffer);
         static bool Read(std::shared_ptr<Bytebuffer>& buffer, MapHeader& out);
     };
 }
