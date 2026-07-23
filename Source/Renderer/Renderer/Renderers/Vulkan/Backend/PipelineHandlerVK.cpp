@@ -487,7 +487,26 @@ namespace Renderer
                 }
 
                 //bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
-                bindInfoPushConstants.insert(bindInfoPushConstants.end(), bindReflection.pushConstants.begin(), bindReflection.pushConstants.end());
+
+                // Merge push constants like the data bindings above: every reflected range gets
+                // the same blanket stage flags, and Vulkan forbids two ranges sharing a stage, so
+                // a block declared by both shaders must union into one range
+                for (const BindInfoPushConstant& pushConstant : bindReflection.pushConstants)
+                {
+                    if (!bindInfoPushConstants.empty())
+                    {
+                        BindInfoPushConstant& existing = bindInfoPushConstants[0];
+
+                        u32 end = glm::max(existing.offset + existing.size, pushConstant.offset + pushConstant.size);
+                        existing.offset = glm::min(existing.offset, pushConstant.offset);
+                        existing.size = end - existing.offset;
+                        existing.stageFlags |= pushConstant.stageFlags;
+                    }
+                    else
+                    {
+                        bindInfoPushConstants.push_back(pushConstant);
+                    }
+                }
             }
 
             // Build the used-set bitmask from reflection. DEBUG is included: if a shader actively uses the DEBUG set we want

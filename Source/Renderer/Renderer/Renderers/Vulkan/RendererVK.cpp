@@ -849,9 +849,16 @@ namespace Renderer
         }
 
         uvec2 extent = desc.extent;
-        if (extent == uvec2(0) && desc.renderTargets[0] != ImageMutableResource::Invalid())
+        if (extent == uvec2(0))
         {
-            extent = _imageHandler->GetDimensions(desc.MutableResourceToImageID(desc.renderTargets[0]), 0);
+            if (desc.renderTargets[0] != ImageMutableResource::Invalid())
+            {
+                extent = _imageHandler->GetDimensions(desc.MutableResourceToImageID(desc.renderTargets[0]), 0);
+            }
+            else if (desc.depthStencil != DepthImageMutableResource::Invalid())
+            {
+                extent = _imageHandler->GetDimensions(desc.MutableResourceToDepthImageID(desc.depthStencil));
+            }
         }
 
         VkRenderingInfo renderInfo = {};
@@ -1733,12 +1740,15 @@ namespace Renderer
         }
         if ((from & BufferPassUsage::GRAPHICS) == BufferPassUsage::GRAPHICS)
         {
-            srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            // DRAW_INDIRECT: the pass may have consumed the buffer as indirect draw args, a
+            // following write needs the execution dependency against that read (WAR)
+            srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
             bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
         }
         if ((from & BufferPassUsage::COMPUTE) == BufferPassUsage::COMPUTE)
         {
-            srcStageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            // Same for indirect dispatch args
+            srcStageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
             bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
         }
 
