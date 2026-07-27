@@ -229,6 +229,10 @@ namespace Renderer
         virtual void CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) = 0;
         // Immediately copies using an immediate command list
         virtual void CopyBufferImmediate(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) = 0;
+        // Debug/automation readback. These calls wait for the graphics queue and
+        // should not be used in performance-sensitive runtime paths.
+        virtual bool ReadImageImmediate(ImageID image, void* destination, size_t destinationSize) = 0;
+        virtual bool ReadImageImmediate(DepthImageID image, void* destination, size_t destinationSize) = 0;
         void UploadToBuffer(BufferID dstBuffer, u64 dstOffset, void* srcData, u64 srcOffset, u64 srcSize);
 
         virtual void* MapBuffer(BufferID buffer) = 0;

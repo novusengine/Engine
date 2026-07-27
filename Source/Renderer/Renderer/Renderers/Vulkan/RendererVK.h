@@ -185,6 +185,8 @@ namespace Renderer
         void CopyBuffer(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
         // Immediately copies using an immediate command list
         void CopyBufferImmediate(BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
+        bool ReadImageImmediate(ImageID image, void* destination, size_t destinationSize) override;
+        bool ReadImageImmediate(DepthImageID image, void* destination, size_t destinationSize) override;
 
         [[nodiscard]] void* MapBuffer(BufferID buffer) override;
         void UnmapBuffer(BufferID buffer) override;

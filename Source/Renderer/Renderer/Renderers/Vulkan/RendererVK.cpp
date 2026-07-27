@@ -26,6 +26,8 @@
 #include <tracy/TracyVulkan.hpp>
 #include <imgui/backends/imgui_impl_vulkan.h>
 
+#include <cstring>
+
 namespace Renderer
 {
     RendererVK::RendererVK(Novus::Window* window)
@@ -2069,6 +2071,138 @@ namespace Renderer
         vkCmdCopyBuffer(commandList, _bufferHandler->GetBuffer(srcBuffer), _bufferHandler->GetBuffer(dstBuffer), 1, &copyRegion);
 
         _device->EndSingleTimeCommands(commandList);
+    }
+
+    bool RendererVK::ReadImageImmediate(ImageID imageID, void* destination, size_t destinationSize)
+    {
+        if (imageID == ImageID::Invalid() || destination == nullptr || destinationSize == 0)
+            return false;
+
+        const uvec2 dimensions = _imageHandler->GetDimensions(imageID, 0);
+        if (dimensions.x == 0 || dimensions.y == 0)
+            return false;
+
+        BufferDesc readbackDesc;
+        readbackDesc.name = "Immediate color image readback";
+        readbackDesc.usage = BufferUsage::TRANSFER_DESTINATION;
+        readbackDesc.cpuAccess = BufferCPUAccess::ReadOnly;
+        readbackDesc.size = destinationSize;
+        const BufferID readbackBuffer = _bufferHandler->CreateBuffer(readbackDesc);
+        if (readbackBuffer == BufferID::Invalid())
+            return false;
+
+        VkImage image = _imageHandler->GetImage(imageID);
+        VkBuffer buffer = _bufferHandler->GetBuffer(readbackBuffer);
+        VkCommandBuffer commandBuffer = _device->BeginSingleTimeCommands();
+
+        _device->TransitionImageLayout(
+            commandBuffer,
+            image,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            1,
+            1);
+
+        VkBufferImageCopy copyRegion = {};
+        copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copyRegion.imageSubresource.layerCount = 1;
+        copyRegion.imageExtent = { dimensions.x, dimensions.y, 1 };
+        vkCmdCopyImageToBuffer(
+            commandBuffer,
+            image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            buffer,
+            1,
+            &copyRegion);
+
+        _device->TransitionImageLayout(
+            commandBuffer,
+            image,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            1,
+            1);
+        _device->EndSingleTimeCommands(commandBuffer);
+
+        void* mappedMemory = MapBuffer(readbackBuffer);
+        if (mappedMemory == nullptr)
+        {
+            _bufferHandler->DestroyBuffer(readbackBuffer);
+            return false;
+        }
+
+        std::memcpy(destination, mappedMemory, destinationSize);
+        UnmapBuffer(readbackBuffer);
+        _bufferHandler->DestroyBuffer(readbackBuffer);
+        return true;
+    }
+
+    bool RendererVK::ReadImageImmediate(DepthImageID imageID, void* destination, size_t destinationSize)
+    {
+        if (imageID == DepthImageID::Invalid() || destination == nullptr || destinationSize == 0)
+            return false;
+
+        const uvec2 dimensions = _imageHandler->GetDimensions(imageID);
+        if (dimensions.x == 0 || dimensions.y == 0)
+            return false;
+
+        BufferDesc readbackDesc;
+        readbackDesc.name = "Immediate depth image readback";
+        readbackDesc.usage = BufferUsage::TRANSFER_DESTINATION;
+        readbackDesc.cpuAccess = BufferCPUAccess::ReadOnly;
+        readbackDesc.size = destinationSize;
+        const BufferID readbackBuffer = _bufferHandler->CreateBuffer(readbackDesc);
+        if (readbackBuffer == BufferID::Invalid())
+            return false;
+
+        VkImage image = _imageHandler->GetImage(imageID);
+        VkBuffer buffer = _bufferHandler->GetBuffer(readbackBuffer);
+        VkCommandBuffer commandBuffer = _device->BeginSingleTimeCommands();
+
+        _device->TransitionImageLayout(
+            commandBuffer,
+            image,
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            1,
+            1);
+
+        VkBufferImageCopy copyRegion = {};
+        copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        copyRegion.imageSubresource.layerCount = 1;
+        copyRegion.imageExtent = { dimensions.x, dimensions.y, 1 };
+        vkCmdCopyImageToBuffer(
+            commandBuffer,
+            image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            buffer,
+            1,
+            &copyRegion);
+
+        _device->TransitionImageLayout(
+            commandBuffer,
+            image,
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            1,
+            1);
+        _device->EndSingleTimeCommands(commandBuffer);
+
+        void* mappedMemory = MapBuffer(readbackBuffer);
+        if (mappedMemory == nullptr)
+        {
+            _bufferHandler->DestroyBuffer(readbackBuffer);
+            return false;
+        }
+
+        std::memcpy(destination, mappedMemory, destinationSize);
+        UnmapBuffer(readbackBuffer);
+        _bufferHandler->DestroyBuffer(readbackBuffer);
+        return true;
     }
 
     void RendererVK::FillBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, u64 size, u32 data)
