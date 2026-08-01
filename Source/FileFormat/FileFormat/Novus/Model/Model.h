@@ -17,7 +17,10 @@ namespace FileFormat::Model
     inline constexpr FileHeader::Type FILE_TYPE = FileHeader::Type::Model;
 
     inline constexpr u32 MAX_MESHLET_VERTICES = 64;
-    inline constexpr u32 MAX_MESHLET_TRIANGLES = 128;
+    // 124 matches meshoptimizer's recommended mesh-shader cluster size and the
+    // Model V2 renderer contract. Keeping this in the shared format prevents the
+    // cooker and renderer from silently choosing different workgroup limits.
+    inline constexpr u32 MAX_MESHLET_TRIANGLES = 124;
 
     enum ModelFlags : u32
     {
@@ -62,8 +65,10 @@ namespace FileFormat::Model
         u16 reserved = 0;
     };
 
-    // Cold stream. Normals and tangents are octahedral signed-normalized pairs;
-    // the tangent word also retains handedness. UV words are packed half2 values.
+    // Cold stream. Normals are octahedral 2x snorm16. Tangents use octahedral
+    // 2x snorm15 in bits [0, 29], handedness in bit 30, and zero in bit 31.
+    // UV words are packed IEEE half2 values. These explicit layouts keep the
+    // AssetConverter and shader unpack paths from acquiring implicit ABI rules.
     struct PackedVertexAttributes
     {
         u32 normal = 0;
