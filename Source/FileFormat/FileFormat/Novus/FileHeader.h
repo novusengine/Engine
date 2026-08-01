@@ -17,7 +17,25 @@ public:
         MapObjectGroup,
         ComplexModel,
         ShaderPack,
-        NavMeshTerrainHeight
+        NavMeshTerrainHeight,
+
+        // Shared AssetConverter/Game contract. Until these formats first reach
+        // main, both consumers must use the same Engine commit and changes to the
+        // serialized structs require discussion and coordination. Do not add
+        // migration code or bump development versions for coordinated edits.
+        Model,
+        Material,
+        MaterialInstance,
+        MaterialAnimation,
+        RigFamily,
+        Skeleton,
+        AnimationClip,
+        AnimationSet,
+        AnimationGraph,
+        BoneMask,
+        IKRig,
+        RetargetProfile,
+        AnimationBounds
     };
 
 public:
@@ -42,3 +60,9 @@ public:
     Type type = Type::Invalid;
     u32 version = 0;
 };
+
+namespace FileFormat
+{
+    using AssetID = u64;
+    inline constexpr AssetID INVALID_ASSET_ID = std::numeric_limits<AssetID>::max();
+}
