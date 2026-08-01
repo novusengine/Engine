@@ -2,6 +2,8 @@
 
 #include <Base/Memory/Bytebuffer.h>
 
+#include <xxhash/xxhash64.h>
+
 #include <limits>
 
 namespace
@@ -67,6 +69,12 @@ namespace
 
 namespace FileFormat::Material
 {
+    u64 CalculateParameterLayoutHash(std::span<const ParameterDefinition> parameters, u32 parameterBlockSize)
+    {
+        const u64 definitionsHash = XXHash64::hash(parameters.data(), parameters.size_bytes(), 0);
+        return XXHash64::hash(&definitionsHash, sizeof(definitionsHash), parameterBlockSize);
+    }
+
     size_t MaterialAsset::GetSerializedSize(const MaterialData& data) const
     {
         size_t size = sizeof(MaterialAsset);

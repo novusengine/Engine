@@ -4,6 +4,7 @@
 #include <Base/Types.h>
 
 #include <memory>
+#include <span>
 #include <type_traits>
 #include <vector>
 
@@ -71,6 +72,11 @@ namespace FileFormat::Material
         std::vector<ParameterDefinition> parameters;
         std::vector<u8> defaultParameterData;
     };
+
+    // Hashes the serialized parameter layout shared by a Material and all of its
+    // flattened MaterialInstances. Keep the algorithm here so producers and
+    // consumers cannot independently define the compatibility check.
+    u64 CalculateParameterLayoutHash(std::span<const ParameterDefinition> parameters, u32 parameterBlockSize);
 
     // One authored Material program and its immutable routing metadata. The
     // default parameter block is already laid out exactly as its generated Slang
