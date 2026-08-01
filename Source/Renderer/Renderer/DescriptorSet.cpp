@@ -64,52 +64,48 @@ namespace Renderer
         u32 slotIndex = static_cast<u32>(_slot);
 
         const GraphicsPipelineDesc& pipelineDesc = renderer->GetDesc(pipelineID);
-
-        // Vertex
+        auto registerShader = [&](const auto& shaderDesc)
         {
-            const VertexShaderDesc& shaderDesc = renderer->GetDesc(pipelineDesc.states.vertexShader);
             const FileFormat::ShaderReflection& reflection = shaderDesc.shaderEntry->reflection;
-            if (reflection.descriptorSets.contains(slotIndex))
+            if (!reflection.descriptorSets.contains(slotIndex))
             {
-                const FileFormat::DescriptorSetReflection& descriptorSet = reflection.descriptorSets.at(slotIndex);
-                for (const auto& [bindingIndex, descriptor] : descriptorSet.descriptors)
+                return;
+            }
+
+            const FileFormat::DescriptorSetReflection& descriptorSet = reflection.descriptorSets.at(slotIndex);
+            for (const auto& [bindingIndex, descriptor] : descriptorSet.descriptors)
+            {
+                if (_combinedReflection.descriptors.contains(bindingIndex))
                 {
-                    if (_combinedReflection.descriptors.contains(bindingIndex))
-                    {
-                        VerifyDescriptorMatch(_combinedReflection.descriptors[bindingIndex], descriptor);
-                    }
-                    else
-                    {
-                        _combinedReflection.descriptors[bindingIndex] = descriptor;
-                        u32 nameHash = StringUtils::fnv1a_32(descriptor.name.c_str(), descriptor.name.size());
-                        _nameHashToBindingIndex[nameHash] = bindingIndex;
-                    }
+                    VerifyDescriptorMatch(_combinedReflection.descriptors[bindingIndex], descriptor);
+                }
+                else
+                {
+                    _combinedReflection.descriptors[bindingIndex] = descriptor;
+                    u32 nameHash = StringUtils::fnv1a_32(descriptor.name.c_str(), descriptor.name.size());
+                    _nameHashToBindingIndex[nameHash] = bindingIndex;
                 }
             }
+        };
+
+        if (std::holds_alternative<VertexPipelineStages>(pipelineDesc.shaderStages))
+        {
+            const VertexPipelineStages& stages = std::get<VertexPipelineStages>(pipelineDesc.shaderStages);
+            registerShader(renderer->GetDesc(stages.vertexShader));
+        }
+        else
+        {
+            const MeshPipelineStages& stages = std::get<MeshPipelineStages>(pipelineDesc.shaderStages);
+            if (stages.taskShader != TaskShaderID::Invalid())
+            {
+                registerShader(renderer->GetDesc(stages.taskShader));
+            }
+            registerShader(renderer->GetDesc(stages.meshShader));
         }
 
-        // Pixel
         if (pipelineDesc.states.pixelShader != PixelShaderID::Invalid())
         {
-            const PixelShaderDesc& shaderDesc = renderer->GetDesc(pipelineDesc.states.pixelShader);
-            const FileFormat::ShaderReflection& reflection = shaderDesc.shaderEntry->reflection;
-            if (reflection.descriptorSets.contains(slotIndex))
-            {
-                const FileFormat::DescriptorSetReflection& descriptorSet = reflection.descriptorSets.at(slotIndex);
-                for (const auto& [bindingIndex, descriptor] : descriptorSet.descriptors)
-                {
-                    if (_combinedReflection.descriptors.contains(bindingIndex))
-                    {
-                        VerifyDescriptorMatch(_combinedReflection.descriptors[bindingIndex], descriptor);
-                    }
-                    else
-                    {
-                        _combinedReflection.descriptors[bindingIndex] = descriptor;
-                        u32 nameHash = StringUtils::fnv1a_32(descriptor.name.c_str(), descriptor.name.size());
-                        _nameHashToBindingIndex[nameHash] = bindingIndex;
-                    }
-                }
-            }
+            registerShader(renderer->GetDesc(pipelineDesc.states.pixelShader));
         }
     }
 

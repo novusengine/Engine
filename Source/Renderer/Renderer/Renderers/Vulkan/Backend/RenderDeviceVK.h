@@ -3,6 +3,7 @@
 #include "Renderer/Descriptors/ImageDesc.h"
 #include "Renderer/Descriptors/DepthImageDesc.h"
 #include "Renderer/Descriptors/TimeQueryDesc.h"
+#include "Renderer/RendererCapabilities.h"
 
 #include <Base/Types.h>
 
@@ -122,6 +123,19 @@ namespace Renderer
 
             static PFN_vkCmdDrawIndirectCountKHR fnVkCmdDrawIndirectCountKHR;
             static PFN_vkCmdDrawIndexedIndirectCountKHR fnVkCmdDrawIndexedIndirectCountKHR;
+            static PFN_vkCmdDrawMeshTasksEXT fnVkCmdDrawMeshTasksEXT;
+            static PFN_vkCmdDrawMeshTasksIndirectEXT fnVkCmdDrawMeshTasksIndirectEXT;
+
+            const MeshShaderProperties& GetMeshShaderProperties() const { return _meshShaderProperties; }
+            VkShaderStageFlags GetEnabledShaderStageFlags() const
+            {
+                VkShaderStageFlags flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
+                if (_meshShaderProperties.taskShaderSupported)
+                {
+                    flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+                }
+                return flags;
+            }
 
             bool HasExtendedTextureSupport() { return _hasExtendedTextureSupport; }
         private:
@@ -151,6 +165,7 @@ namespace Renderer
             f32 _timestampNanosecondsPerIncrement = 0.0f;
             
             bool _hasExtendedTextureSupport = false;
+            MeshShaderProperties _meshShaderProperties;
 
             std::vector<SwapChainVK*> _swapChains;
             std::vector<ImageFormat> _swapChainFormats;

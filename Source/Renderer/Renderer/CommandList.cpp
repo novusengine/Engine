@@ -22,6 +22,8 @@
 #include "Commands/DrawIndexedIndirectCount.h"
 #include "Commands/DrawIndirect.h"
 #include "Commands/DrawIndirectCount.h"
+#include "Commands/DrawMeshTasks.h"
+#include "Commands/DrawMeshTasksIndirect.h"
 #include "Commands/EndTrace.h"
 #include "Commands/FillBuffer.h"
 #include "Commands/ImageBarrier.h"
@@ -463,6 +465,50 @@ namespace Renderer
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         Commands::DrawIndirect::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::DrawMeshTasks(u32 groupCountX, u32 groupCountY, u32 groupCountZ)
+    {
+        NC_ASSERT(groupCountX > 0, "CommandList : DrawMeshTasks requires groupCountX to be greater than zero");
+        NC_ASSERT(groupCountY > 0, "CommandList : DrawMeshTasks requires groupCountY to be greater than zero");
+        NC_ASSERT(groupCountZ > 0, "CommandList : DrawMeshTasks requires groupCountZ to be greater than zero");
+
+        Commands::DrawMeshTasks* command = AddCommand<Commands::DrawMeshTasks>();
+        command->groupCountX = groupCountX;
+        command->groupCountY = groupCountY;
+        command->groupCountZ = groupCountZ;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DrawMeshTasks::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::DrawMeshTasksIndirect(BufferResource argumentResource, u32 argumentBufferOffset)
+    {
+        NC_ASSERT(argumentResource != BufferResource::Invalid(), "CommandList : DrawMeshTasksIndirect got invalid argumentResource");
+        _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
+
+        Commands::DrawMeshTasksIndirect* command = AddCommand<Commands::DrawMeshTasksIndirect>();
+        command->argumentBuffer = _resources->GetBuffer(argumentResource);
+        command->argumentBufferOffset = argumentBufferOffset;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DrawMeshTasksIndirect::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
+    void CommandList::DrawMeshTasksIndirect(BufferMutableResource argumentResource, u32 argumentBufferOffset)
+    {
+        NC_ASSERT(argumentResource != BufferMutableResource::Invalid(), "CommandList : DrawMeshTasksIndirect got invalid argumentResource");
+        _resources->EnforceHasAccess(_currentPassIndex, argumentResource, BufferPassUsage::GRAPHICS);
+
+        Commands::DrawMeshTasksIndirect* command = AddCommand<Commands::DrawMeshTasksIndirect>();
+        command->argumentBuffer = _resources->GetBuffer(argumentResource);
+        command->argumentBufferOffset = argumentBufferOffset;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::DrawMeshTasksIndirect::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
 #endif
     }
 

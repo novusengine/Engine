@@ -67,10 +67,14 @@ namespace Renderer
             std::vector<VertexShaderDesc> vertexShadersDescs = _vertexShaderStore.descs;
             std::vector<PixelShaderDesc> pixelShadersDescs = _pixelShaderStore.descs;
             std::vector<ComputeShaderDesc> computeShadersDescs = _computeShaderStore.descs;
+            std::vector<MeshShaderDesc> meshShadersDescs = _meshShaderStore.descs;
+            std::vector<TaskShaderDesc> taskShadersDescs = _taskShaderStore.descs;
 
             _vertexShaderStore.Clear();
             _pixelShaderStore.Clear();
             _computeShaderStore.Clear();
+            _meshShaderStore.Clear();
+            _taskShaderStore.Clear();
 
             for (auto& desc : vertexShadersDescs)
             {
@@ -83,6 +87,16 @@ namespace Renderer
             }
 
             for (auto& desc : computeShadersDescs)
+            {
+                LoadShader(desc);
+            }
+
+            for (auto& desc : meshShadersDescs)
+            {
+                LoadShader(desc);
+            }
+
+            for (auto& desc : taskShadersDescs)
             {
                 LoadShader(desc);
             }
@@ -148,6 +162,50 @@ namespace Renderer
             if (!wasCached)
             {
                 _computeShaderStore.descs.push_back(desc);
+            }
+            return shaderID;
+        }
+
+        MeshShaderID ShaderHandlerVK::LoadShader(const MeshShaderDesc& desc)
+        {
+            ZoneScoped;
+            MeshShaderID shaderID;
+            bool wasCached;
+
+            if (desc.shaderEntry != nullptr)
+            {
+                shaderID = LoadShaderFromMemory<MeshShaderID>(desc.shaderEntry, _meshShaderStore, wasCached);
+            }
+            else
+            {
+                shaderID = LoadShaderFromFile<MeshShaderID>(desc.path, desc.permutationFields, _meshShaderStore, wasCached);
+            }
+
+            if (!wasCached)
+            {
+                _meshShaderStore.descs.push_back(desc);
+            }
+            return shaderID;
+        }
+
+        TaskShaderID ShaderHandlerVK::LoadShader(const TaskShaderDesc& desc)
+        {
+            ZoneScoped;
+            TaskShaderID shaderID;
+            bool wasCached;
+
+            if (desc.shaderEntry != nullptr)
+            {
+                shaderID = LoadShaderFromMemory<TaskShaderID>(desc.shaderEntry, _taskShaderStore, wasCached);
+            }
+            else
+            {
+                shaderID = LoadShaderFromFile<TaskShaderID>(desc.path, desc.permutationFields, _taskShaderStore, wasCached);
+            }
+
+            if (!wasCached)
+            {
+                _taskShaderStore.descs.push_back(desc);
             }
             return shaderID;
         }
@@ -247,7 +305,7 @@ namespace Renderer
                         BindInfoPushConstant pushConstant;
                         pushConstant.offset = descriptor.byteOffset;
                         pushConstant.size = descriptor.byteSize;
-                        pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+                        pushConstant.stageFlags = _device->GetEnabledShaderStageFlags();
 
                         bindReflection.pushConstants.push_back(pushConstant);
                     }
@@ -260,7 +318,7 @@ namespace Renderer
                         bindInfo.set = set;
                         bindInfo.binding = binding;
                         bindInfo.count = descriptor.count;
-                        bindInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+                        bindInfo.stageFlags = _device->GetEnabledShaderStageFlags();
                         bindInfo.isUsed = descriptor.isUsed;
                         bindInfo.isWrite = (descriptor.accessType == FileFormat::DescriptorAccessTypeReflection::ReadWrite || descriptor.accessType == FileFormat::DescriptorAccessTypeReflection::Write);
                         bindReflection.dataBindings.push_back(bindInfo);

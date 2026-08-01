@@ -46,6 +46,8 @@ namespace Renderer
         bool RenderDeviceVK::_initialized = false;
         PFN_vkCmdDrawIndirectCountKHR RenderDeviceVK::fnVkCmdDrawIndirectCountKHR = nullptr;
         PFN_vkCmdDrawIndexedIndirectCountKHR RenderDeviceVK::fnVkCmdDrawIndexedIndirectCountKHR = nullptr;
+        PFN_vkCmdDrawMeshTasksEXT RenderDeviceVK::fnVkCmdDrawMeshTasksEXT = nullptr;
+        PFN_vkCmdDrawMeshTasksIndirectEXT RenderDeviceVK::fnVkCmdDrawMeshTasksIndirectEXT = nullptr;
 
         const std::vector<const char*> validationLayers =
         {
@@ -65,7 +67,8 @@ namespace Renderer
             "VK_EXT_host_query_reset",
             "VK_KHR_shader_float16_int8",
             "VK_KHR_shader_atomic_int64",
-            "VK_KHR_synchronization2"
+            "VK_KHR_synchronization2",
+            VK_EXT_MESH_SHADER_EXTENSION_NAME
         };
 
         RenderDeviceVK::RenderDeviceVK(Novus::Window* window)
@@ -166,6 +169,13 @@ namespace Renderer
 
             fnVkCmdDrawIndirectCountKHR = (PFN_vkCmdDrawIndirectCountKHR)vkGetDeviceProcAddr(_device, "vkCmdDrawIndirectCountKHR");
             fnVkCmdDrawIndexedIndirectCountKHR = (PFN_vkCmdDrawIndexedIndirectCountKHR)vkGetDeviceProcAddr(_device, "vkCmdDrawIndexedIndirectCountKHR");
+            fnVkCmdDrawMeshTasksEXT = (PFN_vkCmdDrawMeshTasksEXT)vkGetDeviceProcAddr(_device, "vkCmdDrawMeshTasksEXT");
+            fnVkCmdDrawMeshTasksIndirectEXT = (PFN_vkCmdDrawMeshTasksIndirectEXT)vkGetDeviceProcAddr(_device, "vkCmdDrawMeshTasksIndirectEXT");
+
+            if (fnVkCmdDrawMeshTasksEXT == nullptr || fnVkCmdDrawMeshTasksIndirectEXT == nullptr)
+            {
+                NC_LOG_CRITICAL("VK_EXT_mesh_shader was enabled but its required draw entry points could not be loaded");
+            }
 
             _initialized = true;
         }
@@ -362,6 +372,27 @@ namespace Renderer
 
                 _hasExtendedTextureSupport = deviceProperties.limits.maxPerStageDescriptorSampledImages > Renderer::Settings::MAX_TEXTURES_NORMAL;
                 Renderer::Settings::MAX_TEXTURES = _hasExtendedTextureSupport ? Renderer::Settings::MAX_TEXTURES_EXTENDED : Renderer::Settings::MAX_TEXTURES_NORMAL;
+
+                VkPhysicalDeviceMeshShaderPropertiesEXT meshProperties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT };
+                VkPhysicalDeviceProperties2 properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+                properties.pNext = &meshProperties;
+                vkGetPhysicalDeviceProperties2(_physicalDevice, &properties);
+
+                VkPhysicalDeviceMeshShaderFeaturesEXT meshFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
+                VkPhysicalDeviceFeatures2 features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+                features.pNext = &meshFeatures;
+                vkGetPhysicalDeviceFeatures2(_physicalDevice, &features);
+
+                _meshShaderProperties.meshShaderSupported = meshFeatures.meshShader == VK_TRUE;
+                _meshShaderProperties.taskShaderSupported = meshFeatures.taskShader == VK_TRUE;
+                _meshShaderProperties.maxOutputVertices = meshProperties.maxMeshOutputVertices;
+                _meshShaderProperties.maxOutputPrimitives = meshProperties.maxMeshOutputPrimitives;
+                _meshShaderProperties.maxWorkGroupInvocations = meshProperties.maxMeshWorkGroupInvocations;
+                _meshShaderProperties.maxWorkGroupSize = uvec3(meshProperties.maxMeshWorkGroupSize[0], meshProperties.maxMeshWorkGroupSize[1], meshProperties.maxMeshWorkGroupSize[2]);
+                _meshShaderProperties.maxWorkGroupCount = uvec3(meshProperties.maxMeshWorkGroupCount[0], meshProperties.maxMeshWorkGroupCount[1], meshProperties.maxMeshWorkGroupCount[2]);
+                _meshShaderProperties.preferredWorkGroupInvocations = meshProperties.maxPreferredMeshWorkGroupInvocations;
+
+                NC_LOG_INFO("[Renderer]: Mesh shader limits: outputs {0} vertices/{1} primitives, workgroup {2} invocations", _meshShaderProperties.maxOutputVertices, _meshShaderProperties.maxOutputPrimitives, _meshShaderProperties.maxWorkGroupInvocations);
             }
             else
             {
@@ -429,10 +460,16 @@ namespace Renderer
             synchronization2Features.synchronization2 = VK_TRUE;
             synchronization2Features.pNext = &dynamicRenderingFeatures;
 
+            VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures = {};
+            meshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+            meshShaderFeatures.meshShader = VK_TRUE;
+            meshShaderFeatures.taskShader = _meshShaderProperties.taskShaderSupported ? VK_TRUE : VK_FALSE;
+            meshShaderFeatures.pNext = &synchronization2Features;
+
             VkPhysicalDeviceVulkan11Features device11Features = {};
             device11Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
             device11Features.shaderDrawParameters = VK_TRUE;
-            device11Features.pNext = &synchronization2Features;
+            device11Features.pNext = &meshShaderFeatures;
 
             VkPhysicalDeviceFeatures2 deviceFeatures = {};
             deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -741,6 +778,16 @@ namespace Renderer
             if (!extensionsSupported)
             {
                 NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1} because it doesn't support the required extensions", deviceProperties.deviceName, 0);
+                return 0;
+            }
+
+            VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
+            VkPhysicalDeviceFeatures2 extendedFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+            extendedFeatures.pNext = &meshShaderFeatures;
+            vkGetPhysicalDeviceFeatures2(device, &extendedFeatures);
+            if (!meshShaderFeatures.meshShader)
+            {
+                NC_LOG_INFO("[Renderer]: GPU Detected {0} with score {1} because VK_EXT_mesh_shader meshShader is not supported", deviceProperties.deviceName, 0);
                 return 0;
             }
 

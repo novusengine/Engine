@@ -3,6 +3,8 @@
 #include "Renderer/Descriptors/VertexShaderDesc.h"
 #include "Renderer/Descriptors/PixelShaderDesc.h"
 #include "Renderer/Descriptors/ComputeShaderDesc.h"
+#include "Renderer/Descriptors/MeshShaderDesc.h"
+#include "Renderer/Descriptors/TaskShaderDesc.h"
 
 #include <Base/Types.h>
 #include <Base/Util/DebugHandler.h>
@@ -65,6 +67,8 @@ namespace Renderer
             using vsIDType = type_safe::underlying_type<VertexShaderID>;
             using psIDType = type_safe::underlying_type<PixelShaderID>;
             using csIDType = type_safe::underlying_type<ComputeShaderID>;
+            using msIDType = type_safe::underlying_type<MeshShaderID>;
+            using tsIDType = type_safe::underlying_type<TaskShaderID>;
 
         public:
             void Init(RenderDeviceVK* device);
@@ -74,14 +78,20 @@ namespace Renderer
             VertexShaderID LoadShader(const VertexShaderDesc& desc);
             PixelShaderID LoadShader(const PixelShaderDesc& desc);
             ComputeShaderID LoadShader(const ComputeShaderDesc& desc);
+            MeshShaderID LoadShader(const MeshShaderDesc& desc);
+            TaskShaderID LoadShader(const TaskShaderDesc& desc);
 
             const VertexShaderDesc& GetDesc(const VertexShaderID id) { return _vertexShaderStore.descs[static_cast<vsIDType>(id)]; }
             const PixelShaderDesc& GetDesc(const PixelShaderID id) { return _pixelShaderStore.descs[static_cast<psIDType>(id)]; }
             const ComputeShaderDesc& GetDesc(const ComputeShaderID id) { return _computeShaderStore.descs[static_cast<csIDType>(id)]; }
+            const MeshShaderDesc& GetDesc(const MeshShaderID id) { return _meshShaderStore.descs[static_cast<msIDType>(id)]; }
+            const TaskShaderDesc& GetDesc(const TaskShaderID id) { return _taskShaderStore.descs[static_cast<tsIDType>(id)]; }
 
             VkShaderModule GetShaderModule(const VertexShaderID id) { return _vertexShaderStore.shaders[static_cast<vsIDType>(id)].module; }
             VkShaderModule GetShaderModule(const PixelShaderID id) { return _pixelShaderStore.shaders[static_cast<psIDType>(id)].module; }
             VkShaderModule GetShaderModule(const ComputeShaderID id) { return _computeShaderStore.shaders[static_cast<csIDType>(id)].module; }
+            VkShaderModule GetShaderModule(const MeshShaderID id) { return _meshShaderStore.shaders[static_cast<msIDType>(id)].module; }
+            VkShaderModule GetShaderModule(const TaskShaderID id) { return _taskShaderStore.shaders[static_cast<tsIDType>(id)].module; }
 
             // Reflection of only what this shader uses
             const BindReflection& GetUsedBindReflection(const VertexShaderID id)
@@ -94,7 +104,15 @@ namespace Renderer
             }
             const BindReflection& GetUsedBindReflection(const ComputeShaderID id)
             {
-                return _computeShaderStore.shaders[static_cast<psIDType>(id)].usedBindReflection;
+                return _computeShaderStore.shaders[static_cast<csIDType>(id)].usedBindReflection;
+            }
+            const BindReflection& GetUsedBindReflection(const MeshShaderID id)
+            {
+                return _meshShaderStore.shaders[static_cast<msIDType>(id)].usedBindReflection;
+            }
+            const BindReflection& GetUsedBindReflection(const TaskShaderID id)
+            {
+                return _taskShaderStore.shaders[static_cast<tsIDType>(id)].usedBindReflection;
             }
 
             // Full reflection of all descriptors in the shader even if not used
@@ -108,7 +126,15 @@ namespace Renderer
             }
             const BindReflection& GetFullBindReflection(const ComputeShaderID id)
             {
-                return _computeShaderStore.shaders[static_cast<psIDType>(id)].fullBindReflection;
+                return _computeShaderStore.shaders[static_cast<csIDType>(id)].fullBindReflection;
+            }
+            const BindReflection& GetFullBindReflection(const MeshShaderID id)
+            {
+                return _meshShaderStore.shaders[static_cast<msIDType>(id)].fullBindReflection;
+            }
+            const BindReflection& GetFullBindReflection(const TaskShaderID id)
+            {
+                return _taskShaderStore.shaders[static_cast<tsIDType>(id)].fullBindReflection;
             }
 
         private:
@@ -254,6 +280,8 @@ namespace Renderer
             ShaderStore<VertexShaderDesc> _vertexShaderStore;
             ShaderStore<PixelShaderDesc> _pixelShaderStore;
             ShaderStore<ComputeShaderDesc> _computeShaderStore;
+            ShaderStore<MeshShaderDesc> _meshShaderStore;
+            ShaderStore<TaskShaderDesc> _taskShaderStore;
         };
     }
 }

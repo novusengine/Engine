@@ -1,6 +1,8 @@
 #pragma once
 #include "VertexShaderDesc.h"
 #include "PixelShaderDesc.h"
+#include "MeshShaderDesc.h"
+#include "TaskShaderDesc.h"
 #include "ImageDesc.h"
 #include "DepthImageDesc.h"
 #include "RenderTargetDesc.h"
@@ -12,17 +14,30 @@
 #include <type_safe/strong_typedef.hpp>
 
 #include <functional>
+#include <variant>
 
 namespace Renderer
 {
     class RenderGraph;
 
+    struct VertexPipelineStages
+    {
+        VertexShaderID vertexShader = VertexShaderID::Invalid();
+    };
+
+    struct MeshPipelineStages
+    {
+        MeshShaderID meshShader = MeshShaderID::Invalid();
+        TaskShaderID taskShader = TaskShaderID::Invalid();
+    };
+
+    using GraphicsPipelineStages = std::variant<VertexPipelineStages, MeshPipelineStages>;
+
     struct GraphicsPipelineDesc
     {
         static const int MAX_INPUT_LAYOUTS = 8;
 
-        // This part of the descriptor is hashable in the PipelineHandler
-        PRAGMA_NO_PADDING_START;
+        // This part of the descriptor contributes to the PipelineHandler cache key
         struct States
         {
             // States
@@ -34,14 +49,13 @@ namespace Renderer
             PrimitiveTopology primitiveTopology = PrimitiveTopology::Triangles;
 
             // Shaders
-            VertexShaderID vertexShader = VertexShaderID::Invalid();
             PixelShaderID pixelShader = PixelShaderID::Invalid();
 
             ImageFormat renderTargetFormats[MAX_RENDER_TARGETS] = { ImageFormat::UNKNOWN };
             DepthImageFormat depthStencilFormat = DepthImageFormat::UNKNOWN;
         };
-        PRAGMA_NO_PADDING_END;
         States states;
+        GraphicsPipelineStages shaderStages;
 
         // Everything below this isn't hashable in the PipelineHandler since it will depend on the RenderGraph (which gets recreated every frame)
         std::string debugName = "";

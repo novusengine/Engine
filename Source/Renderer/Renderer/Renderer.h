@@ -25,6 +25,9 @@
 #include "Descriptors/TimeQueryDesc.h"
 #include "Descriptors/UploadBuffer.h"
 #include "Descriptors/VertexShaderDesc.h"
+#include "Descriptors/MeshShaderDesc.h"
+#include "Descriptors/TaskShaderDesc.h"
+#include "RendererCapabilities.h"
 
 namespace FileFormat
 {
@@ -112,6 +115,8 @@ namespace Renderer
         virtual VertexShaderID LoadShader(VertexShaderDesc& desc) = 0;
         virtual PixelShaderID LoadShader(PixelShaderDesc& desc) = 0;
         virtual ComputeShaderID LoadShader(ComputeShaderDesc& desc) = 0;
+        virtual MeshShaderID LoadShader(MeshShaderDesc& desc) = 0;
+        virtual TaskShaderID LoadShader(TaskShaderDesc& desc) = 0;
 
         // Unloading
         virtual void UnloadTexture(TextureID textureID) = 0;
@@ -148,6 +153,8 @@ namespace Renderer
         virtual void DrawIndexed(CommandListID commandListID, u32 numIndices, u32 numInstances, u32 indexOffset, u32 vertexOffset, u32 instanceOffset) = 0;
         virtual void DrawIndexedIndirect(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset, u32 drawCount) = 0;
         virtual void DrawIndexedIndirectCount(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset, BufferID drawCountBuffer, u32 drawCountBufferOffset, u32 maxDrawCount) = 0;
+        virtual void DrawMeshTasks(CommandListID commandListID, u32 groupCountX, u32 groupCountY, u32 groupCountZ) = 0;
+        virtual void DrawMeshTasksIndirect(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset) = 0;
 
         virtual void Dispatch(CommandListID commandListID, u32 threadGroupCountX, u32 threadGroupCountY, u32 threadGroupCountZ) = 0;
         virtual void DispatchIndirect(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset) = 0;
@@ -256,6 +263,10 @@ namespace Renderer
         virtual const ComputeShaderDesc& GetDesc(ComputeShaderID ID) = 0;
         virtual const VertexShaderDesc& GetDesc(VertexShaderID ID) = 0;
         virtual const PixelShaderDesc& GetDesc(PixelShaderID ID) = 0;
+        virtual const MeshShaderDesc& GetDesc(MeshShaderID ID) = 0;
+        virtual const TaskShaderDesc& GetDesc(TaskShaderID ID) = 0;
+
+        virtual const MeshShaderProperties& GetMeshShaderProperties() = 0;
 
         // Utils
         virtual void FlushGPU() = 0;

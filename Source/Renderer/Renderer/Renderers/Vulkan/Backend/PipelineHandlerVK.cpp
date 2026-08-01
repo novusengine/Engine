@@ -21,7 +21,20 @@ namespace Renderer
         PRAGMA_NO_PADDING_START;
         struct GraphicsPipelineCacheDesc
         {
-            GraphicsPipelineDesc::States states;
+            RasterizerState rasterizerState;
+            DepthStencilState depthStencilState;
+            BlendState blendState;
+            InputLayout inputLayouts[GraphicsPipelineDesc::MAX_INPUT_LAYOUTS];
+            PrimitiveTopology primitiveTopology = PrimitiveTopology::Triangles;
+
+            u8 shaderStageType = 0;
+            VertexShaderID vertexShader = VertexShaderID::Invalid();
+            TaskShaderID taskShader = TaskShaderID::Invalid();
+            MeshShaderID meshShader = MeshShaderID::Invalid();
+            PixelShaderID pixelShader = PixelShaderID::Invalid();
+
+            ImageFormat renderTargetFormats[MAX_RENDER_TARGETS] = { ImageFormat::UNKNOWN };
+            DepthImageFormat depthStencilFormat = DepthImageFormat::UNKNOWN;
         };
         PRAGMA_NO_PADDING_END;
 
@@ -351,7 +364,33 @@ namespace Renderer
         u64 PipelineHandlerVK::CalculateCacheDescHash(const GraphicsPipelineDesc& desc)
         {
             GraphicsPipelineCacheDesc cacheDesc = {};
-            cacheDesc.states = desc.states;
+            cacheDesc.rasterizerState = desc.states.rasterizerState;
+            cacheDesc.depthStencilState = desc.states.depthStencilState;
+            cacheDesc.blendState = desc.states.blendState;
+            for (u32 i = 0; i < GraphicsPipelineDesc::MAX_INPUT_LAYOUTS; i++)
+            {
+                cacheDesc.inputLayouts[i] = desc.states.inputLayouts[i];
+            }
+            cacheDesc.primitiveTopology = desc.states.primitiveTopology;
+            cacheDesc.pixelShader = desc.states.pixelShader;
+            for (u32 i = 0; i < MAX_RENDER_TARGETS; i++)
+            {
+                cacheDesc.renderTargetFormats[i] = desc.states.renderTargetFormats[i];
+            }
+            cacheDesc.depthStencilFormat = desc.states.depthStencilFormat;
+
+            if (std::holds_alternative<VertexPipelineStages>(desc.shaderStages))
+            {
+                const VertexPipelineStages& stages = std::get<VertexPipelineStages>(desc.shaderStages);
+                cacheDesc.vertexShader = stages.vertexShader;
+            }
+            else
+            {
+                const MeshPipelineStages& stages = std::get<MeshPipelineStages>(desc.shaderStages);
+                cacheDesc.shaderStageType = 1;
+                cacheDesc.taskShader = stages.taskShader;
+                cacheDesc.meshShader = stages.meshShader;
+            }
 
             u64 hash = XXHash64::hash(&cacheDesc, sizeof(GraphicsPipelineCacheDesc), 0);
 
@@ -421,76 +460,85 @@ namespace Renderer
         {
             u32 numSupportedTextures = _device->HasExtendedTextureSupport() ? 8192 : 4096;
 
+            VertexShaderID vertexShader = VertexShaderID::Invalid();
+            TaskShaderID taskShader = TaskShaderID::Invalid();
+            MeshShaderID meshShader = MeshShaderID::Invalid();
+
+            if (std::holds_alternative<VertexPipelineStages>(desc.shaderStages))
+            {
+                vertexShader = std::get<VertexPipelineStages>(desc.shaderStages).vertexShader;
+            }
+            else
+            {
+                const MeshPipelineStages& stages = std::get<MeshPipelineStages>(desc.shaderStages);
+                taskShader = stages.taskShader;
+                meshShader = stages.meshShader;
+            }
+
+            const bool hasVertexShader = vertexShader != VertexShaderID::Invalid();
+            const bool hasTaskShader = taskShader != TaskShaderID::Invalid();
+            const bool hasMeshShader = meshShader != MeshShaderID::Invalid();
+
+            if (hasVertexShader == hasMeshShader)
+            {
+                NC_LOG_CRITICAL("Graphics pipeline '{0}' must specify exactly one vertex-producing shader: vertex or mesh", desc.debugName);
+            }
+            if (hasTaskShader && !hasMeshShader)
+            {
+                NC_LOG_CRITICAL("Graphics pipeline '{0}' specifies a task shader without a mesh shader", desc.debugName);
+            }
+            if (hasTaskShader && !_device->GetMeshShaderProperties().taskShaderSupported)
+            {
+                NC_LOG_CRITICAL("Graphics pipeline '{0}' requires task shaders, but the selected GPU does not support them", desc.debugName);
+            }
+            if (hasMeshShader && desc.states.inputLayouts[0].enabled)
+            {
+                NC_LOG_CRITICAL("Graphics pipeline '{0}' uses a mesh shader and cannot specify vertex input layouts", desc.debugName);
+            }
+
             // -- Get Reflection data from shader --
             std::vector<BindInfo> bindInfos;
             std::vector<BindInfoPushConstant> bindInfoPushConstants;
-            if (desc.states.vertexShader != VertexShaderID::Invalid())
+            auto mergeShaderReflection = [&](auto shaderID, const char* shaderStageName)
             {
-                // Find which sets are used by the shader
-                const BindReflection& usedBindReflection = _shaderHandler->GetUsedBindReflection(desc.states.vertexShader);
+                const BindReflection& usedBindReflection = _shaderHandler->GetUsedBindReflection(shaderID);
                 for (const BindInfo& bindInfo : usedBindReflection.dataBindings)
                 {
                     pipeline.setsUsed.insert(bindInfo.set);
                     pipeline.usedBindingsPerSlot[bindInfo.set].Set(bindInfo.binding);
                 }
 
-                const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.states.vertexShader);
-                bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
-                bindInfoPushConstants.insert(bindInfoPushConstants.end(), bindReflection.pushConstants.begin(), bindReflection.pushConstants.end());
-            }
-            if (desc.states.pixelShader != PixelShaderID::Invalid())
-            {
-                // Find which sets are used by the shader
-                const BindReflection& usedBindReflection = _shaderHandler->GetUsedBindReflection(desc.states.pixelShader);
-                for (const BindInfo& bindInfo : usedBindReflection.dataBindings)
-                {
-                    pipeline.setsUsed.insert(bindInfo.set);
-                    pipeline.usedBindingsPerSlot[bindInfo.set].Set(bindInfo.binding);
-                }
+                const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(shaderID);
 
-                const BindReflection& bindReflection = _shaderHandler->GetFullBindReflection(desc.states.pixelShader);
-
-                // Loop over all new databindings
                 for (const BindInfo& dataBinding : bindReflection.dataBindings)
                 {
                     bool found = false;
-                    // Loop over our current databindings
                     for (BindInfo& bindInfo : bindInfos)
                     {
-                        // If they occupy the same descriptor space
                         if (dataBinding.set == bindInfo.set &&
                             dataBinding.binding == bindInfo.binding)
                         {
-                            // If the name, descriptorType and count matches as well we assume it matches and is fine
                             if (dataBinding.nameHash == bindInfo.nameHash &&
                                 dataBinding.descriptorType == bindInfo.descriptorType &&
                                 dataBinding.count == bindInfo.count)
                             {
-                                // Just add our stageflags to it
                                 bindInfo.stageFlags |= dataBinding.stageFlags;
                             }
                             else
                             {
-                                // Else somethings is really bad, lets fatal log
-                                NC_LOG_CRITICAL("Vertex Shader and Pixel Shader tries to use the same descriptor set and binding, but they don't seem to match");
+                                NC_LOG_CRITICAL("{0} in graphics pipeline '{1}' conflicts with another shader at descriptor set {2}, binding {3}", shaderStageName, desc.debugName, dataBinding.set, dataBinding.binding);
                             }
                             found = true;
                             break;
                         }
                     }
 
-                    // If we  didn't find a match, add it to our bindInfos
                     if (!found)
                     {
                         bindInfos.push_back(dataBinding);
                     }
                 }
 
-                //bindInfos.insert(bindInfos.end(), bindReflection.dataBindings.begin(), bindReflection.dataBindings.end());
-
-                // Merge push constants like the data bindings above: every reflected range gets
-                // the same blanket stage flags, and Vulkan forbids two ranges sharing a stage, so
-                // a block declared by both shaders must union into one range
                 for (const BindInfoPushConstant& pushConstant : bindReflection.pushConstants)
                 {
                     if (!bindInfoPushConstants.empty())
@@ -507,6 +555,23 @@ namespace Renderer
                         bindInfoPushConstants.push_back(pushConstant);
                     }
                 }
+            };
+
+            if (hasVertexShader)
+            {
+                mergeShaderReflection(vertexShader, "Vertex shader");
+            }
+            if (hasTaskShader)
+            {
+                mergeShaderReflection(taskShader, "Task shader");
+            }
+            if (hasMeshShader)
+            {
+                mergeShaderReflection(meshShader, "Mesh shader");
+            }
+            if (desc.states.pixelShader != PixelShaderID::Invalid())
+            {
+                mergeShaderReflection(desc.states.pixelShader, "Pixel shader");
             }
 
             // Build the used-set bitmask from reflection. DEBUG is included: if a shader actively uses the DEBUG set we want
@@ -584,16 +649,34 @@ namespace Renderer
             }
 
             std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-            if (desc.states.vertexShader != VertexShaderID::Invalid())
+            if (hasVertexShader)
             {
                 VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
                 vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
                 vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 
-                vertShaderStageInfo.module = _shaderHandler->GetShaderModule(desc.states.vertexShader);
+                vertShaderStageInfo.module = _shaderHandler->GetShaderModule(vertexShader);
                 vertShaderStageInfo.pName = "main";
 
                 shaderStages.push_back(vertShaderStageInfo);
+            }
+            if (hasTaskShader)
+            {
+                VkPipelineShaderStageCreateInfo taskShaderStageInfo = {};
+                taskShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+                taskShaderStageInfo.stage = VK_SHADER_STAGE_TASK_BIT_EXT;
+                taskShaderStageInfo.module = _shaderHandler->GetShaderModule(taskShader);
+                taskShaderStageInfo.pName = "main";
+                shaderStages.push_back(taskShaderStageInfo);
+            }
+            if (hasMeshShader)
+            {
+                VkPipelineShaderStageCreateInfo meshShaderStageInfo = {};
+                meshShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+                meshShaderStageInfo.stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+                meshShaderStageInfo.module = _shaderHandler->GetShaderModule(meshShader);
+                meshShaderStageInfo.pName = "main";
+                shaderStages.push_back(meshShaderStageInfo);
             }
             if (desc.states.pixelShader != PixelShaderID::Invalid())
             {
@@ -830,8 +913,8 @@ namespace Renderer
             pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
             pipelineInfo.stageCount = static_cast<u32>(shaderStages.size());
             pipelineInfo.pStages = shaderStages.data();
-            pipelineInfo.pVertexInputState = &vertexInputInfo;
-            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pVertexInputState = hasMeshShader ? nullptr : &vertexInputInfo;
+            pipelineInfo.pInputAssemblyState = hasMeshShader ? nullptr : &inputAssembly;
             pipelineInfo.pViewportState = &viewportState;
             pipelineInfo.pRasterizationState = &rasterizer;
             pipelineInfo.pMultisampleState = &multisampling;

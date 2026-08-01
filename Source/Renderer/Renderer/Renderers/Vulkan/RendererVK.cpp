@@ -249,6 +249,16 @@ namespace Renderer
         return _shaderHandler->LoadShader(desc);
     }
 
+    MeshShaderID RendererVK::LoadShader(MeshShaderDesc& desc)
+    {
+        return _shaderHandler->LoadShader(desc);
+    }
+
+    TaskShaderID RendererVK::LoadShader(TaskShaderDesc& desc)
+    {
+        return _shaderHandler->LoadShader(desc);
+    }
+
     void RendererVK::UnloadTexture(TextureID textureID)
     {
         _device->FlushGPU(); // Make sure we have finished rendering
@@ -385,6 +395,21 @@ namespace Renderer
     const PixelShaderDesc& RendererVK::GetDesc(PixelShaderID ID)
     {
         return _shaderHandler->GetDesc(ID);
+    }
+
+    const MeshShaderDesc& RendererVK::GetDesc(MeshShaderID ID)
+    {
+        return _shaderHandler->GetDesc(ID);
+    }
+
+    const TaskShaderDesc& RendererVK::GetDesc(TaskShaderID ID)
+    {
+        return _shaderHandler->GetDesc(ID);
+    }
+
+    const MeshShaderProperties& RendererVK::GetMeshShaderProperties()
+    {
+        return _device->GetMeshShaderProperties();
     }
 
     static VmaBudget sBudgets[16] = { { 0 } };
@@ -741,6 +766,38 @@ namespace Renderer
         VkBuffer vkDrawCountBuffer = _bufferHandler->GetBuffer(drawCountBuffer);
 
         Backend::RenderDeviceVK::fnVkCmdDrawIndexedIndirectCountKHR(commandBuffer, vkArgumentBuffer, argumentBufferOffset, vkDrawCountBuffer, drawCountBufferOffset, maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
+    }
+
+    void RendererVK::DrawMeshTasks(CommandListID commandListID, u32 groupCountX, u32 groupCountY, u32 groupCountZ)
+    {
+        const MeshShaderProperties& properties = _device->GetMeshShaderProperties();
+        if (groupCountX > properties.maxWorkGroupCount.x || groupCountY > properties.maxWorkGroupCount.y || groupCountZ > properties.maxWorkGroupCount.z)
+        {
+            NC_LOG_CRITICAL("vkCmdDrawMeshTasksEXT group count ({0}, {1}, {2}) exceeds the selected GPU limit ({3}, {4}, {5})", groupCountX, groupCountY, groupCountZ, properties.maxWorkGroupCount.x, properties.maxWorkGroupCount.y, properties.maxWorkGroupCount.z);
+        }
+
+        if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
+        {
+            NC_LOG_CRITICAL("You tried to draw mesh tasks without first calling BeginPipeline!");
+        }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDrawMeshTasksEXT");
+
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        Backend::RenderDeviceVK::fnVkCmdDrawMeshTasksEXT(commandBuffer, groupCountX, groupCountY, groupCountZ);
+    }
+
+    void RendererVK::DrawMeshTasksIndirect(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset)
+    {
+        NC_ASSERT(argumentBufferOffset % 4 == 0, "vkCmdDrawMeshTasksIndirectEXT argument buffer offset must be four-byte aligned");
+        if (_commandListHandler->GetRenderPassOpenCount(commandListID) <= 0)
+        {
+            NC_LOG_CRITICAL("You tried to draw mesh tasks indirectly without first calling BeginPipeline!");
+        }
+        ValidateBoundDescriptorSets(commandListID, "vkCmdDrawMeshTasksIndirectEXT");
+
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        VkBuffer vkArgumentBuffer = _bufferHandler->GetBuffer(argumentBuffer);
+        Backend::RenderDeviceVK::fnVkCmdDrawMeshTasksIndirectEXT(commandBuffer, vkArgumentBuffer, argumentBufferOffset, 1, sizeof(VkDrawMeshTasksIndirectCommandEXT));
     }
 
     void RendererVK::Dispatch(CommandListID commandListID, u32 threadGroupCountX, u32 threadGroupCountY, u32 threadGroupCountZ)
@@ -1450,7 +1507,7 @@ namespace Renderer
         dummyShaderDesc.path = "globalDataDummy.vs.hlsl";
 
         GraphicsPipelineDesc dummyPipelineDesc;
-        dummyPipelineDesc.states.vertexShader = _shaderHandler->LoadShader(dummyShaderDesc);
+        dummyPipelineDesc.shaderStages = VertexPipelineStages{ .vertexShader = _shaderHandler->LoadShader(dummyShaderDesc) };
 
         _globalDummyPipeline = _pipelineHandler->CreatePipeline(dummyPipelineDesc);
     }
@@ -1782,7 +1839,7 @@ namespace Renderer
 
         GraphicsPipelineID graphicsPipelineID = _commandListHandler->GetBoundGraphicsPipeline(commandListID);
 
-        VkShaderStageFlags shaderStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+        VkShaderStageFlags shaderStageFlags = _device->GetEnabledShaderStageFlags();
         VkPipelineLayout layout;
 
         if (graphicsPipelineID != GraphicsPipelineID::Invalid())
@@ -1960,7 +2017,7 @@ namespace Renderer
             blitConstant.channelRedirectors |= (2 << 16);
             blitConstant.channelRedirectors |= (3 << 24);
 
-            vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BlitConstant), &blitConstant);
+            vkCmdPushConstants(commandBuffer, pipelineLayout, _device->GetEnabledShaderStageFlags(), 0, sizeof(BlitConstant), &blitConstant);
 
             vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 

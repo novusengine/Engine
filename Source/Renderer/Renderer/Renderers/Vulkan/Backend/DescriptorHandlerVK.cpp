@@ -326,7 +326,7 @@ namespace Renderer
                 binding.binding = descriptor.binding;
                 binding.descriptorType = FormatConverterVK::ToVkDescriptorType(descriptor);
                 binding.descriptorCount = count;
-                binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+                binding.stageFlags = _device->GetEnabledShaderStageFlags();
                 binding.pImmutableSamplers = nullptr;
                 bindings.push_back(binding);
                 bindingFlags.push_back(flags);

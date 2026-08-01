@@ -81,6 +81,8 @@ namespace Renderer
         [[nodiscard]] VertexShaderID LoadShader(VertexShaderDesc& desc) override;
         [[nodiscard]] PixelShaderID LoadShader(PixelShaderDesc& desc) override;
         [[nodiscard]] ComputeShaderID LoadShader(ComputeShaderDesc& desc) override;
+        [[nodiscard]] MeshShaderID LoadShader(MeshShaderDesc& desc) override;
+        [[nodiscard]] TaskShaderID LoadShader(TaskShaderDesc& desc) override;
 
         // Unloading
         void UnloadTexture(TextureID textureID) override;
@@ -117,6 +119,8 @@ namespace Renderer
         void DrawIndexed(CommandListID commandListID, u32 numIndices, u32 numInstances, u32 indexOffset, u32 vertexOffset, u32 instanceOffset) override;
         void DrawIndexedIndirect(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset, u32 drawCount) override;
         void DrawIndexedIndirectCount(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset, BufferID drawCountBuffer, u32 drawCountBufferOffset, u32 maxDrawCount) override;
+        void DrawMeshTasks(CommandListID commandListID, u32 groupCountX, u32 groupCountY, u32 groupCountZ) override;
+        void DrawMeshTasksIndirect(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset) override;
         void Dispatch(CommandListID commandListID, u32 threadGroupCountX, u32 threadGroupCountY, u32 threadGroupCountZ) override;
         void DispatchIndirect(CommandListID commandListID, BufferID argumentBuffer, u32 argumentBufferOffset) override;
 
@@ -207,6 +211,10 @@ namespace Renderer
         [[nodiscard]] const ComputeShaderDesc& GetDesc(ComputeShaderID ID);
         [[nodiscard]] const VertexShaderDesc& GetDesc(VertexShaderID ID);
         [[nodiscard]] const PixelShaderDesc& GetDesc(PixelShaderID ID);
+        [[nodiscard]] const MeshShaderDesc& GetDesc(MeshShaderID ID);
+        [[nodiscard]] const TaskShaderDesc& GetDesc(TaskShaderID ID);
+
+        [[nodiscard]] const MeshShaderProperties& GetMeshShaderProperties() override;
 
         // Utils
         // Flush will wait until any in-flight frames are done

@@ -16,6 +16,8 @@
 #include "DrawIndexedIndirectCount.h"
 #include "DrawIndirect.h"
 #include "DrawIndirectCount.h"
+#include "DrawMeshTasks.h"
+#include "DrawMeshTasksIndirect.h"
 #include "EndTrace.h"
 #include "FillBuffer.h"
 #include "ImageBarrier.h"
@@ -70,6 +72,8 @@ namespace Renderer
         const BackendDispatchFunction DrawIndexedIndirectCount::DISPATCH_FUNCTION = &BackendDispatch::DrawIndexedIndirectCount;
         const BackendDispatchFunction DrawIndirect::DISPATCH_FUNCTION = &BackendDispatch::DrawIndirect;
         const BackendDispatchFunction DrawIndirectCount::DISPATCH_FUNCTION = &BackendDispatch::DrawIndirectCount;
+        const BackendDispatchFunction DrawMeshTasks::DISPATCH_FUNCTION = &BackendDispatch::DrawMeshTasks;
+        const BackendDispatchFunction DrawMeshTasksIndirect::DISPATCH_FUNCTION = &BackendDispatch::DrawMeshTasksIndirect;
         const BackendDispatchFunction EndRenderPass::DISPATCH_FUNCTION = &BackendDispatch::EndRenderPass;
         const BackendDispatchFunction EndTextureRenderPass::DISPATCH_FUNCTION = &BackendDispatch::EndTextureRenderPass;
         const BackendDispatchFunction EndTextureComputeWritePass::DISPATCH_FUNCTION = &BackendDispatch::EndTextureComputeWritePass;

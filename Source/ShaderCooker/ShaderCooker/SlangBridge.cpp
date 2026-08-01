@@ -129,7 +129,7 @@ namespace ShaderCooker
             return SlangStage::SLANG_STAGE_GEOMETRY;
         if (strcmp(profileType.c_str(), "cs") == 0)
             return SlangStage::SLANG_STAGE_COMPUTE;
-        if (strcmp(profileType.c_str(), "ma") == 0)
+        if (strcmp(profileType.c_str(), "ms") == 0)
             return SlangStage::SLANG_STAGE_MESH;
         if (strcmp(profileType.c_str(), "as") == 0)
             return SlangStage::SLANG_STAGE_AMPLIFICATION;

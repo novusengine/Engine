@@ -19,6 +19,8 @@
 #include "Commands/DrawIndexedIndirectCount.h"
 #include "Commands/DrawIndirect.h"
 #include "Commands/DrawIndirectCount.h"
+#include "Commands/DrawMeshTasks.h"
+#include "Commands/DrawMeshTasksIndirect.h"
 #include "Commands/EndTrace.h"
 #include "Commands/FillBuffer.h"
 #include "Commands/ImageBarrier.h"
@@ -88,6 +90,18 @@ namespace Renderer
         ZoneScopedC(tracy::Color::Red3);
         const Commands::DrawIndirectCount* actualData = static_cast<const Commands::DrawIndirectCount*>(data);
         renderer->DrawIndirectCount(commandList, actualData->argumentBuffer, actualData->argumentBufferOffset, actualData->drawCountBuffer, actualData->drawCountBufferOffset, actualData->maxDrawCount);
+    }
+
+    void BackendDispatch::DrawMeshTasks(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        const Commands::DrawMeshTasks* actualData = static_cast<const Commands::DrawMeshTasks*>(data);
+        renderer->DrawMeshTasks(commandList, actualData->groupCountX, actualData->groupCountY, actualData->groupCountZ);
+    }
+
+    void BackendDispatch::DrawMeshTasksIndirect(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        const Commands::DrawMeshTasksIndirect* actualData = static_cast<const Commands::DrawMeshTasksIndirect*>(data);
+        renderer->DrawMeshTasksIndirect(commandList, actualData->argumentBuffer, actualData->argumentBufferOffset);
     }
 
     void BackendDispatch::DrawIndexed(Renderer* renderer, CommandListID commandList, const void* data)
