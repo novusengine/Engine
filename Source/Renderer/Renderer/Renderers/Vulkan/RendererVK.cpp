@@ -1801,7 +1801,9 @@ namespace Renderer
         {
             // DRAW_INDIRECT: the pass may have consumed the buffer as indirect draw args, a
             // following write needs the execution dependency against that read (WAR)
-            srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+            srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                            VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
+                            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
             bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
         }
         if ((from & BufferPassUsage::COMPUTE) == BufferPassUsage::COMPUTE)
@@ -1816,7 +1818,9 @@ namespace Renderer
         bufferBarrier.dstAccessMask |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
         
         // Graphics
-        dstStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+        dstStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                        VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
+                        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
         bufferBarrier.dstAccessMask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
         
         // Compute
