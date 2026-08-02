@@ -3,6 +3,7 @@
 
 #include <Base/Types.h>
 
+#include <cstddef>
 #include <memory>
 #include <type_traits>
 #include <vector>
@@ -142,6 +143,11 @@ namespace FileFormat::Model
         Bounds bounds;
         f32 geometricError = 0.0f;
         u32 flags = MeshLODFlags_None;
+
+        // Explicit serialized tail padding keeps the C++ array stride equal to
+        // Slang/Vulkan's 16-byte-aligned StructuredBuffer<ModelLOD> stride.
+        u32 reserved0 = 0;
+        u32 reserved1 = 0;
     };
 
     // LOD selection belongs to the Mesh. All LOD positions share this Mesh-level
@@ -273,7 +279,12 @@ namespace FileFormat::Model
     static_assert(sizeof(PackedMeshletTriangle) == 4);
     static_assert(sizeof(Meshlet) == 32);
     static_assert(sizeof(Submesh) == 24);
-    static_assert(sizeof(MeshLOD) == 88);
+    static_assert(sizeof(MeshLOD) == 96);
+    static_assert(offsetof(MeshLOD, bounds) == 48);
+    static_assert(offsetof(MeshLOD, geometricError) == 80);
+    static_assert(offsetof(MeshLOD, flags) == 84);
+    static_assert(offsetof(MeshLOD, reserved0) == 88);
+    static_assert(offsetof(MeshLOD, reserved1) == 92);
     static_assert(sizeof(Mesh) == 96);
     static_assert(sizeof(MaterialSlot) == 24);
     static_assert(sizeof(EmbeddedInstance) == 56);
