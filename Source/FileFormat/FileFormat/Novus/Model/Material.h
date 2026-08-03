@@ -21,6 +21,9 @@ namespace FileFormat::Material
     inline constexpr FileHeader::Type MATERIAL_INSTANCE_FILE_TYPE = FileHeader::Type::MaterialInstance;
     inline constexpr FileHeader::Type MATERIAL_ANIMATION_FILE_TYPE = FileHeader::Type::MaterialAnimation;
 
+    using MaterialProgramKey = u64;
+    inline constexpr MaterialProgramKey INVALID_MATERIAL_PROGRAM_KEY = 0;
+
     // Every non-empty root section begins on a 16-byte boundary. Root offsets are
     // byte offsets from the start of the file, and arrays contain their final
     // runtime representation so Game can bulk-copy them after Read validates the
@@ -85,6 +88,10 @@ namespace FileFormat::Material
     {
         FileHeader header = FileHeader(MATERIAL_FILE_TYPE, DEVELOPMENT_VERSION);
 
+        // Collision-safe runtime identity for the canonical source program.
+        // Cookers must validate that repeated keys describe identical program
+        // bytes. programID is only a compact diagnostic/debug value.
+        MaterialProgramKey programKey = INVALID_MATERIAL_PROGRAM_KEY;
         u32 programID = 0;
         u16 lightingModelID = 0;
         u16 materialExecutionGroupID = 0;
@@ -231,7 +238,7 @@ namespace FileFormat::Material
 
     static_assert(sizeof(ParameterDefinition) == 16);
     static_assert(sizeof(vec4) == 16);
-    static_assert(sizeof(MaterialAsset) == 48);
+    static_assert(sizeof(MaterialAsset) == 56);
     static_assert(sizeof(ResourceBinding) == 16);
     static_assert(sizeof(MaterialAnimationBinding) == 16);
     static_assert(sizeof(MaterialInstanceAsset) == 48);

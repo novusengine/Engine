@@ -71,6 +71,8 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
     SECTION("Material blocks remain raw contiguous bytes")
     {
         FileFormat::Material::MaterialAsset asset;
+        asset.programKey = 0x123456789abcdef0ull;
+        asset.programID = 0x88888888u;
         FileFormat::Material::MaterialData data;
         data.parameters.push_back({0x1234u, 0, 4, FileFormat::Material::ParameterType::Float, 1});
         data.defaultParameterData = {10, 20, 30, 40};
@@ -85,6 +87,8 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
 
         FileFormat::Material::MaterialAsset loaded;
         REQUIRE(FileFormat::Material::MaterialAsset::Read(buffer, loaded));
+        REQUIRE(loaded.programKey == asset.programKey);
+        REQUIRE(loaded.programID == asset.programID);
     }
 
     SECTION("Animation samples remain raw contiguous engine math types")
