@@ -1,4 +1,5 @@
 #pragma once
+#include "Map.h"
 #include "FileFormat/Shared.h"
 #include "FileFormat/Novus/FileHeader.h"
 
@@ -76,7 +77,7 @@ namespace Map
     struct Chunk
     {
     public:
-        static inline constexpr u32 CURRENT_VERSION = 8;
+        static inline constexpr u32 CURRENT_VERSION = 9;
 
         struct HeightHeader
         {
@@ -234,6 +235,10 @@ namespace Map
         CellsData cellsData;
 
         u64 chunkAlphaMapTextureHash = Terrain::TEXTURE_ID_INVALID;
+
+        // Per-chunk scene counts aid streaming reservations. MapHeader's unique
+        // resource totals remain authoritative for full-map allocation.
+        ModelAllocationHints modelAllocationHints;
 
         PlacementHeader placementHeader;
         LiquidHeader liquidHeader;

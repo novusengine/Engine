@@ -21,6 +21,7 @@ namespace Map
         failed |= !buffer->Put(cellsData);
 
         failed |= !buffer->PutU64(chunkAlphaMapTextureHash); // Write alpha map string index
+        failed |= !buffer->Put(modelAllocationHints);
 
         // Headers
         {
@@ -99,6 +100,7 @@ namespace Map
         failed |= !buffer->Get(out.heightBox);
         failed |= !buffer->Get(out.cellsData);
         failed |= !buffer->Get(out.chunkAlphaMapTextureHash);
+        failed |= !buffer->Get(out.modelAllocationHints);
         failed |= !buffer->Get(out.placementHeader);
         failed |= !buffer->Get(out.liquidHeader);
         failed |= !buffer->Get(out.physicsHeader);

@@ -2,6 +2,7 @@
 
 #include <Base/Memory/Bytebuffer.h>
 #include <FileFormat/Novus/Animation/Animation.h>
+#include <FileFormat/Novus/Map/Map.h>
 #include <FileFormat/Novus/Model/Material.h>
 #include <FileFormat/Novus/Model/Model.h>
 
@@ -105,5 +106,49 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
 
         FileFormat::Animation::AnimationClipAsset loaded;
         REQUIRE(FileFormat::Animation::AnimationClipAsset::Read(buffer, loaded));
+    }
+
+    SECTION("Map Model V2 allocation hints round trip without becoming validation requirements")
+    {
+        Map::ModelResourceAllocationHints first;
+        first.models = 2;
+        first.meshes = 3;
+        first.meshletTriangleRecords = 17;
+        Map::ModelResourceAllocationHints second;
+        second.models = 5;
+        second.meshes = 7;
+        second.meshletTriangleRecords = 19;
+        first += second;
+        REQUIRE(first.models == 7);
+        REQUIRE(first.meshes == 10);
+        REQUIRE(first.meshletTriangleRecords == 36);
+
+        Map::ModelSceneAllocationHints scene;
+        scene.rootPlacements = 11;
+        scene.selectedRenderableEmbeddedInstances = 13;
+        scene.totalModelInstances = 1; // Deliberately not arithmetically related: hints are not validation.
+        scene.geometryGroupMaskWords = 23;
+        scene.meshletHistoryWords = 29;
+
+        Map::MapHeader asset;
+        asset.modelAllocationHints.resources = first;
+        asset.modelAllocationHints.scene = scene;
+        asset.modelAllocationHints.flags = Map::ModelAllocationHintFlags_SceneCountsAreUpperBounds;
+        asset.chunkHashes = { 0x1234u, 0x5678u };
+
+        std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(4096);
+        REQUIRE(asset.Save(buffer));
+        buffer->readData = 0;
+
+        Map::MapHeader loaded;
+        REQUIRE(Map::MapHeader::Read(buffer, loaded));
+        REQUIRE(loaded.modelAllocationHints.resources.models == 7);
+        REQUIRE(loaded.modelAllocationHints.resources.meshes == 10);
+        REQUIRE(loaded.modelAllocationHints.resources.meshletTriangleRecords == 36);
+        REQUIRE(loaded.modelAllocationHints.scene.rootPlacements == 11);
+        REQUIRE(loaded.modelAllocationHints.scene.totalModelInstances == 1);
+        REQUIRE(loaded.modelAllocationHints.scene.meshletHistoryWords == 29);
+        REQUIRE(loaded.modelAllocationHints.flags == Map::ModelAllocationHintFlags_SceneCountsAreUpperBounds);
+        REQUIRE(loaded.chunkHashes == asset.chunkHashes);
     }
 }
