@@ -17,6 +17,6 @@ namespace ShaderCooker
         bool HasChanged(std::filesystem::path shaderPath);
 
     private:
-        robin_hood::unordered_map<u32, std::time_t> _filesLastTouchTime;
+        robin_hood::unordered_map<u32, i64> _filesLastTouchTime;
     };
 }

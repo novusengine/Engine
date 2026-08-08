@@ -3,6 +3,7 @@
 
 #include <Base/Util/DebugHandler.h>
 
+#include <cstring>
 #include <fstream>
 
 namespace FileFormat
@@ -148,6 +149,7 @@ namespace FileFormat
         u64 dataOffset = baseShaderRefOffset + (sizeof(ShaderRef) * manifest.numShaders);
         
         ShaderRef shaderRef;
+        std::memset(&shaderRef, 0, sizeof(shaderRef));
         for (u32 i = 0; i < shaders.size(); i++)
         {
             shaderRef.permutationNameHash = shaders[i].permutationNameHash;

@@ -658,6 +658,7 @@ namespace Renderer
                 case DescriptorSetSlot::LIGHT:    return "LIGHT";
                 case DescriptorSetSlot::TERRAIN:  return "TERRAIN";
                 case DescriptorSetSlot::MODEL:    return "MODEL";
+                case DescriptorSetSlot::MATERIAL: return "MATERIAL";
                 case DescriptorSetSlot::PER_PASS: return "PER_PASS";
                 case DescriptorSetSlot::PER_DRAW: return "PER_DRAW";
                 default:                          return "UNKNOWN";
@@ -667,11 +668,11 @@ namespace Renderer
 
     void RendererVK::ValidateBoundDescriptorSets(CommandListID commandListID, const char* opName)
     {
-        u8 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
+        u16 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
         if (mask == 0)
             return;
 
-        for (u32 slot = 0; slot < 8; slot++)
+        for (u32 slot = 0; slot < DescriptorSetSlot::COUNT; slot++)
         {
             if ((mask & (1u << slot)) == 0)
                 continue;
@@ -1573,8 +1574,8 @@ namespace Renderer
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, slot, 1, &vkDescriptorSet, 0, nullptr);
 
             // Clear this slot from the "still required to be bound" mask
-            u8 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
-            mask &= ~static_cast<u8>(1u << slot);
+            u16 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
+            mask &= ~static_cast<u16>(1u << slot);
             _commandListHandler->SetUnboundDescriptorSets(commandListID, mask);
         }
         else if (computePipelineID != ComputePipelineID::Invalid())
@@ -1596,8 +1597,8 @@ namespace Renderer
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, slot, 1, &vkDescriptorSet, 0, nullptr);
 
             // Clear this slot from the "still required to be bound" mask
-            u8 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
-            mask &= ~static_cast<u8>(1u << slot);
+            u16 mask = _commandListHandler->GetUnboundDescriptorSets(commandListID);
+            mask &= ~static_cast<u16>(1u << slot);
             _commandListHandler->SetUnboundDescriptorSets(commandListID, mask);
         }
     }

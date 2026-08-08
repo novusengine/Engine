@@ -226,8 +226,15 @@ namespace ShaderCooker
                         if (shader.hasResolvedIncludes)
                             continue;
 
-                        // If timestamp hasn't changed, continue
-                        if (!_shouldForceCompile && (!_shaderCache->HasChanged(shader.path) && !shader.markedForChange))
+                        const bool isInclude = StringUtils::EndsWith(shader.name, ".inc.slang") ||
+                            StringUtils::EndsWith(shader.name, ".mat.slang");
+                        fs::path outputPath = _binDirPath / fs::relative(shader.path, _sourceDirPath);
+                        outputPath.replace_extension(FileFormat::SHADER_PACK_EXTENSION);
+                        const bool outputMissing = !isInclude && !fs::is_regular_file(outputPath);
+
+                        // Recompile when the source changed, an include changed, or the output was removed.
+                        if (!_shouldForceCompile && !outputMissing &&
+                            !_shaderCache->HasChanged(shader.path) && !shader.markedForChange)
                             continue;
 
                         auto iterator = _shaderHashToPaths.find(shader.pathHash);
@@ -263,7 +270,8 @@ namespace ShaderCooker
                     if (!shader.hasResolvedIncludes)
                         continue;
 
-                    if (StringUtils::EndsWith(shader.name, ".inc.slang"))
+                    if (StringUtils::EndsWith(shader.name, ".inc.slang") ||
+                        StringUtils::EndsWith(shader.name, ".mat.slang"))
                     {
                         _shaderCache->Touch(shader.path);
                         continue;
@@ -389,9 +397,10 @@ namespace ShaderCooker
                         std::filesystem::create_directories(outputPath.parent_path());
 
                         FileFormat::ShaderPack shaderPack;
-                        shaderPack.Save(outputPath.string(), shaderOutputs);
-
-                        _numCompiledShaders++;
+                        if (!shaderPack.Save(outputPath.string(), shaderOutputs))
+                            _numFailedShaders++;
+                        else
+                            _numCompiledShaders++;
                     }
                 }
                 break;

@@ -29,8 +29,10 @@ namespace Renderer
         LIGHT,
         TERRAIN,
         MODEL,
+        MATERIAL,
         PER_PASS,
-        PER_DRAW
+        PER_DRAW,
+        COUNT
     };
 
     inline const char* DescriptorSetToName(DescriptorSetSlot slot)
@@ -42,6 +44,7 @@ namespace Renderer
             case LIGHT: return "LIGHT";
             case TERRAIN: return "TERRAIN";
             case MODEL: return "MODEL";
+            case MATERIAL: return "MATERIAL";
             case PER_PASS: return "PER_PASS";
             case PER_DRAW: return "PER_DRAW";
             default:

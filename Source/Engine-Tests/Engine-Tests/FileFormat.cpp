@@ -4,7 +4,17 @@
 #include <FileFormat/Novus/Animation/Animation.h>
 #include <FileFormat/Novus/Map/Map.h>
 #include <FileFormat/Novus/Model/Material.h>
+#include <FileFormat/Novus/Model/MaterialPack.h>
 #include <FileFormat/Novus/Model/Model.h>
+#include <FileFormat/Novus/ShaderPack/ShaderPack.h>
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <vector>
 
 namespace
 {
@@ -31,6 +41,7 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
         VerifyEmptyRoundTrip(FileFormat::Material::MaterialAsset{}, FileFormat::Material::MaterialData{});
         VerifyEmptyRoundTrip(FileFormat::Material::MaterialInstanceAsset{}, FileFormat::Material::MaterialInstanceData{});
         VerifyEmptyRoundTrip(FileFormat::Material::MaterialAnimationAsset{}, FileFormat::Material::MaterialAnimationData{});
+        VerifyEmptyRoundTrip(FileFormat::Material::MaterialPack{}, FileFormat::Material::MaterialPackData{});
         VerifyEmptyRoundTrip(FileFormat::Animation::RigFamilyAsset{}, FileFormat::Animation::RigFamilyData{});
         VerifyEmptyRoundTrip(FileFormat::Animation::SkeletonAsset{}, FileFormat::Animation::SkeletonData{});
         VerifyEmptyRoundTrip(FileFormat::Animation::AnimationClipAsset{}, FileFormat::Animation::AnimationClipData{});
@@ -89,6 +100,47 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
         REQUIRE(FileFormat::Material::MaterialAsset::Read(buffer, loaded));
         REQUIRE(loaded.programKey == asset.programKey);
         REQUIRE(loaded.programID == asset.programID);
+    }
+
+    SECTION("MaterialPack tables remain aligned and directly addressable")
+    {
+        FileFormat::Material::MaterialPack pack;
+        pack.materialABIVersion = 1;
+        pack.sourceManifestFingerprint = 11;
+        pack.routingFingerprint = 22;
+        pack.functionalCookFingerprint = 33;
+
+        FileFormat::Material::MaterialPackData data;
+        data.executionGroups.push_back({.numPrograms = 1, .executionGroupID = 2});
+        data.programs.push_back({.programKey = 0x123456789abcdef0ull,
+                                 .parameterLayoutHash = 44,
+                                 .programID = 55,
+                                 .parameterDefinitionOffset = 0,
+                                 .parameterBlockSize = 96,
+                                 .parameterBlockAlignment = 16,
+                                 .rasterRoutes = {{{0, 0}, {2, 0}, {4, 0}}},
+                                 .numParameterDefinitions = 1});
+        data.programLookups.push_back({.programKey = 0x123456789abcdef0ull,
+                                       .programIndex = 0});
+        data.parameterDefinitions.push_back({0x9876u, 0, 4,
+                                             FileFormat::Material::ParameterType::Float, 1});
+
+        std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(pack.GetSerializedSize(data));
+        REQUIRE(pack.Save(buffer, data));
+        REQUIRE((pack.executionGroupsOffset & 15u) == 0);
+        REQUIRE((pack.programsOffset & 15u) == 0);
+        REQUIRE((pack.programLookupsOffset & 15u) == 0);
+        REQUIRE((pack.parameterDefinitionsOffset & 15u) == 0);
+
+        FileFormat::Material::MaterialPack loaded;
+        REQUIRE(FileFormat::Material::MaterialPack::Read(buffer, loaded));
+        REQUIRE(loaded.materialABIVersion == 1);
+        REQUIRE(loaded.numPrograms == 1);
+        REQUIRE(loaded.numProgramLookups == 1);
+
+        buffer->writtenData--;
+        buffer->readData = 0;
+        REQUIRE_FALSE(FileFormat::Material::MaterialPack::Read(buffer, loaded));
     }
 
     SECTION("Animation samples remain raw contiguous engine math types")
@@ -155,4 +207,40 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
         REQUIRE(loaded.modelAllocationHints.flags == Map::ModelAllocationHintFlags_SceneCountsAreUpperBounds);
         REQUIRE(loaded.chunkHashes == asset.chunkHashes);
     }
+}
+
+TEST_CASE("ShaderPack serialization clears raw record padding", "[FileFormat]")
+{
+    std::array<u8, 4> shaderData = {3, 2, 1, 0};
+    FileFormat::ShaderInMemory shader;
+    shader.permutationNameHash = 0x12345678u;
+    shader.data = shaderData.data();
+    shader.size = static_cast<u32>(shaderData.size());
+
+    const std::filesystem::path path = std::filesystem::temp_directory_path() /
+        ("novus-shaderpack-padding-" +
+         std::to_string(reinterpret_cast<uintptr_t>(&shader)) + ".shaderpack");
+    FileFormat::ShaderPack pack;
+    REQUIRE(pack.Save(path.string(), {shader}));
+
+    std::ifstream input(path, std::ios::binary);
+    const std::vector<u8> bytes{
+        std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+    REQUIRE(bytes.size() >= sizeof(FileHeader) + sizeof(FileFormat::ShaderPackManifest) +
+                                sizeof(FileFormat::ShaderRef));
+
+    const size_t recordOffset = sizeof(FileHeader) + sizeof(FileFormat::ShaderPackManifest);
+    const auto IsZero = [&](size_t begin, size_t end) {
+        return std::all_of(bytes.begin() + recordOffset + begin,
+                           bytes.begin() + recordOffset + end,
+                           [](u8 value) { return value == 0; });
+    };
+    CHECK(IsZero(sizeof(u32), offsetof(FileFormat::ShaderRef, dataOffset)));
+    CHECK(IsZero(offsetof(FileFormat::ShaderRef, dataSize) + sizeof(u32),
+                 offsetof(FileFormat::ShaderRef, reflectionOffset)));
+    CHECK(IsZero(offsetof(FileFormat::ShaderRef, reflectionSize) + sizeof(u32),
+                 sizeof(FileFormat::ShaderRef)));
+
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
 }

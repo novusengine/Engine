@@ -115,6 +115,7 @@ namespace Renderer
             "LIGHT",
             "TERRAIN",
             "MODEL",
+            "MATERIAL",
             "PER_PASS",
             "PER_DRAW" 
         };
