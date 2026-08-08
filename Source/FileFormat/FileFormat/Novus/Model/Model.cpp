@@ -81,6 +81,8 @@ namespace FileFormat::Model
         size = AddSectionSize(size, data.meshletTriangles);
         size = AddSectionSize(size, data.jointPaletteRemaps);
         size = AddSectionSize(size, data.materialSlots);
+        size = AddSectionSize(size, data.parameters);
+        size = AddSectionSize(size, data.parameterBindings);
         size = AddSectionSize(size, data.embeddedInstanceSets);
         size = AddSectionSize(size, data.embeddedInstances);
         return size;
@@ -92,7 +94,7 @@ namespace FileFormat::Model
             return false;
 
         ModelAsset serialized = *this;
-        serialized.header = FileHeader(FILE_TYPE, DEVELOPMENT_VERSION);
+        serialized.header = FileHeader(FILE_TYPE, VERSION);
 
         if (!buffer->Put(serialized))
             return false;
@@ -109,6 +111,8 @@ namespace FileFormat::Model
         failed |= !WriteSection(buffer, data.meshletTriangles, serialized.meshletTrianglesOffset, serialized.numMeshletTriangles);
         failed |= !WriteSection(buffer, data.jointPaletteRemaps, serialized.jointPaletteRemapsOffset, serialized.numJointPaletteRemaps);
         failed |= !WriteSection(buffer, data.materialSlots, serialized.materialSlotsOffset, serialized.numMaterialSlots);
+        failed |= !WriteSection(buffer, data.parameters, serialized.parametersOffset, serialized.numParameters);
+        failed |= !WriteSection(buffer, data.parameterBindings, serialized.parameterBindingsOffset, serialized.numParameterBindings);
         failed |= !WriteSection(buffer, data.embeddedInstanceSets, serialized.embeddedInstanceSetsOffset, serialized.numEmbeddedInstanceSets);
         failed |= !WriteSection(buffer, data.embeddedInstances, serialized.embeddedInstancesOffset, serialized.numEmbeddedInstances);
         failed |= !buffer->Put(serialized, 0);
@@ -125,7 +129,7 @@ namespace FileFormat::Model
         if (!buffer || buffer->readData != 0 || !buffer->Get(out))
             return false;
 
-        if (out.header.type != FILE_TYPE || out.header.version != DEVELOPMENT_VERSION)
+        if (out.header.type != FILE_TYPE || out.header.version != VERSION)
             return false;
 
         const size_t headerSize = sizeof(ModelAsset);
@@ -140,6 +144,8 @@ namespace FileFormat::Model
                IsValidSection<PackedMeshletTriangle>(buffer, out.meshletTrianglesOffset, out.numMeshletTriangles, headerSize) &&
                IsValidSection<u16>(buffer, out.jointPaletteRemapsOffset, out.numJointPaletteRemaps, headerSize) &&
                IsValidSection<MaterialSlot>(buffer, out.materialSlotsOffset, out.numMaterialSlots, headerSize) &&
+               IsValidSection<Parameter>(buffer, out.parametersOffset, out.numParameters, headerSize) &&
+               IsValidSection<ParameterBinding>(buffer, out.parameterBindingsOffset, out.numParameterBindings, headerSize) &&
                IsValidSection<EmbeddedInstanceSet>(buffer, out.embeddedInstanceSetsOffset, out.numEmbeddedInstanceSets, headerSize) &&
                IsValidSection<EmbeddedInstance>(buffer, out.embeddedInstancesOffset, out.numEmbeddedInstances, headerSize);
     }

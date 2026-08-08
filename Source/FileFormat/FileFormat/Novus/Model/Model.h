@@ -12,9 +12,7 @@ namespace FileFormat::Model
 {
     inline constexpr char FILE_EXTENSION[] = ".model";
 
-    // Keep this value fixed during coordinated pre-main development. The first
-    // accepted main-branch format establishes the initial shipping version.
-    inline constexpr u32 DEVELOPMENT_VERSION = 0;
+    inline constexpr u32 VERSION = 1;
     inline constexpr FileHeader::Type FILE_TYPE = FileHeader::Type::Model;
 
     inline constexpr u32 MAX_MESHLET_VERTICES = 64;
@@ -175,6 +173,45 @@ namespace FileFormat::Model
         u32 reserved = 0;
     };
 
+    enum class ParameterType : u8
+    {
+        Float,
+        Float2,
+        Float3,
+        Float4,
+        Texture2D
+    };
+
+    enum class ParameterBindingTarget : u8
+    {
+        MaterialParameter,
+        TextureSlot
+    };
+
+    // Defines one CPU-side typed value exposed by a Model for editor and Game overrides.
+    // Stable IDs are model-local and remain independent of serialized array placement.
+    struct Parameter
+    {
+        u64 nameHash = 0;
+        u64 defaultValue[2] = {};
+        u32 stableID = 0;
+        ParameterType type = ParameterType::Float;
+        u8 reserved0 = 0;
+        u16 reserved1 = 0;
+    };
+
+    // Routes one exposed Model parameter into one configured material slot input.
+    // The same parameter may update several slots without duplicating display data.
+    struct ParameterBinding
+    {
+        u32 parameterStableID = 0;
+        u32 materialSlotStableID = 0;
+        u16 targetIndex = 0;
+        ParameterBindingTarget target = ParameterBindingTarget::MaterialParameter;
+        u8 reserved0 = 0;
+        u32 reserved1 = 0;
+    };
+
     // Generalized embedded child-model placement used for converted WMO doodads
     // and similar authored model hierarchies. Runtime world placement remains a
     // Scene concern rather than GPU ModelAsset data.
@@ -215,6 +252,8 @@ namespace FileFormat::Model
         std::vector<u16> jointPaletteRemaps;
 
         std::vector<MaterialSlot> materialSlots;
+        std::vector<Parameter> parameters;
+        std::vector<ParameterBinding> parameterBindings;
         std::vector<EmbeddedInstanceSet> embeddedInstanceSets;
         std::vector<EmbeddedInstance> embeddedInstances;
     };
@@ -230,7 +269,7 @@ namespace FileFormat::Model
     // formats; archive and disk I/O remain the caller's responsibility.
     struct ModelAsset
     {
-        FileHeader header = FileHeader(FILE_TYPE, DEVELOPMENT_VERSION);
+        FileHeader header = FileHeader(FILE_TYPE, VERSION);
         Bounds bounds;
         AssetID collisionAssetID = INVALID_ASSET_ID;
 
@@ -258,6 +297,10 @@ namespace FileFormat::Model
 
         u32 materialSlotsOffset = 0;
         u32 numMaterialSlots = 0;
+        u32 parametersOffset = 0;
+        u32 numParameters = 0;
+        u32 parameterBindingsOffset = 0;
+        u32 numParameterBindings = 0;
         u32 embeddedInstanceSetsOffset = 0;
         u32 numEmbeddedInstanceSets = 0;
         u32 embeddedInstancesOffset = 0;
@@ -287,10 +330,12 @@ namespace FileFormat::Model
     static_assert(offsetof(MeshLOD, reserved1) == 92);
     static_assert(sizeof(Mesh) == 96);
     static_assert(sizeof(MaterialSlot) == 24);
+    static_assert(sizeof(Parameter) == 32);
+    static_assert(sizeof(ParameterBinding) == 16);
     static_assert(sizeof(EmbeddedInstance) == 56);
     static_assert(sizeof(EmbeddedInstanceSet) == 24);
     static_assert(sizeof(Bounds) == 32);
-    static_assert(sizeof(ModelAsset) == 160);
+    static_assert(sizeof(ModelAsset) == 176);
 
     static_assert(std::is_trivially_copyable_v<ModelAsset>);
     static_assert(std::is_standard_layout_v<ModelAsset>);

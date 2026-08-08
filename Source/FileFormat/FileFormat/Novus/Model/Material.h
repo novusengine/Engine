@@ -14,9 +14,7 @@ namespace FileFormat::Material
     inline constexpr char MATERIAL_INSTANCE_FILE_EXTENSION[] = ".materialinstance";
     inline constexpr char MATERIAL_ANIMATION_FILE_EXTENSION[] = ".materialanimation";
 
-    // Keep this value fixed during coordinated pre-main development. The first
-    // accepted main-branch format establishes the initial shipping version.
-    inline constexpr u32 DEVELOPMENT_VERSION = 0;
+    inline constexpr u32 VERSION = 1;
     inline constexpr FileHeader::Type MATERIAL_FILE_TYPE = FileHeader::Type::Material;
     inline constexpr FileHeader::Type MATERIAL_INSTANCE_FILE_TYPE = FileHeader::Type::MaterialInstance;
     inline constexpr FileHeader::Type MATERIAL_ANIMATION_FILE_TYPE = FileHeader::Type::MaterialAnimation;
@@ -31,7 +29,7 @@ namespace FileFormat::Material
 
     enum class RasterClass : u8
     {
-        Solid,
+        Opaque,
         AlphaTest,
         Transparent
     };
@@ -39,11 +37,16 @@ namespace FileFormat::Material
     enum MaterialFlags : u32
     {
         MaterialFlags_None = 0,
-        MaterialFlags_TwoSided = 1u << 0,
-        MaterialFlags_CastsShadows = 1u << 1,
-        MaterialFlags_ReceivesDecals = 1u << 2,
-        MaterialFlags_ReceivesFog = 1u << 3,
-        MaterialFlags_HasCoverageFunction = 1u << 4
+        MaterialFlags_HasCoverageFunction = 1u << 0
+    };
+
+    enum MaterialInstanceFlags : u32
+    {
+        MaterialInstanceFlags_None = 0,
+        MaterialInstanceFlags_TwoSided = 1u << 0,
+        MaterialInstanceFlags_CastsShadows = 1u << 1,
+        MaterialInstanceFlags_ReceivesDecals = 1u << 2,
+        MaterialInstanceFlags_ReceivesFog = 1u << 3
     };
 
     enum class ParameterType : u8
@@ -86,18 +89,13 @@ namespace FileFormat::Material
     // loader expects.
     struct MaterialAsset
     {
-        FileHeader header = FileHeader(MATERIAL_FILE_TYPE, DEVELOPMENT_VERSION);
+        FileHeader header = FileHeader(MATERIAL_FILE_TYPE, VERSION);
 
         // Collision-safe runtime identity for the canonical source program.
         // Cookers must validate that repeated keys describe identical program
         // bytes. programID is only a compact diagnostic/debug value.
         MaterialProgramKey programKey = INVALID_MATERIAL_PROGRAM_KEY;
         u32 programID = 0;
-        u16 lightingModelID = 0;
-        u16 materialExecutionGroupID = 0;
-
-        RasterClass rasterClass = RasterClass::Solid;
-        u8 reserved0[3] = {0, 0, 0};
         u32 flags = MaterialFlags_None;
 
         u32 parameterBlockSize = 0;
@@ -106,6 +104,8 @@ namespace FileFormat::Material
         u32 numParameters = 0;
         u32 defaultParameterDataOffset = 0;
         u32 defaultParameterDataSize = 0;
+        u32 textureSlotCount = 0;
+        u32 reserved0 = 0;
 
         size_t GetSerializedSize(const MaterialData& data) const;
         bool Save(std::shared_ptr<Bytebuffer>& buffer, const MaterialData& data);
@@ -125,13 +125,12 @@ namespace FileFormat::Material
         ResourceBindingFlags_Optional = 1u << 0
     };
 
-    // AssetConverter emits a complete flat parameter block. Game memcpy-copies it
-    // and patches only these sparse resource words after resolving assets into the
-    // runtime bindless heap. parameterByteOffset points at one u32 in the block.
-    struct ResourceBinding
+    // Assigns one asset to one generic numbered texture input. The authored
+    // Material program alone decides what each local texture slot means.
+    struct TextureBinding
     {
         AssetID resourceAssetID = INVALID_ASSET_ID;
-        u32 parameterByteOffset = 0;
+        u32 textureSlot = 0;
         u16 samplerID = 0;
         ResourceType type = ResourceType::Texture2D;
         u8 flags = ResourceBindingFlags_None;
@@ -162,7 +161,7 @@ namespace FileFormat::Material
     struct MaterialInstanceData
     {
         std::vector<u8> parameterData;
-        std::vector<ResourceBinding> resourceBindings;
+        std::vector<TextureBinding> textureBindings;
         std::vector<MaterialAnimationBinding> animationBindings;
     };
 
@@ -170,13 +169,17 @@ namespace FileFormat::Material
     // parent/delta chain. parameterLayoutHash must match the referenced Material.
     struct MaterialInstanceAsset
     {
-        FileHeader header = FileHeader(MATERIAL_INSTANCE_FILE_TYPE, DEVELOPMENT_VERSION);
+        FileHeader header = FileHeader(MATERIAL_INSTANCE_FILE_TYPE, VERSION);
         AssetID materialAssetID = INVALID_ASSET_ID;
         u64 parameterLayoutHash = 0;
+        u32 flags = MaterialInstanceFlags_None;
+        u16 lightingModelID = 0;
+        RasterClass rasterClass = RasterClass::Opaque;
+        u8 reserved0 = 0;
         u32 parameterDataOffset = 0;
         u32 parameterDataSize = 0;
-        u32 resourceBindingsOffset = 0;
-        u32 numResourceBindings = 0;
+        u32 textureBindingsOffset = 0;
+        u32 numTextureBindings = 0;
         u32 animationBindingsOffset = 0;
         u32 numAnimationBindings = 0;
 
@@ -223,7 +226,7 @@ namespace FileFormat::Material
 
     struct MaterialAnimationAsset
     {
-        FileHeader header = FileHeader(MATERIAL_ANIMATION_FILE_TYPE, DEVELOPMENT_VERSION);
+        FileHeader header = FileHeader(MATERIAL_ANIMATION_FILE_TYPE, VERSION);
         f32 durationSeconds = 0.0f;
         u32 reserved = 0;
         u32 tracksOffset = 0;
@@ -239,9 +242,9 @@ namespace FileFormat::Material
     static_assert(sizeof(ParameterDefinition) == 16);
     static_assert(sizeof(vec4) == 16);
     static_assert(sizeof(MaterialAsset) == 56);
-    static_assert(sizeof(ResourceBinding) == 16);
+    static_assert(sizeof(TextureBinding) == 16);
     static_assert(sizeof(MaterialAnimationBinding) == 16);
-    static_assert(sizeof(MaterialInstanceAsset) == 48);
+    static_assert(sizeof(MaterialInstanceAsset) == 56);
     static_assert(sizeof(MaterialAnimationTrack) == 56);
     static_assert(sizeof(MaterialAnimationAsset) == 32);
 

@@ -89,7 +89,7 @@ namespace FileFormat::Material
             return false;
 
         MaterialAsset serialized = *this;
-        serialized.header = FileHeader(MATERIAL_FILE_TYPE, DEVELOPMENT_VERSION);
+        serialized.header = FileHeader(MATERIAL_FILE_TYPE, VERSION);
         serialized.parameterBlockSize = static_cast<u32>(data.defaultParameterData.size());
 
         if (!buffer->Put(serialized))
@@ -112,7 +112,7 @@ namespace FileFormat::Material
         if (!buffer || buffer->readData != 0 || !buffer->Get(out))
             return false;
 
-        if (out.header.type != MATERIAL_FILE_TYPE || out.header.version != DEVELOPMENT_VERSION || out.parameterBlockSize != out.defaultParameterDataSize)
+        if (out.header.type != MATERIAL_FILE_TYPE || out.header.version != VERSION || out.parameterBlockSize != out.defaultParameterDataSize)
             return false;
 
         const size_t headerSize = sizeof(MaterialAsset);
@@ -124,7 +124,7 @@ namespace FileFormat::Material
     {
         size_t size = sizeof(MaterialInstanceAsset);
         size = AddSectionSize(size, data.parameterData);
-        size = AddSectionSize(size, data.resourceBindings);
+        size = AddSectionSize(size, data.textureBindings);
         size = AddSectionSize(size, data.animationBindings);
         return size;
     }
@@ -135,14 +135,14 @@ namespace FileFormat::Material
             return false;
 
         MaterialInstanceAsset serialized = *this;
-        serialized.header = FileHeader(MATERIAL_INSTANCE_FILE_TYPE, DEVELOPMENT_VERSION);
+        serialized.header = FileHeader(MATERIAL_INSTANCE_FILE_TYPE, VERSION);
 
         if (!buffer->Put(serialized))
             return false;
 
         bool failed = false;
         failed |= !WriteSection(buffer, data.parameterData, serialized.parameterDataOffset, serialized.parameterDataSize);
-        failed |= !WriteSection(buffer, data.resourceBindings, serialized.resourceBindingsOffset, serialized.numResourceBindings);
+        failed |= !WriteSection(buffer, data.textureBindings, serialized.textureBindingsOffset, serialized.numTextureBindings);
         failed |= !WriteSection(buffer, data.animationBindings, serialized.animationBindingsOffset, serialized.numAnimationBindings);
         failed |= !buffer->Put(serialized, 0);
 
@@ -158,12 +158,12 @@ namespace FileFormat::Material
         if (!buffer || buffer->readData != 0 || !buffer->Get(out))
             return false;
 
-        if (out.header.type != MATERIAL_INSTANCE_FILE_TYPE || out.header.version != DEVELOPMENT_VERSION)
+        if (out.header.type != MATERIAL_INSTANCE_FILE_TYPE || out.header.version != VERSION)
             return false;
 
         const size_t headerSize = sizeof(MaterialInstanceAsset);
         return IsValidSection<u8>(buffer, out.parameterDataOffset, out.parameterDataSize, headerSize) &&
-               IsValidSection<ResourceBinding>(buffer, out.resourceBindingsOffset, out.numResourceBindings, headerSize) &&
+               IsValidSection<TextureBinding>(buffer, out.textureBindingsOffset, out.numTextureBindings, headerSize) &&
                IsValidSection<MaterialAnimationBinding>(buffer, out.animationBindingsOffset, out.numAnimationBindings, headerSize);
     }
 
@@ -181,7 +181,7 @@ namespace FileFormat::Material
             return false;
 
         MaterialAnimationAsset serialized = *this;
-        serialized.header = FileHeader(MATERIAL_ANIMATION_FILE_TYPE, DEVELOPMENT_VERSION);
+        serialized.header = FileHeader(MATERIAL_ANIMATION_FILE_TYPE, VERSION);
 
         if (!buffer->Put(serialized))
             return false;
@@ -203,7 +203,7 @@ namespace FileFormat::Material
         if (!buffer || buffer->readData != 0 || !buffer->Get(out))
             return false;
 
-        if (out.header.type != MATERIAL_ANIMATION_FILE_TYPE || out.header.version != DEVELOPMENT_VERSION)
+        if (out.header.type != MATERIAL_ANIMATION_FILE_TYPE || out.header.version != VERSION)
             return false;
 
         const size_t headerSize = sizeof(MaterialAnimationAsset);
