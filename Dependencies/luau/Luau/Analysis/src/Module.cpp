@@ -14,11 +14,7 @@
 
 #include <algorithm>
 
-LUAU_FASTFLAG(LuauSolverV2);
-LUAU_FASTFLAG(LuauUseWorkspacePropToChooseSolver)
-LUAU_FASTFLAG(LuauLimitDynamicConstraintSolving3)
-LUAU_FASTFLAGVARIABLE(LuauEmplaceNotPushBack)
-LUAU_FASTFLAG(LuauSuggestHotComments)
+LUAU_FASTFLAGVARIABLE(LuauDoNotExportBrokenTypeFunction)
 
 namespace Luau
 {
@@ -120,18 +116,8 @@ struct ClonePublicInterface : Substitution
 {
     NotNull<BuiltinTypes> builtinTypes;
     NotNull<Module> module;
-    // NOTE: This can be made non-optional after
-    // LuauUseWorkspacePropToChooseSolver is clipped.
-    std::optional<SolverMode> solverMode{std::nullopt};
+    SolverMode solverMode;
     bool internalTypeEscaped = false;
-
-    ClonePublicInterface(const TxnLog* log, NotNull<BuiltinTypes> builtinTypes, Module* module)
-        : Substitution(log, &module->interfaceTypes)
-        , builtinTypes(builtinTypes)
-        , module(module)
-    {
-        LUAU_ASSERT(module);
-    }
 
     ClonePublicInterface(const TxnLog* log, NotNull<BuiltinTypes> builtinTypes, Module* module, SolverMode solverMode)
         : Substitution(log, &module->interfaceTypes)
@@ -144,12 +130,12 @@ struct ClonePublicInterface : Substitution
 
     bool isNewSolver() const
     {
-        return FFlag::LuauSolverV2 || (FFlag::LuauUseWorkspacePropToChooseSolver && solverMode == SolverMode::New);
+        return solverMode == SolverMode::New;
     }
 
     bool isDirty(TypeId ty) override
     {
-        if (ty->owningArena == &module->internalTypes)
+        if (ty->owningArena == module->internalTypes.get())
             return true;
 
         if (const FunctionType* ftv = get<FunctionType>(ty))
@@ -161,12 +147,12 @@ struct ClonePublicInterface : Substitution
 
     bool isDirty(TypePackId tp) override
     {
-        return tp->owningArena == &module->internalTypes;
+        return tp->owningArena == module->internalTypes.get();
     }
 
     bool ignoreChildrenVisit(TypeId ty) override
     {
-        if (ty->owningArena != &module->internalTypes)
+        if (ty->owningArena != module->internalTypes.get())
             return true;
 
         return false;
@@ -174,7 +160,7 @@ struct ClonePublicInterface : Substitution
 
     bool ignoreChildrenVisit(TypePackId tp) override
     {
-        if (tp->owningArena != &module->internalTypes)
+        if (tp->owningArena != module->internalTypes.get())
             return true;
 
         return false;
@@ -203,41 +189,25 @@ struct ClonePublicInterface : Substitution
             if (isNewSolver())
             {
                 ttv->scope = nullptr;
-                if (FFlag::LuauLimitDynamicConstraintSolving3)
-                    ttv->state = TableState::Sealed;
+                ttv->state = TableState::Sealed;
             }
         }
 
         if (isNewSolver())
         {
-            if (FFlag::LuauLimitDynamicConstraintSolving3)
+            if (is<FreeType, BlockedType, PendingExpansionType>(ty))
             {
-                if (is<FreeType, BlockedType, PendingExpansionType>(ty))
-                {
-                    internalTypeEscaped = true;
-                    result = builtinTypes->errorType;
-                }
-                else if (auto genericty = getMutable<GenericType>(result))
-                {
-                    genericty->scope = nullptr;
-                }
+                internalTypeEscaped = true;
+                result = builtinTypes->errorType;
             }
-            else
+            else if (auto genericty = getMutable<GenericType>(result))
             {
-                if (auto freety = getMutable<FreeType>(result))
-                {
-                    module->errors.emplace_back(
-                        freety->scope->location,
-                        module->name,
-                        InternalError{"Free type is escaping its module; please report this bug at "
-                                      "https://github.com/luau-lang/luau/issues"}
-                    );
-                    result = builtinTypes->errorType;
-                }
-                else if (auto genericty = getMutable<GenericType>(result))
-                {
-                    genericty->scope = nullptr;
-                }
+                genericty->scope = nullptr;
+            }
+            else if (auto tfit = get<TypeFunctionInstanceType>(ty);
+                     FFlag::LuauDoNotExportBrokenTypeFunction && tfit && tfit->state != TypeFunctionInstanceState::Solved)
+            {
+                result = builtinTypes->errorType;
             }
         }
 
@@ -248,32 +218,14 @@ struct ClonePublicInterface : Substitution
     {
         if (isNewSolver())
         {
-            if (FFlag::LuauLimitDynamicConstraintSolving3)
+            if (is<FreeTypePack, BlockedTypePack>(tp))
             {
-                if (is<FreeTypePack, BlockedTypePack>(tp))
-                {
-                    internalTypeEscaped = true;
-                    return builtinTypes->errorTypePack;
-                }
-
-                auto clonedTp = clone(tp);
-                if (auto gtp = getMutable<GenericTypePack>(clonedTp))
-                    gtp->scope = nullptr;
-                return clonedTp;
+                internalTypeEscaped = true;
+                return builtinTypes->errorTypePack;
             }
 
             auto clonedTp = clone(tp);
-            if (auto ftp = getMutable<FreeTypePack>(clonedTp))
-            {
-                module->errors.emplace_back(
-                    ftp->scope->location,
-                    module->name,
-                    InternalError{"Free type pack is escaping its module; please report this bug at "
-                                  "https://github.com/luau-lang/luau/issues"}
-                );
-                clonedTp = builtinTypes->errorTypePack;
-            }
-            else if (auto gtp = getMutable<GenericTypePack>(clonedTp))
+            if (auto gtp = getMutable<GenericTypePack>(clonedTp))
                 gtp->scope = nullptr;
             return clonedTp;
         }
@@ -293,10 +245,7 @@ struct ClonePublicInterface : Substitution
         else
         {
 
-            if (FFlag::LuauEmplaceNotPushBack)
-                module->errors.emplace_back(module->scopes[0].first, UnificationTooComplex{});
-            else
-                module->errors.push_back(TypeError{module->scopes[0].first, UnificationTooComplex{}});
+            module->errors.emplace_back(module->scopes[0].first, UnificationTooComplex{});
             return builtinTypes->errorType;
         }
     }
@@ -310,10 +259,7 @@ struct ClonePublicInterface : Substitution
         }
         else
         {
-            if (FFlag::LuauEmplaceNotPushBack)
-                module->errors.emplace_back(module->scopes[0].first, UnificationTooComplex{});
-            else
-                module->errors.push_back(TypeError{module->scopes[0].first, UnificationTooComplex{}});
+            module->errors.emplace_back(module->scopes[0].first, UnificationTooComplex{});
             return builtinTypes->errorTypePack;
         }
     }
@@ -354,58 +300,8 @@ struct ClonePublicInterface : Substitution
 Module::~Module()
 {
     unfreeze(interfaceTypes);
-    unfreeze(internalTypes);
-}
-
-void Module::clonePublicInterface_DEPRECATED(NotNull<BuiltinTypes> builtinTypes, InternalErrorReporter& ice)
-{
-    CloneState cloneState{builtinTypes};
-
-    ScopePtr moduleScope = getModuleScope();
-
-    TypePackId returnType = moduleScope->returnType;
-    std::optional<TypePackId> varargPack = FFlag::LuauSolverV2 ? std::nullopt : moduleScope->varargPack;
-
-    TxnLog log;
-    ClonePublicInterface clonePublicInterface{&log, builtinTypes, this};
-
-    returnType = clonePublicInterface.cloneTypePack(returnType);
-
-    moduleScope->returnType = returnType;
-    if (varargPack)
-    {
-        varargPack = clonePublicInterface.cloneTypePack(*varargPack);
-        moduleScope->varargPack = varargPack;
-    }
-
-    for (auto& [name, tf] : moduleScope->exportedTypeBindings)
-    {
-        tf = clonePublicInterface.cloneTypeFun(tf);
-    }
-
-    for (auto& [name, ty] : declaredGlobals)
-    {
-        ty = clonePublicInterface.cloneType(ty);
-    }
-
-    for (auto& tf : typeFunctionAliases)
-    {
-        *tf = clonePublicInterface.cloneTypeFun(*tf);
-    }
-
-    if (FFlag::LuauLimitDynamicConstraintSolving3 && clonePublicInterface.internalTypeEscaped)
-    {
-        errors.emplace_back(
-            Location{}, // Not amazing but the best we can do.
-            name,
-            InternalError{"An internal type is escaping this module; please report this bug at "
-                          "https://github.com/luau-lang/luau/issues"}
-        );
-    }
-
-    // Copy external stuff over to Module itself
-    this->returnType = moduleScope->returnType;
-    this->exportedTypeBindings = moduleScope->exportedTypeBindings;
+    if (internalTypes)
+        unfreeze(*internalTypes);
 }
 
 void Module::clonePublicInterface(NotNull<BuiltinTypes> builtinTypes, InternalErrorReporter& ice, SolverMode mode)
@@ -444,7 +340,7 @@ void Module::clonePublicInterface(NotNull<BuiltinTypes> builtinTypes, InternalEr
         *tf = clonePublicInterface.cloneTypeFun(*tf);
     }
 
-    if (FFlag::LuauLimitDynamicConstraintSolving3 && clonePublicInterface.internalTypeEscaped)
+    if (clonePublicInterface.internalTypeEscaped)
     {
         errors.emplace_back(
             Location{}, // Not amazing but the best we can do.
@@ -468,6 +364,114 @@ ScopePtr Module::getModuleScope() const
 {
     LUAU_ASSERT(hasModuleScope());
     return scopes.front().second;
+}
+
+void synthesizeExportReturn(NotNull<BuiltinTypes> builtinTypes, NotNull<Module> module)
+{
+    LUAU_ASSERT(module->root);
+
+    ScopePtr moduleScope = module->getModuleScope();
+    TableType::Props props;
+
+    auto lookupExportedBindingType = [&](AstLocal* local) -> TypeId
+    {
+        NotNull<Scope> scope = moduleScope->findNarrowestScopeContaining(local->location);
+
+        if (std::optional<std::pair<Binding*, Scope*>> binding = scope->lookupEx(Symbol{local}))
+            return follow(binding->first->typeId);
+
+        return builtinTypes->errorType;
+    };
+
+    auto lookupExprType = [&](AstExpr* expr) -> TypeId
+    {
+        if (TypeId* ty = module->astTypes.find(expr))
+            return follow(*ty);
+
+        return builtinTypes->errorType;
+    };
+
+    DenseHashSet<AstLocal*> exportedLocals{nullptr};
+
+    for (AstStat* statement : module->root->body)
+    {
+        if (AstStatLocal* localStat = statement->as<AstStatLocal>())
+        {
+            if (!localStat->isExported)
+                continue;
+
+            for (size_t i = 0; i < localStat->vars.size; ++i)
+            {
+                AstLocal* local = localStat->vars.data[i];
+                exportedLocals.insert(local);
+
+                if (localStat->vars.size != localStat->values.size || i >= localStat->values.size)
+                {
+                    props[local->name.value] = lookupExportedBindingType(local);
+                }
+                else
+                {
+                    props[local->name.value] = Property::readonly(lookupExprType(localStat->values.data[i]));
+                }
+
+                props[local->name.value].location = local->location;
+            }
+        }
+        else if (AstStatLocalFunction* localFunction = statement->as<AstStatLocalFunction>())
+        {
+            if (!localFunction->name->isExported)
+                continue;
+
+            props[localFunction->name->name.value] = Property::readonly(lookupExportedBindingType(localFunction->name));
+            props[localFunction->name->name.value].location = localFunction->name->location;
+        }
+        else if (AstStatAssign* assign = statement->as<AstStatAssign>())
+        {
+            for (size_t i = 0; i < assign->vars.size; ++i)
+            {
+                AstExprLocal* exprLocal = assign->vars.data[i]->as<AstExprLocal>();
+                if (!exprLocal || !exportedLocals.contains(exprLocal->local))
+                    continue;
+
+                if (assign->vars.size != assign->values.size || i >= assign->values.size)
+                {
+                    props[exprLocal->local->name.value] = lookupExportedBindingType(exprLocal->local);
+                }
+                else
+                {
+                    props[exprLocal->local->name.value] = Property::readonly(lookupExprType(assign->values.data[i]));
+                }
+
+                props[exprLocal->local->name.value].location = exprLocal->local->location;
+            }
+        }
+        else if (AstStatFunction* funcStat = statement->as<AstStatFunction>())
+        {
+            AstExprLocal* exprLocal = funcStat->name->as<AstExprLocal>();
+            if (exprLocal && exportedLocals.contains(exprLocal->local))
+            {
+                props[exprLocal->local->name.value] = Property::readonly(lookupExprType(funcStat->func));
+                props[exprLocal->local->name.value].location = exprLocal->local->location;
+            }
+        }
+        else if (FFlag::DebugLuauUserDefinedClasses)
+        {
+            if (AstStatClass* classStat = statement->as<AstStatClass>())
+            {
+                if (!classStat->exported)
+                    continue;
+
+                props[classStat->name->name.value] = Property::readonly(lookupExportedBindingType(classStat->name));
+                props[classStat->name->name.value].location = classStat->name->location;
+            }
+        }
+    }
+
+    if (props.empty())
+        return;
+
+    TypeId exports = module->internalTypes->addType(TableType{props, std::nullopt, moduleScope->level, TableState::Sealed});
+    moduleScope->returnType = module->internalTypes->addTypePack({exports});
 }
 
 } // namespace Luau

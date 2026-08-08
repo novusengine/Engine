@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 namespace PACT
@@ -29,6 +30,13 @@ namespace PACT
         u32 mountIndex;
     };
 
+    struct PactVirtualDirectory
+    {
+    public:
+        std::vector<std::string> directories;
+        std::vector<std::string> files;
+    };
+
     struct PactMountTable
     {
     public:
@@ -39,5 +47,7 @@ namespace PACT
         robin_hood::unordered_set<PactManifestHandle> mountIDSet;
         robin_hood::unordered_map<u64, PactFileRuntimeRecord> pathTable;
         robin_hood::unordered_map<PactFileID, PactFileRuntimeRecord> fileIDTable;
+        std::vector<std::string> virtualPathIndex;
+        robin_hood::unordered_map<std::string, PactVirtualDirectory> virtualDirectoryIndex;
     };
 }

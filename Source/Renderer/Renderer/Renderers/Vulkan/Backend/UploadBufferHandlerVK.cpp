@@ -57,9 +57,12 @@ namespace Renderer
             UploadToTextureTask() : UploadTask(UploadTaskType::UploadToTexture) { }
 
             TextureID targetTexture = TextureID::Invalid();
-            size_t targetOffset;
-            size_t stagingBufferOffset;
-            size_t numMipsToGenerate;
+            size_t targetOffset = 0;
+            size_t stagingBufferOffset = 0;
+            size_t numMipsToGenerate = 0;
+            size_t copySize = 0;
+            TextureUploadRegion region;
+            bool regionUpload = false;
         };
 
         struct CopyBufferToBufferTask : UploadTask
@@ -383,6 +386,7 @@ namespace Renderer
             task->targetOffset = targetOffset;
             task->stagingBufferOffset = offset;
             task->numMipsToGenerate = numMipsToGenerate;
+            task->copySize = size;
 
             size_t targetTextureTotalSize = _textureHandler->GetTextureTotalSize(targetTexture);
             if (targetOffset + size > targetTextureTotalSize)
@@ -424,6 +428,67 @@ namespace Renderer
             uploadBuffer->size = size;
             uploadBuffer->mappedMemory = mappedMemory;
 
+            data->isDirty = true;
+            return uploadBuffer;
+        }
+
+        std::shared_ptr<UploadBuffer> UploadBufferHandlerVK::CreateUploadBuffer(TextureID targetTexture, const TextureUploadRegion& region, size_t size)
+        {
+            if (targetTexture == TextureID::Invalid())
+            {
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Tried to create a regional upload buffer pointing at an invalid texture");
+                return nullptr;
+            }
+
+            size_t requiredSize = 0;
+            if (!_textureHandler->TryGetTextureUploadRegionSize(targetTexture, region, requiredSize))
+            {
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Requested an invalid regional texture upload");
+                return nullptr;
+            }
+
+            if (size != requiredSize || size > Settings::STAGING_BUFFER_SIZE)
+            {
+                NC_LOG_CRITICAL("UploadBufferHandlerVK : Regional texture upload size mismatch (provided {0}, required {1})", size, requiredSize);
+                return nullptr;
+            }
+
+            UploadBufferHandlerVKData* data = static_cast<UploadBufferHandlerVKData*>(_data);
+            NC_ASSERT(!(std::this_thread::get_id() == data->renderThreadID && data->uploadsLocked),
+                "UploadBufferHandlerVK : Staging upload requested after this frame's uploads were submitted (FlipFrame). Move it to the Update phase, before Render.");
+
+            void* mappedMemory = nullptr;
+            StagingBufferID stagingBufferID;
+            const size_t offset = Allocate(size, stagingBufferID, mappedMemory);
+
+            UploadToTextureTask* task = new UploadToTextureTask();
+            task->targetTexture = targetTexture;
+            task->stagingBufferOffset = offset;
+            task->copySize = size;
+            task->region = region;
+            task->regionUpload = true;
+
+            StagingBuffer& stagingBuffer = data->stagingBuffers.Get(static_cast<StagingBufferID::type>(stagingBufferID));
+            stagingBuffer.uploadTasks.enqueue(task);
+            {
+                std::scoped_lock lock(stagingBuffer.handleMutex);
+                stagingBuffer.activeHandles++;
+                stagingBuffer.totalHandles++;
+            }
+
+            std::shared_ptr<UploadBuffer> uploadBuffer(new UploadBuffer(),
+                [&](UploadBuffer* buffer)
+                {
+                    {
+                        std::scoped_lock lock(stagingBuffer.handleMutex);
+                        NC_ASSERT(stagingBuffer.bufferStatus == BufferStatus::READY || stagingBuffer.bufferStatus == BufferStatus::CLOSED, "UploadBufferHandlerVK : It seems like the staging buffer got executed while we had an active handle");
+                        stagingBuffer.activeHandles--;
+                    }
+                    delete buffer;
+                });
+
+            uploadBuffer->size = size;
+            uploadBuffer->mappedMemory = mappedMemory;
             data->isDirty = true;
             return uploadBuffer;
         }
@@ -688,11 +753,17 @@ namespace Renderer
             VkBuffer srcBuffer = _bufferHandler->GetBuffer(stagingBuffer.buffer);
 
             size_t srcBufferSize = _bufferHandler->GetBufferSize(stagingBuffer.buffer);
-            size_t textureSize = _textureHandler->GetTextureUploadSize(uploadToTextureTask->targetTexture);
+            const size_t copySize = uploadToTextureTask->regionUpload ? uploadToTextureTask->copySize : _textureHandler->GetTextureUploadSize(uploadToTextureTask->targetTexture);
 
-            if (uploadToTextureTask->stagingBufferOffset + textureSize > srcBufferSize)
+            if (uploadToTextureTask->stagingBufferOffset + copySize > srcBufferSize)
             {
                 NC_LOG_CRITICAL("[UploadBufferHandlerVK::HandleUploadToTextureTask] Source Buffer out of bounds!");
+            }
+
+            if (uploadToTextureTask->regionUpload)
+            {
+                _textureHandler->CopyBufferToImage(commandBuffer, srcBuffer, uploadToTextureTask->stagingBufferOffset, uploadToTextureTask->targetTexture, uploadToTextureTask->region);
+                return;
             }
 
             _textureHandler->CopyBufferToImage(commandBuffer, srcBuffer, uploadToTextureTask->stagingBufferOffset, uploadToTextureTask->targetTexture);

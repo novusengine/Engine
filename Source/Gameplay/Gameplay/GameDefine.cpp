@@ -232,7 +232,15 @@ namespace GameDefine
             didFail |= !buffer->GetU32(result.iconID);
             didFail |= !buffer->GetF32(result.castTime);
             didFail |= !buffer->GetF32(result.cooldown);
-            didFail |= !buffer->GetF32(result.duration);
+            didFail |= !buffer->GetU8(result.targetSelector);
+            didFail |= !buffer->GetU8(result.targetShape);
+            didFail |= !buffer->GetU8(result.targetRelation);
+            didFail |= !buffer->GetU8(result.targetRecipientMask);
+            didFail |= !buffer->GetU8(result.rangePolicy);
+            didFail |= !buffer->GetF32(result.minimumRange);
+            didFail |= !buffer->GetF32(result.maximumRange);
+            didFail |= !buffer->GetF32(result.targetRadius);
+            didFail |= !buffer->GetU16(result.maximumTargets);
 
             bool succeeded = !didFail;
             return succeeded;
@@ -248,10 +256,46 @@ namespace GameDefine
             didFail |= !buffer->PutU32(data.iconID);
             didFail |= !buffer->PutF32(data.castTime);
             didFail |= !buffer->PutF32(data.cooldown);
-            didFail |= !buffer->PutF32(data.duration);
+            didFail |= !buffer->PutU8(data.targetSelector);
+            didFail |= !buffer->PutU8(data.targetShape);
+            didFail |= !buffer->PutU8(data.targetRelation);
+            didFail |= !buffer->PutU8(data.targetRecipientMask);
+            didFail |= !buffer->PutU8(data.rangePolicy);
+            didFail |= !buffer->PutF32(data.minimumRange);
+            didFail |= !buffer->PutF32(data.maximumRange);
+            didFail |= !buffer->PutF32(data.targetRadius);
+            didFail |= !buffer->PutU16(data.maximumTargets);
 
             bool succeeded = !didFail;
             return succeeded;
+        }
+
+        bool SpellAura::Read(Bytebuffer* buffer, SpellAura& result)
+        {
+            bool didFail = false;
+            didFail |= !buffer->GetU32(result.spellID);
+            didFail |= !buffer->GetF32(result.duration);
+            didFail |= !buffer->GetU16(result.stacksPerApplication);
+            didFail |= !buffer->GetU16(result.maximumStacks);
+            didFail |= !buffer->GetU8(result.applicationPolicy);
+            didFail |= !buffer->GetU8(result.disposition);
+            didFail |= !buffer->GetU8(result.dispelType);
+            didFail |= !buffer->GetU8(result.lifecycleFlags);
+            return !didFail;
+        }
+
+        bool SpellAura::Write(Bytebuffer* buffer, const SpellAura& data)
+        {
+            bool didFail = false;
+            didFail |= !buffer->PutU32(data.spellID);
+            didFail |= !buffer->PutF32(data.duration);
+            didFail |= !buffer->PutU16(data.stacksPerApplication);
+            didFail |= !buffer->PutU16(data.maximumStacks);
+            didFail |= !buffer->PutU8(data.applicationPolicy);
+            didFail |= !buffer->PutU8(data.disposition);
+            didFail |= !buffer->PutU8(data.dispelType);
+            didFail |= !buffer->PutU8(data.lifecycleFlags);
+            return !didFail;
         }
 
         bool SpellEffect::Read(Bytebuffer* buffer, SpellEffect& result)

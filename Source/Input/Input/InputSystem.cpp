@@ -417,7 +417,7 @@ bool InputSystem::AppendEvent(const InputEvent& event)
     {
         if (!_eventOverflowed)
         {
-            NC_LOG_ERROR("InputSystem: Input event buffer overflowed; additional events will be dropped for this frame");
+            NC_LOG_WARNING("InputSystem: Input event buffer overflowed; additional events will be dropped for this frame");
             _eventOverflowed = true;
         }
 

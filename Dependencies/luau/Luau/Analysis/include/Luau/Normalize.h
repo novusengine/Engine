@@ -1,7 +1,6 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #pragma once
 
-#include "Luau/EqSatSimplification.h"
 #include "Luau/NotNull.h"
 #include "Luau/Set.h"
 #include "Luau/TypeFwd.h"
@@ -19,27 +18,9 @@ namespace Luau
 struct InternalErrorReporter;
 struct Module;
 struct Scope;
+struct TypeFunctionRuntime;
 
 using ModulePtr = std::shared_ptr<Module>;
-
-bool isSubtype(
-    TypeId subTy,
-    TypeId superTy,
-    NotNull<Scope> scope,
-    NotNull<BuiltinTypes> builtinTypes,
-    NotNull<Simplifier> simplifier,
-    InternalErrorReporter& ice,
-    SolverMode solverMode
-);
-bool isSubtype(
-    TypePackId subPack,
-    TypePackId superPack,
-    NotNull<Scope> scope,
-    NotNull<BuiltinTypes> builtinTypes,
-    NotNull<Simplifier> simplifier,
-    InternalErrorReporter& ice,
-    SolverMode solverMode
-);
 
 } // namespace Luau
 
@@ -145,6 +126,12 @@ struct NormalizedExternType
      */
     std::unordered_map<TypeId, TypeIds> externTypes;
 
+    /*
+     * We track an overall collection of shapes that extend this extern type.
+     * This should be interpreted as a big intersection of the given types.
+     */
+    TypeIds shapeExtensions;
+
     /**
      * In order to maintain a consistent insertion order, we use this vector to
      * keep track of it. An ordered std::map will sort by pointer identity,
@@ -202,6 +189,8 @@ enum class NormalizationResult
 // * G is a union of generic/free/blocked types, intersected with a normalized type
 struct NormalizedType
 {
+    NotNull<BuiltinTypes> builtinTypes;
+
     // The top part of the type.
     // This type is either never, unknown, or any.
     // If this type is not never, all the other fields are null.
@@ -224,6 +213,10 @@ struct NormalizedType
     // The number part of the type.
     // This type is either never or number.
     TypeId numbers;
+
+    // The integer part of the type.
+    // This type is either never or integer.
+    TypeId integers;
 
     // The string part of the type.
     // This may be the `string` type, or a union of singletons.
@@ -278,7 +271,7 @@ struct NormalizedType
     /// Returns true if this type should result in error suppressing behavior.
     bool shouldSuppressErrors() const;
 
-    /// Returns true if this type contains the primitve top table type, `table`.
+    /// Returns true if this type contains the primitive top table type, `table`.
     bool hasTopTable() const;
 
     /// Returns true if this type is `nil` or `nil | *error-type*`
@@ -291,6 +284,7 @@ struct NormalizedType
     bool hasErrors() const;
     bool hasNils() const;
     bool hasNumbers() const;
+    bool hasIntegers() const;
     bool hasStrings() const;
     bool hasThreads() const;
     bool hasBuffers() const;
@@ -314,6 +308,8 @@ class Normalizer
 
     DenseHashMap<TypeId, bool> cachedIsInhabited{nullptr};
     DenseHashMap<std::pair<TypeId, TypeId>, bool, TypeIdPairHash> cachedIsInhabitedIntersection{{nullptr, nullptr}};
+
+    std::optional<int> fuel{std::nullopt};
 
     bool withinResourceLimits();
     bool useNewLuauSolver() const;
@@ -340,13 +336,28 @@ public:
 
     // If this returns null, the typechecker should emit a "too complex" error
     std::shared_ptr<const NormalizedType> normalize(TypeId ty);
-    void clearNormal(NormalizedType& norm);
+
+    void clearCaches();
+
+    NormalizationResult isIntersectionInhabited(TypeId left, TypeId right);
+
+    // Check for inhabitance
+    NormalizationResult isInhabited(TypeId ty);
+    NormalizationResult isInhabited(const NormalizedType* norm);
+
+    // -------- Convert back from a normalized type to a type
+    TypeId typeFromNormal(const NormalizedType& norm);
+
+    std::optional<TypePackId> intersectionOfTypePacks(TypePackId here, TypePackId there);
+
+private:
+    std::optional<TypePackId> intersectionOfTypePacks_INTERNAL(TypePackId here, TypePackId there);
 
     // ------- Cached TypeIds
     TypeId unionType(TypeId here, TypeId there);
     TypeId intersectionType(TypeId here, TypeId there);
     const TypeIds* cacheTypeIds(TypeIds tys);
-    void clearCaches();
+    void clearNormal(NormalizedType& norm);
 
     // ------- Normalizing unions
     void unionTysWithTy(TypeIds& here, TypeId there);
@@ -386,8 +397,8 @@ public:
     TypeId intersectionOfBools(TypeId here, TypeId there);
     void intersectExternTypes(NormalizedExternType& heres, const NormalizedExternType& theres);
     void intersectExternTypesWithExternType(NormalizedExternType& heres, TypeId there);
+    void intersectExternTypesWithShape(NormalizedExternType& heres, TypeId there);
     void intersectStrings(NormalizedStringType& here, const NormalizedStringType& there);
-    std::optional<TypePackId> intersectionOfTypePacks(TypePackId here, TypePackId there);
     std::optional<TypeId> intersectionOfTables(TypeId here, TypeId there, SeenTablePropPairs& seenTablePropPairs, Set<TypeId>& seenSet);
     void intersectTablesWithTable(TypeIds& heres, TypeId there, SeenTablePropPairs& seenTablePropPairs, Set<TypeId>& seenSetTypes);
     void intersectTables(TypeIds& heres, const TypeIds& theres);
@@ -409,18 +420,32 @@ public:
         Set<TypeId>& seenSet
     );
 
-    // Check for inhabitance
-    NormalizationResult isInhabited(TypeId ty);
     NormalizationResult isInhabited(TypeId ty, Set<TypeId>& seen);
-    NormalizationResult isInhabited(const NormalizedType* norm);
     NormalizationResult isInhabited(const NormalizedType* norm, Set<TypeId>& seen);
 
     // Check for intersections being inhabited
-    NormalizationResult isIntersectionInhabited(TypeId left, TypeId right);
     NormalizationResult isIntersectionInhabited(TypeId left, TypeId right, SeenTablePropPairs& seenTablePropPairs, Set<TypeId>& seenSet);
 
-    // -------- Convert back from a normalized type to a type
-    TypeId typeFromNormal(const NormalizedType& norm);
+
+    // Fuel setup
+
+    bool initializeFuel();
+    void clearFuel();
+    void consumeFuel();
+
+    friend struct FuelInitializer;
 };
+
+bool isSubtype(
+    TypeId subTy,
+    TypeId superTy,
+    NotNull<TypeArena> arena,
+    NotNull<BuiltinTypes> builtinTypes,
+    NotNull<Scope> scope,
+    NotNull<Normalizer> normalizer,
+    NotNull<TypeFunctionRuntime> typeFunctionRuntime,
+    NotNull<InternalErrorReporter> reporter
+);
+
 
 } // namespace Luau

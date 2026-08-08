@@ -7,6 +7,7 @@
 
 #include <Luau/Compiler.h>
 #include <Luau/CodeGen.h>
+#include <Luau/Common.h>
 
 #include <lua.h>
 #include <lualib.h>
@@ -19,6 +20,10 @@ AutoCVar_String CVAR_ScriptDir(CVarCategory::Client, "scriptingDirectory", "defi
 AutoCVar_String CVAR_ScriptExtension(CVarCategory::Client, "scriptingExtension", "defines the file extension to recognized as a script file", ".luau");
 AutoCVar_String CVAR_ScriptMotd(CVarCategory::Client, "scriptingMotd", "defines the message of the day passed in the GameLoaded Event", "Welcome to Novuscore");
 AutoCVar_Int CVAR_ScriptNativeCompilation(CVarCategory::Client, "scriptingNativeCompilation", "enables native compilation of luau scripts, may improve performance but increases load times", 0, CVarFlags::EditCheckbox);
+
+LUAU_FASTFLAG(LuauCodegenInteger3)
+LUAU_FASTFLAG(LuauIntegerLibrary)
+LUAU_FASTFLAG(LuauIntegerType2)
 
 namespace Scripting
 {
@@ -152,6 +157,10 @@ namespace Scripting
 
     LuaManager::LuaManager()
     {
+        FFlag::LuauCodegenInteger3.value = true;
+        FFlag::LuauIntegerLibrary.value = true;
+        FFlag::LuauIntegerType2.value = true;
+
         _luaHandlers.reserve(32);
     }
 
@@ -238,6 +247,9 @@ namespace Scripting
             compileOptions.debugLevel = 2;
             compileOptions.typeInfoLevel = 1;
             compileOptions.coverageLevel = 2;
+            compileOptions.vectorLib = "vec";
+            compileOptions.vectorCtor = "New";
+            compileOptions.vectorType = "vec";
         }
 
         Luau::ParseOptions parseOptions;
@@ -404,6 +416,9 @@ namespace Scripting
             compileOptions.debugLevel = 2;
             compileOptions.typeInfoLevel = 1;
             compileOptions.coverageLevel = 2;
+            compileOptions.vectorLib = "vec";
+            compileOptions.vectorCtor = "New";
+            compileOptions.vectorType = "vec";
         }
         Luau::ParseOptions parseOptions;
 

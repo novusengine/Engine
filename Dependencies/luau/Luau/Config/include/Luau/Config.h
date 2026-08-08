@@ -48,24 +48,11 @@ struct Config
     DenseHashMap<std::string, AliasInfo> aliases{""};
 
     void setAlias(std::string alias, std::string value, const std::string& configLocation);
+    void setAlias(std::string alias, std::string value);
 
 private:
     // Prevents making unnecessary copies of the same config location string.
     DenseHashMap<std::string, std::unique_ptr<std::string>> configLocationCache{""};
-};
-
-struct ConfigResolver
-{
-    virtual ~ConfigResolver() {}
-
-    virtual const Config& getConfig(const ModuleName& name) const = 0;
-};
-
-struct NullConfigResolver : ConfigResolver
-{
-    Config defaultConfig;
-
-    virtual const Config& getConfig(const ModuleName& name) const override;
 };
 
 std::optional<std::string> parseModeString(Mode& mode, const std::string& modeString, bool compat = false);
@@ -85,11 +72,18 @@ struct ConfigOptions
 
     struct AliasOptions
     {
-        std::string configLocation;
+        std::optional<std::string> configLocation;
         bool overwriteAliases;
     };
     std::optional<AliasOptions> aliasOptions = std::nullopt;
 };
+
+std::optional<std::string> parseAlias(
+    Config& config,
+    const std::string& aliasKey,
+    const std::string& aliasValue,
+    const std::optional<ConfigOptions::AliasOptions>& aliasOptions
+);
 
 std::optional<std::string> parseConfig(const std::string& contents, Config& config, const ConfigOptions& options = ConfigOptions{});
 

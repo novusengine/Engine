@@ -38,8 +38,8 @@ namespace Renderer
 
             TextureID LoadTexture(const TextureDesc& desc);
             TextureID LoadDataTexture(const DataTextureDesc& desc);
-            TextureID LoadTextureIntoArray(const TextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates);
-            TextureID LoadDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates);
+            TextureID LoadTextureIntoArray(const TextureDesc& desc, TextureArrayID textureArrayID, size_t& arrayIndex, bool allowDuplicates);
+            TextureID LoadDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, size_t& arrayIndex, bool allowDuplicates);
 
             void UnloadTexture(const TextureID textureID);
             void UnloadTexturesInArray(const TextureArrayID textureArrayID, u32 unloadStartIndex);
@@ -47,14 +47,15 @@ namespace Renderer
             TextureArrayID CreateTextureArray(const TextureArrayDesc& desc);
 
             TextureID CreateDataTexture(const DataTextureDesc& desc);
-            TextureID CreateDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex);
+            TextureID CreateDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, size_t& arrayIndex);
 
-            u32 AddTextureToArray(const TextureID textureID, const TextureArrayID textureArrayID);
+            size_t AddTextureToArray(const TextureID textureID, const TextureArrayID textureArrayID);
 
             void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, size_t srcOffset, TextureID dstTextureID);
+            void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, size_t srcOffset, TextureID dstTextureID, const TextureUploadRegion& region);
             void TransitionImageLayout(VkCommandBuffer commandBuffer, TextureID textureID, VkImageAspectFlags aspects, VkImageLayout oldLayout, VkImageLayout newLayout);
 
-            TextureID GetTextureIDInArray(const TextureArrayID textureArrayID, u32 index);
+            TextureID GetTextureIDInArray(const TextureArrayID textureArrayID, size_t index);
             TextureBaseDesc GetTextureDesc(const TextureID textureID);
 
             const SafeVector<TextureID>& GetTextureIDsInArray(const TextureArrayID textureArrayID);
@@ -71,22 +72,24 @@ namespace Renderer
 
             size_t GetTextureUploadSize(const TextureID textureID);
             size_t GetTextureTotalSize(const TextureID textureID);
+            bool TryGetTextureUploadRegionSize(const TextureID textureID, const TextureUploadRegion& region, size_t& uploadSize);
             u32 GetTextureArraySize(const TextureArrayID textureArrayID);
 
             ivec2 GetTextureDimensions(const TextureID textureID);
+
+            bool TryFindExistingTexture(u64 descHash, TextureID& textureID);
+            bool TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID);
 
             const std::string& GetDebugName(const TextureID textureID);
 
         private:
             u64 CalculateDescHash(const TextureDesc& desc);
-            bool TryFindExistingTexture(u64 descHash, size_t& id);
-            bool TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID);
 
             void LoadFile(const std::string& filename, Texture& texture, TextureID textureID);
             void LoadFromMemory(const u8* data, size_t size, Texture& texture, TextureID textureID);
             void CreateTexture(Texture& texture);
 
-            u32 AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership);
+            size_t AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership);
 
         private:
             ITextureHandlerVKData* _data;

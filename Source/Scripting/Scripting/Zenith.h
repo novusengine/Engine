@@ -88,8 +88,14 @@ namespace Scripting
 
         void SetGlobalKey(const char* key);
         void AddGlobalField(const char* key, bool value);
+        void AddGlobalField(const char* key, i8 value);
+        void AddGlobalField(const char* key, i16 value);
         void AddGlobalField(const char* key, i32 value);
+        void AddGlobalField(const char* key, i64 value);
+        void AddGlobalField(const char* key, u8 value);
+        void AddGlobalField(const char* key, u16 value);
         void AddGlobalField(const char* key, u32 value);
+        void AddGlobalField(const char* key, u64 value);
         void AddGlobalField(const char* key, f32 value);
         void AddGlobalField(const char* key, f64 value);
         void AddGlobalField(const char* key, const char* value);
@@ -99,6 +105,7 @@ namespace Scripting
 
         bool IsNil(i32 index);
         bool IsBoolean(i32 index);
+        bool IsInteger(i32 index);
         bool IsNumber(i32 index);
         bool IsString(i32 index);
         bool IsVector(i32 index);
@@ -108,8 +115,8 @@ namespace Scripting
         bool IsLightUserData(i32 index);
 
         bool ToBoolean(i32 index);
-        i32 ToInteger(i32 index);
-        u32 ToUnsigned(i32 index);
+        i64 ToInteger(i32 index);
+        u64 ToUnsigned(i32 index);
         f64 ToNumber(i32 index);
         const char* ToString(i32 index);
         vec3 ToVector(i32 index);
@@ -531,8 +538,14 @@ namespace Scripting
 
 
     template<> bool Zenith::GetGlobalField<bool>(const char* key);
+    template<> i8 Zenith::GetGlobalField<i8>(const char* key);
+    template<> i16 Zenith::GetGlobalField<i16>(const char* key);
     template<> i32 Zenith::GetGlobalField<i32>(const char* key);
+    template<> i64 Zenith::GetGlobalField<i64>(const char* key);
+    template<> u8 Zenith::GetGlobalField<u8>(const char* key);
+    template<> u16 Zenith::GetGlobalField<u16>(const char* key);
     template<> u32 Zenith::GetGlobalField<u32>(const char* key);
+    template<> u64 Zenith::GetGlobalField<u64>(const char* key);
     template<> f32 Zenith::GetGlobalField<f32>(const char* key);
     template<> f64 Zenith::GetGlobalField<f64>(const char* key);
     template<> const char* Zenith::GetGlobalField<const char*>(const char* key);
@@ -547,8 +560,14 @@ namespace Scripting
     template<> void Zenith::Push<::std::string>(const ::std::string& value);
 
     template<> bool Zenith::Get<bool>(i32 index);
+    template<> i8 Zenith::Get<i8>(i32 index);
+    template<> i16 Zenith::Get<i16>(i32 index);
     template<> i32 Zenith::Get<i32>(i32 index);
+    template<> i64 Zenith::Get<i64>(i32 index);
+    template<> u8 Zenith::Get<u8>(i32 index);
+    template<> u16 Zenith::Get<u16>(i32 index);
     template<> u32 Zenith::Get<u32>(i32 index);
+    template<> u64 Zenith::Get<u64>(i32 index);
     template<> f32 Zenith::Get<f32>(i32 index);
     template<> f64 Zenith::Get<f64>(i32 index);
     template<> const char* Zenith::Get<const char*>(i32 index);

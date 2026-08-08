@@ -4,14 +4,22 @@
 
 #include "lstate.h"
 
+#include <limits>
 #include <math.h>
 #include <time.h>
 
-#undef PI
-#define PI (3.14159265358979323846)
-#define RADIANS_PER_DEGREE (PI / 180.0)
+#define LUAU_PI (3.14159265358979323846)
+#define RADIANS_PER_DEGREE (LUAU_PI / 180.0)
+
+#define LUAU_NAN (std::numeric_limits<double>::quiet_NaN())
+#define LUAU_E (2.71828182845904523536)
+#define LUAU_PHI (1.61803398874989484820)
+#define LUAU_SQRT2 (1.41421356237309504880)
+#define LUAU_TAU (6.28318530717958647692)
 
 #define PCG32_INC 105
+
+LUAU_FASTFLAGVARIABLE(FixMathNoisePrecision)
 
 static uint32_t pcg32_random(uint64_t* state)
 {
@@ -369,6 +377,17 @@ static int math_noise(lua_State* L)
     luaL_argexpected(L, ny || lua_isnoneornil(L, 2), 2, "number");
     luaL_argexpected(L, nz || lua_isnoneornil(L, 3), 3, "number");
 
+    if (FFlag::FixMathNoisePrecision)
+    {
+        // NOTES: input numbers from Luau are double with higher precision and range than float used by perlin().
+        // If we don't do this, for large numbers, perlin() will return almost always 0, since with larger inputs,
+        // most of the mantissa is used to store the integer part and perlin() is always 0 at integer cell values.
+        // Noise repeat exactly every 256 units in all dimensions, so we can wrap to prevent loss of precision for large numbers.
+        x = fmod(x, 256.0);
+        y = fmod(y, 256.0);
+        z = fmod(z, 256.0);
+    }
+
     double r = perlin((float)x, (float)y, (float)z);
 
     lua_pushnumber(L, r);
@@ -427,6 +446,30 @@ static int math_lerp(lua_State* L)
     return 1;
 }
 
+static int math_isnan(lua_State* L)
+{
+    double x = luaL_checknumber(L, 1);
+
+    lua_pushboolean(L, isnan(x));
+    return 1;
+}
+
+static int math_isinf(lua_State* L)
+{
+    double x = luaL_checknumber(L, 1);
+
+    lua_pushboolean(L, isinf(x));
+    return 1;
+}
+
+static int math_isfinite(lua_State* L)
+{
+    double x = luaL_checknumber(L, 1);
+
+    lua_pushboolean(L, isfinite(x));
+    return 1;
+}
+
 static const luaL_Reg mathlib[] = {
     {"abs", math_abs},
     {"acos", math_acos},
@@ -462,6 +505,9 @@ static const luaL_Reg mathlib[] = {
     {"round", math_round},
     {"map", math_map},
     {"lerp", math_lerp},
+    {"isnan", math_isnan},
+    {"isinf", math_isinf},
+    {"isfinite", math_isfinite},
     {NULL, NULL},
 };
 
@@ -470,17 +516,28 @@ static const luaL_Reg mathlib[] = {
 */
 int luaopen_math(lua_State* L)
 {
-    uint64_t seed = uintptr_t(L);
+    uint64_t seed = lua_encodepointer(L, uintptr_t(L));
     seed ^= time(NULL);
     seed ^= clock();
 
     pcg32_seed(&L->global->rngstate, seed);
 
     luaL_register(L, LUA_MATHLIBNAME, mathlib);
-    lua_pushnumber(L, PI);
+
+    lua_pushnumber(L, LUAU_PI);
     lua_setfield(L, -2, "pi");
     lua_pushnumber(L, HUGE_VAL);
     lua_setfield(L, -2, "huge");
+    lua_pushnumber(L, LUAU_NAN);
+    lua_setfield(L, -2, "nan");
+    lua_pushnumber(L, LUAU_E);
+    lua_setfield(L, -2, "e");
+    lua_pushnumber(L, LUAU_PHI);
+    lua_setfield(L, -2, "phi");
+    lua_pushnumber(L, LUAU_SQRT2);
+    lua_setfield(L, -2, "sqrt2");
+    lua_pushnumber(L, LUAU_TAU);
+    lua_setfield(L, -2, "tau");
 
     return 1;
 }

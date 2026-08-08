@@ -1,6 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 
 #include "Luau/Type.h"
+#include "Luau/TypePack.h"
 #include "Luau/TypeIds.h"
 
 namespace Luau
@@ -32,6 +33,23 @@ void TypeIds::clear()
 {
     order.clear();
     types.clear();
+    hash = 0;
+}
+
+void TypeIds::clearWithoutRealloc()
+{
+    // Our goal for this function is to logically clear the TypeIds without
+    // resetting either of the underlying allocations, so that we can reuse
+    // this TypeIds in a loop without paying allocation costs every time.
+    //
+    // According to the C++ standard, clear does not affect the result of capacity,
+    // so we should be able to guarantee that the underlying data is not reallocted.
+    // https://en.cppreference.com/w/cpp/container/vector/clear.html
+    order.clear();
+    // `DenseHashTable` exposes a "threshold" for clearing the underlying data.
+    // We just pass in max `size_t` here to ensure that the underlying data is
+    // never cleared.
+    types.clear(std::numeric_limits<size_t>::max());
     hash = 0;
 }
 
@@ -92,6 +110,11 @@ size_t TypeIds::count(TypeId ty) const
     ty = follow(ty);
     const bool* val = types.find(ty);
     return (val && *val) ? 1 : 0;
+}
+
+bool TypeIds::contains(TypeId ty) const
+{
+    return 0 != count(ty);
 }
 
 void TypeIds::retain(const TypeIds& tys)
@@ -161,6 +184,5 @@ void TypeIds::reserve(size_t n)
 {
     order.reserve(n);
 }
-
 
 } // namespace Luau

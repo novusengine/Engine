@@ -112,6 +112,15 @@ local function Execute()
 
     if MetaGen == nil then error("MetaGen project profile is not configured", 0) end
     local profile = MetaGen.ResolveProject()
+    for _, provider in ipairs(profile.providers) do
+        for _, moduleRoot in ipairs(provider.moduleRoots) do
+            if not os.isdir(moduleRoot) then
+                error("MetaGen provider '" .. provider.name .. "' module root does not exist: " .. moduleRoot, 0)
+            end
+            package.path = moduleRoot .. "/?.lua;" .. moduleRoot .. "/?/Init.lua;" .. package.path
+        end
+    end
+
     local sourceSets = {}
     for _, provider in ipairs(profile.providers) do
         for _, source in ipairs(provider.sources) do

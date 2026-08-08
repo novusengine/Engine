@@ -31,6 +31,7 @@
 #include <robinhood/robinhood.h>
 
 #include <filesystem>
+#include <limits>
 #include <queue>
 #include <vector>
 
@@ -73,7 +74,7 @@ namespace Renderer
 
             SafeVector<TextureID>* textures = nullptr;
             SafeVector<u64>* textureHashes = nullptr;
-            robin_hood::unordered_map<TextureID::type, u32>* textureIDToArrayIndex;
+            robin_hood::unordered_map<TextureID::type, size_t>* textureIDToArrayIndex;
             robin_hood::unordered_set<TextureID::type> ownedTextureIDs;
 
             std::vector<TextureArrayBinding> registeredBindings;
@@ -205,7 +206,7 @@ namespace Renderer
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
             // Check the cache, we only want to do this for LOADED textures though, never CREATED data textures
-            size_t nextID;
+            TextureID nextID;
             u64 cacheDescHash = CalculateDescHash(desc);
             if (TryFindExistingTexture(cacheDescHash, nextID))
             {
@@ -266,7 +267,7 @@ namespace Renderer
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
             // Check the cache, we only want to do this for LOADED textures though, never CREATED data textures
-            size_t nextID;
+            TextureID nextID;
             u64 cacheDescHash = desc.hash;
             if (TryFindExistingTexture(cacheDescHash, nextID))
             {
@@ -315,7 +316,7 @@ namespace Renderer
             return textureID;
         }
 
-        TextureID TextureHandlerVK::LoadTextureIntoArray(const TextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates)
+        TextureID TextureHandlerVK::LoadTextureIntoArray(const TextureDesc& desc, TextureArrayID textureArrayID, size_t& arrayIndex, bool allowDuplicates)
         {
             ZoneScoped;
 
@@ -342,7 +343,7 @@ namespace Renderer
             {
                 if (TryFindExistingTextureInArray(textureArrayID, descHash, nextID, textureID))
                 {
-                    arrayIndex = static_cast<u32>(nextID);
+                    arrayIndex = nextID;
                     return textureID; // This texture already exists in this array
                 }
             }
@@ -353,7 +354,7 @@ namespace Renderer
             
             return textureID;
         }
-        TextureID TextureHandlerVK::LoadDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex, bool allowDuplicates)
+        TextureID TextureHandlerVK::LoadDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, size_t& arrayIndex, bool allowDuplicates)
         {
             ZoneScoped;
 
@@ -381,7 +382,7 @@ namespace Renderer
             {
                 if (TryFindExistingTextureInArray(textureArrayID, descHash, nextID, textureID))
                 {
-                    arrayIndex = static_cast<u32>(nextID);
+                    arrayIndex = nextID;
                     return textureID; // This texture already exists in this array
                 }
             }
@@ -478,7 +479,7 @@ namespace Renderer
                     textureArray.textureHashes = new SafeVector<u64>();
                     textureArray.textureHashes->Reserve(desc.size);
                     textureArray.size = desc.size;
-                    textureArray.textureIDToArrayIndex = new robin_hood::unordered_map<TextureID::type, u32>();
+                    textureArray.textureIDToArrayIndex = new robin_hood::unordered_map<TextureID::type, size_t>();
 
                 });
 
@@ -629,7 +630,7 @@ namespace Renderer
             return textureID;
         }
 
-        TextureID TextureHandlerVK::CreateDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, u32& arrayIndex)
+        TextureID TextureHandlerVK::CreateDataTextureIntoArray(const DataTextureDesc& desc, TextureArrayID textureArrayID, size_t& arrayIndex)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
@@ -645,7 +646,7 @@ namespace Renderer
             return textureID;
         }
 
-        u32 TextureHandlerVK::AddTextureToArray(const TextureID textureID, const TextureArrayID textureArrayID)
+        size_t TextureHandlerVK::AddTextureToArray(const TextureID textureID, const TextureArrayID textureArrayID)
         {
             ZoneScoped;
 
@@ -702,13 +703,75 @@ namespace Renderer
                 });
         }
 
+        void TextureHandlerVK::CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, size_t srcOffset, TextureID dstTextureID, const TextureUploadRegion& region)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            const TextureID::type id = static_cast<TextureID::type>(dstTextureID);
+
+            data.textures.WriteLock(
+                [&](std::vector<Texture*>& textures)
+                {
+                    if (textures.size() <= id)
+                    {
+                        NC_LOG_CRITICAL("Tried to upload a region to an invalid TextureID: {0}", id);
+                        return;
+                    }
+
+                    Texture& texture = *textures[id];
+                    if (!texture.loaded)
+                        return;
+
+                    const u32 mipWidth = glm::max(1u, static_cast<u32>(texture.desc.width) >> region.mipLevel);
+                    const u32 mipHeight = glm::max(1u, static_cast<u32>(texture.desc.height) >> region.mipLevel);
+                    if (region.extent.x == 0 || region.extent.y == 0 || region.layer >= static_cast<u32>(texture.desc.layers) || region.mipLevel >= static_cast<u32>(texture.desc.mipLevels) ||
+                        region.offset.x > mipWidth || region.extent.x > mipWidth - region.offset.x || region.offset.y > mipHeight || region.extent.y > mipHeight - region.offset.y)
+                    {
+                        NC_LOG_CRITICAL("Texture region upload is outside the target texture");
+                        return;
+                    }
+
+                    VkImageMemoryBarrier barrier = {};
+                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.image = texture.image;
+                    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    barrier.subresourceRange.baseMipLevel = region.mipLevel;
+                    barrier.subresourceRange.levelCount = 1;
+                    barrier.subresourceRange.baseArrayLayer = region.layer;
+                    barrier.subresourceRange.layerCount = 1;
+                    barrier.oldLayout = texture.layoutUndefined ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    barrier.srcAccessMask = texture.layoutUndefined ? 0 : VK_ACCESS_SHADER_READ_BIT;
+                    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+                    VkBufferImageCopy copy = {};
+                    copy.bufferOffset = srcOffset;
+                    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    copy.imageSubresource.mipLevel = region.mipLevel;
+                    copy.imageSubresource.baseArrayLayer = region.layer;
+                    copy.imageSubresource.layerCount = 1;
+                    copy.imageOffset = { static_cast<i32>(region.offset.x), static_cast<i32>(region.offset.y), 0 };
+                    copy.imageExtent = { region.extent.x, region.extent.y, 1 };
+                    vkCmdCopyBufferToImage(commandBuffer, srcBuffer, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+                    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+                    texture.layoutUndefined = false;
+                });
+        }
+
         void TextureHandlerVK::TransitionImageLayout(VkCommandBuffer commandBuffer, TextureID textureID, VkImageAspectFlags aspects, VkImageLayout oldLayout, VkImageLayout newLayout)
         {
             //TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
             //TextureID::type id = static_cast<TextureID::type>(textureID);
         }
 
-        TextureID TextureHandlerVK::GetTextureIDInArray(const TextureArrayID textureArrayID, u32 index)
+        TextureID TextureHandlerVK::GetTextureIDInArray(const TextureArrayID textureArrayID, size_t index)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
             TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
@@ -871,6 +934,60 @@ namespace Renderer
             return data.textures.ReadGet(id)->totalSize;
         }
 
+        bool TextureHandlerVK::TryGetTextureUploadRegionSize(const TextureID textureID, const TextureUploadRegion& region, size_t& uploadSize)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            const TextureID::type id = static_cast<TextureID::type>(textureID);
+            uploadSize = 0;
+
+            if (textureID == TextureID::Invalid() || data.textures.Size() <= id)
+                return false;
+
+            bool valid = false;
+            data.textures.ReadLock(
+                [&](const std::vector<Texture*>& textures)
+                {
+                    const Texture* texture = textures[id];
+                    if (!texture->loaded || texture->desc.width <= 0 || texture->desc.height <= 0 || texture->desc.layers <= 0 || texture->desc.mipLevels <= 0 ||
+                        region.mipLevel >= static_cast<u32>(texture->desc.mipLevels) || region.mipLevel >= 32 || region.layer >= static_cast<u32>(texture->desc.layers))
+                    {
+                        return;
+                    }
+
+                    const u32 mipWidth = glm::max(1u, static_cast<u32>(texture->desc.width) >> region.mipLevel);
+                    const u32 mipHeight = glm::max(1u, static_cast<u32>(texture->desc.height) >> region.mipLevel);
+                    if (region.extent.x == 0 || region.extent.y == 0 || region.offset.x > mipWidth || region.extent.x > mipWidth - region.offset.x ||
+                        region.offset.y > mipHeight || region.extent.y > mipHeight - region.offset.y)
+                    {
+                        return;
+                    }
+
+                    const VkFormat format = FormatConverterVK::ToVkFormat(texture->desc.format);
+                    const VkExtent3D blockExtent = FormatTexelBlockExtent(format);
+                    const u32 blockSize = FormatElementSize(format, VK_IMAGE_ASPECT_COLOR_BIT);
+                    if (blockExtent.width == 0 || blockExtent.height == 0 || blockSize == 0)
+                        return;
+
+                    if (FormatIsCompressed(format) &&
+                        ((region.offset.x % blockExtent.width) != 0 || (region.offset.y % blockExtent.height) != 0 ||
+                            ((region.extent.x % blockExtent.width) != 0 && region.offset.x + region.extent.x != mipWidth) ||
+                            ((region.extent.y % blockExtent.height) != 0 && region.offset.y + region.extent.y != mipHeight)))
+                    {
+                        return;
+                    }
+
+                    const size_t blockCountX = (static_cast<size_t>(region.extent.x) + blockExtent.width - 1) / blockExtent.width;
+                    const size_t blockCountY = (static_cast<size_t>(region.extent.y) + blockExtent.height - 1) / blockExtent.height;
+                    if (blockCountX > std::numeric_limits<size_t>::max() / blockCountY || blockCountX * blockCountY > std::numeric_limits<size_t>::max() / blockSize)
+                        return;
+
+                    uploadSize = blockCountX * blockCountY * blockSize;
+                    valid = true;
+                });
+
+            return valid;
+        }
+
         TextureBaseDesc TextureHandlerVK::GetTextureDesc(const TextureID textureID)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
@@ -932,53 +1049,61 @@ namespace Renderer
             return hash;
         }
 
-        bool TextureHandlerVK::TryFindExistingTexture(u64 descHash, size_t& id)
+        bool TextureHandlerVK::TryFindExistingTexture(u64 descHash, TextureID& textureID)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
-            id = 0;
+            textureID = TextureID::Invalid();
 
-            bool foundTexture = false;
             data.textures.ReadLock(
                 [&](const std::vector<Texture*>& textures)
                 {
-                    for (auto* texture : textures)
+                    for (size_t i = 0; i < textures.size(); i++)
                     {
-                        if (descHash == texture->hash)
+                        const Texture* texture = textures[i];
+                        if (texture->loaded && descHash == texture->hash)
                         {
-                            foundTexture = true;
+                            textureID = TextureID(static_cast<TextureID::type>(i));
                             return;
                         }
-                        id++;
                     }
                 });
 
+            bool foundTexture = textureID != TextureID::Invalid();
             return foundTexture;
         }
 
         bool TextureHandlerVK::TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
-            TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
+            const TextureArrayID::type id = static_cast<TextureArrayID::type>(textureArrayID);
+            arrayIndex = 0;
+            textureID = TextureID::Invalid();
             if (data.textureArrays.Size() <= id)
             {
                 NC_LOG_CRITICAL("Tried to access invalid TextureArrayID: {0}", id);
+                return false;
             }
 
             bool foundTexture = false;
-            data.textureArrays.WriteLock(
-                [&](std::vector<TextureArray>& textureArrays)
+            data.textureArrays.ReadLock(
+                [&](const std::vector<TextureArray>& textureArrays)
                 {
-                    TextureArray& array = textureArrays[id];
-
-                    for (arrayIndex = 0; arrayIndex < array.textureHashes->Size(); arrayIndex++)
-                    {
-                        if (descHash == array.textureHashes->ReadGet(arrayIndex))
+                    const TextureArray& array = textureArrays[id];
+                    data.textures.ReadLock(
+                        [&](const std::vector<Texture*>& textures)
                         {
-                            textureID = array.textures->ReadGet(arrayIndex);
-                            foundTexture = true;
-                            return;
-                        }
-                    }
+                            for (arrayIndex = 0; arrayIndex < array.textureHashes->Size(); arrayIndex++)
+                            {
+                                const TextureID candidateTextureID = array.textures->ReadGet(arrayIndex);
+                                const TextureID::type candidateID = static_cast<TextureID::type>(candidateTextureID);
+                                if (descHash == array.textureHashes->ReadGet(arrayIndex) && candidateID < textures.size() && textures[candidateID]->loaded)
+                                {
+                                    textureID = candidateTextureID;
+                                    foundTexture = true;
+                                    return;
+                                }
+                            }
+                        });
                 });
 
             return foundTexture;
@@ -1225,12 +1350,12 @@ namespace Renderer
             DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.imageView, VK_OBJECT_TYPE_IMAGE_VIEW, texture.desc.debugName.c_str());
         }
 
-        u32 TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership)
+        size_t TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership)
         {
             ZoneScoped;
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
-            u32 arrayIndex = 0;
+            size_t arrayIndex = 0;
             data.textureArrays.WriteLock(
                 [&, hasOwnership](std::vector<TextureArray>& textureArrays)
                 {
@@ -1243,7 +1368,7 @@ namespace Renderer
                         return;
                     }
 
-                    arrayIndex = static_cast<u32>(textureArray.textures->Size());
+                    arrayIndex = textureArray.textures->Size();
                     textureArray.textures->PushBack(textureID);
                     textureArray.textureHashes->PushBack(hash);
 

@@ -204,7 +204,7 @@ namespace Renderer
         return _textureHandler->CreateDataTexture(desc);
     }
 
-    TextureID RendererVK::CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex)
+    TextureID RendererVK::CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex)
     {
         return _textureHandler->CreateDataTextureIntoArray(desc, textureArray, arrayIndex);
     }
@@ -224,12 +224,12 @@ namespace Renderer
         return _textureHandler->LoadDataTexture(desc);
     }
 
-    TextureID RendererVK::LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates)
+    TextureID RendererVK::LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex, bool allowDuplicates)
     {
         return _textureHandler->LoadTextureIntoArray(desc, textureArray, arrayIndex, allowDuplicates);
     }
 
-    TextureID RendererVK::LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates)
+    TextureID RendererVK::LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex, bool allowDuplicates)
     {
         return _textureHandler->LoadDataTextureIntoArray(desc, textureArray, arrayIndex, allowDuplicates);
     }
@@ -337,7 +337,7 @@ namespace Renderer
         _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, textureArrayID);
     }
 
-    u32 RendererVK::AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID)
+    size_t RendererVK::AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID)
     {
         return _textureHandler->AddTextureToArray(textureID, textureArrayID);
     }
@@ -345,6 +345,16 @@ namespace Renderer
     void RendererVK::FlushTextureArrayDescriptors(TextureArrayID textureArrayID)
     {
         _textureHandler->FlushTextureArrayDescriptors(textureArrayID);
+    }
+
+    bool RendererVK::TryFindExistingTexture(u64 descHash, TextureID& textureID)
+    {
+        return _textureHandler->TryFindExistingTexture(descHash, textureID);
+    }
+
+    bool RendererVK::TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID)
+    {
+        return _textureHandler->TryFindExistingTextureInArray(textureArrayID, descHash, arrayIndex, textureID);
     }
 
     TextureBaseDesc RendererVK::GetDesc(TextureID textureID)
@@ -471,7 +481,7 @@ namespace Renderer
         _frameTimeQueries.clear();
     }
 
-    TextureID RendererVK::GetTextureID(TextureArrayID textureArrayID, u32 index)
+    TextureID RendererVK::GetTextureID(TextureArrayID textureArrayID, size_t index)
     {
         return _textureHandler->GetTextureIDInArray(textureArrayID, index);
     }
@@ -2032,6 +2042,11 @@ namespace Renderer
     std::shared_ptr<UploadBuffer> RendererVK::CreateUploadBuffer(BufferID targetBuffer, size_t targetOffset, size_t size)
     {
         return _uploadBufferHandler->CreateUploadBuffer(targetBuffer, targetOffset, size);
+    }
+
+    std::shared_ptr<UploadBuffer> RendererVK::CreateUploadBuffer(TextureID targetTexture, const TextureUploadRegion& region, size_t size)
+    {
+        return _uploadBufferHandler->CreateUploadBuffer(targetTexture, region, size);
     }
 
     bool RendererVK::ShouldWaitForUpload()

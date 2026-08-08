@@ -6,11 +6,24 @@
 #include "Luau/NotNull.h"
 #include "Luau/TypeFwd.h"
 
+#include <optional>
+#include <string>
+#include <vector>
+
 namespace Luau
 {
 
-// Search through the expression 'expr' for types that are known to represent
-// uniquely held references. Append these types to 'uniqueTypes'.
+struct TypeGuard
+{
+    bool isTypeof;
+    AstExpr* target;
+    std::string type;
+};
+
+std::optional<TypeGuard> matchTypeGuard(AstExprBinary::Op op, AstExpr* left, AstExpr* right);
+
+// Search through the expression 'expr' for typeArguments that are known to represent
+// uniquely held references. Append these typeArguments to 'uniqueTypes'.
 void findUniqueTypes(NotNull<DenseHashSet<TypeId>> uniqueTypes, AstExpr* expr, NotNull<const DenseHashMap<const AstExpr*, TypeId>> astTypes);
 
 void findUniqueTypes(

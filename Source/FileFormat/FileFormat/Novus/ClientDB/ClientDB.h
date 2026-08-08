@@ -385,6 +385,7 @@ namespace ClientDB
 
         void SetData(u32 index, const void* data, u32 numRows = 1);
         void SetZero(u32 index);
+        void ClearPaddingBytes();
         void Link(u32 id, u32 index);
         void Unlink(u32 id);
         bool HasLink(u32 id);

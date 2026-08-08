@@ -2,6 +2,9 @@
 
 #include <Base/Util/DebugHandler.h>
 
+#include <bit>
+#include <limits>
+
 namespace Scripting
 {
     void Zenith::SetState(lua_State* newState)
@@ -61,15 +64,45 @@ namespace Scripting
         GetGlobalKey(key);
         return Get<bool>(-1);
     }
+    template<> i8 Zenith::GetGlobalField<i8>(const char* key)
+    {
+        GetGlobalKey(key);
+        return Get<i8>(-1);
+    }
+    template<> i16 Zenith::GetGlobalField<i16>(const char* key)
+    {
+        GetGlobalKey(key);
+        return Get<i16>(-1);
+    }
     template<> i32 Zenith::GetGlobalField<i32>(const char* key)
     {
         GetGlobalKey(key);
         return Get<i32>(-1);
     }
+    template<> i64 Zenith::GetGlobalField<i64>(const char* key)
+    {
+        GetGlobalKey(key);
+        return Get<i64>(-1);
+    }
+    template<> u8 Zenith::GetGlobalField<u8>(const char* key)
+    {
+        GetGlobalKey(key);
+        return Get<u8>(-1);
+    }
+    template<> u16 Zenith::GetGlobalField<u16>(const char* key)
+    {
+        GetGlobalKey(key);
+        return Get<u16>(-1);
+    }
     template<> u32 Zenith::GetGlobalField<u32>(const char* key)
     {
         GetGlobalKey(key);
         return Get<u32>(-1);
+    }
+    template<> u64 Zenith::GetGlobalField<u64>(const char* key)
+    {
+        GetGlobalKey(key);
+        return Get<u64>(-1);
     }
     template<> f32 Zenith::GetGlobalField<f32>(const char* key)
     {
@@ -101,12 +134,42 @@ namespace Scripting
         Push(value);
         lua_setglobal(state, key);
     }
+    void Zenith::AddGlobalField(const char* key, i8 value)
+    {
+        Push(value);
+        lua_setglobal(state, key);
+    }
+    void Zenith::AddGlobalField(const char* key, i16 value)
+    {
+        Push(value);
+        lua_setglobal(state, key);
+    }
     void Zenith::AddGlobalField(const char* key, i32 value)
     {
         Push(value);
         lua_setglobal(state, key);
     }
+    void Zenith::AddGlobalField(const char* key, i64 value)
+    {
+        Push(value);
+        lua_setglobal(state, key);
+    }
+    void Zenith::AddGlobalField(const char* key, u8 value)
+    {
+        Push(value);
+        lua_setglobal(state, key);
+    }
+    void Zenith::AddGlobalField(const char* key, u16 value)
+    {
+        Push(value);
+        lua_setglobal(state, key);
+    }
     void Zenith::AddGlobalField(const char* key, u32 value)
+    {
+        Push(value);
+        lua_setglobal(state, key);
+    }
+    void Zenith::AddGlobalField(const char* key, u64 value)
     {
         Push(value);
         lua_setglobal(state, key);
@@ -149,6 +212,10 @@ namespace Scripting
     {
         return lua_isboolean(state, index);
     }
+    bool Zenith::IsInteger(i32 index)
+    {
+        return lua_isinteger64(state, index);
+    }
     bool Zenith::IsNumber(i32 index)
     {
         return lua_isnumber(state, index);
@@ -182,13 +249,13 @@ namespace Scripting
     {
         return lua_toboolean(state, index) != 0;
     }
-    i32 Zenith::ToInteger(i32 index)
+    i64 Zenith::ToInteger(i32 index)
     {
-        return lua_tointeger(state, index);
+        return lua_tointeger64(state, index, nullptr);
     }
-    u32 Zenith::ToUnsigned(i32 index)
+    u64 Zenith::ToUnsigned(i32 index)
     {
-        return lua_tounsigned(state, index);
+        return std::bit_cast<u64>(lua_tointeger64(state, index, nullptr));
     }
     f64 Zenith::ToNumber(i32 index)
     {
@@ -276,37 +343,35 @@ namespace Scripting
     }
     void Zenith::Push(i8 value)
     {
-        lua_pushinteger(state, (i32)value);
+        lua_pushinteger64(state, static_cast<i64>(value));
     }
     void Zenith::Push(i16 value)
     {
-        lua_pushinteger(state, (i32)value);
+        lua_pushinteger64(state, static_cast<i64>(value));
     }
     void Zenith::Push(i32 value)
     {
-        lua_pushinteger(state, value);
+        lua_pushinteger64(state, static_cast<i64>(value));
     }
     void Zenith::Push(i64 value)
     {
-        f64 number = static_cast<f64>(value);
-        Push(number);
+        lua_pushinteger64(state, value);
     }
     void Zenith::Push(u8 value)
     {
-        lua_pushunsigned(state, (u32)value);
+        lua_pushinteger64(state, static_cast<i64>(value));
     }
     void Zenith::Push(u16 value)
     {
-        lua_pushunsigned(state, (u32)value);
+        lua_pushinteger64(state, static_cast<i64>(value));
     }
     void Zenith::Push(u32 value)
     {
-        lua_pushunsigned(state, value);
+        lua_pushinteger64(state, static_cast<i64>(value));
     }
     void Zenith::Push(u64 value)
     {
-        f64 number = static_cast<f64>(value);
-        Push(number);
+        lua_pushinteger64(state, std::bit_cast<i64>(value));
     }
     void Zenith::Push(f32 value)
     {
@@ -337,11 +402,35 @@ namespace Scripting
     {
         return ToBoolean(index);
     }
+    template<> i8 Zenith::Get<i8>(i32 index)
+    {
+        return static_cast<i8>(ToInteger(index));
+    }
+    template<> i16 Zenith::Get<i16>(i32 index)
+    {
+        return static_cast<i16>(ToInteger(index));
+    }
     template<> i32 Zenith::Get<i32>(i32 index)
+    {
+        return static_cast<i32>(ToInteger(index));
+    }
+    template<> i64 Zenith::Get<i64>(i32 index)
     {
         return ToInteger(index);
     }
+    template<> u8 Zenith::Get<u8>(i32 index)
+    {
+        return static_cast<u8>(ToUnsigned(index));
+    }
+    template<> u16 Zenith::Get<u16>(i32 index)
+    {
+        return static_cast<u16>(ToUnsigned(index));
+    }
     template<> u32 Zenith::Get<u32>(i32 index)
+    {
+        return static_cast<u32>(ToUnsigned(index));
+    }
+    template<> u64 Zenith::Get<u64>(i32 index)
     {
         return ToUnsigned(index);
     }
@@ -364,22 +453,20 @@ namespace Scripting
 
     static i64 CheckSigned(Zenith* zenith, i32 index, i64 min, i64 max)
     {
-        f64 value = luaL_checknumber(zenith->state, index);
+        i64 value = luaL_checkinteger64(zenith->state, index);
         if (value < min || value > max)
-            luaL_error(zenith->state, "signed integer expected, got %f (Must be between %u...%u)", value, min, max);
+            luaL_error(zenith->state, "signed integer out of range (must be between %lld and %lld)", static_cast<long long>(min), static_cast<long long>(max));
 
-        i64 result = static_cast<i64>(value);
-        return result;
+        return value;
     }
 
     static u64 CheckUnsigned(Zenith* zenith, i32 index, u64 max)
     {
-        f64 value = luaL_checknumber(zenith->state, index);
-        if (value < 0 || value > max)
-            luaL_error(zenith->state, "unsigned integer expected, got %f (Must be between 0...%u)", value, max);
+        i64 value = luaL_checkinteger64(zenith->state, index);
+        if (value < 0 || static_cast<u64>(value) > max)
+            luaL_error(zenith->state, "unsigned integer out of range (must be between 0 and %llu)", static_cast<unsigned long long>(max));
 
-        u64 result = static_cast<u64>(value);
-        return result;
+        return static_cast<u64>(value);
     }
 
     template<> bool Zenith::CheckVal<bool>(i32 index)
@@ -416,7 +503,7 @@ namespace Scripting
     }
     template<> u64 Zenith::CheckVal<u64>(i32 index)
     {
-        return CheckUnsigned(this, index, std::numeric_limits<u64>().max());
+        return std::bit_cast<u64>(luaL_checkinteger64(state, index));
     }
     template<> f32 Zenith::CheckVal<f32>(i32 index)
     {
@@ -668,6 +755,14 @@ namespace Scripting
     void Zenith::RegisterDefaultLibraries()
     {
         luaL_openlibs(state);
+
+        lua_getglobal(state, "vector");
+        lua_getfield(state, -1, "create");
+        lua_setfield(state, -2, "New");
+        lua_setglobal(state, "vec");
+
+        lua_pushnil(state);
+        lua_setglobal(state, "vector");
     }
 
     void* Zenith::AllocateUserData(lua_State* state, size_t size, LuaUserDataDtor dtor)

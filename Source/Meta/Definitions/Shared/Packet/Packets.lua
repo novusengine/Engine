@@ -183,7 +183,9 @@ return D.Definitions
 
     D.Packet("ClientSpellCastPacket",
     {
-        D.Field("spellID", Type.U32)
+        D.Field("spellID", Type.U32),
+        D.Field("targetGUID", Type.OBJECTGUID),
+        D.Field("targetPosition", Type.VEC3)
     }),
 
     D.Packet("ServerSpellCastResultPacket",
@@ -329,5 +331,41 @@ return D.Definitions
         D.Field("activeFields", Type.U8),
         D.Field("effectiveStandingValue", Type.I32),
         D.Field("effectiveReaction", Type.U8)
+    }),
+
+    D.Packet("ClientAutoAttackStatePacket",
+    {
+        D.Field("enabled", Type.U8)
+    }),
+
+    D.Packet("ServerUnitAutoAttackStatePacket",
+    {
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("enabled", Type.U8)
+    }),
+
+    D.Packet("ServerUnitAttackPacket",
+    {
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("weaponSlot", Type.U8)
+    }),
+
+    D.Packet("ServerSpellEditorSnapshotBeginPacket",
+    {}),
+
+    D.Packet("ServerSpellEditorSnapshotChunkPacket",
+    {}),
+
+    D.Packet("ServerSpellEditorSnapshotEndPacket",
+    {}),
+
+    D.Packet("ServerSpellEditorMutationResultPacket",
+    {
+        D.Field("requestID", Type.U32),
+        D.Field("artifact", Type.U8),
+        D.Field("artifactID", Type.U32),
+        D.Field("mutationType", Type.U8),
+        D.Field("succeeded", Type.U8),
+        D.Field("response", Type.STRING)
     })
 }

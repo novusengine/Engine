@@ -20,6 +20,12 @@ local root = scriptPath:match("(.*/)")
 -- This is restored to the original inside of Meta.lua which includes this file
 package.path = root .. "?.lua;" .. root .. "?/Init.lua;" .. package.path
 
+-- Migration authoring must compare changed definitions with the committed history
+-- before ordinary generation rejects that intentional drift.
+if _ACTION == "metagen-migration" then
+    return
+end
+
 local cppGeneration = CppEmitter.Create()
 local cppWriter = cppGeneration.writer
 local cppEmitter = cppGeneration.cpp

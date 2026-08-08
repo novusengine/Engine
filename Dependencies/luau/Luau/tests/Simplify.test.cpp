@@ -8,9 +8,7 @@
 
 using namespace Luau;
 
-LUAU_FASTFLAG(LuauSolverV2)
-LUAU_FASTFLAG(LuauSimplifyAnyAndUnion)
-LUAU_FASTFLAG(LuauSimplifyRefinementOfReadOnlyProperty)
+LUAU_FASTFLAG(DebugLuauForceOldSolver)
 LUAU_DYNAMIC_FASTINT(LuauSimplificationComplexityLimit)
 
 namespace
@@ -65,7 +63,7 @@ struct SimplifyFixture : Fixture
     TypeId unrelatedClassTy = nullptr;
 
     // This only affects type stringification.
-    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+    ScopedFastFlag sff{FFlag::DebugLuauForceOldSolver, false};
 
     SimplifyFixture()
     {
@@ -624,8 +622,6 @@ TEST_CASE_FIXTURE(SimplifyFixture, "cyclic_never_union_and_string")
 
 TEST_CASE_FIXTURE(SimplifyFixture, "any & (error | string)")
 {
-    ScopedFastFlag sff{FFlag::LuauSimplifyAnyAndUnion, true};
-
     TypeId errStringTy = arena->addType(UnionType{{getBuiltins()->errorType, getBuiltins()->stringType}});
 
     auto res = intersect(builtinTypes->anyType, errStringTy);
@@ -635,8 +631,6 @@ TEST_CASE_FIXTURE(SimplifyFixture, "any & (error | string)")
 
 TEST_CASE_FIXTURE(SimplifyFixture, "(error | string) & any")
 {
-    ScopedFastFlag sff{FFlag::LuauSimplifyAnyAndUnion, true};
-
     TypeId errStringTy = arena->addType(UnionType{{getBuiltins()->errorType, getBuiltins()->stringType}});
 
     auto res = intersect(errStringTy, builtinTypes->anyType);
@@ -646,8 +640,6 @@ TEST_CASE_FIXTURE(SimplifyFixture, "(error | string) & any")
 
 TEST_CASE_FIXTURE(SimplifyFixture, "{ x: number, y: number } & { x: unknown }")
 {
-    ScopedFastFlag sff{FFlag::LuauSimplifyRefinementOfReadOnlyProperty, true};
-
     TypeId leftTy = mkTable({{"x", builtinTypes->numberType}, {"y", builtinTypes->numberType}});
     TypeId rightTy = mkTable({{"x", Property::rw(builtinTypes->unknownType)}});
 
@@ -656,8 +648,6 @@ TEST_CASE_FIXTURE(SimplifyFixture, "{ x: number, y: number } & { x: unknown }")
 
 TEST_CASE_FIXTURE(SimplifyFixture, "{ x: number, y: number } & { read x: unknown }")
 {
-    ScopedFastFlag sff{FFlag::LuauSimplifyRefinementOfReadOnlyProperty, true};
-
     TypeId leftTy = mkTable({{"x", builtinTypes->numberType}, {"y", builtinTypes->numberType}});
     TypeId rightTy = mkTable({{"x", Property::readonly(builtinTypes->unknownType)}});
 
@@ -666,8 +656,6 @@ TEST_CASE_FIXTURE(SimplifyFixture, "{ x: number, y: number } & { read x: unknown
 
 TEST_CASE_FIXTURE(SimplifyFixture, "{ read x: Child } & { x: Parent }")
 {
-    ScopedFastFlag sff{FFlag::LuauSimplifyRefinementOfReadOnlyProperty, true};
-
     createSomeExternTypes(getFrontend());
 
     TypeId parentTy = getFrontend().globals.globalScope->exportedTypeBindings["Parent"].type;
@@ -681,6 +669,78 @@ TEST_CASE_FIXTURE(SimplifyFixture, "{ read x: Child } & { x: Parent }")
 
     // TODO: This could be { read x: Child, write x: Parent }
     CHECK("{ read x: Child } & { x: Parent }" == toString(intersect(leftTy, rightTy)));
+}
+
+TEST_CASE_FIXTURE(SimplifyFixture, "intersect_parts_empty_table_non_empty")
+{
+    TableType empty;
+    empty.state = TableState::Sealed;
+    TypeId emptyTable = arena->addType(std::move(empty));
+
+    TableType nonEmpty;
+    nonEmpty.props["p"] = arena->addType(UnionType{{getBuiltins()->numberType, getBuiltins()->stringType}});
+    nonEmpty.state = TableState::Sealed;
+    TypeId nonEmptyTable = arena->addType(std::move(nonEmpty));
+
+    CHECK("{ p: number | string }" == toString(simplifyIntersection(getBuiltins(), arena, {nonEmptyTable, emptyTable}).result));
+}
+
+TEST_CASE_FIXTURE(SimplifyFixture, "relate_write_only_number_with_number")
+{
+    TypeId leftTy = mkTable({{"x", Property::writeonly(builtinTypes->numberType)}});
+    TypeId rightTy = mkTable({{"x", Property::rw(arena->addType(UnionType{{builtinTypes->nilType, builtinTypes->numberType}}))}});
+
+    // This example could be simplified to:
+    //
+    //  { write x: number, read x: number ? }
+    CHECK("{ write x: number } & { x: number? }" == toString(intersect(leftTy, rightTy)));
+    CHECK("{ write x: number } & { x: number? }" == toString(intersect(rightTy, leftTy)));
+
+    // We could probably simplify this to...
+    //
+    //  { x: number? }
+    //
+    // ... as...
+    //
+    //  { write x: number } <: { x: number? }
+    CHECK("{ write x: number } | { x: number? }" == toString(union_(leftTy, rightTy)));
+    CHECK("{ write x: number } | { x: number? }" == toString(union_(rightTy, leftTy)));
+}
+
+TEST_CASE_FIXTURE(SimplifyFixture, "relate_read_only_number_with_number")
+{
+    TypeId leftTy = mkTable({{"x", Property::readonly(builtinTypes->numberType)}});
+    TypeId rightTy = mkTable({{"x", Property::rw(arena->addType(UnionType{{builtinTypes->nilType, builtinTypes->numberType}}))}});
+
+    // Both of these examples _could_ be simplified, but require
+    // minting a new table ...
+
+    // This could be: { read x: number, write x: number? }
+    CHECK("{ read x: number } & { x: number? }" == toString(intersect(leftTy, rightTy)));
+    CHECK("{ read x: number } & { x: number? }" == toString(intersect(rightTy, leftTy)));
+
+    // This could be: { read x: number? }
+    CHECK("{ read x: number } | { x: number? }" == toString(union_(leftTy, rightTy)));
+    CHECK("{ read x: number } | { x: number? }" == toString(union_(rightTy, leftTy)));
+}
+
+TEST_CASE_FIXTURE(SimplifyFixture, "relate_coincident_minus_one_prop_tables")
+{
+    // { x: number, y: boolean }
+    TypeId leftTy = mkTable({{"x", Property::rw(builtinTypes->numberType)}, {"y", Property::rw(builtinTypes->booleanType)}});
+
+    // { x: number, y: boolean, z: string }
+    TypeId rightTy = mkTable(
+        {{"x", Property::rw(builtinTypes->numberType)}, {"y", Property::rw(builtinTypes->booleanType)}, {"z", Property::rw(builtinTypes->stringType)}}
+    );
+
+    // By width subtyping this could be { x: number, y: boolean, z: string }
+    CHECK("{ x: number, y: boolean } & { x: number, y: boolean, z: string }" == toString(intersect(leftTy, rightTy)));
+    CHECK("{ x: number, y: boolean } & { x: number, y: boolean, z: string }" == toString(intersect(rightTy, leftTy)));
+
+    // By width subtyping this could be { x: number, y: boolean }
+    CHECK("{ x: number, y: boolean } | { x: number, y: boolean, z: string }" == toString(union_(leftTy, rightTy)));
+    CHECK("{ x: number, y: boolean } | { x: number, y: boolean, z: string }" == toString(union_(rightTy, leftTy)));
 }
 
 TEST_SUITE_END();

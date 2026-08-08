@@ -2,9 +2,7 @@
 #include "Luau/Ast.h"
 
 #include "Luau/Common.h"
-#include "Luau/StringUtils.h"
 
-LUAU_FASTFLAG(LuauParametrizedAttributeSyntax)
 
 namespace Luau
 {
@@ -22,20 +20,7 @@ static AstAttr* findAttributeInArray(const AstArray<AstAttr*> attributes, AstAtt
 
 static bool hasAttributeInArray(const AstArray<AstAttr*> attributes, AstAttr::Type attributeType)
 {
-    if (FFlag::LuauParametrizedAttributeSyntax)
-    {
-        return findAttributeInArray(attributes, attributeType) != nullptr;
-    }
-    else
-    {
-        for (const auto attribute : attributes)
-        {
-            if (attribute->type == attributeType)
-                return true;
-        }
-
-        return false;
-    }
+    return findAttributeInArray(attributes, attributeType) != nullptr;
 }
 
 static void visitTypeList(AstVisitor* visitor, const AstTypeList& list)
@@ -45,6 +30,17 @@ static void visitTypeList(AstVisitor* visitor, const AstTypeList& list)
 
     if (list.tailType)
         list.tailType->visit(visitor);
+}
+
+static void visitTypeOrPackArray(AstVisitor* visitor, const AstArray<AstTypeOrPack>& arrayOfTypeOrPack)
+{
+    for (const AstTypeOrPack& param : arrayOfTypeOrPack)
+    {
+        if (param.type)
+            param.type->visit(visitor);
+        else
+            param.typePack->visit(visitor);
+    }
 }
 
 AstAttr::AstAttr(const Location& location, Type type, AstArray<AstExpr*> args)
@@ -175,6 +171,18 @@ void AstExprConstantNumber::visit(AstVisitor* visitor)
     visitor->visit(this);
 }
 
+AstExprConstantInteger::AstExprConstantInteger(const Location& location, int64_t value, ConstantNumberParseResult parseResult)
+    : AstExpr(ClassIndex(), location)
+    , value(value)
+    , parseResult(parseResult)
+{
+}
+
+void AstExprConstantInteger::visit(AstVisitor* visitor)
+{
+    visitor->visit(this);
+}
+
 AstExprConstantString::AstExprConstantString(const Location& location, const AstArray<char>& value, QuoteStyle quoteStyle)
     : AstExpr(ClassIndex(), location)
     , value(value)
@@ -225,9 +233,17 @@ void AstExprVarargs::visit(AstVisitor* visitor)
     visitor->visit(this);
 }
 
-AstExprCall::AstExprCall(const Location& location, AstExpr* func, const AstArray<AstExpr*>& args, bool self, const Location& argLocation)
+AstExprCall::AstExprCall(
+    const Location& location,
+    AstExpr* func,
+    const AstArray<AstExpr*>& args,
+    bool self,
+    const AstArray<AstTypeOrPack>& explicitTypes,
+    const Location& argLocation
+)
     : AstExpr(ClassIndex(), location)
     , func(func)
+    , typeArguments(explicitTypes)
     , args(args)
     , self(self)
     , argLocation(argLocation)
@@ -407,11 +423,11 @@ std::string toString(AstExprUnary::Op op)
 {
     switch (op)
     {
-    case AstExprUnary::Minus:
+    case AstExprUnary::Op::Minus:
         return "-";
-    case AstExprUnary::Not:
+    case AstExprUnary::Op::Not:
         return "not";
-    case AstExprUnary::Len:
+    case AstExprUnary::Op::Len:
         return "#";
     default:
         LUAU_ASSERT(false);
@@ -536,6 +552,23 @@ void AstExprInterpString::visit(AstVisitor* visitor)
             expr->visit(visitor);
     }
 }
+
+AstExprInstantiate::AstExprInstantiate(const Location& location, AstExpr* expr, AstArray<AstTypeOrPack> types)
+    : AstExpr(ClassIndex(), location)
+    , expr(expr)
+    , typeArguments(types)
+{
+}
+
+void AstExprInstantiate::visit(AstVisitor* visitor)
+{
+    if (visitor->visit(this))
+    {
+        expr->visit(visitor);
+        visitTypeOrPackArray(visitor, typeArguments);
+    }
+}
+
 
 void AstExprError::visit(AstVisitor* visitor)
 {
@@ -677,11 +710,13 @@ AstStatLocal::AstStatLocal(
     const Location& location,
     const AstArray<AstLocal*>& vars,
     const AstArray<AstExpr*>& values,
-    const std::optional<Location>& equalsSignLocation
+    const std::optional<Location>& equalsSignLocation,
+    bool isConst
 )
     : AstStat(ClassIndex(), location)
     , vars(vars)
     , values(values)
+    , isConst(isConst)
     , equalsSignLocation(equalsSignLocation)
 {
 }
@@ -829,10 +864,12 @@ void AstStatFunction::visit(AstVisitor* visitor)
     }
 }
 
-AstStatLocalFunction::AstStatLocalFunction(const Location& location, AstLocal* name, AstExprFunction* func)
+AstStatLocalFunction::AstStatLocalFunction(const Location& location, AstLocal* name, AstExprFunction* func, bool isConst, Position constKeywordBegin)
     : AstStat(ClassIndex(), location)
     , name(name)
     , func(func)
+    , isConst(isConst)
+    , constKeywordBegin(constKeywordBegin)
 {
 }
 
@@ -940,6 +977,40 @@ AstStatDeclareFunction::AstStatDeclareFunction(
     , varargLocation(varargLocation)
     , retTypes(retTypes)
 {
+}
+
+AstStatClass::AstStatClass(const Location& location, AstLocal* name, AstArray<AstClassMember> members, bool exported)
+    : AstStat(ClassIndex(), location)
+    , name(name)
+    , members(members)
+    , exported(exported)
+{
+    LUAU_ASSERT(FFlag::DebugLuauUserDefinedClasses);
+}
+
+void AstStatClass::visit(AstVisitor* visitor)
+{
+    LUAU_ASSERT(FFlag::DebugLuauUserDefinedClasses);
+    if (visitor->visit(this))
+    {
+        for (const auto& member : members)
+        {
+            Luau::visit(
+                overloaded{
+                    [&](const AstClassProperty& prop)
+                    {
+                        if (prop.ty)
+                            prop.ty->visit(visitor);
+                    },
+                    [&](const AstClassMethod& method)
+                    {
+                        method.function->visit(visitor);
+                    }
+                },
+                member
+            );
+        }
+    }
 }
 
 AstStatDeclareFunction::AstStatDeclareFunction(
@@ -1055,12 +1126,14 @@ AstTypeReference::AstTypeReference(
     std::optional<Location> prefixLocation,
     const Location& nameLocation,
     bool hasParameterList,
-    const AstArray<AstTypeOrPack>& parameters
+    const AstArray<AstTypeOrPack>& parameters,
+    AstLocal* prefixLocal
 )
     : AstType(ClassIndex(), location)
     , hasParameterList(hasParameterList)
     , prefix(prefix)
     , prefixLocation(prefixLocation)
+    , prefixLocal(prefixLocal)
     , name(name)
     , nameLocation(nameLocation)
     , parameters(parameters)
@@ -1071,13 +1144,7 @@ void AstTypeReference::visit(AstVisitor* visitor)
 {
     if (visitor->visit(this))
     {
-        for (const AstTypeOrPack& param : parameters)
-        {
-            if (param.type)
-                param.type->visit(visitor);
-            else
-                param.typePack->visit(visitor);
-        }
+        visitTypeOrPackArray(visitor, parameters);
     }
 }
 

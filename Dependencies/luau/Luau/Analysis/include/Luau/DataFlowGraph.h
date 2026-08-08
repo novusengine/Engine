@@ -112,6 +112,8 @@ struct DataFlowGraphBuilder
         NotNull<struct InternalErrorReporter> handle
     );
 
+    static DataFlowGraph empty(NotNull<DefArena> defArena, NotNull<RefinementKeyArena> keyArena);
+
 private:
     DataFlowGraphBuilder(NotNull<DefArena> defArena, NotNull<RefinementKeyArena> keyArena);
 
@@ -145,7 +147,7 @@ private:
 
     void join(DfgScope* p, DfgScope* a, DfgScope* b);
     void joinBindings(DfgScope* p, const DfgScope& a, const DfgScope& b);
-    void joinProps(DfgScope* p, const DfgScope& a, const DfgScope& b);
+    void joinProps(DfgScope* result, const DfgScope& a, const DfgScope& b);
 
     DefId lookup(Symbol symbol, Location location);
     DefId lookup(DefId def, const std::string& key, Location location);
@@ -173,6 +175,7 @@ private:
     ControlFlow visit(AstStatDeclareGlobal* d);
     ControlFlow visit(AstStatDeclareFunction* d);
     ControlFlow visit(AstStatDeclareExternType* d);
+    ControlFlow visit(AstStatClass* d);
     ControlFlow visit(AstStatError* error);
 
     DataFlowResult visitExpr(AstExpr* e);
@@ -182,13 +185,17 @@ private:
     DataFlowResult visitExpr(AstExprCall* c);
     DataFlowResult visitExpr(AstExprIndexName* i);
     DataFlowResult visitExpr(AstExprIndexExpr* i);
+
     DataFlowResult visitExpr(AstExprFunction* f);
+    DataFlowResult visitFunction(AstExprFunction* f, NotNull<DfgScope> signatureScope);
+
     DataFlowResult visitExpr(AstExprTable* t);
     DataFlowResult visitExpr(AstExprUnary* u);
     DataFlowResult visitExpr(AstExprBinary* b);
     DataFlowResult visitExpr(AstExprTypeAssertion* t);
     DataFlowResult visitExpr(AstExprIfElse* i);
     DataFlowResult visitExpr(AstExprInterpString* i);
+    DataFlowResult visitExpr(AstExprInstantiate* i);
     DataFlowResult visitExpr(AstExprError* error);
 
     void visitLValue(AstExpr* e, DefId incomingDef);

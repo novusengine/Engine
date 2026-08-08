@@ -345,7 +345,16 @@ return D.Definitions
 
         D.Field("castTime", Type.F32),
         D.Field("cooldown", Type.F32),
-        D.Field("duration", Type.F32)
+
+        D.Field("targetSelector", Type.U8),
+        D.Field("targetShape", Type.U8),
+        D.Field("targetRelation", Type.U8),
+        D.Field("targetRecipientMask", Type.U8),
+        D.Field("rangePolicy", Type.U8),
+        D.Field("minimumRange", Type.F32),
+        D.Field("maximumRange", Type.F32),
+        D.Field("targetRadius", Type.F32),
+        D.Field("maximumTargets", Type.U16)
     }),
 
     D.ClientDB("SpellEffects",
@@ -353,12 +362,42 @@ return D.Definitions
         D.Field("spellID", Type.U32),
         D.Field("effectPriority", Type.U8),
         D.Field("effectType", Type.U8),
-        D.Field("effectValues", Type.ARRAY, { type = Type.I32, count = 3 }),
-        D.Field("effectMiscValues", Type.ARRAY, { type = Type.I32, count = 3 })
+        D.Field("parameters", Type.ARRAY, { type = Type.I32, count = 6 })
+    }),
+
+    D.ClientDB("SpellAura",
+    {
+        D.Field("duration", Type.F32),
+        D.Field("stacksPerApplication", Type.U16),
+        D.Field("maximumStacks", Type.U16),
+        D.Field("applicationPolicy", Type.U8),
+        D.Field("disposition", Type.U8),
+        D.Field("dispelType", Type.U8),
+        D.Field("lifecycleFlags", Type.U8)
+    }),
+
+    D.ClientDB("SpellAuraConstraintGroup",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("defaultScope", Type.U8),
+        D.Field("defaultMaximumApplications", Type.U16),
+        D.Field("defaultOverflowBehavior", Type.U8)
+    }),
+
+    D.ClientDB("SpellAuraConstraint",
+    {
+        D.Field("spellID", Type.U32),
+        D.Field("groupID", Type.U32),
+        D.Field("scope", Type.U8),
+        D.Field("maximumApplications", Type.U16),
+        D.Field("overflowBehavior", Type.U8),
+        D.Field("overrideMask", Type.U8)
     }),
 
     D.ClientDB("SpellProcData",
     {
+        D.Field("ownerSpellID", Type.U32),
+        D.Field("name", Type.STRINGREF),
         D.Field("phaseMask", Type.U32),
         D.Field("typeMask", Type.U64),
         D.Field("hitMask", Type.U64),

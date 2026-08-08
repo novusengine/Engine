@@ -7,6 +7,8 @@
 
 #include <string.h>
 
+LUAU_FASTFLAG(LuauCodegenSharedLog)
+
 using namespace Luau::CodeGen;
 using namespace Luau::CodeGen::X64;
 
@@ -25,7 +27,7 @@ class AssemblyBuilderX64Fixture
 public:
     bool check(void (*f)(AssemblyBuilderX64& build), std::vector<uint8_t> code, std::vector<uint8_t> data = {})
     {
-        AssemblyBuilderX64 build(/* logText= */ false);
+        AssemblyBuilderX64 build(/* logger= */ nullptr, false, /* features= */ 0);
 
         f(build);
 
@@ -224,10 +226,18 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "FormsOfMovExtended")
     SINGLE_COMPARE(movsx(r12, byte[r10]), 0x4d, 0x0f, 0xbe, 0x22);
     SINGLE_COMPARE(movsx(ebx, word[r11]), 0x41, 0x0f, 0xbf, 0x1b);
     SINGLE_COMPARE(movsx(rdx, word[rcx]), 0x48, 0x0f, 0xbf, 0x11);
+    SINGLE_COMPARE(movsx(edx, cl), 0x0f, 0xbe, 0xd1);
+    SINGLE_COMPARE(movsx(edx, r12b), 0x41, 0x0f, 0xbe, 0xd4);
+    SINGLE_COMPARE(movsx(edx, wordReg(ecx)), 0x0f, 0xbf, 0xd1);
+    SINGLE_COMPARE(movsx(edx, wordReg(r12d)), 0x41, 0x0f, 0xbf, 0xd4);
     SINGLE_COMPARE(movzx(eax, byte[rcx]), 0x0f, 0xb6, 0x01);
     SINGLE_COMPARE(movzx(r12, byte[r10]), 0x4d, 0x0f, 0xb6, 0x22);
     SINGLE_COMPARE(movzx(ebx, word[r11]), 0x41, 0x0f, 0xb7, 0x1b);
     SINGLE_COMPARE(movzx(rdx, word[rcx]), 0x48, 0x0f, 0xb7, 0x11);
+    SINGLE_COMPARE(movzx(edx, cl), 0x0f, 0xb6, 0xd1);
+    SINGLE_COMPARE(movzx(edx, r12b), 0x41, 0x0f, 0xb6, 0xd4);
+    SINGLE_COMPARE(movzx(edx, wordReg(ecx)), 0x0f, 0xb7, 0xd1);
+    SINGLE_COMPARE(movzx(edx, wordReg(r12d)), 0x41, 0x0f, 0xb7, 0xd4);
 }
 
 TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "FormsOfTest")
@@ -365,7 +375,7 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "AlignmentOverflow")
 {
     // Test that alignment correctly resizes the code buffer
     {
-        AssemblyBuilderX64 build(/* logText */ false);
+        AssemblyBuilderX64 build(/* logger */ nullptr, false, /* features= */ 0);
 
         build.ret();
         build.align(8192, AlignmentDataX64::Nop);
@@ -373,7 +383,7 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "AlignmentOverflow")
     }
 
     {
-        AssemblyBuilderX64 build(/* logText */ false);
+        AssemblyBuilderX64 build(/* logger */ nullptr, false, /* features= */ 0);
 
         build.ret();
         build.align(8192, AlignmentDataX64::Int3);
@@ -381,7 +391,7 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "AlignmentOverflow")
     }
 
     {
-        AssemblyBuilderX64 build(/* logText */ false);
+        AssemblyBuilderX64 build(/* logger */ nullptr, false, /* features= */ 0);
 
         for (int i = 0; i < 8192; i++)
             build.int3();
@@ -389,7 +399,7 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "AlignmentOverflow")
     }
 
     {
-        AssemblyBuilderX64 build(/* logText */ false);
+        AssemblyBuilderX64 build(/* logger */ nullptr, false, /* features= */ 0);
 
         build.ret();
         build.align(8192, AlignmentDataX64::Ud2);
@@ -508,6 +518,12 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "AVXBinaryInstructionForms")
     SINGLE_COMPARE(vmaxsd(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x2b, 0x5f, 0xc6);
     SINGLE_COMPARE(vminsd(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x2b, 0x5d, 0xc6);
 
+    SINGLE_COMPARE(vmaxss(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x2a, 0x5f, 0xc6);
+    SINGLE_COMPARE(vminss(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x2a, 0x5d, 0xc6);
+
+    SINGLE_COMPARE(vmaxps(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x28, 0x5f, 0xc6);
+    SINGLE_COMPARE(vminps(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x28, 0x5d, 0xc6);
+
     SINGLE_COMPARE(vcmpeqsd(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x2b, 0xc2, 0xc6, 0x00);
     SINGLE_COMPARE(vcmpltsd(xmm8, xmm10, xmm14), 0xc4, 0x41, 0x2b, 0xc2, 0xc6, 0x01);
 }
@@ -578,10 +594,18 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "AVXTernaryInstructionForms")
         vroundsd(xmm8, xmm13, xmmword[r13 + rdx], RoundingModeX64::RoundToPositiveInfinity), 0xc4, 0x43, 0x11, 0x0b, 0x44, 0x15, 0x00, 0x0a
     );
     SINGLE_COMPARE(vroundsd(xmm9, xmm14, xmmword[rcx + r10], RoundingModeX64::RoundToZero), 0xc4, 0x23, 0x09, 0x0b, 0x0c, 0x11, 0x0b);
-    SINGLE_COMPARE(vblendvpd(xmm7, xmm12, xmm5, xmmword[rcx + r10]), 0xc4, 0xa3, 0x19, 0x4b, 0x3c, 0x11, 0x50);
+
+    SINGLE_COMPARE(vroundps(xmm1, xmm3, RoundingModeX64::RoundToNegativeInfinity), 0xc4, 0xe3, 0x79, 0x08, 0xcb, 0x09);
+    SINGLE_COMPARE(vroundps(xmm12, xmm14, RoundingModeX64::RoundToNegativeInfinity), 0xc4, 0x43, 0x79, 0x08, 0xe6, 0x09);
+    SINGLE_COMPARE(vroundps(xmm12, xmmword[rax + r13], RoundingModeX64::RoundToNegativeInfinity), 0xc4, 0x23, 0x79, 0x08, 0x24, 0x28, 0x09);
+
+    SINGLE_COMPARE(vblendvpd(xmm7, xmm12, xmmword[rcx + r10], xmm5), 0xc4, 0xa3, 0x19, 0x4b, 0x3c, 0x11, 0x50);
 
     SINGLE_COMPARE(vpshufps(xmm7, xmm12, xmmword[rcx + r10], 0b11010100), 0xc4, 0xa1, 0x18, 0xc6, 0x3c, 0x11, 0xd4);
     SINGLE_COMPARE(vpinsrd(xmm7, xmm12, xmmword[rcx + r10], 2), 0xc4, 0xa3, 0x19, 0x22, 0x3c, 0x11, 0x02);
+
+    SINGLE_COMPARE(vpextrd(ecx, xmm5, 2), 0xc4, 0xe3, 0x79, 0x16, 0xe9, 0x02);
+    SINGLE_COMPARE(vpextrd(r10d, xmm9, 1), 0xc4, 0x43, 0x79, 0x16, 0xca, 0x01);
 
     SINGLE_COMPARE(vdpps(xmm7, xmm12, xmmword[rcx + r10], 2), 0xc4, 0xa3, 0x19, 0x40, 0x3c, 0x11, 0x02);
 }
@@ -616,7 +640,9 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "LabelLea")
 
 TEST_CASE("LogTest")
 {
-    AssemblyBuilderX64 build(/* logText= */ true);
+    AssemblyOptions options;
+    LogBuilder logger(options);
+    AssemblyBuilderX64 build(/* logger= */ &logger, true, /* features= */ 0);
 
     build.push(r12);
     build.align(8);
@@ -647,9 +673,11 @@ TEST_CASE("LogTest")
     build.imul(rcx, rdx);
     build.imul(rcx, rdx, 8);
     build.vroundsd(xmm1, xmm2, xmm3, RoundingModeX64::RoundToNearestEven);
+    build.vroundps(xmm1, xmm12, RoundingModeX64::RoundToNegativeInfinity);
     build.add(rdx, qword[rcx - 12]);
     build.pop(r12);
     build.cmov(ConditionX64::AboveEqual, rax, rbx);
+    build.vpextrd(ecx, xmm5, 2);
     build.ret();
     build.int3();
 
@@ -693,9 +721,11 @@ TEST_CASE("LogTest")
  imul        rcx,rdx
  imul        rcx,rdx,8
  vroundsd    xmm1,xmm2,xmm3,8
+ vroundps    xmm1,xmm12,9
  add         rdx,qword ptr [rcx-0Ch]
  pop         r12
  cmovae      rax,rbx
+ vpextrd     ecx,xmm5,2
  ret
  int3
  nop
@@ -709,7 +739,7 @@ TEST_CASE("LogTest")
  nop         word ptr[rax+rax] ; 9-byte nop
 )";
 
-    CHECK("\n" + build.text == expected);
+    CHECK("\n" + (FFlag::LuauCodegenSharedLog ? logger.text : build.text) == expected);
 }
 
 TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "Constants")
@@ -756,7 +786,7 @@ TEST_CASE_FIXTURE(AssemblyBuilderX64Fixture, "Constants")
 
 TEST_CASE("ConstantStorage")
 {
-    AssemblyBuilderX64 build(/* logText= */ false);
+    AssemblyBuilderX64 build(/* logger= */ nullptr, false, /* features= */ 0);
 
     for (int i = 0; i <= 3000; i++)
         build.vaddss(xmm0, xmm0, build.i32(i));
@@ -776,7 +806,7 @@ TEST_CASE("ConstantStorage")
 
 TEST_CASE("ConstantStorageDedup")
 {
-    AssemblyBuilderX64 build(/* logText= */ false);
+    AssemblyBuilderX64 build(/* logger= */ nullptr, false, /* features= */ 0);
 
     for (int i = 0; i <= 3000; i++)
         build.vaddss(xmm0, xmm0, build.f32(1.0f));
@@ -793,7 +823,7 @@ TEST_CASE("ConstantStorageDedup")
 
 TEST_CASE("ConstantCaching")
 {
-    AssemblyBuilderX64 build(/* logText= */ false);
+    AssemblyBuilderX64 build(/* logger= */ nullptr, false, /* features= */ 0);
 
     OperandX64 two = build.f64(2);
 

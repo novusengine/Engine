@@ -47,6 +47,7 @@ namespace PACT
     public:
         Type type;
         u64 value;
+        PactGenerationID generation;
     };
 
     enum class PactLoadState
@@ -148,6 +149,7 @@ struct std::hash<PACT::PactFileKey>
         XXHash64 hash(0);
         hash.add(&x.type, sizeof(x.type));
         hash.add(&x.value, sizeof(x.value));
+        hash.add(&x.generation, sizeof(x.generation));
 
         return hash.hash();
     }

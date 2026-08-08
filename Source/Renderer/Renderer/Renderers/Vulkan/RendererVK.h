@@ -68,15 +68,15 @@ namespace Renderer
         [[nodiscard]] TextureArrayID CreateTextureArray(TextureArrayDesc& desc) override;
 
         [[nodiscard]] TextureID CreateDataTexture(DataTextureDesc& desc) override;
-        [[nodiscard]] TextureID CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex) override;
+        [[nodiscard]] TextureID CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex) override;
 
         [[nodiscard]] TimeQueryID CreateTimeQuery(TimeQueryDesc& desc) override;
 
         // Loading
         [[nodiscard]] TextureID LoadTexture(TextureDesc& desc) override;
         [[nodiscard]] TextureID LoadDataTexture(DataTextureDesc& desc) override;
-        [[nodiscard]] TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) override;
-        [[nodiscard]] TextureID LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) override;
+        [[nodiscard]] TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex, bool allowDuplicates = false) override;
+        [[nodiscard]] TextureID LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex, bool allowDuplicates = false) override;
 
         [[nodiscard]] VertexShaderID LoadShader(VertexShaderDesc& desc) override;
         [[nodiscard]] PixelShaderID LoadShader(PixelShaderDesc& desc) override;
@@ -99,8 +99,10 @@ namespace Renderer
         void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) override;
         
         // Misc
-        u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) override;
+        size_t AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) override;
         void FlushTextureArrayDescriptors(TextureArrayID textureArrayID) override;
+        bool TryFindExistingTexture(u64 descHash, TextureID& textureID) override;
+        bool TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID) override;
 
         // Command List Functions
         [[nodiscard]] CommandListID BeginCommandList() override;
@@ -176,6 +178,7 @@ namespace Renderer
 
         // Staging and memory
         [[nodiscard]] std::shared_ptr<UploadBuffer> CreateUploadBuffer(BufferID targetBuffer, size_t targetOffset, size_t size) override;
+        [[nodiscard]] std::shared_ptr<UploadBuffer> CreateUploadBuffer(TextureID targetTexture, const TextureUploadRegion& region, size_t size) override;
         [[nodiscard]] bool ShouldWaitForUpload() override;
         void SetHasWaitedForUpload() override;
         [[nodiscard]] SemaphoreID GetUploadFinishedSemaphore() override;
@@ -218,7 +221,7 @@ namespace Renderer
 
         void ResetTimeQueries(u32 frameIndex) override;
 
-        [[nodiscard]] TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) override;
+        [[nodiscard]] TextureID GetTextureID(TextureArrayID textureArrayID, size_t index) override;
 
         [[nodiscard]] uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) override;
         [[nodiscard]] uvec2 GetImageDimensions(const DepthImageID id) override;

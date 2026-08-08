@@ -39,10 +39,7 @@ return D.Definitions
         D.Field("TriggerAdd"),
         D.Field("TriggerRemove"),
         D.Field("SpellSet"),
-        D.Field("SpellEffectSet"),
-        D.Field("SpellProcDataSet"),
-        D.Field("SpellProcLinkSet"),
-        D.Field("CreatureAddScript"),
+        D.Field("CreatureAddScript", 37),
         D.Field("CreatureRemoveScript"),
         D.Field("CreatureMove"),
         D.Field("CreatureFollow"),
@@ -55,6 +52,12 @@ return D.Definitions
         D.Field("FactionReputationRemove"),
         D.Field("FactionReputationSetFlags"),
         D.Field("FactionReputationLock"),
-        D.Field("UnitSetFaction")
+        D.Field("UnitSetFaction"),
+        D.Field("SpellEditorSnapshot"),
+        D.Field("SpellDelete"),
+        D.Field("SpellAuraConstraintGroupSet"),
+        D.Field("SpellAuraConstraintGroupDelete"),
+        D.Field("SpellProcDataSet"),
+        D.Field("SpellProcDataDelete")
     })
 }

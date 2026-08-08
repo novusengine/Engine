@@ -49,7 +49,10 @@ enum class ConditionA64
     // AL: always
     Always,
 
-    Count
+    Count,
+
+    UnsignedLess = CarryClear,
+    UnsignedGreaterEqual = CarrySet,
 };
 
 // Returns a condition that for 'a op b' will result in 'b op a'
@@ -63,9 +66,9 @@ inline ConditionA64 getInverseCondition(ConditionA64 cond)
     case ConditionA64::NotEqual:
         return ConditionA64::NotEqual;
     case ConditionA64::UnsignedGreater:
-        return ConditionA64::CarryClear;
+        return ConditionA64::UnsignedLess;
     case ConditionA64::UnsignedLessEqual:
-        return ConditionA64::CarrySet;
+        return ConditionA64::UnsignedGreaterEqual;
     case ConditionA64::GreaterEqual:
         return ConditionA64::LessEqual;
     case ConditionA64::Less:
@@ -74,6 +77,10 @@ inline ConditionA64 getInverseCondition(ConditionA64 cond)
         return ConditionA64::Less;
     case ConditionA64::LessEqual:
         return ConditionA64::GreaterEqual;
+    case ConditionA64::CarryClear: // UnsignedLess -> UnsignedGreater
+        return ConditionA64::UnsignedGreater;
+    case ConditionA64::CarrySet: // UnsignedGreaterEqual -> UnsignedLessEqual
+        return ConditionA64::UnsignedLessEqual;
     default:
         CODEGEN_ASSERT(!"invalid ConditionA64 value for getInverseCondition");
     }

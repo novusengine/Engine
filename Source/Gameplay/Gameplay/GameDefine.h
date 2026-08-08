@@ -1,12 +1,19 @@
 #pragma once
 #include "Base/Types.h"
 
+#include <array>
 #include <memory>
 
 class Bytebuffer;
 
 namespace GameDefine
 {
+    namespace SpellTargeting
+    {
+        inline constexpr f32 MAX_RADIUS = 100.0f;
+        inline constexpr u16 MAX_TARGETS = 64;
+    }
+
     enum class UnitRace : u8
     {
         None        = 0,
@@ -205,11 +212,36 @@ namespace GameDefine
 
             f32 castTime;
             f32 cooldown;
-            f32 duration;
+            u8 targetSelector;
+            u8 targetShape;
+            u8 targetRelation;
+            u8 targetRecipientMask;
+            u8 rangePolicy;
+            f32 minimumRange;
+            f32 maximumRange;
+            f32 targetRadius;
+            u16 maximumTargets;
 
         public:
             static bool Read(Bytebuffer* buffer, Spell& result);
             static bool Write(Bytebuffer* buffer, const Spell& data);
+        };
+
+        struct SpellAura
+        {
+        public:
+            u32 spellID;
+            f32 duration;
+            u16 stacksPerApplication;
+            u16 maximumStacks;
+            u8 applicationPolicy;
+            u8 disposition;
+            u8 dispelType;
+            u8 lifecycleFlags;
+
+        public:
+            static bool Read(Bytebuffer* buffer, SpellAura& result);
+            static bool Write(Bytebuffer* buffer, const SpellAura& data);
         };
 
         struct SpellEffect
@@ -221,13 +253,7 @@ namespace GameDefine
             u8 effectPriority;
             u8 effectType;
 
-            i32 effectValue1;
-            i32 effectValue2;
-            i32 effectValue3;
-
-            i32 effectMiscValue1;
-            i32 effectMiscValue2;
-            i32 effectMiscValue3;
+            std::array<i32, 6> parameters;
 
         public:
             static bool Read(Bytebuffer* buffer, SpellEffect& result);
