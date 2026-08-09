@@ -195,6 +195,12 @@ bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>
             InitAnimationArray(buffer, textureTransform->scale, md21Offset);
         }
 
+        for (u32 i = 0; i < layout.md21.textureWeights.size; i++)
+        {
+            M2TextureWeight* textureWeight = layout.md21.textureWeights.GetElement(buffer, i);
+            InitAnimationArray(buffer, textureWeight->weight, md21Offset);
+        }
+
         for (u32 i = 0; i < layout.md21.cameras.size; i++)
         {
             M2Camera* camera = layout.md21.cameras.GetElement(buffer, i);
