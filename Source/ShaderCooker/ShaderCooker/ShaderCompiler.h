@@ -37,9 +37,15 @@ namespace ShaderCooker
         void SetShaderCache(ShaderCooker::ShaderCache* shaderCache) { _shaderCache = shaderCache; }
 
         std::filesystem::path GetSourceDirPath() { return _sourceDirPath; }
-        void SetSourceDirPath(std::filesystem::path sourceDirPath) { _sourceDirPath = sourceDirPath; }
+        void SetSourceDirPath(std::filesystem::path sourceDirPath)
+        {
+            _sourceDirPath = std::filesystem::absolute(sourceDirPath).make_preferred();
+        }
 
-        void SetBinDirPath(std::filesystem::path binDirPath) { _binDirPath = binDirPath; }
+        void SetBinDirPath(std::filesystem::path binDirPath)
+        {
+            _binDirPath = std::filesystem::absolute(binDirPath).make_preferred();
+        }
 
         Stage GetStage() { return _stageInfo.stage; }
         void SetStage(Stage stage) { _stageInfo.stage = stage; }

@@ -31,7 +31,7 @@ namespace Renderer
 
             i8 renderPassOpenCount = 0;
             i8 pipelineOpenCount = 0;
-            u8 unboundDescriptorSetsMask = 0; // bits set = descriptor set slots required by the bound pipeline that haven't been bound on this command list yet
+            u16 unboundDescriptorSetsMask = 0; // bits set = descriptor set slots required by the bound pipeline that haven't been bound on this command list yet
             QueueType queueType = QueueType::Graphics;
         };
 
@@ -322,7 +322,7 @@ namespace Renderer
             commandList.pipelineOpenCount = count;
         }
 
-        u8 CommandListHandlerVK::GetUnboundDescriptorSets(CommandListID id)
+        u16 CommandListHandlerVK::GetUnboundDescriptorSets(CommandListID id)
         {
             CommandListHandlerVKData& data = static_cast<CommandListHandlerVKData&>(*_data);
 
@@ -331,7 +331,7 @@ namespace Renderer
             return commandList.unboundDescriptorSetsMask;
         }
 
-        void CommandListHandlerVK::SetUnboundDescriptorSets(CommandListID id, u8 mask)
+        void CommandListHandlerVK::SetUnboundDescriptorSets(CommandListID id, u16 mask)
         {
             CommandListHandlerVKData& data = static_cast<CommandListHandlerVKData&>(*_data);
 

@@ -55,7 +55,29 @@ namespace FileFormat::Material::ABI
         Count
     };
 
-    inline constexpr u32 EXECUTION_GROUP_COUNT = static_cast<u32>(ExecutionGroup::Count);
+    inline constexpr u32 EXECUTION_GROUP_CLASS_COUNT = static_cast<u32>(ExecutionGroup::Count);
+
+    // Classification uses one bit per execution group. Five authored program families
+    // fit beside the six raster/topology classes without requiring 64-bit GPU atomics.
+    inline constexpr u32 MAX_PROGRAM_FAMILIES = 5;
+    inline constexpr u32 EXECUTION_GROUP_COUNT =
+        EXECUTION_GROUP_CLASS_COUNT * MAX_PROGRAM_FAMILIES;
+
+    constexpr u16 MakeExecutionGroup(u16 programFamily, ExecutionGroup groupClass)
+    {
+        return static_cast<u16>(programFamily * EXECUTION_GROUP_CLASS_COUNT +
+                                static_cast<u16>(groupClass));
+    }
+
+    constexpr ExecutionGroup GetExecutionGroupClass(u16 executionGroup)
+    {
+        return static_cast<ExecutionGroup>(executionGroup % EXECUTION_GROUP_CLASS_COUNT);
+    }
+
+    constexpr u16 GetProgramFamily(u16 executionGroup)
+    {
+        return static_cast<u16>(executionGroup / EXECUTION_GROUP_CLASS_COUNT);
+    }
 
     namespace LegacyModel
     {

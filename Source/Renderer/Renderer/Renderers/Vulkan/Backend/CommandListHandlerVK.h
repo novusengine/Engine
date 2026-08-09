@@ -58,8 +58,8 @@ namespace Renderer
 
             // Bitmask of descriptor set slots the currently bound pipeline statically uses but which haven't been bound on this command list yet.
             // Initialized in BeginPipeline from the pipeline's used-set mask, cleared bit-by-bit by BindDescriptorSet, validated by Draw / Dispatch, reset on EndPipeline.
-            u8 GetUnboundDescriptorSets(CommandListID id);
-            void SetUnboundDescriptorSets(CommandListID id, u8 mask);
+            u16 GetUnboundDescriptorSets(CommandListID id);
+            void SetUnboundDescriptorSets(CommandListID id, u16 mask);
 
             tracy::VkCtxManualScope*& GetTracyScope(CommandListID id);
 

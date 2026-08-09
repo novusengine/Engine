@@ -35,7 +35,8 @@ public:
         BoneMask,
         IKRig,
         RetargetProfile,
-        AnimationBounds
+        AnimationBounds,
+        MaterialPack
     };
 
 public:

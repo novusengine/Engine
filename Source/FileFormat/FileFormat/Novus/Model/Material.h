@@ -3,6 +3,7 @@
 
 #include <Base/Types.h>
 
+#include <cstddef>
 #include <memory>
 #include <span>
 #include <type_traits>
@@ -241,6 +242,7 @@ namespace FileFormat::Material
 
     static_assert(sizeof(ParameterDefinition) == 16);
     static_assert(sizeof(vec4) == 16);
+    static_assert(offsetof(MaterialAsset, programKey) == 8);
     static_assert(sizeof(MaterialAsset) == 56);
     static_assert(sizeof(TextureBinding) == 16);
     static_assert(sizeof(MaterialAnimationBinding) == 16);

@@ -56,7 +56,7 @@ namespace Renderer
 
             std::unordered_set<u32> setsUsed;
             std::unordered_map<u32, PersistentBitSet> usedBindingsPerSlot;
-            u8 usedDescriptorSetMask = 0; // bit `slot` set for each statically-used descriptor set slot (including DEBUG)
+            u16 usedDescriptorSetMask = 0; // bit `slot` set for each statically-used descriptor set slot (including DEBUG)
         };
 
         struct ComputePipelineCacheDesc
@@ -79,7 +79,7 @@ namespace Renderer
 
             std::unordered_set<u32> setsUsed;
             std::unordered_map<u32, PersistentBitSet> usedBindingsPerSlot;
-            u8 usedDescriptorSetMask = 0; // bit `slot` set for each statically-used descriptor set slot (including DEBUG)
+            u16 usedDescriptorSetMask = 0; // bit `slot` set for each statically-used descriptor set slot (including DEBUG)
         };
 
         struct PipelineHandlerVKData : IPipelineHandlerVKData
@@ -297,13 +297,13 @@ namespace Renderer
             return static_cast<u32>(data.computePipelines[static_cast<cIDType>(id)].setsUsed.contains(setNumber));
         }
 
-        u8 PipelineHandlerVK::GetUsedDescriptorSetMask(GraphicsPipelineID id)
+        u16 PipelineHandlerVK::GetUsedDescriptorSetMask(GraphicsPipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
             return data.graphicsPipelines[static_cast<gIDType>(id)].usedDescriptorSetMask;
         }
 
-        u8 PipelineHandlerVK::GetUsedDescriptorSetMask(ComputePipelineID id)
+        u16 PipelineHandlerVK::GetUsedDescriptorSetMask(ComputePipelineID id)
         {
             PipelineHandlerVKData& data = static_cast<PipelineHandlerVKData&>(*_data);
             return data.computePipelines[static_cast<cIDType>(id)].usedDescriptorSetMask;
@@ -580,7 +580,7 @@ namespace Renderer
             pipeline.usedDescriptorSetMask = 0;
             for (u32 slot : pipeline.setsUsed)
             {
-                pipeline.usedDescriptorSetMask |= static_cast<u8>(1u << slot);
+                pipeline.usedDescriptorSetMask |= static_cast<u16>(1u << slot);
             }
 
             // -- Create Descriptor Set Layout from reflected SPIR-V --
@@ -953,7 +953,7 @@ namespace Renderer
             pipeline.usedDescriptorSetMask = 0;
             for (u32 slot : pipeline.setsUsed)
             {
-                pipeline.usedDescriptorSetMask |= static_cast<u8>(1u << slot);
+                pipeline.usedDescriptorSetMask |= static_cast<u16>(1u << slot);
             }
 
             std::vector<BindInfo> bindInfos;
@@ -1051,5 +1051,6 @@ namespace Renderer
             }
             DebugMarkerUtilVK::SetObjectName(_device->_device, (uint64_t)pipeline.pipeline, VK_OBJECT_TYPE_PIPELINE, desc.debugName.c_str());
         }
+
     }
 }

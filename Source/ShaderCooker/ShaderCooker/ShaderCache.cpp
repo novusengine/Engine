@@ -7,17 +7,21 @@
 
 namespace fs = std::filesystem;
 
+namespace
+{
+    constexpr u32 SHADER_CACHE_MAGIC = 0x4348534Eu;
+
+    // Increment when compiler-wide defines or reflection rules change without touching shader sources.
+    constexpr u32 SHADER_COMPILER_ABI_VERSION = 2;
+
+    i64 LastWriteStamp(const fs::path& path)
+    {
+        return static_cast<i64>(fs::last_write_time(path).time_since_epoch().count());
+    }
+}
+
 namespace ShaderCooker
 {
-    template <typename TP>
-    std::time_t to_time_t(TP tp)
-    {
-        using namespace std::chrono;
-        auto sctp = time_point_cast<system_clock::duration>(tp - TP::clock::now()
-            + system_clock::now());
-        return system_clock::to_time_t(sctp);
-    }
-
     bool ShaderCache::Load(fs::path path)
     {
         path = path.make_preferred();
@@ -45,6 +49,16 @@ namespace ShaderCooker
         fileReader.Read(&buffer, buffer.size);
         fileReader.Close();
 
+        if (buffer.size < sizeof(u32) * 3)
+            return false;
+
+        u32 magic = 0;
+        u32 compilerABIVersion = 0;
+        buffer.Get<u32>(magic);
+        buffer.Get<u32>(compilerABIVersion);
+        if (magic != SHADER_CACHE_MAGIC || compilerABIVersion != SHADER_COMPILER_ABI_VERSION)
+            return false;
+
         // Get number of cached files
         u32 numberOfFiles = 0;
         buffer.Get<u32>(numberOfFiles);
@@ -57,8 +71,8 @@ namespace ShaderCooker
         {
             u32 fileHash;
             buffer.Get<u32>(fileHash);
-            std::time_t lastWriteTime;
-            buffer.Get<std::time_t>(lastWriteTime);
+            i64 lastWriteTime;
+            buffer.Get<i64>(lastWriteTime);
 
             _filesLastTouchTime.emplace(fileHash, lastWriteTime);
         }
@@ -80,6 +94,9 @@ namespace ShaderCooker
         // Get a bytebuffer
         std::shared_ptr<Bytebuffer> byteBuffer = Bytebuffer::Borrow<1048576>();
 
+        byteBuffer->Put<u32>(SHADER_CACHE_MAGIC);
+        byteBuffer->Put<u32>(SHADER_COMPILER_ABI_VERSION);
+
         // Write number of cached files
         u32 numberOfCachedFiles = static_cast<u32>(_filesLastTouchTime.size());
         byteBuffer->Put<u32>(numberOfCachedFiles);
@@ -98,8 +115,8 @@ namespace ShaderCooker
             u32 key = keys[i];
             byteBuffer->Put<u32>(key);
 
-            std::time_t time = _filesLastTouchTime[key];
-            byteBuffer->Put<std::time_t>(time);
+            i64 time = _filesLastTouchTime[key];
+            byteBuffer->Put<i64>(time);
         }
 
         output.write(reinterpret_cast<char const*>(byteBuffer->GetDataPointer()), byteBuffer->writtenData);
@@ -114,7 +131,7 @@ namespace ShaderCooker
         //std::transform(shaderPathString.begin(), shaderPathString.end(), shaderPathString.begin(), ::tolower);
 
         u32 shaderPathHash = StringUtils::fnv1a_32(shaderPathString.c_str(), shaderPathString.length());
-        std::time_t lastWriteTime = to_time_t(fs::last_write_time(shaderPath));
+        const i64 lastWriteTime = LastWriteStamp(shaderPath);
 
         if (_filesLastTouchTime.find(shaderPathHash) == _filesLastTouchTime.end())
         {
@@ -134,7 +151,7 @@ namespace ShaderCooker
         //std::transform(shaderPathString.begin(), shaderPathString.end(), shaderPathString.begin(), ::tolower);
 
         u32 shaderPathHash = StringUtils::fnv1a_32(shaderPathString.c_str(), shaderPathString.length());
-        std::time_t lastWriteTime = to_time_t(fs::last_write_time(shaderPath));
+        const i64 lastWriteTime = LastWriteStamp(shaderPath);
 
         if (_filesLastTouchTime.find(shaderPathHash) == _filesLastTouchTime.end())
         {

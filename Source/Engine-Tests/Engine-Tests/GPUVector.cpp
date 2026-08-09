@@ -85,6 +85,31 @@ void WaitForUpload(Renderer::Renderer* renderer, Novus::Window* window, Renderer
     renderer->Present(window, rt, uploadFinishedSemaphore);
 }
 
+TEST_CASE("GPU Vector capacity growth", "[Renderer]")
+{
+    Renderer::GPUVector<u32> defaultGrowth;
+    defaultGrowth.AddCount(16);
+    REQUIRE(defaultGrowth.Capacity() == 16);
+    defaultGrowth.Add();
+    REQUIRE(defaultGrowth.Capacity() == 24);
+
+    Renderer::GPUVector<u32> doubledGrowth(false, 2.0f);
+    doubledGrowth.AddCount(16);
+    doubledGrowth.Add();
+    REQUIRE(doubledGrowth.Capacity() == 32);
+
+    Renderer::GPUVector<u32> reservedGrowth;
+    reservedGrowth.AddCount(16);
+    reservedGrowth.Reserve(1);
+    REQUIRE(reservedGrowth.Capacity() == 24);
+
+    REQUIRE(!reservedGrowth.SetGrowthFactor(0.5f));
+    REQUIRE(reservedGrowth.SetGrowthFactor(2.0f));
+    reservedGrowth.AddCount(8);
+    reservedGrowth.Add();
+    REQUIRE(reservedGrowth.Capacity() == 48);
+}
+
 TEST_CASE("GPU Vector", "[Renderer]")
 {
     // Set up logger
@@ -310,7 +335,7 @@ TEST_CASE("GPU Vector", "[Renderer]")
         REQUIRE(u32Vector.Validate());
     }
 
-    // Grow two frames in a row
+    // Geometric capacity growth avoids another resize on the following frame
     {
         for (u32 i = 0; i < 13; i++)
         {
@@ -326,7 +351,7 @@ TEST_CASE("GPU Vector", "[Renderer]")
             u32Vector.Add(500 + i);
         }
 
-        REQUIRE(u32Vector.SyncToGPU(renderer)); // Require ensures that it grew
+        REQUIRE(!u32Vector.SyncToGPU(renderer));
         WaitForUpload(renderer, window, finalColor);
         REQUIRE(u32Vector.Validate());
     }

@@ -8,6 +8,8 @@
 #include <Base/Memory/BufferRangeAllocator.h>
 #include <Base/Util/DebugHandler.h>
 
+#include <algorithm>
+#include <cmath>
 #include <mutex>
 #include <shared_mutex>
 
@@ -28,12 +30,24 @@ namespace Renderer
 
     public:
         static const u32 ELEMENT_SIZE = sizeof(T);
+        static constexpr f32 DEFAULT_GROWTH_FACTOR = 1.5f;
 
         // Constructor, pass true if you want to validate transfers to the GPU (SLOW, ONLY FOR DEBUGGING)
-        GPUVector(bool validateTransfers = false)
+        GPUVector(bool validateTransfers = false, f32 growthFactor = DEFAULT_GROWTH_FACTOR)
             : _validateTransfers(validateTransfers)
         {
             _allocator.Init(0, 0);
+            SetGrowthFactor(growthFactor);
+        }
+
+        // Controls automatic capacity growth, including growth requested through Reserve().
+        bool SetGrowthFactor(f32 growthFactor)
+        {
+            if (!std::isfinite(growthFactor) || growthFactor < 1.0f)
+                return false;
+
+            _growthFactor = growthFactor;
+            return true;
         }
 
         // Non-const [] operator (allows modification)
@@ -50,9 +64,7 @@ namespace Renderer
             BufferRangeFrame frame;
             if (!_allocator.Allocate(ELEMENT_SIZE, frame))
             {
-                // Did not have room, so lets grow
-                size_t newSize = _allocator.Size() + (ELEMENT_SIZE * ELEMENTS_PER_BLOCK);
-                _allocator.Grow(newSize);
+                GrowToFit(_allocator.Size() + ELEMENT_SIZE);
 
                 // Try again
                 if (!_allocator.Allocate(ELEMENT_SIZE, frame))
@@ -61,14 +73,6 @@ namespace Renderer
                     return -1;
                 }
 
-                // Had to grow, so lets reallocate our data
-                u8* oldData = _data;
-                _data = new u8[_allocator.Size()];
-                if (oldData)
-                {
-                    memcpy(_data, oldData, frame.offset);
-                    delete[] oldData;
-                }
             }
 
             // Default initialize the new element
@@ -103,12 +107,7 @@ namespace Renderer
             BufferRangeFrame frame;
             if (!_allocator.Allocate(count * ELEMENT_SIZE, frame))
             {
-                // Did not have room, so lets grow
-                size_t requiredBytes = count * ELEMENT_SIZE;
-                size_t blockBytes = ELEMENTS_PER_BLOCK * ELEMENT_SIZE;
-                size_t growBytes = ((requiredBytes + blockBytes - 1) / blockBytes) * blockBytes;
-                size_t newSize = _allocator.Size() + growBytes;
-                _allocator.Grow(newSize);
+                GrowToFit(_allocator.Size() + (static_cast<size_t>(count) * ELEMENT_SIZE));
 
                 // Try again
                 if (!_allocator.Allocate(count * ELEMENT_SIZE, frame))
@@ -117,14 +116,6 @@ namespace Renderer
                     return -1;
                 }
 
-                // Had to grow, so lets reallocate our data
-                u8* oldData = _data;
-                _data = new u8[_allocator.Size()];
-                if (oldData)
-                {
-                    memcpy(_data, oldData, frame.offset);
-                    delete[] oldData;
-                }
             }
 
             for (u32 i = 0; i < count; i++)
@@ -174,23 +165,10 @@ namespace Renderer
             size_t allocated = _allocator.AllocatedBytes();
             size_t requestedSize = allocated + (count * ELEMENT_SIZE);
 
-            if (_allocator.Size() > requestedSize)
+            if (_allocator.Size() >= requestedSize)
                 return;
 
-            size_t requiredBytes = count * ELEMENT_SIZE;
-            size_t blockBytes = ELEMENTS_PER_BLOCK * ELEMENT_SIZE;
-            size_t growBytes = ((requiredBytes + blockBytes - 1) / blockBytes) * blockBytes;
-            size_t newSize = _allocator.Size() + growBytes;
-            _allocator.Grow(newSize);
-
-            // Had to grow, so lets reallocate our data
-            u8* oldData = _data;
-            _data = new u8[_allocator.Size()];
-            if (oldData)
-            {
-                memcpy(_data, oldData, allocated);
-                delete[] oldData;
-            }
+            GrowToFit(requestedSize);
         }
 
         // Clears the vector
@@ -430,6 +408,30 @@ namespace Renderer
             return true;
         }
     private:
+        void GrowToFit(size_t minimumSize)
+        {
+            const size_t currentSize = _allocator.Size();
+            const size_t geometricSize = static_cast<size_t>(std::ceil(static_cast<double>(currentSize) * _growthFactor));
+            const size_t blockBytes = static_cast<size_t>(ELEMENTS_PER_BLOCK) * ELEMENT_SIZE;
+            const size_t requestedSize = std::max(minimumSize, geometricSize);
+            const size_t newSize = ((requestedSize + blockBytes - 1) / blockBytes) * blockBytes;
+            ResizeCPUStorage(newSize);
+        }
+
+        void ResizeCPUStorage(size_t newSize)
+        {
+            const size_t oldSize = _allocator.Size();
+            _allocator.Grow(newSize);
+
+            u8* oldData = _data;
+            _data = new u8[newSize];
+            if (oldData)
+            {
+                memcpy(_data, oldData, oldSize);
+                delete[] oldData;
+            }
+        }
+
         void ResizeBuffer(Renderer* renderer, size_t newSize, bool copyOld)
         {
             BufferDesc desc;
@@ -522,6 +524,7 @@ namespace Renderer
 
     private:
         bool _validateTransfers = false;
+        f32 _growthFactor = DEFAULT_GROWTH_FACTOR;
         bool _queuedValidation = false;
         bool _isCompressed = true;
 

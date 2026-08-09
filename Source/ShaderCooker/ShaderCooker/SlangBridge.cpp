@@ -452,8 +452,9 @@ namespace ShaderCooker
         defines.push_back({ "LIGHT", "3" });
         defines.push_back({ "TERRAIN", "4" });
         defines.push_back({ "MODEL", "5" });
-        defines.push_back({ "PER_PASS", "6" });
-        defines.push_back({ "PER_DRAW", "7" });
+        defines.push_back({ "MATERIAL", "6" });
+        defines.push_back({ "PER_PASS", "7" });
+        defines.push_back({ "PER_DRAW", "8" });
 
         // Add extra defines
         defines.insert(defines.end(), data->permutationDefines.begin(), data->permutationDefines.end());
