@@ -202,6 +202,7 @@ namespace Renderer
 
         virtual void CopyImage(CommandListID commandListID, ImageID dstImageID, uvec2 dstPos, u32 dstMipLevel, ImageID srcImageID, uvec2 srcPos, u32 srcMipLevel, uvec2 size) = 0;
         virtual void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) = 0;
+        virtual void CopyImageToTexture(CommandListID commandListID, TextureID dstTextureID, ImageID srcImageID, uvec2 size) = 0;
         virtual void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) = 0;
 
         virtual void ImageBarrier(CommandListID commandListID, ImageID imageID) = 0;

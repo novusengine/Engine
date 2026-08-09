@@ -163,6 +163,7 @@ namespace Renderer
 
         void CopyImage(CommandListID commandListID, ImageID dstImageID, uvec2 dstPos, u32 dstMipLevel, ImageID srcImageID, uvec2 srcPos, u32 srcMipLevel, uvec2 size) override;
         void CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size) override;
+        void CopyImageToTexture(CommandListID commandListID, TextureID dstTextureID, ImageID srcImageID, uvec2 size) override;
         void CopyBuffer(CommandListID commandListID, BufferID dstBuffer, u64 dstOffset, BufferID srcBuffer, u64 srcOffset, u64 range) override;
 
         void ImageBarrier(CommandListID commandListID, ImageID imageID) override;

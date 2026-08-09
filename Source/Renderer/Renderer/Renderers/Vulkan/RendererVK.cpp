@@ -1693,6 +1693,65 @@ namespace Renderer
         vkCmdCopyImage(commandBuffer, srcImage, VK_IMAGE_LAYOUT_GENERAL, dstImage, VK_IMAGE_LAYOUT_GENERAL, 1, &imageCopy);
     }
 
+    void RendererVK::CopyImageToTexture(CommandListID commandListID, TextureID dstTextureID, ImageID srcImageID,
+                                        uvec2 size)
+    {
+        VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
+        VkImage dstImage = _textureHandler->GetImage(dstTextureID);
+        VkImage srcImage = _imageHandler->GetImage(srcImageID);
+
+        VkImageMemoryBarrier barriers[2] = {};
+        barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[0].image = srcImage;
+        barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barriers[0].subresourceRange.levelCount = 1;
+        barriers[0].subresourceRange.layerCount = 1;
+
+        barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[1].oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+        barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[1].image = dstImage;
+        barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barriers[1].subresourceRange.levelCount = 1;
+        barriers[1].subresourceRange.layerCount = 1;
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 2, barriers);
+
+        VkImageCopy imageCopy = {};
+        imageCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopy.srcSubresource.layerCount = 1;
+        imageCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopy.dstSubresource.layerCount = 1;
+        imageCopy.extent = {size.x, size.y, 1};
+        vkCmdCopyImage(commandBuffer, srcImage, VK_IMAGE_LAYOUT_GENERAL, dstImage,
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
+
+        VkImageMemoryBarrier sampledBarrier = {};
+        sampledBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        sampledBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        sampledBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        sampledBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        sampledBarrier.newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+        sampledBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        sampledBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        sampledBarrier.image = dstImage;
+        sampledBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        sampledBarrier.subresourceRange.levelCount = 1;
+        sampledBarrier.subresourceRange.layerCount = 1;
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                             0, nullptr, 0, nullptr, 1, &sampledBarrier);
+    }
+
     void RendererVK::CopyImage(CommandListID commandListID, DepthImageID dstImageID, uvec2 dstPos, DepthImageID srcImageID, uvec2 srcPos, uvec2 size)
     {
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);

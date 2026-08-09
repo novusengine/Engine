@@ -131,6 +131,7 @@ namespace Renderer
 
         void CopyImage(ImageID dstImage, uvec2 dstPos, u32 dstMipLevel, ImageID srcImage, uvec2 srcPos, u32 srcMipLevel, uvec2 size);
         void CopyDepthImage(DepthImageID dstImage, uvec2 dstPos, DepthImageID srcImage, uvec2 srcPos, uvec2 size);
+        void CopyImageToTexture(TextureID dstTexture, ImageID srcImage, uvec2 size);
 
         void CopyBuffer(BufferMutableResource dstBuffer, u64 dstBufferOffset, BufferResource srcBuffer, u64 srcBufferOffset, u64 region);
         void CopyBuffer(BufferMutableResource dstBuffer, u64 dstBufferOffset, BufferMutableResource srcBuffer, u64 srcBufferOffset, u64 region);

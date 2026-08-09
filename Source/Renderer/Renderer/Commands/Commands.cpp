@@ -62,6 +62,7 @@ namespace Renderer
         const BackendDispatchFunction CopyBuffer::DISPATCH_FUNCTION = &BackendDispatch::CopyBuffer;
         const BackendDispatchFunction CopyDepthImage::DISPATCH_FUNCTION = &BackendDispatch::CopyDepthImage;
         const BackendDispatchFunction CopyImage::DISPATCH_FUNCTION = &BackendDispatch::CopyImage;
+        const BackendDispatchFunction CopyImageToTexture::DISPATCH_FUNCTION = &BackendDispatch::CopyImageToTexture;
         const BackendDispatchFunction DepthImageBarrier::DISPATCH_FUNCTION = &BackendDispatch::DepthImageBarrier;
         const BackendDispatchFunction Dispatch::DISPATCH_FUNCTION = &BackendDispatch::Dispatch;
         const BackendDispatchFunction DispatchIndirect::DISPATCH_FUNCTION = &BackendDispatch::DispatchIndirect;

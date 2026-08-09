@@ -1,6 +1,7 @@
 #pragma once
 #include "Renderer/Descriptors/ImageDesc.h"
 #include "Renderer/Descriptors/DepthImageDesc.h"
+#include "Renderer/Descriptors/TextureDesc.h"
 
 #include <Base/Types.h>
 
@@ -29,6 +30,15 @@ namespace Renderer
             uvec2 dstPos = uvec2(0, 0);
             DepthImageID srcImage = DepthImageID::Invalid();
             uvec2 srcPos = uvec2(0, 0);
+            uvec2 size = uvec2(0, 0);
+        };
+
+        struct CopyImageToTexture
+        {
+            static const BackendDispatchFunction DISPATCH_FUNCTION;
+
+            TextureID dstTexture = TextureID::Invalid();
+            ImageID srcImage = ImageID::Invalid();
             uvec2 size = uvec2(0, 0);
         };
     }

@@ -340,6 +340,13 @@ namespace Renderer
         renderer->CopyImage(commandList, actualData->dstImage, actualData->dstPos, actualData->srcImage, actualData->srcPos, actualData->size);
     }
 
+    void BackendDispatch::CopyImageToTexture(Renderer* renderer, CommandListID commandList, const void* data)
+    {
+        ZoneScopedC(tracy::Color::Red3);
+        const Commands::CopyImageToTexture* actualData = static_cast<const Commands::CopyImageToTexture*>(data);
+        renderer->CopyImageToTexture(commandList, actualData->dstTexture, actualData->srcImage, actualData->size);
+    }
+
     void BackendDispatch::CopyBuffer(Renderer* renderer, CommandListID commandList, const void* data)
     {
         ZoneScopedC(tracy::Color::Red3);

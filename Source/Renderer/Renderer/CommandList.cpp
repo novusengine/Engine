@@ -854,6 +854,20 @@ namespace Renderer
 #endif
     }
 
+    void CommandList::CopyImageToTexture(TextureID dstTexture, ImageID srcImage, uvec2 size)
+    {
+        assert(dstTexture != TextureID::Invalid());
+        assert(srcImage != ImageID::Invalid());
+        Commands::CopyImageToTexture* command = AddCommand<Commands::CopyImageToTexture>();
+        command->dstTexture = dstTexture;
+        command->srcImage = srcImage;
+        command->size = size;
+
+#if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        Commands::CopyImageToTexture::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#endif
+    }
+
     void CommandList::CopyBuffer(BufferMutableResource dstResource, u64 dstBufferOffset, BufferResource srcResource, u64 srcBufferOffset, u64 region)
     {
         NC_ASSERT(dstResource != BufferMutableResource::Invalid(), "CommandList : CopyBuffer got invalid dstResource");
