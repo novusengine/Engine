@@ -71,7 +71,7 @@ namespace ShaderCooker
         (char*)"ms",  // Mesh Shader
         (char*)"as"   // Amplification Shader (used with Mesh Shaders)
     };
-    constexpr i32 ProfileToProfileIndex(const std::string& profile)
+    inline i32 ProfileToProfileIndex(const std::string& profile)
     {
         i32 currentProfileIndex = 0;
         for (char* validProfile : validProfilesArray)

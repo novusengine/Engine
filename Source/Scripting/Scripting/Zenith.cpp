@@ -251,11 +251,15 @@ namespace Scripting
     }
     i64 Zenith::ToInteger(i32 index)
     {
-        return lua_tointeger64(state, index, nullptr);
+        i32 isInteger = 0;
+        i64 result = lua_tointeger64(state, index, &isInteger);
+        if (!isInteger && lua_type(state, index) == LUA_TNUMBER)
+            result = static_cast<i64>(lua_tonumber(state, index));
+        return result;
     }
     u64 Zenith::ToUnsigned(i32 index)
     {
-        return std::bit_cast<u64>(lua_tointeger64(state, index, nullptr));
+        return std::bit_cast<u64>(ToInteger(index));
     }
     f64 Zenith::ToNumber(i32 index)
     {

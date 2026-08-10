@@ -48,9 +48,9 @@ struct EnumTraits;
 inline const T operator| (T a, T b) { return (T)((i32)a | (i32)b); } \
 inline const T operator& (T a, T b) { return (T)((i32)a & (i32)b); } \
 inline const T operator^ (T a, T b) { return (T)((i32)a ^ (i32)b); } \
-inline const T& operator|= (T& a, T b) { return (T&)((i32&)a |= (i32)b); } \
-inline const T& operator&= (T& a, T b) { return (T&)((i32&)a &= (i32)b); } \
-inline const T& operator^= (T& a, T b) { return (T&)((i32&)a ^= (i32)b); }
+inline const T& operator|= (T& a, T b) { a = (T)((i32)a | (i32)b); return a; } \
+inline const T& operator&= (T& a, T b) { a = (T)((i32)a & (i32)b); return a; } \
+inline const T& operator^= (T& a, T b) { a = (T)((i32)a ^ (i32)b); return a; }
 
 // Define extra implicit conversions for ImGui vector classes
 #define IM_VEC2_CLASS_EXTRA \
