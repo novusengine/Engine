@@ -33,7 +33,13 @@ VERSION HISTORY
 
 #define SPIRV_REFLECT_USE_SYSTEM_SPIRV_H
 #if defined(SPIRV_REFLECT_USE_SYSTEM_SPIRV_H)
+#if __has_include(<spirv/unified1/spirv.h>)
+#include <spirv/unified1/spirv.h>
+#elif __has_include(<spirv-headers/spirv.h>)
 #include <spirv-headers/spirv.h>
+#else
+#error "Unable to locate SPIR-V headers"
+#endif
 #else
 #include "./include/spirv/unified1/spirv.h"
 #endif

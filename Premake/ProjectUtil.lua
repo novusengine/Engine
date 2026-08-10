@@ -44,8 +44,8 @@ end
 
 systemToExecutableExtensionMap =
 {
-    windows = "exe",
-    linux = "sh"
+    windows = ".exe",
+    linux = ""
 }
 
 systemToDynamicLibExtensionMap =
@@ -236,6 +236,11 @@ Solution.Util.CreateProject = function(name, projectType, binDir, dependencies, 
 
         characterset ("ASCII")
         editandcontinue "Off"
+
+        filter "system:linux"
+            linkgroups "On"
+            linkoptions { "-Wl,-rpath,'$$ORIGIN'" }
+        filter {}
 
         filter "configurations:Debug"
             runtime "Debug"
