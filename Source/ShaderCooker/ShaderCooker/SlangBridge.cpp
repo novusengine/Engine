@@ -39,7 +39,7 @@ namespace ShaderCooker
 
     SlangBridge::~SlangBridge()
     {
-        
+        delete static_cast<SlangBridgeData*>(_data);
     }
 
     void SlangBridge::AddDefine(const std::string& name, const std::string& value)
