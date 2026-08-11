@@ -237,6 +237,12 @@ Solution.Util.CreateProject = function(name, projectType, binDir, dependencies, 
         characterset ("ASCII")
         editandcontinue "Off"
 
+        -- First-party code builds with warnings as errors; dependency projects are exempt
+        if not (Solution.ActiveGroup ~= nil and string.find(Solution.ActiveGroup, Solution.DependencyGroup, 1, true) ~= nil) then
+            flags { "FatalCompileWarnings" }
+        end
+        externalwarnings "Off"
+
         filter "system:linux"
             linkgroups "On"
             linkoptions { "-Wl,-rpath,'$$ORIGIN'" }
@@ -269,7 +275,9 @@ Solution.Util.CreateProject = function(name, projectType, binDir, dependencies, 
     for _, v in ipairs(resolvedDependencies) do
         local depInternalName = "Dependency-" .. v.name
         if (_G[depInternalName].Callback ~= nil) then
+            Solution.Util.InExternalDepCallback = _G[depInternalName].IsExternal == true
             _G[depInternalName].Callback()
+            Solution.Util.InExternalDepCallback = false
             filter {}
         end
     end
@@ -329,7 +337,8 @@ Solution.Util.CreateDep = function(name, dependencies, callback)
     {
         Callback = callback,
         Dependencies = dependencies,
-        Cache = {}
+        Cache = {},
+        IsExternal = Solution.ActiveGroup ~= nil and string.find(Solution.ActiveGroup, Solution.DependencyGroup, 1, true) ~= nil
     }
 
     _G[internalName] = dependencyTable
@@ -382,7 +391,13 @@ Solution.Util.SetFiles = function(filesToAdd)
 end
 
 Solution.Util.SetIncludes = function(includesToAdd)
-    includedirs (includesToAdd)
+    -- Dependency callbacks register their includes as external so their headers do
+    -- not produce warnings in consuming code (-isystem / /external:I)
+    if Solution.Util.InExternalDepCallback then
+        externalincludedirs (includesToAdd)
+    else
+        includedirs (includesToAdd)
+    end
 end
 
 Solution.Util.SetDefines = function(definesToAdd)

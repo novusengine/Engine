@@ -55,6 +55,11 @@ namespace Network
             constexpr u16 numFieldsTouched = (sizeof(DecayedT) + fieldSize - 1) / fieldSize;
             NC_ASSERT(startFieldIndex + numFieldsTouched <= NUM_FIELDS, "Attempting to Set NetField out of bounds");
 
+            // Real bounds guard: NC_ASSERT compiles out in Release, and this write must
+            // never go out of bounds even for malformed input
+            if (startFieldIndex + numFieldsTouched > NUM_FIELDS)
+                return;
+
             std::byte* base = reinterpret_cast<std::byte*>(fields);
             std::byte* dest = base + (startFieldIndex * fieldSize) + fieldByteOffset;
 

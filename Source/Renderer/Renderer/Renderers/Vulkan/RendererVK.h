@@ -199,17 +199,17 @@ namespace Renderer
         [[nodiscard]] f32 GetLastTimeQueryDuration(TimeQueryID id) override;
 
         // ID to Descriptor
-        [[nodiscard]] TextureBaseDesc GetDesc(TextureID textureID);
+        [[nodiscard]] TextureBaseDesc GetDesc(TextureID textureID) override;
 
-        [[nodiscard]] const ImageDesc& GetDesc(ImageID ID);
-        [[nodiscard]] const DepthImageDesc& GetDesc(DepthImageID ID);
+        [[nodiscard]] const ImageDesc& GetDesc(ImageID ID) override;
+        [[nodiscard]] const DepthImageDesc& GetDesc(DepthImageID ID) override;
 
-        [[nodiscard]] const ComputePipelineDesc& GetDesc(ComputePipelineID ID);
-        [[nodiscard]] const GraphicsPipelineDesc& GetDesc(GraphicsPipelineID ID);
+        [[nodiscard]] const ComputePipelineDesc& GetDesc(ComputePipelineID ID) override;
+        [[nodiscard]] const GraphicsPipelineDesc& GetDesc(GraphicsPipelineID ID) override;
 
-        [[nodiscard]] const ComputeShaderDesc& GetDesc(ComputeShaderID ID);
-        [[nodiscard]] const VertexShaderDesc& GetDesc(VertexShaderID ID);
-        [[nodiscard]] const PixelShaderDesc& GetDesc(PixelShaderID ID);
+        [[nodiscard]] const ComputeShaderDesc& GetDesc(ComputeShaderID ID) override;
+        [[nodiscard]] const VertexShaderDesc& GetDesc(VertexShaderID ID) override;
+        [[nodiscard]] const PixelShaderDesc& GetDesc(PixelShaderID ID) override;
 
         // Utils
         // Flush will wait until any in-flight frames are done

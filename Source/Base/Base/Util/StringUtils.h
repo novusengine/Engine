@@ -44,7 +44,10 @@ namespace StringUtils
         length = sprintf_s(buffer, bufferSize, format, args...);
     #else
         (void)bufferSize; // Get rid of warning
-        length = sprintf(buffer, format, args...);
+        if constexpr (sizeof...(args) == 0)
+            length = sprintf(buffer, "%s", format); // non-literal format with no args trips -Wformat-security
+        else
+            length = sprintf(buffer, format, args...);
     #endif
 
         assert(length > -1);

@@ -58,7 +58,7 @@ namespace Renderer
     class Renderer
     {
     public:
-        ~Renderer();
+        virtual ~Renderer();
 
         virtual void InitDebug() = 0;
         virtual void InitWindow(Novus::Window* window) = 0;

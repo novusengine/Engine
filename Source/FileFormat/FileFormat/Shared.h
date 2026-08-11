@@ -208,7 +208,7 @@ inline vec3 OctNormalDecode(vec2 encN)
     encN = encN * 2.0f - 1.0f;
 
     // https://twitter.com/Stubbesaurus/status/937994790553227264
-    vec3 n = vec3(encN.x, encN.y, 1.0f - abs(encN.x) - abs(encN.y));
+    vec3 n = vec3(encN.x, encN.y, 1.0f - std::abs(encN.x) - std::abs(encN.y));
     float t = glm::clamp(-n.z, 0.0f, 1.0f);
 
     n.x += n.x >= 0.0f ? -t : t;

@@ -282,6 +282,10 @@ namespace ShaderCooker
                 }
                 return FileFormat::DescriptorTypeReflection::Array;
             }
+            default:
+            {
+                break;
+            }
         }
 
         NC_LOG_CRITICAL("Unsupported type kind {0} in GetDescriptorTypeReflection", static_cast<u32>(kind));
@@ -308,6 +312,8 @@ namespace ShaderCooker
                 return FileFormat::DescriptorAccessTypeReflection::Write;
             case SLANG_RESOURCE_ACCESS_FEEDBACK:
                 return FileFormat::DescriptorAccessTypeReflection::Feedback;
+            default:
+                break;
         }
 
         return FileFormat::DescriptorAccessTypeReflection::None;

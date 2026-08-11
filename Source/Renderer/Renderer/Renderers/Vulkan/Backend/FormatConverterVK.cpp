@@ -577,6 +577,9 @@ namespace Renderer
                     return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                 else
                     return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+
+            default:
+                break;
             }
 
             NC_LOG_CRITICAL("This should never hit, did we forget to update this function after adding more descriptor types?");

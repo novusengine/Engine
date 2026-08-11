@@ -727,6 +727,9 @@ namespace Renderer
             case ImageFormat::UNKNOWN:
                 NC_LOG_CRITICAL("This should never hit, we should catch unknowns earlier!");
                 break;
+
+            default:
+                break;
         }
         NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating ImageFormat?");
         return ImageComponentType::FLOAT;
@@ -822,6 +825,9 @@ namespace Renderer
             case ImageFormat::UNKNOWN:
                 NC_LOG_CRITICAL("This should never hit, we should catch unknowns earlier!");
                 break;
+
+            default:
+                break;
         }
 
         NC_LOG_CRITICAL("This should never hit, did we forget to add more cases after updating ImageFormat?");
@@ -868,6 +874,8 @@ namespace Renderer
         case ImageComponentType::UINT:
             componentTypeName = "uint";
             break;
+        default:
+            break;
         }
 
         u8 componentCount = ToImageComponentCount(format);
@@ -896,6 +904,8 @@ namespace Renderer
             break;
         case ImageComponentType::UINT:
             componentTypeName = "uint";
+            break;
+        default:
             break;
         }
 

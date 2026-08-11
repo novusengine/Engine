@@ -1,4 +1,3 @@
-#pragma once
 #include "ShaderPack.h"
 
 #include <Base/Util/DebugHandler.h>
