@@ -258,6 +258,8 @@ namespace ShaderCooker
             }
             else if (_stageInfo.stage == Stage::COMPILATION)
             {
+                ShaderCooker::SlangBridge slangBridge(_sourceDirPath);
+
                 for (Shader& shader : _shaders)
                 {
                     if (!shader.hasResolvedIncludes)
@@ -268,8 +270,6 @@ namespace ShaderCooker
                         _shaderCache->Touch(shader.path);
                         continue;
                     }
-
-                    ShaderCooker::SlangBridge slangBridge(_sourceDirPath);
 
                     // Figure out the actual permutations
                     u32 numPermutationGroups = static_cast<u32>(shader.permutationGroups.size());
