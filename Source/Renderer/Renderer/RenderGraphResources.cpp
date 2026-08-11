@@ -17,6 +17,7 @@ namespace Renderer
             , depthClears(allocator, 16)
             , imageAccesses(allocator, 16)
             , depthImageAccesses(allocator, 16)
+            , bufferAccesses(allocator, 16)
             , bufferPermissions(allocator, numBufferPermissionSets)
             , descriptorSetIDs(allocator, 8)
         {
@@ -28,6 +29,7 @@ namespace Renderer
 
         DynamicArray<TrackedImageAccess> imageAccesses;
         DynamicArray<TrackedDepthImageAccess> depthImageAccesses;
+        DynamicArray<TrackedBufferAccess> bufferAccesses;
 
         TrackedBufferBitSets bufferPermissions;
 
@@ -71,6 +73,7 @@ namespace Renderer
         DynamicArray<DescriptorSet*> trackedDescriptorSets;
 
         std::string currentPassName;
+        const BitSet* livePasses = nullptr;
 
         static robin_hood::unordered_map<u32, u32> imageIDToResource;
         static robin_hood::unordered_map<u32, u32> depthImageIDToResource;
@@ -158,6 +161,21 @@ namespace Renderer
     {
         DepthImageID imageID = GetImage(resource);
         return _renderer->GetImageDimensions(imageID);
+    }
+
+    const DynamicArray<ImageID>& RenderGraphResources::GetTrackedImages() const
+    {
+        return static_cast<RenderGraphResourcesData*>(_data)->trackedImages;
+    }
+
+    const DynamicArray<DepthImageID>& RenderGraphResources::GetTrackedDepthImages() const
+    {
+        return static_cast<RenderGraphResourcesData*>(_data)->trackedDepthImages;
+    }
+
+    const DynamicArray<BufferID>& RenderGraphResources::GetTrackedBuffers() const
+    {
+        return static_cast<RenderGraphResourcesData*>(_data)->trackedBuffers;
     }
 
     ImageID RenderGraphResources::GetImage(ImageResource resource)
@@ -361,7 +379,7 @@ namespace Renderer
         data->trackedPasses[passIndex].depthClears.Insert(resource);
     }
 
-    inline void _Access(Memory::Allocator* allocator, DynamicArray<TrackedImageAccess>& imageAccesses, DynamicArray<DynamicArray<TrackedImagePassAccess>>& passAccesses, DynamicArray<u32>& lastBarriers, u32 passIndex, ImageID imageID, AccessType accessType, PipelineType pipelineType)
+    inline void _Access(Memory::Allocator* allocator, DynamicArray<TrackedImageAccess>& imageAccesses, DynamicArray<DynamicArray<TrackedImagePassAccess>>& passAccesses, DynamicArray<u32>& lastBarriers, u32 passIndex, ImageID imageID, u32 resourceIndex, AccessType accessType, PipelineType pipelineType)
     {
         ZoneScoped;
 
@@ -372,6 +390,7 @@ namespace Renderer
 
             TrackedImageAccess imageAccess;
             imageAccess.imageID = imageID;
+            imageAccess.resourceIndex = resourceIndex;
             imageAccess.accessType = accessType;
             imageAccess.pipelineType = pipelineType;
 
@@ -399,7 +418,7 @@ namespace Renderer
         }
     }
 
-    void _Access(Memory::Allocator* allocator, DynamicArray<TrackedDepthImageAccess>& imageAccesses, DynamicArray<DynamicArray<TrackedImagePassAccess>>& passAccesses, DynamicArray<u32>& lastBarriers, u32 passIndex, DepthImageID imageID, AccessType accessType, PipelineType pipelineType)
+    void _Access(Memory::Allocator* allocator, DynamicArray<TrackedDepthImageAccess>& imageAccesses, DynamicArray<DynamicArray<TrackedImagePassAccess>>& passAccesses, DynamicArray<u32>& lastBarriers, u32 passIndex, DepthImageID imageID, u32 resourceIndex, AccessType accessType, PipelineType pipelineType)
     {
         ZoneScoped;
 
@@ -410,6 +429,7 @@ namespace Renderer
 
             TrackedDepthImageAccess imageAccess;
             imageAccess.imageID = imageID;
+            imageAccess.resourceIndex = resourceIndex;
             imageAccess.accessType = accessType;
             imageAccess.pipelineType = pipelineType;
 
@@ -471,7 +491,7 @@ namespace Renderer
             NC_LOG_CRITICAL("Tried to Access pass that hasn't been tracked yet");
         }
 
-        _Access(_allocator, data->trackedPasses[passIndex].imageAccesses, data->trackedImageAccesses, data->trackedImageLastBarrier, passIndex, imageID, accessType, pipelineType);
+        _Access(_allocator, data->trackedPasses[passIndex].imageAccesses, data->trackedImageAccesses, data->trackedImageLastBarrier, passIndex, imageID, data->imageIDToResource[static_cast<ImageID::type>(imageID)], accessType, pipelineType);
     }
 
     void RenderGraphResources::Access(u32 passIndex, DepthImageID imageID, AccessType accessType, PipelineType pipelineType)
@@ -485,7 +505,7 @@ namespace Renderer
             NC_LOG_CRITICAL("Tried to Access pass that hasn't been tracked yet");
         }
 
-        _Access(_allocator, data->trackedPasses[passIndex].depthImageAccesses, data->trackedDepthImageAccesses, data->trackedDepthImageLastBarrier, passIndex, imageID, accessType, pipelineType);
+        _Access(_allocator, data->trackedPasses[passIndex].depthImageAccesses, data->trackedDepthImageAccesses, data->trackedDepthImageLastBarrier, passIndex, imageID, data->depthImageIDToResource[static_cast<DepthImageID::type>(imageID)], accessType, pipelineType);
     }
 
     void RenderGraphResources::Access(u32 passIndex, BufferID bufferID, AccessType accessType, BufferPassUsage bufferPassUsage)
@@ -501,6 +521,7 @@ namespace Renderer
 
         TrackedPass& trackedPass = data->trackedPasses[passIndex];
         _Access(_renderer, _allocator, trackedPass.bufferPermissions, passIndex, bufferID, accessType, bufferPassUsage);
+        trackedPass.bufferAccesses.Insert({ bufferID, data->bufferIDToResource[static_cast<BufferID::type>(bufferID)], accessType, bufferPassUsage });
     }
 
     void RenderGraphResources::Use(u32 passIndex, DescriptorSetResource resource)
@@ -604,6 +625,13 @@ namespace Renderer
         return data->trackedPasses[passIndex].depthImageAccesses;
     }
 
+    const DynamicArray<TrackedBufferAccess>& RenderGraphResources::GetBufferAccesses(u32 passIndex)
+    {
+        RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
+        NC_ASSERT(passIndex < data->trackedPasses.Count(), "Tried to access bufferAccesses of pass that hasn't been tracked yet");
+        return data->trackedPasses[passIndex].bufferAccesses;
+    }
+
     const TrackedBufferBitSets& RenderGraphResources::GetBufferPermissions(u32 passIndex)
     {
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
@@ -652,6 +680,18 @@ namespace Renderer
         }
 
         return data->trackedDepthImageAccesses[index];
+    }
+
+    void RenderGraphResources::SetLivePasses(const BitSet* livePasses)
+    {
+        RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
+        data->livePasses = livePasses;
+    }
+
+    bool RenderGraphResources::IsPassLive(u32 passIndex) const
+    {
+        const RenderGraphResourcesData* data = static_cast<const RenderGraphResourcesData*>(_data);
+        return data->livePasses == nullptr || data->livePasses->Has(passIndex);
     }
 
     u32 RenderGraphResources::GetLastBarrier(ImageID imageID)

@@ -41,6 +41,7 @@ namespace Renderer
     struct TrackedImageAccess
     {
         ImageID imageID;
+        u32 resourceIndex;
         AccessType accessType;
         PipelineType pipelineType;
     };
@@ -48,6 +49,7 @@ namespace Renderer
     struct TrackedDepthImageAccess
     {
         DepthImageID imageID;
+        u32 resourceIndex;
         AccessType accessType;
         PipelineType pipelineType;
     };
@@ -62,6 +64,7 @@ namespace Renderer
     struct TrackedBufferAccess
     {
         BufferID bufferID;
+        u32 resourceIndex;
         AccessType accessType;
         BufferPassUsage bufferPassUsage;
     };
@@ -128,6 +131,11 @@ namespace Renderer
 
         const DynamicArray<TrackedImageAccess>& GetImageAccesses(u32 passIndex);
         const DynamicArray<TrackedDepthImageAccess>& GetDepthImageAccesses(u32 passIndex);
+        const DynamicArray<TrackedBufferAccess>& GetBufferAccesses(u32 passIndex);
+
+        const DynamicArray<ImageID>& GetTrackedImages() const;
+        const DynamicArray<DepthImageID>& GetTrackedDepthImages() const;
+        const DynamicArray<BufferID>& GetTrackedBuffers() const;
 
         const TrackedBufferBitSets& GetBufferPermissions(u32 passIndex);
 
@@ -143,6 +151,8 @@ namespace Renderer
         void SetLastBarrier(DepthImageID imageID, u32 passID);
 
         void SetPassName(std::string passName);
+        void SetLivePasses(const BitSet* livePasses);
+        bool IsPassLive(u32 passIndex) const;
 
     private:
         Renderer* _renderer = nullptr;

@@ -47,7 +47,8 @@ namespace FileFormat::Material
         MaterialInstanceFlags_TwoSided = 1u << 0,
         MaterialInstanceFlags_CastsShadows = 1u << 1,
         MaterialInstanceFlags_ReceivesDecals = 1u << 2,
-        MaterialInstanceFlags_ReceivesFog = 1u << 3
+        MaterialInstanceFlags_ReceivesFog = 1u << 3,
+        MaterialInstanceFlags_HasTextureTransforms = 1u << 4
     };
 
     enum class ParameterType : u8

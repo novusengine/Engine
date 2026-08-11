@@ -7,6 +7,17 @@
 
 namespace Renderer
 {
+    enum class RenderPassFlags : u8
+    {
+        None = 0,
+        SideEffect = 1u << 0u
+    };
+
+    inline bool HasRenderPassFlag(RenderPassFlags flags, RenderPassFlags flag)
+    {
+        return (static_cast<u8>(flags) & static_cast<u8>(flag)) != 0;
+    }
+
     class Renderer;
     class RenderLayer;
     class RenderGraph;
@@ -22,6 +33,7 @@ namespace Renderer
 
         char _name[32];
         u8 _nameLength = 0;
+        RenderPassFlags _flags = RenderPassFlags::None;
     };
 
     template <typename PassData>
@@ -31,10 +43,11 @@ namespace Renderer
         typedef std::function<bool(PassData&, RenderGraphBuilder&)> SetupFunction;
         typedef std::function<void(PassData&, RenderGraphResources&, CommandList&)> ExecuteFunction;
     
-        RenderPass(std::string& name, SetupFunction& onSetup, ExecuteFunction& onExecute)
+        RenderPass(std::string& name, SetupFunction& onSetup, ExecuteFunction& onExecute, RenderPassFlags flags)
             : _onSetup(std::move(onSetup))
             , _onExecute(std::move(onExecute))
         {
+            _flags = flags;
             if (name.length() >= 32)
             {
                 NC_LOG_CRITICAL("We encountered a render pass name ({0}) that is longer than 31 characters, we have this limit because we store the string internally and not on the heap.", name.c_str());

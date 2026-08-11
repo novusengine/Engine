@@ -20,6 +20,9 @@ namespace FileFormat::Material::ABI
         OcclusionStrength,
         Opacity,
         AlphaCutoff,
+        TextureTranslation,
+        TextureRotation,
+        TextureScale,
         Count
     };
 
@@ -34,7 +37,18 @@ namespace FileFormat::Material::ABI
         inline constexpr u32 OCCLUSION_STRENGTH_OFFSET = 44;
         inline constexpr u32 OPACITY_OFFSET = 48;
         inline constexpr u32 ALPHA_CUTOFF_OFFSET = 52;
-        inline constexpr u32 BLOCK_SIZE = 64;
+        inline constexpr u32 TEXTURE_TRANSFORM_OFFSET = 64;
+        inline constexpr u32 TEXTURE_TRANSFORM_STRIDE = 48;
+        inline constexpr u32 TEXTURE_TRANSLATION_OFFSET = 0;
+        inline constexpr u32 TEXTURE_ROTATION_OFFSET = 16;
+        inline constexpr u32 TEXTURE_SCALE_OFFSET = 32;
+        inline constexpr u32 MAX_TEXTURES = 8;
+        inline constexpr u32 BLOCK_SIZE = TEXTURE_TRANSFORM_OFFSET + TEXTURE_TRANSFORM_STRIDE * MAX_TEXTURES;
+
+        constexpr u32 GetTextureTransformOffset(u32 textureSlot)
+        {
+            return TEXTURE_TRANSFORM_OFFSET + TEXTURE_TRANSFORM_STRIDE * textureSlot;
+        }
     }
 
     enum class LightingModel : u16
@@ -81,7 +95,7 @@ namespace FileFormat::Material::ABI
 
     namespace LegacyModel
     {
-        inline constexpr u32 MAX_TEXTURES = 8;
+        inline constexpr u32 MAX_TEXTURES = ParameterLayout::MAX_TEXTURES;
         inline constexpr u32 MAX_UNITS = 8;
     }
 }

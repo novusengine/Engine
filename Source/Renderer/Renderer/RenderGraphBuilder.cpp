@@ -116,6 +116,9 @@ namespace Renderer
                 {
                     const TrackedImagePassAccess& passAccess = passAccesses[i];
 
+                    if (!_resources.IsPassLive(passAccess.passIndex))
+                        continue;
+
                     if (passAccess.passIndex >= currentPassIndex)
                     {
                         // Keep iterating until we get to previous passes
@@ -166,6 +169,9 @@ namespace Renderer
                 for (i32 i = static_cast<i32>(passAccesses.Count()) - 1; i >= 0; i--)
                 {
                     const TrackedImagePassAccess& passAccess = passAccesses[i];
+
+                    if (!_resources.IsPassLive(passAccess.passIndex))
+                        continue;
 
                     if (passAccess.passIndex >= currentPassIndex)
                     {
@@ -380,6 +386,8 @@ namespace Renderer
             _resources.Clear(_currentPassIndex, resource);
         }
 
+        if (loadMode == LoadMode::LOAD)
+            _resources.Access(_currentPassIndex, id, AccessType::READ, pipelineType);
         _resources.Access(_currentPassIndex, id, AccessType::WRITE, pipelineType);
 
         return resource;
@@ -397,6 +405,8 @@ namespace Renderer
             _resources.Clear(_currentPassIndex, resource);
         }
 
+        if (loadMode == LoadMode::LOAD)
+            _resources.Access(_currentPassIndex, id, AccessType::READ, pipelineType);
         _resources.Access(_currentPassIndex, id, AccessType::WRITE, pipelineType);
 
         return resource;

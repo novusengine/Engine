@@ -20,14 +20,17 @@ namespace Renderer
         ~RenderGraph();
 
         template <typename PassData>
-        void AddPass(std::string name, std::function<bool(PassData&, RenderGraphBuilder&)> onSetup, std::function<void(PassData&, RenderGraphResources&, CommandList&)> onExecute)
+        void AddPass(std::string name, std::function<bool(PassData&, RenderGraphBuilder&)> onSetup, std::function<void(PassData&, RenderGraphResources&, CommandList&)> onExecute, RenderPassFlags flags = RenderPassFlags::None)
         {
-            IRenderPass* pass = Memory::Allocator::New<RenderPass<PassData>>(_desc.allocator, name, onSetup, onExecute);
+            IRenderPass* pass = Memory::Allocator::New<RenderPass<PassData>>(_desc.allocator, name, onSetup, onExecute, flags);
             AddPass(pass);
         }
 
         void AddSignalSemaphore(SemaphoreID semaphoreID);
         void AddWaitSemaphore(SemaphoreID semaphoreID);
+        void Export(ImageID imageID);
+        void Export(DepthImageID imageID);
+        void Export(BufferID bufferID);
 
         void Setup();
         void Execute();
