@@ -263,6 +263,51 @@ namespace Renderer
             return DepthImageID(static_cast<DepthImageID::type>(nextHandle));
         }
 
+        void ImageHandlerVK::DestroyImage(ImageID id)
+        {
+            ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
+            const u32 index = static_cast<u32>(static_cast<ImageID::type>(id));
+            if (index >= data.images.size())
+                return;
+
+            Image& image = data.images[index];
+            if (image.image == VK_NULL_HANDLE || image.isSwapchain)
+                return;
+
+            if (image.imguiTextureHandle != VK_NULL_HANDLE)
+                vkFreeDescriptorSets(_device->_device, _device->_imguiContext->imguiPool, 1, &image.imguiTextureHandle);
+            vkDestroyImageView(_device->_device, image.colorView, nullptr);
+            for (VkImageView view : image.mipViews)
+                vkDestroyImageView(_device->_device, view, nullptr);
+            for (VkImageView view : image.mipArrayViews)
+                vkDestroyImageView(_device->_device, view, nullptr);
+            vmaDestroyImage(_device->_allocator, image.image, image.allocation);
+            image.imguiTextureHandle = VK_NULL_HANDLE;
+            image.colorView = VK_NULL_HANDLE;
+            image.mipViews.clear();
+            image.mipArrayViews.clear();
+            image.image = VK_NULL_HANDLE;
+            image.allocation = VK_NULL_HANDLE;
+        }
+
+        void ImageHandlerVK::DestroyDepthImage(DepthImageID id)
+        {
+            ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
+            const u32 index = static_cast<u32>(static_cast<DepthImageID::type>(id));
+            if (index >= data.depthImages.size())
+                return;
+
+            DepthImage& image = data.depthImages[index];
+            if (image.image == VK_NULL_HANDLE)
+                return;
+
+            vkDestroyImageView(_device->_device, image.depthView, nullptr);
+            vmaDestroyImage(_device->_allocator, image.image, image.allocation);
+            image.depthView = VK_NULL_HANDLE;
+            image.image = VK_NULL_HANDLE;
+            image.allocation = VK_NULL_HANDLE;
+        }
+
         const ImageDesc& ImageHandlerVK::GetImageDesc(const ImageID id)
         {
             ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);

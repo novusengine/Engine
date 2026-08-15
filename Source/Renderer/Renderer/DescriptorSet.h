@@ -18,6 +18,28 @@
 
 namespace Renderer
 {
+    struct DescriptorPoolStats
+    {
+        u32 liveSets = 0;
+        u32 peakSets = 0;
+        u32 setCapacity = 0;
+        u32 liveUniformBuffers = 0;
+        u32 peakUniformBuffers = 0;
+        u32 uniformBufferCapacity = 0;
+        u32 liveSampledImages = 0;
+        u32 peakSampledImages = 0;
+        u32 sampledImageCapacity = 0;
+        u32 liveStorageBuffers = 0;
+        u32 peakStorageBuffers = 0;
+        u32 storageBufferCapacity = 0;
+        u32 liveStorageImages = 0;
+        u32 peakStorageImages = 0;
+        u32 storageImageCapacity = 0;
+        u32 liveSamplers = 0;
+        u32 peakSamplers = 0;
+        u32 samplerCapacity = 0;
+    };
+
     class Renderer;
     class RenderGraphResources;
 
@@ -56,12 +78,16 @@ namespace Renderer
     class DescriptorSet
     {
     public:
-        
-    public:
         DescriptorSet(DescriptorSetSlot slot) : _slot(slot) 
         {
             _combinedReflection.slot = static_cast<u32>(slot);
         };
+        ~DescriptorSet();
+
+        DescriptorSet(const DescriptorSet&) = delete;
+        DescriptorSet& operator=(const DescriptorSet&) = delete;
+        DescriptorSet(DescriptorSet&& other) noexcept;
+        DescriptorSet& operator=(DescriptorSet&& other) noexcept;
 
         void RegisterPipeline(Renderer* renderer, ComputePipelineID pipelineID);
         void RegisterPipeline(Renderer* renderer, GraphicsPipelineID pipelineID);
@@ -79,6 +105,7 @@ namespace Renderer
         DescriptorSetSlot GetSlot() const { return _slot; }
 
     private:
+        void Release();
         bool HasBinding(StringUtils::StringHash nameHash) const;
         u32 GetBindingIndex(StringUtils::StringHash nameHash) const;
         FileFormat::DescriptorReflection& GetDescriptorReflection(u32 bindingIndex);

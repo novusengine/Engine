@@ -15,6 +15,7 @@ class BitSet;
 
 namespace Renderer
 {
+    struct DescriptorPoolStats;
     class TrackedBufferBitSets;
 
     namespace Backend
@@ -32,6 +33,8 @@ namespace Renderer
             void Init(RenderDeviceVK* device, TextureHandlerVK* textureHandler, BufferHandlerVK* bufferHandler);
 
             DescriptorSetID CreateDescriptorSet(const DescriptorSetDesc& desc);
+            void DestroyDescriptorSet(DescriptorSetID setID);
+            DescriptorPoolStats GetPoolStats() const;
 
             void BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, DescriptorType type, u32 frameIndex);
 

@@ -56,11 +56,15 @@ namespace Renderer
 
         [[nodiscard]] ImageID CreateImage(ImageDesc& desc) override;
         [[nodiscard]] DepthImageID CreateDepthImage(DepthImageDesc& desc) override;
+        void DestroyImage(ImageID image) override;
+        void DestroyDepthImage(DepthImageID image) override;
 
         [[nodiscard]] SamplerID CreateSampler(SamplerDesc& desc) override;
         [[nodiscard]] SemaphoreID CreateNSemaphore() override;
 
         [[nodiscard]] DescriptorSetID CreateDescriptorSet(const DescriptorSetDesc& desc) override;
+        void DestroyDescriptorSet(DescriptorSetID descriptorSetID) override;
+        DescriptorPoolStats GetDescriptorPoolStats() const override;
 
         [[nodiscard]] GraphicsPipelineID CreatePipeline(GraphicsPipelineDesc& desc) override;
         [[nodiscard]] ComputePipelineID CreatePipeline(ComputePipelineDesc& desc) override;
@@ -293,6 +297,9 @@ namespace Renderer
         struct ObjectDestroyList
         {
             std::vector<BufferID> buffers;
+            std::vector<ImageID> images;
+            std::vector<DepthImageID> depthImages;
+            std::vector<DescriptorSetID> descriptorSets;
         };
 
         std::array<ObjectDestroyList, 4> _destroyLists;

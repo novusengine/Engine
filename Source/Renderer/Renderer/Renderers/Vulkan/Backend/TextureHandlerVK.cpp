@@ -30,6 +30,7 @@
 #include <tracy/Tracy.hpp>
 #include <robinhood/robinhood.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <queue>
 #include <vector>
@@ -513,6 +514,22 @@ namespace Renderer
                     newBinding.descriptorSetID = descriptorSetID;
                     newBinding.bindingIndex = bindingIndex;
                     textureArray.registeredBindings.push_back(newBinding);
+                });
+        }
+
+        void TextureHandlerVK::UnregisterDescriptorSet(DescriptorSetID descriptorSetID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            data.textureArrays.WriteLock(
+                [&](std::vector<TextureArray>& textureArrays)
+                {
+                    for (TextureArray& textureArray : textureArrays)
+                    {
+                        std::erase_if(textureArray.registeredBindings, [descriptorSetID](const TextureArrayBinding& binding)
+                        {
+                            return binding.descriptorSetID == descriptorSetID;
+                        });
+                    }
                 });
         }
 

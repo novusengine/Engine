@@ -7,6 +7,50 @@
 
 namespace Renderer
 {
+    DescriptorSet::~DescriptorSet()
+    {
+        Release();
+    }
+
+    DescriptorSet::DescriptorSet(DescriptorSet&& other) noexcept
+        : _renderer(other._renderer), _initialized(other._initialized), _slot(other._slot),
+          _metaInfo(std::move(other._metaInfo)), _combinedReflection(std::move(other._combinedReflection)),
+          _nameHashToBindingIndex(std::move(other._nameHashToBindingIndex)), _descriptorSetID(other._descriptorSetID),
+          _locked(other._locked)
+    {
+        other._renderer = nullptr;
+        other._initialized = false;
+    }
+
+    DescriptorSet& DescriptorSet::operator=(DescriptorSet&& other) noexcept
+    {
+        if (this == &other)
+            return *this;
+
+        Release();
+        _renderer = other._renderer;
+        _initialized = other._initialized;
+        _slot = other._slot;
+        _metaInfo = std::move(other._metaInfo);
+        _combinedReflection = std::move(other._combinedReflection);
+        _nameHashToBindingIndex = std::move(other._nameHashToBindingIndex);
+        _descriptorSetID = other._descriptorSetID;
+        _locked = other._locked;
+        other._renderer = nullptr;
+        other._initialized = false;
+        return *this;
+    }
+
+    void DescriptorSet::Release()
+    {
+        if (!_initialized)
+            return;
+
+        _renderer->DestroyDescriptorSet(_descriptorSetID);
+        _renderer = nullptr;
+        _initialized = false;
+    }
+
     void VerifyDescriptorMatch(const FileFormat::DescriptorReflection& a, const FileFormat::DescriptorReflection& b)
     {
         if (a.name != b.name)

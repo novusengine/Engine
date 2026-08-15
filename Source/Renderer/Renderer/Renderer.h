@@ -90,11 +90,15 @@ namespace Renderer
 
         virtual ImageID CreateImage(ImageDesc& desc) = 0;
         virtual DepthImageID CreateDepthImage(DepthImageDesc& desc) = 0;
+        virtual void DestroyImage(ImageID image) = 0;
+        virtual void DestroyDepthImage(DepthImageID image) = 0;
 
         virtual SamplerID CreateSampler(SamplerDesc& sampler) = 0;
         virtual SemaphoreID CreateNSemaphore() = 0;
 
         virtual DescriptorSetID CreateDescriptorSet(const DescriptorSetDesc& desc) = 0;
+        virtual void DestroyDescriptorSet(DescriptorSetID descriptorSetID) = 0;
+        virtual DescriptorPoolStats GetDescriptorPoolStats() const = 0;
 
         virtual GraphicsPipelineID CreatePipeline(GraphicsPipelineDesc& desc) = 0;
         virtual ComputePipelineID CreatePipeline(ComputePipelineDesc& desc) = 0;

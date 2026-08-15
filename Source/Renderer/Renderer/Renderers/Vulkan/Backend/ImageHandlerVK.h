@@ -32,6 +32,8 @@ namespace Renderer
             ImageID CreateImageFromSwapchain(const ImageDesc& desc, VkFormat format, VkSwapchainKHR swapChain, u32 imageCount, u32 index);
 
             DepthImageID CreateDepthImage(const DepthImageDesc& desc);
+            void DestroyImage(ImageID id);
+            void DestroyDepthImage(DepthImageID id);
 
             const ImageDesc& GetImageDesc(const ImageID id);
             const DepthImageDesc& GetImageDesc(const DepthImageID id);

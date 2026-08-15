@@ -34,6 +34,7 @@ namespace Renderer
             void FlipFrame(u32 frameIndex);
 
             void RegisterTextureArrayBinding(TextureArrayID textureArrayID, DescriptorSetID descriptorSetID, u32 bindingIndex);
+            void UnregisterDescriptorSet(DescriptorSetID descriptorSetID);
             void FlushTextureArrayDescriptors(TextureArrayID textureArrayID);
 
             TextureID LoadTexture(const TextureDesc& desc);

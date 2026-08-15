@@ -3,6 +3,7 @@
 #include "BufferHandlerVK.h"
 #include "RenderDeviceVK.h"
 #include "FormatConverterVK.h"
+#include "Renderer/DescriptorSet.h"
 #include "Renderer/TrackedBufferBitSets.h"
 
 #include <Base/Container/SafeVector.h>
@@ -13,6 +14,9 @@
 
 #include <tracy/Tracy.hpp>
 #include <algorithm>
+#include <array>
+#include <limits>
+#include <memory>
 #include <unordered_map>
 
 namespace Renderer
@@ -21,13 +25,13 @@ namespace Renderer
     {
         VkDescriptorPoolSize poolSizes[] =
         {
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 40000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_SAMPLER, 100 }
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 512 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 131072 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4096 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 256 },
+            { VK_DESCRIPTOR_TYPE_SAMPLER, 128 }
         };
-        constexpr u32 maxDescriptorSets = 256;
+        constexpr u32 maxDescriptorSets = 512;
 
         // [Temp descriptor sets] Per-frame transient pools, reset in FlipFrame once the slot's fence
         // guarantees the GPU is done with the previous frame's transient sets
@@ -51,10 +55,11 @@ namespace Renderer
 
         struct DescriptorSet
         {
-            DescriptorSetDesc desc;
+            FileFormat::DescriptorSetReflection reflection;
 
             VkDescriptorSet sets[RenderDeviceVK::FRAME_INDEX_COUNT];
             VkDescriptorSetLayout layout;
+            std::array<u32, 5> poolUsage = {};
 
             PersistentBitSet bufferAccesses;      // All accessed buffers (for pipeline stage check)
             PersistentBitSet bufferReadAccesses;  // Buffers read from
@@ -95,12 +100,14 @@ namespace Renderer
             VkDescriptorPool framePools[RenderDeviceVK::FRAME_INDEX_COUNT];
             std::vector<VkDescriptorSet> transientSets[RenderDeviceVK::FRAME_INDEX_COUNT];
 
-            std::vector<DescriptorSet> descriptorSets;
+            std::vector<std::unique_ptr<DescriptorSet>> descriptorSets;
+            std::vector<DescriptorSetID> freeDescriptorSetIDs;
+            DescriptorPoolStats poolStats;
         };
 
         std::string GetBindingName(const DescriptorSet& descriptorSet, u32 binding)
         {
-            for (const auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
+            for (const auto& [_, descriptor] : descriptorSet.reflection.descriptors)
             {
                 if (descriptor.binding == binding)
                     return descriptor.name;
@@ -136,13 +143,56 @@ namespace Renderer
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
 
-            DescriptorSetID id = DescriptorSetID(static_cast<DescriptorSetID::type>(data.descriptorSets.size()));
-            DescriptorSet& descriptorSet = data.descriptorSets.emplace_back();
-            descriptorSet.desc = desc;
+            DescriptorSetID id;
+            if (data.freeDescriptorSetIDs.empty())
+            {
+                id = DescriptorSetID(static_cast<DescriptorSetID::type>(data.descriptorSets.size()));
+                data.descriptorSets.push_back(std::make_unique<DescriptorSet>());
+            }
+            else
+            {
+                id = data.freeDescriptorSetIDs.back();
+                data.freeDescriptorSetIDs.pop_back();
+                data.descriptorSets[static_cast<DescriptorSetID::type>(id)] = std::make_unique<DescriptorSet>();
+            }
+
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(id)];
+            descriptorSet.reflection = *desc.reflection;
 
             CreateDescriptorSet(descriptorSet);
 
             return id;
+        }
+
+        void DescriptorHandlerVK::DestroyDescriptorSet(DescriptorSetID setID)
+        {
+            DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
+            const DescriptorSetID::type id = static_cast<DescriptorSetID::type>(setID);
+            NC_ASSERT(id < data.descriptorSets.size() && data.descriptorSets[id], "DescriptorHandlerVK::DestroyDescriptorSet: Invalid DescriptorSetID");
+
+            DescriptorSet& descriptorSet = *data.descriptorSets[id];
+            _textureHandler->UnregisterDescriptorSet(setID);
+            VkResult result = vkFreeDescriptorSets(_device->_device, data.permanentPool, RenderDeviceVK::FRAME_INDEX_COUNT, descriptorSet.sets);
+            if (result != VK_SUCCESS)
+            {
+                NC_LOG_CRITICAL("DescriptorHandlerVK::DestroyDescriptorSet: Failed to free descriptor sets ({})", static_cast<i32>(result));
+            }
+            vkDestroyDescriptorSetLayout(_device->_device, descriptorSet.layout, nullptr);
+
+            data.poolStats.liveSets -= RenderDeviceVK::FRAME_INDEX_COUNT;
+            data.poolStats.liveUniformBuffers -= descriptorSet.poolUsage[0];
+            data.poolStats.liveSampledImages -= descriptorSet.poolUsage[1];
+            data.poolStats.liveStorageBuffers -= descriptorSet.poolUsage[2];
+            data.poolStats.liveStorageImages -= descriptorSet.poolUsage[3];
+            data.poolStats.liveSamplers -= descriptorSet.poolUsage[4];
+            data.descriptorSets[id].reset();
+            data.freeDescriptorSetIDs.push_back(setID);
+        }
+
+        DescriptorPoolStats DescriptorHandlerVK::GetPoolStats() const
+        {
+            const DescriptorHandlerData& data = *static_cast<const DescriptorHandlerData*>(_data);
+            return data.poolStats;
         }
 
         bool DescriptorHandlerVK::ValidatePermissionViolations(u32 slot, const DescriptorSet& descriptorSet, const PersistentBitSet& accesses, const BitSet& permissions, const char* permissionName, const PersistentBitSet* usedBindings)
@@ -195,7 +245,9 @@ namespace Renderer
             if (id >= data.descriptorSets.size())
                 return;
 
-            DescriptorSet& descriptorSet = data.descriptorSets[id];
+            if (!data.descriptorSets[id])
+                return;
+            DescriptorSet& descriptorSet = *data.descriptorSets[id];
             bool didError = false;
 
             // Check for unbound bindings
@@ -240,12 +292,12 @@ namespace Renderer
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
 
             DescriptorSetID::type id = static_cast<DescriptorSetID::type>(descriptorSetID);
-            if (id >= data.descriptorSets.size())
+            if (id >= data.descriptorSets.size() || !data.descriptorSets[id])
             {
                 NC_LOG_CRITICAL("DescriptorHandlerVK::GetVkDescriptorSet: Invalid DescriptorSetID {}", id);
             }
 
-            return data.descriptorSets[id].sets[frameIndex];
+            return data.descriptorSets[id]->sets[frameIndex];
         }
 
         VkDescriptorSetLayout DescriptorHandlerVK::GetVkDescriptorSetLayout(DescriptorSetID descriptorSetID)
@@ -253,12 +305,12 @@ namespace Renderer
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
 
             DescriptorSetID::type id = static_cast<DescriptorSetID::type>(descriptorSetID);
-            if (id >= data.descriptorSets.size())
+            if (id >= data.descriptorSets.size() || !data.descriptorSets[id])
             {
                 NC_LOG_CRITICAL("DescriptorHandlerVK::GetVkDescriptorSetLayout: Invalid DescriptorSetID {}", id);
             }
 
-            return data.descriptorSets[id].layout;
+            return data.descriptorSets[id]->layout;
         }
 
         void DescriptorHandlerVK::CreateDescriptorPool()
@@ -270,7 +322,7 @@ namespace Renderer
             poolInfo.maxSets = maxDescriptorSets;
             poolInfo.poolSizeCount = ARRAY_COUNT(poolSizes);
             poolInfo.pPoolSizes = poolSizes;
-            poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT;
+            poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT | VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
             vkCreateDescriptorPool(_device->_device, &poolInfo, nullptr, &data.permanentPool);
 
@@ -284,6 +336,13 @@ namespace Renderer
             {
                 vkCreateDescriptorPool(_device->_device, &framePoolInfo, nullptr, &data.framePools[i]);
             }
+
+            data.poolStats.setCapacity = maxDescriptorSets;
+            data.poolStats.uniformBufferCapacity = poolSizes[0].descriptorCount;
+            data.poolStats.sampledImageCapacity = poolSizes[1].descriptorCount;
+            data.poolStats.storageBufferCapacity = poolSizes[2].descriptorCount;
+            data.poolStats.storageImageCapacity = poolSizes[3].descriptorCount;
+            data.poolStats.samplerCapacity = poolSizes[4].descriptorCount;
         }
 
         void DescriptorHandlerVK::CreateDescriptorSet(DescriptorSet& descriptorSet)
@@ -293,7 +352,7 @@ namespace Renderer
             u32 numSupportedTextures = _device->HasExtendedTextureSupport() ? 8192 : 4096;
 
             // Init bindings
-            u32 numReflectedDescriptors = static_cast<u32>(descriptorSet.desc.reflection->descriptors.size());
+            u32 numReflectedDescriptors = static_cast<u32>(descriptorSet.reflection.descriptors.size());
             std::vector<VkDescriptorSetLayoutBinding> bindings;
             bindings.reserve(numReflectedDescriptors);
 
@@ -302,7 +361,7 @@ namespace Renderer
 
             bool hasVariableBinding = false;
 
-            for (auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
+            for (auto& [_, descriptor] : descriptorSet.reflection.descriptors)
             {
                 VkDescriptorBindingFlags flags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
                 u32 count = descriptor.count;
@@ -331,6 +390,19 @@ namespace Renderer
                 binding.pImmutableSamplers = nullptr;
                 bindings.push_back(binding);
                 bindingFlags.push_back(flags);
+
+                u32 poolIndex = std::numeric_limits<u32>::max();
+                switch (binding.descriptorType)
+                {
+                    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: poolIndex = 0; break;
+                    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: poolIndex = 1; break;
+                    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: poolIndex = 2; break;
+                    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: poolIndex = 3; break;
+                    case VK_DESCRIPTOR_TYPE_SAMPLER: poolIndex = 4; break;
+                    default: break;
+                }
+                if (poolIndex != std::numeric_limits<u32>::max())
+                    descriptorSet.poolUsage[poolIndex] += count * RenderDeviceVK::FRAME_INDEX_COUNT;
             }
 
             // Create layout
@@ -369,14 +441,20 @@ namespace Renderer
                 result = vkAllocateDescriptorSets(_device->_device, &allocInfo, &descriptorSet.sets[i]);
                 if (result != VK_SUCCESS)
                 {
-                    NC_LOG_CRITICAL("DescriptorHandlerVK::CreateDescriptorSet: Failed to allocate descriptor set! You probably need to increase maxDescriptorSets.");
+                    NC_LOG_CRITICAL("DescriptorHandlerVK::CreateDescriptorSet: Allocation failed ({}) at sets={}/{} uniform={}/{} sampled={}/{} storage_buffers={}/{} storage_images={}/{} samplers={}/{}",
+                        static_cast<i32>(result), data.poolStats.liveSets, data.poolStats.setCapacity,
+                        data.poolStats.liveUniformBuffers, data.poolStats.uniformBufferCapacity,
+                        data.poolStats.liveSampledImages, data.poolStats.sampledImageCapacity,
+                        data.poolStats.liveStorageBuffers, data.poolStats.storageBufferCapacity,
+                        data.poolStats.liveStorageImages, data.poolStats.storageImageCapacity,
+                        data.poolStats.liveSamplers, data.poolStats.samplerCapacity);
                 }
             }
 
             descriptorSet.hasVariableBinding = hasVariableBinding;
 
             // Store binding info from reflection
-            for (auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
+            for (auto& [_, descriptor] : descriptorSet.reflection.descriptors)
             {
                 // Track which bindings need to be bound
                 descriptorSet.unboundBindings.Set(descriptor.binding);
@@ -388,13 +466,26 @@ namespace Renderer
                     descriptorSet.writeBindings.Set(descriptor.binding);
                 }
             }
+
+            data.poolStats.liveSets += RenderDeviceVK::FRAME_INDEX_COUNT;
+            data.poolStats.liveUniformBuffers += descriptorSet.poolUsage[0];
+            data.poolStats.liveSampledImages += descriptorSet.poolUsage[1];
+            data.poolStats.liveStorageBuffers += descriptorSet.poolUsage[2];
+            data.poolStats.liveStorageImages += descriptorSet.poolUsage[3];
+            data.poolStats.liveSamplers += descriptorSet.poolUsage[4];
+            data.poolStats.peakSets = std::max(data.poolStats.peakSets, data.poolStats.liveSets);
+            data.poolStats.peakUniformBuffers = std::max(data.poolStats.peakUniformBuffers, data.poolStats.liveUniformBuffers);
+            data.poolStats.peakSampledImages = std::max(data.poolStats.peakSampledImages, data.poolStats.liveSampledImages);
+            data.poolStats.peakStorageBuffers = std::max(data.poolStats.peakStorageBuffers, data.poolStats.liveStorageBuffers);
+            data.poolStats.peakStorageImages = std::max(data.poolStats.peakStorageImages, data.poolStats.liveStorageImages);
+            data.poolStats.peakSamplers = std::max(data.poolStats.peakSamplers, data.poolStats.liveSamplers);
         }
 
         void DescriptorHandlerVK::BindDescriptor(DescriptorSetID setID, u32 binding, BufferID bufferID, DescriptorType type, u32 frameIndex)
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
 
             BufferID::type newBufferIndex = static_cast<BufferID::type>(bufferID);
 
@@ -479,8 +570,11 @@ namespace Renderer
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
 
-            for (DescriptorSet& descriptorSet : data.descriptorSets)
+            for (const std::unique_ptr<DescriptorSet>& descriptorSetPtr : data.descriptorSets)
             {
+                if (!descriptorSetPtr)
+                    continue;
+                DescriptorSet& descriptorSet = *descriptorSetPtr;
                 auto& pending = descriptorSet.pendingBufferWritesPerSlot[frameIndex];
                 for (auto& [binding, write] : pending)
                 {
@@ -495,7 +589,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
 
             NC_ASSERT(!descriptorSet.hasVariableBinding, "DescriptorHandlerVK::SnapshotTempDescriptorSet: Sets with variable-count bindings are not supported");
 
@@ -516,9 +610,9 @@ namespace Renderer
             auto& pendingBufferWrites = descriptorSet.pendingBufferWritesPerSlot[frameIndex];
 
             std::vector<VkCopyDescriptorSet> copies;
-            copies.reserve(descriptorSet.desc.reflection->descriptors.size());
+            copies.reserve(descriptorSet.reflection.descriptors.size());
 
-            for (auto& [_, descriptor] : descriptorSet.desc.reflection->descriptors)
+            for (auto& [_, descriptor] : descriptorSet.reflection.descriptors)
             {
                 if (descriptorSet.unboundBindings.Has(descriptor.binding))
                     continue;
@@ -570,7 +664,7 @@ namespace Renderer
         void DescriptorHandlerVK::MarkBound(DescriptorSetID setID)
         {
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            data.descriptorSets[static_cast<DescriptorSetID::type>(setID)].lastBoundGeneration = _frameGeneration;
+            data.descriptorSets[static_cast<DescriptorSetID::type>(setID)]->lastBoundGeneration = _frameGeneration;
         }
 
         // Rewriting a descriptor that a set bound earlier in this frame's recording still references means
@@ -609,7 +703,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
             WarnIfBoundThisFrame(descriptorSet, binding);
 
@@ -631,7 +725,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
             WarnIfBoundThisFrame(descriptorSet, binding);
 
@@ -657,7 +751,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
             WarnIfBoundThisFrame(descriptorSet, binding);
 
@@ -693,7 +787,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
             
             VkDescriptorImageInfo samplerInfo{};
@@ -713,7 +807,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
 
             u32& writtenCount = descriptorSet.bindingWrittenCounts[binding];
@@ -737,7 +831,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
             
             // Register this binding so future texture array updates can propagate to this descriptor set
@@ -785,7 +879,7 @@ namespace Renderer
         {
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
-            DescriptorSet& descriptorSet = data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
             descriptorSet.unboundBindings.Unset(binding);
             
             if (count == 0)

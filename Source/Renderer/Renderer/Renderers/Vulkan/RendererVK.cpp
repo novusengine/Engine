@@ -169,6 +169,18 @@ namespace Renderer
         return _imageHandler->CreateDepthImage(desc);
     }
 
+    void RendererVK::DestroyImage(ImageID image)
+    {
+        std::scoped_lock lock(_destroyListMutex);
+        _destroyLists[_destroyListIndex].images.push_back(image);
+    }
+
+    void RendererVK::DestroyDepthImage(DepthImageID image)
+    {
+        std::scoped_lock lock(_destroyListMutex);
+        _destroyLists[_destroyListIndex].depthImages.push_back(image);
+    }
+
     SamplerID RendererVK::CreateSampler(SamplerDesc& desc)
     {
         return _samplerHandler->CreateSampler(desc);
@@ -182,6 +194,17 @@ namespace Renderer
     DescriptorSetID RendererVK::CreateDescriptorSet(const DescriptorSetDesc& desc)
     {
         return _descriptorHandler->CreateDescriptorSet(desc);
+    }
+
+    void RendererVK::DestroyDescriptorSet(DescriptorSetID descriptorSetID)
+    {
+        std::scoped_lock lock(_destroyListMutex);
+        _destroyLists[_destroyListIndex].descriptorSets.push_back(descriptorSetID);
+    }
+
+    DescriptorPoolStats RendererVK::GetDescriptorPoolStats() const
+    {
+        return _descriptorHandler->GetPoolStats();
     }
 
     GraphicsPipelineID RendererVK::CreatePipeline(GraphicsPipelineDesc& desc)
@@ -1515,12 +1538,25 @@ namespace Renderer
 
     void RendererVK::DestroyObjects(ObjectDestroyList& destroyList)
     {
+        for (const DescriptorSetID descriptorSet : destroyList.descriptorSets)
+            _descriptorHandler->DestroyDescriptorSet(descriptorSet);
+
         for (const BufferID buffer : destroyList.buffers)
         {
             _bufferHandler->DestroyBuffer(buffer);
         }
 
+        for (const ImageID image : destroyList.images)
+            _imageHandler->DestroyImage(image);
+        for (const DepthImageID image : destroyList.depthImages)
+        {
+            _imageHandler->DestroyDepthImage(image);
+        }
+
         destroyList.buffers.clear();
+        destroyList.images.clear();
+        destroyList.depthImages.clear();
+        destroyList.descriptorSets.clear();
     }
 
     void RendererVK::BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions)
