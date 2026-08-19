@@ -93,6 +93,7 @@ namespace Renderer
         void RegisterPipeline(Renderer* renderer, GraphicsPipelineID pipelineID);
         void Init(Renderer* renderer);
         bool IsInitialized() const { return _initialized; }
+        bool HasPendingBufferWrites() const;
 
         void Bind(StringUtils::StringHash nameHash, BufferID bufferID, bool optional = false);
 

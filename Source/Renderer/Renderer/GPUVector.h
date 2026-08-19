@@ -12,6 +12,7 @@
 #include <cmath>
 #include <mutex>
 #include <shared_mutex>
+#include <type_traits>
 
 namespace Renderer
 {
@@ -129,6 +130,31 @@ namespace Renderer
             {
                 SetDirtyRegion(frame.offset, frame.size);
             }
+
+            return static_cast<u32>(frame.offset) / ELEMENT_SIZE;
+        }
+
+        // Reserves elements without touching their CPU storage. The caller must
+        // overwrite every element before the next upload.
+        inline u32 AddCountUninitialized(u32 count)
+            requires std::is_trivially_copyable_v<T>
+        {
+            if (count == 0)
+                return static_cast<u32>(_allocator.Size()) / ELEMENT_SIZE;
+
+            BufferRangeFrame frame;
+            if (!_allocator.Allocate(count * ELEMENT_SIZE, frame))
+            {
+                GrowToFit(_allocator.Size() + (static_cast<size_t>(count) * ELEMENT_SIZE));
+                if (!_allocator.Allocate(count * ELEMENT_SIZE, frame))
+                {
+                    NC_LOG_ERROR("Failed to allocate memory for GPUVector");
+                    return -1;
+                }
+            }
+
+            if (frame.wasHole)
+                SetDirtyRegion(frame.offset, frame.size);
 
             return static_cast<u32>(frame.offset) / ELEMENT_SIZE;
         }

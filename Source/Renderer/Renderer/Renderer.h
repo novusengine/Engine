@@ -137,6 +137,7 @@ namespace Renderer
         virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, DescriptorType type, u32 frameIndex) = 0;
         virtual void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) = 0;
         virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) = 0;
+        virtual bool HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID) const = 0;
 
         // Misc
         virtual u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;
@@ -190,6 +191,7 @@ namespace Renderer
         virtual void SetBuffer(CommandListID commandListID, u32 slot, BufferID buffer) = 0;
 
         virtual void BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions) = 0;
+        virtual void MarkDescriptorSetBound(DescriptorSetID descriptorSetID) = 0;
 
         // [Temp descriptor sets] Snapshots the set's current contents into a transient descriptor set that
         // lives for this frame only, so a bind recorded now is unaffected by later rewrites of the set.

@@ -103,6 +103,7 @@ namespace Renderer
         void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, DescriptorType type, u32 frameIndex) override;
         void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) override;
         void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) override;
+        bool HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID) const override;
         
         // Misc
         u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) override;
@@ -155,6 +156,7 @@ namespace Renderer
         void SetBuffer(CommandListID commandListID, u32 slot, BufferID buffer) override;
 
         void BindDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, const TrackedBufferBitSets* bufferPermissions) override;
+        void MarkDescriptorSetBound(DescriptorSetID descriptorSetID) override;
         u32 SnapshotTempDescriptorSet(DescriptorSetID descriptorSetID) override;
         void BindTempDescriptorSet(CommandListID commandListID, DescriptorSet* descriptorSet, u32 transientSetIndex, const TrackedBufferBitSets* bufferPermissions) override;
 

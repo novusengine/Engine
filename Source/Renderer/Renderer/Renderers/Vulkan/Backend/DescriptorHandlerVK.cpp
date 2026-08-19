@@ -15,6 +15,7 @@
 #include <tracy/Tracy.hpp>
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <unordered_map>
@@ -45,6 +46,20 @@ namespace Renderer
         };
         constexpr u32 maxTempDescriptorSetsPerFrame = 256;
 
+        VkDescriptorPool CreatePermanentDescriptorPool(VkDevice device)
+        {
+            VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+            poolInfo.maxSets = maxDescriptorSets;
+            poolInfo.poolSizeCount = ARRAY_COUNT(poolSizes);
+            poolInfo.pPoolSizes = poolSizes;
+            poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT |
+                             VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+            VkDescriptorPool pool = VK_NULL_HANDLE;
+            const VkResult result = vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool);
+            NC_ASSERT(result == VK_SUCCESS, "DescriptorHandlerVK::CreatePermanentDescriptorPool failed ({})", static_cast<i32>(result));
+            return pool;
+        }
+
         // [Frame-safe descriptor rebind] A buffer descriptor write that must wait until its target frame
         // slot is no longer being read by an in-flight frame before it can safely be applied.
         struct PendingBufferWrite
@@ -59,6 +74,7 @@ namespace Renderer
 
             VkDescriptorSet sets[RenderDeviceVK::FRAME_INDEX_COUNT];
             VkDescriptorSetLayout layout;
+            VkDescriptorPool owningPool = VK_NULL_HANDLE;
             std::array<u32, 5> poolUsage = {};
 
             PersistentBitSet bufferAccesses;      // All accessed buffers (for pipeline stage check)
@@ -96,7 +112,7 @@ namespace Renderer
         struct DescriptorHandlerData : public IDescriptorHandlerData
         {
              // Pool data
-            VkDescriptorPool permanentPool;
+            std::vector<VkDescriptorPool> permanentPools;
             VkDescriptorPool framePools[RenderDeviceVK::FRAME_INDEX_COUNT];
             std::vector<VkDescriptorSet> transientSets[RenderDeviceVK::FRAME_INDEX_COUNT];
 
@@ -172,7 +188,7 @@ namespace Renderer
 
             DescriptorSet& descriptorSet = *data.descriptorSets[id];
             _textureHandler->UnregisterDescriptorSet(setID);
-            VkResult result = vkFreeDescriptorSets(_device->_device, data.permanentPool, RenderDeviceVK::FRAME_INDEX_COUNT, descriptorSet.sets);
+            VkResult result = vkFreeDescriptorSets(_device->_device, descriptorSet.owningPool, RenderDeviceVK::FRAME_INDEX_COUNT, descriptorSet.sets);
             if (result != VK_SUCCESS)
             {
                 NC_LOG_CRITICAL("DescriptorHandlerVK::DestroyDescriptorSet: Failed to free descriptor sets ({})", static_cast<i32>(result));
@@ -318,13 +334,7 @@ namespace Renderer
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
 
-            VkDescriptorPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-            poolInfo.maxSets = maxDescriptorSets;
-            poolInfo.poolSizeCount = ARRAY_COUNT(poolSizes);
-            poolInfo.pPoolSizes = poolSizes;
-            poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT | VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-
-            vkCreateDescriptorPool(_device->_device, &poolInfo, nullptr, &data.permanentPool);
+            data.permanentPools.push_back(CreatePermanentDescriptorPool(_device->_device));
 
             VkDescriptorPoolCreateInfo framePoolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
             framePoolInfo.maxSets = maxTempDescriptorSetsPerFrame;
@@ -337,12 +347,12 @@ namespace Renderer
                 vkCreateDescriptorPool(_device->_device, &framePoolInfo, nullptr, &data.framePools[i]);
             }
 
-            data.poolStats.setCapacity = maxDescriptorSets;
-            data.poolStats.uniformBufferCapacity = poolSizes[0].descriptorCount;
-            data.poolStats.sampledImageCapacity = poolSizes[1].descriptorCount;
-            data.poolStats.storageBufferCapacity = poolSizes[2].descriptorCount;
-            data.poolStats.storageImageCapacity = poolSizes[3].descriptorCount;
-            data.poolStats.samplerCapacity = poolSizes[4].descriptorCount;
+            data.poolStats.setCapacity += maxDescriptorSets;
+            data.poolStats.uniformBufferCapacity += poolSizes[0].descriptorCount;
+            data.poolStats.sampledImageCapacity += poolSizes[1].descriptorCount;
+            data.poolStats.storageBufferCapacity += poolSizes[2].descriptorCount;
+            data.poolStats.storageImageCapacity += poolSizes[3].descriptorCount;
+            data.poolStats.samplerCapacity += poolSizes[4].descriptorCount;
         }
 
         void DescriptorHandlerVK::CreateDescriptorSet(DescriptorSet& descriptorSet)
@@ -432,24 +442,48 @@ namespace Renderer
             {
                 allocInfo.pNext = &variableCountInfo;
             }
-            allocInfo.descriptorPool = data.permanentPool;
+            allocInfo.descriptorPool = data.permanentPools.back();
             allocInfo.descriptorSetCount = 1;
             allocInfo.pSetLayouts = &descriptorSet.layout;
 
-            for (u32 i = 0; i < RenderDeviceVK::FRAME_INDEX_COUNT; i++)
+            u32 allocatedSetCount = 0;
+            bool grewPool = false;
+            for (u32 i = 0; i < RenderDeviceVK::FRAME_INDEX_COUNT;)
             {
                 result = vkAllocateDescriptorSets(_device->_device, &allocInfo, &descriptorSet.sets[i]);
-                if (result != VK_SUCCESS)
+                if (result == VK_SUCCESS)
                 {
-                    NC_LOG_CRITICAL("DescriptorHandlerVK::CreateDescriptorSet: Allocation failed ({}) at sets={}/{} uniform={}/{} sampled={}/{} storage_buffers={}/{} storage_images={}/{} samplers={}/{}",
-                        static_cast<i32>(result), data.poolStats.liveSets, data.poolStats.setCapacity,
-                        data.poolStats.liveUniformBuffers, data.poolStats.uniformBufferCapacity,
-                        data.poolStats.liveSampledImages, data.poolStats.sampledImageCapacity,
-                        data.poolStats.liveStorageBuffers, data.poolStats.storageBufferCapacity,
-                        data.poolStats.liveStorageImages, data.poolStats.storageImageCapacity,
-                        data.poolStats.liveSamplers, data.poolStats.samplerCapacity);
+                    ++i;
+                    ++allocatedSetCount;
+                    continue;
                 }
+
+                if (result != VK_ERROR_OUT_OF_POOL_MEMORY && result != VK_ERROR_FRAGMENTED_POOL)
+                {
+                    NC_LOG_CRITICAL("DescriptorHandlerVK::CreateDescriptorSet: Allocation failed ({})", static_cast<i32>(result));
+                    std::abort();
+                }
+                if (grewPool)
+                {
+                    NC_LOG_CRITICAL("DescriptorHandlerVK::CreateDescriptorSet: descriptor set exceeds an empty permanent pool");
+                    std::abort();
+                }
+
+                if (allocatedSetCount != 0)
+                    vkFreeDescriptorSets(_device->_device, allocInfo.descriptorPool, allocatedSetCount, descriptorSet.sets);
+                allocatedSetCount = 0;
+                grewPool = true;
+                data.permanentPools.push_back(CreatePermanentDescriptorPool(_device->_device));
+                data.poolStats.setCapacity += maxDescriptorSets;
+                data.poolStats.uniformBufferCapacity += poolSizes[0].descriptorCount;
+                data.poolStats.sampledImageCapacity += poolSizes[1].descriptorCount;
+                data.poolStats.storageBufferCapacity += poolSizes[2].descriptorCount;
+                data.poolStats.storageImageCapacity += poolSizes[3].descriptorCount;
+                data.poolStats.samplerCapacity += poolSizes[4].descriptorCount;
+                allocInfo.descriptorPool = data.permanentPools.back();
+                i = 0;
             }
+            descriptorSet.owningPool = allocInfo.descriptorPool;
 
             descriptorSet.hasVariableBinding = hasVariableBinding;
 
@@ -583,6 +617,18 @@ namespace Renderer
                 }
                 pending.clear();
             }
+        }
+
+        bool DescriptorHandlerVK::HasPendingBufferWrites(DescriptorSetID setID) const
+        {
+            const DescriptorHandlerData& data = *static_cast<const DescriptorHandlerData*>(_data);
+            const DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            for (const auto& pending : descriptorSet.pendingBufferWritesPerSlot)
+            {
+                if (!pending.empty())
+                    return true;
+            }
+            return false;
         }
 
         u32 DescriptorHandlerVK::SnapshotTempDescriptorSet(DescriptorSetID setID, u32 frameIndex)

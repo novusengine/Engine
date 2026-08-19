@@ -7,6 +7,11 @@
 
 namespace Renderer
 {
+    bool DescriptorSet::HasPendingBufferWrites() const
+    {
+        return _initialized && _renderer->HasPendingBufferDescriptorWrites(_descriptorSetID);
+    }
+
     DescriptorSet::~DescriptorSet()
     {
         Release();

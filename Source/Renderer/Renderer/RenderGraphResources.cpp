@@ -224,9 +224,11 @@ namespace Renderer
 
     DescriptorSet* RenderGraphResources::GetDescriptorSet(DescriptorSetResourceID descriptorSetID)
     {
-        NC_ASSERT(descriptorSetID != DescriptorSetResourceID::Invalid(), "RenderGraphResources : GetDescriptorSet tried to get image of invalid DescriptorSetResourceID");
-
         RenderGraphResourcesData* data = static_cast<RenderGraphResourcesData*>(_data);
+        NC_ASSERT(descriptorSetID != DescriptorSetResourceID::Invalid(),
+                  "RenderGraphResources : GetDescriptorSet received an invalid DescriptorSetResourceID while recording pass '{}'",
+                  data->currentPassName);
+
         return data->trackedDescriptorSets[static_cast<DepthImageMutableResource::type>(descriptorSetID)];
     }
 

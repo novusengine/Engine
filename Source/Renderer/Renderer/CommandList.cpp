@@ -296,6 +296,7 @@ namespace Renderer
     void CommandList::BindDescriptorSet(DescriptorSetResource resource, u32 frameIndex)
     {
         DescriptorSet* descriptorSet = _resources->GetDescriptorSet(resource.GetID());
+        _renderer->MarkDescriptorSetBound(descriptorSet->GetID());
 
         Commands::BindDescriptorSet* command = AddCommand<Commands::BindDescriptorSet>();
         command->set = descriptorSet;

@@ -41,6 +41,7 @@ namespace Renderer
             // [Frame-safe descriptor rebind] Apply buffer descriptor writes that were deferred while their
             // frame slot was in flight. Call once per frame, right after that slot's fence has been waited.
             void FlushPendingBufferWrites(u32 frameIndex);
+            bool HasPendingBufferWrites(DescriptorSetID setID) const;
 
             // [Temp descriptor sets] Snapshot the set's current contents (canonical frame copy plus this
             // frame's pending buffer binds) into a fresh set from a per-frame transient pool, so a bind

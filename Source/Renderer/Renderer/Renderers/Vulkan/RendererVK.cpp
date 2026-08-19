@@ -304,6 +304,11 @@ namespace Renderer
         _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, bufferID, type, frameIndex);
     }
 
+    bool RendererVK::HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID) const
+    {
+        return _descriptorHandler->HasPendingBufferWrites(descriptorSetID);
+    }
+
     void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, DescriptorType type, u32 frameIndex)
     {
         VkImageView imageView = _imageHandler->GetColorView(imageID, mipLevel);
@@ -1563,8 +1568,12 @@ namespace Renderer
     {
         ZoneScopedNC("RendererVK::BindDescriptorSet", tracy::Color::Red3);
 
-        _descriptorHandler->MarkBound(descriptorSet->GetID());
         BindDescriptorSetInternal(commandListID, descriptorSet, false, 0, bufferPermissions);
+    }
+
+    void RendererVK::MarkDescriptorSetBound(DescriptorSetID descriptorSetID)
+    {
+        _descriptorHandler->MarkBound(descriptorSetID);
     }
 
     u32 RendererVK::SnapshotTempDescriptorSet(DescriptorSetID descriptorSetID)
