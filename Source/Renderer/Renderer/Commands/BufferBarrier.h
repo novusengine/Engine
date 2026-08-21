@@ -11,8 +11,8 @@ namespace Renderer
         {
             static const BackendDispatchFunction DISPATCH_FUNCTION;
 
-            BufferID bufferID = BufferID::Invalid();
-            BufferPassUsage from = BufferPassUsage::NONE;
+            const BufferBarrierDesc* barriers = nullptr;
+            u32 count = 0;
         };
     }
 }

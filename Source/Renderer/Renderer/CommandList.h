@@ -158,9 +158,17 @@ namespace Renderer
         void Execute();
         // BufferBarrier taking BufferIDs gets friend-called from RenderGraphBuilder
         void BufferBarrier(BufferID bufferID, BufferPassUsage from);
+        void BufferBarrier(const BufferBarrierDesc* barriers, u32 count);
 
         template<typename Command>
         Command* AddCommand()
+        {
+            FlushPendingBufferBarriers();
+            return AddCommandWithoutFlush<Command>();
+        }
+
+        template<typename Command>
+        Command* AddCommandWithoutFlush()
         {
             Command* command = AllocateCommand<Command>();
 
@@ -169,6 +177,8 @@ namespace Renderer
 
             return command;
         }
+
+        void FlushPendingBufferBarriers();
 
         template<typename Command>
         Command* AllocateCommand()
@@ -203,6 +213,7 @@ namespace Renderer
 
         DynamicArray<BackendDispatchFunction> _functions;
         DynamicArray<void*> _data;
+        DynamicArray<BufferBarrierDesc> _pendingBufferBarriers;
 
         bool _isTracing = false;
 

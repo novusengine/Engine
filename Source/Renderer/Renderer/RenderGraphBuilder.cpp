@@ -241,6 +241,7 @@ namespace Renderer
 
             {
                 ZoneScopedN("Place Barriers");
+                DynamicArray<BufferBarrierDesc> barriers(_allocator, 8);
                 temp.ForEachSetBit([&](u32 set, u32 bit)
                 {
                     u32 bufferIndex = set * 64 + bit;
@@ -260,10 +261,15 @@ namespace Renderer
                         from |= BufferPassUsage::COMPUTE;
                     }
 
-                    BufferID bufferID = BufferID(bufferIndex);
-                    commandList.BufferBarrier(bufferID, from);
+                    BufferBarrierDesc barrier;
+                    barrier.bufferID = BufferID(bufferIndex);
+                    barrier.from = from;
+                    barriers.Insert(barrier);
                     _numPlacedBufferBarriers++;
                 });
+
+                if (barriers.Count() > 0)
+                    commandList.BufferBarrier(&barriers[0], static_cast<u32>(barriers.Count()));
             }
             
             // Calculate how this pass affected the dirty sets

@@ -75,6 +75,7 @@ namespace Renderer
 
     void CommandList::Execute()
     {
+        FlushPendingBufferBarriers();
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         _renderer->EndCommandList(_immediateCommandList);
 #else
@@ -96,13 +97,38 @@ namespace Renderer
 
     void CommandList::BufferBarrier(BufferID bufferID, BufferPassUsage from)
     {
-        Commands::BufferBarrier* command = AddCommand<Commands::BufferBarrier>();
-        command->bufferID = bufferID;
-        command->from = from;
+        BufferBarrierDesc barrier;
+        barrier.bufferID = bufferID;
+        barrier.from = from;
+        _pendingBufferBarriers.Insert(barrier);
+    }
+
+    void CommandList::BufferBarrier(const BufferBarrierDesc* barriers, u32 count)
+    {
+        for (u32 i = 0; i < count; i++)
+            _pendingBufferBarriers.Insert(barriers[i]);
+    }
+
+    void CommandList::FlushPendingBufferBarriers()
+    {
+        const u32 count = static_cast<u32>(_pendingBufferBarriers.Count());
+        if (count == 0)
+            return;
+
+        Commands::BufferBarrier* command = AddCommandWithoutFlush<Commands::BufferBarrier>();
+        command->count = count;
 
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
+        command->barriers = &_pendingBufferBarriers[0];
         Commands::BufferBarrier::DISPATCH_FUNCTION(_renderer, _immediateCommandList, command);
+#else
+        BufferBarrierDesc* barriers = Memory::Allocator::NewArray<BufferBarrierDesc>(_allocator, count);
+        for (u32 i = 0; i < count; i++)
+            barriers[i] = _pendingBufferBarriers[i];
+        command->barriers = barriers;
 #endif
+
+        _pendingBufferBarriers.Clear();
     }
 
     CommandList::CommandList(Renderer* renderer, Memory::Allocator* allocator, RenderGraphResources* resources)
@@ -112,6 +138,7 @@ namespace Renderer
         , _markerScope(0)
         , _functions(allocator, 32)
         , _data(allocator, 32)
+        , _pendingBufferBarriers(allocator, 8)
     {
 #if COMMANDLIST_DEBUG_IMMEDIATE_MODE
         _immediateCommandList = _renderer->BeginCommandList();

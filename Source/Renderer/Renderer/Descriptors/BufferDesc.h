@@ -17,4 +17,10 @@ namespace Renderer
 
     // Lets strong-typedef an ID type with the underlying type of u16
     STRONG_TYPEDEF(BufferID, u16);
+
+    struct BufferBarrierDesc
+    {
+        BufferID bufferID = BufferID::Invalid();
+        BufferPassUsage from = BufferPassUsage::NONE;
+    };
 }

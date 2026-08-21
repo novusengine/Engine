@@ -213,7 +213,7 @@ namespace Renderer
 
         virtual void ImageBarrier(CommandListID commandListID, ImageID imageID) = 0;
         virtual void ImageBarrier(CommandListID commandListID, DepthImageID imageID) = 0;
-        virtual void BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from) = 0;
+        virtual void BufferBarrier(CommandListID commandListID, const BufferBarrierDesc* barriers, u32 count) = 0;
         virtual void UploadBufferBarrier(CommandListID commandListID) = 0;
 
         virtual void PushConstant(CommandListID commandListID, void* data, u32 offset, u32 size) = 0;

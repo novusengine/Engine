@@ -1880,60 +1880,69 @@ namespace Renderer
         _device->TransitionImageLayout(commandBuffer, vkImage, imageAspect, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, 1);
     }
 
-    void RendererVK::BufferBarrier(CommandListID commandListID, BufferID bufferID, BufferPassUsage from)
+    void RendererVK::BufferBarrier(CommandListID commandListID, const BufferBarrierDesc* barriers, u32 count)
     {
         NC_ASSERT(commandListID != CommandListID::Invalid(), "RendererVK : BufferBarrier got invalid commandListID");
-        NC_ASSERT(bufferID != BufferID::Invalid(), "RendererVK : BufferBarrier got invalid bufferID");
-        NC_ASSERT(from != BufferPassUsage::NONE, "RendererVK : BufferBarrier from BufferPassUsage was NONE");
+        NC_ASSERT(barriers != nullptr && count > 0, "RendererVK : BufferBarrier got no barriers");
 
         VkCommandBuffer commandBuffer = _commandListHandler->GetCommandBuffer(commandListID);
 
         VkPipelineStageFlags srcStageMask = 0;
         VkPipelineStageFlags dstStageMask = 0;
 
-        VkBufferMemoryBarrier bufferBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
-        bufferBarrier.buffer = _bufferHandler->GetBuffer(bufferID);
-        bufferBarrier.size = VK_WHOLE_SIZE;
-        bufferBarrier.srcAccessMask = 0;
-        bufferBarrier.dstAccessMask = 0;
+        static thread_local std::vector<VkBufferMemoryBarrier> vkBarriers;
+        vkBarriers.clear();
+        vkBarriers.reserve(count);
 
-        if ((from & BufferPassUsage::TRANSFER) == BufferPassUsage::TRANSFER)
+        for (u32 i = 0; i < count; i++)
         {
-            srcStageMask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-            bufferBarrier.srcAccessMask |= VK_ACCESS_TRANSFER_WRITE_BIT;
-        }
-        if ((from & BufferPassUsage::GRAPHICS) == BufferPassUsage::GRAPHICS)
-        {
-            // DRAW_INDIRECT: the pass may have consumed the buffer as indirect draw args, a
-            // following write needs the execution dependency against that read (WAR)
-            srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                            VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
-                            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-            bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
-        }
-        if ((from & BufferPassUsage::COMPUTE) == BufferPassUsage::COMPUTE)
-        {
-            // Same for indirect dispatch args
-            srcStageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-            bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
+            const BufferBarrierDesc& barrier = barriers[i];
+            NC_ASSERT(barrier.bufferID != BufferID::Invalid(), "RendererVK : BufferBarrier got invalid bufferID");
+            NC_ASSERT(barrier.from != BufferPassUsage::NONE, "RendererVK : BufferBarrier from BufferPassUsage was NONE");
+
+            VkBufferMemoryBarrier& bufferBarrier = vkBarriers.emplace_back();
+            bufferBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+            bufferBarrier.buffer = _bufferHandler->GetBuffer(barrier.bufferID);
+            bufferBarrier.size = VK_WHOLE_SIZE;
+
+            if ((barrier.from & BufferPassUsage::TRANSFER) == BufferPassUsage::TRANSFER)
+            {
+                srcStageMask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+                bufferBarrier.srcAccessMask |= VK_ACCESS_TRANSFER_WRITE_BIT;
+            }
+            if ((barrier.from & BufferPassUsage::GRAPHICS) == BufferPassUsage::GRAPHICS)
+            {
+                // DRAW_INDIRECT: the pass may have consumed the buffer as indirect draw args, a
+                // following write needs the execution dependency against that read (WAR)
+                srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                                VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
+                                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+                bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
+            }
+            if ((barrier.from & BufferPassUsage::COMPUTE) == BufferPassUsage::COMPUTE)
+            {
+                // Same for indirect dispatch args
+                srcStageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+                bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
+            }
+
+            bufferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+                                          VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+                                          VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
         }
 
         // Transfer
         dstStageMask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-        bufferBarrier.dstAccessMask |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-        
         // Graphics
         dstStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
                         VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
                         VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-        bufferBarrier.dstAccessMask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
         
         // Compute
         dstStageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-        bufferBarrier.dstAccessMask |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-        
 
-        vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
+        vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, 0, 0, nullptr,
+            static_cast<u32>(vkBarriers.size()), vkBarriers.data(), 0, nullptr);
     }
 
     void RendererVK::UploadBufferBarrier(CommandListID commandListID)

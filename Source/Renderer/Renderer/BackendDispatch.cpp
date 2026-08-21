@@ -386,7 +386,7 @@ namespace Renderer
     {
         ZoneScopedC(tracy::Color::Red3);
         const Commands::BufferBarrier* actualData = static_cast<const Commands::BufferBarrier*>(data);
-        renderer->BufferBarrier(commandList, actualData->bufferID, actualData->from);
+        renderer->BufferBarrier(commandList, actualData->barriers, actualData->count);
     }
 
     void BackendDispatch::UploadBufferBarrier(Renderer* renderer, CommandListID commandList, const void*)

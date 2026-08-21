@@ -52,6 +52,11 @@ public:
         return _count;
     }
 
+    void Clear()
+    {
+        _count = 0;
+    }
+
     size_t Capacity() const
     {
         return _capacity;
