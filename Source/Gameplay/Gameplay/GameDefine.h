@@ -175,7 +175,7 @@ namespace GameDefine
             std::string internalName;
             std::string name;
 
-            u16 type;
+            u8 type;
             u16 maxPlayers;
 
         public:

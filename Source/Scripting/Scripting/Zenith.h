@@ -224,9 +224,9 @@ namespace Scripting
             bool result = true;
 
             u32 numFunctions = static_cast<u32>(funcList.size());
-            for (i32 funcRef : funcList)
+            for (auto itr = funcList.rbegin(); itr != funcList.rend(); ++itr)
             {
-                GetRawI(LUA_REGISTRYINDEX, funcRef);
+                GetRawI(LUA_REGISTRYINDEX, *itr);
             }
 
             while (numFunctions > 0)
@@ -266,9 +266,9 @@ namespace Scripting
             bool result = true;
 
             u32 numFunctions = static_cast<u32>(funcList.size());
-            for (i32 funcRef : funcList)
+            for (auto itr = funcList.rbegin(); itr != funcList.rend(); ++itr)
             {
-                GetRawI(LUA_REGISTRYINDEX, funcRef);
+                GetRawI(LUA_REGISTRYINDEX, *itr);
             }
 
             while (result && numFunctions > 0)
@@ -429,11 +429,14 @@ namespace Scripting
         }
 
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
-        bool CallEvent(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
+        bool CallEventHandlers(EventType eventType, EventDataType&& eventData, const std::vector<i32>& funcRefList)
         {
             u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
             u16 eventDataID = std::decay_t<EventDataType>::STRUCT_ID;
             u16 eventTypeVal = static_cast<u16>(eventType);
+
+            if (funcRefList.empty())
+                return false;
 
             auto& eventTypeMap = eventState.eventTypeToState;
             if (!eventTypeMap.contains(eventTypeID))
@@ -445,14 +448,6 @@ namespace Scripting
 
             EventState& eventState = eventTypeState.eventIDToEventState[eventTypeVal];
             if (eventState.eventDataID != eventDataID)
-                return false;
-
-            auto itr = eventState.eventVariantToFuncRef.find(variantID);
-            if (itr == eventState.eventVariantToFuncRef.end())
-                return false;
-
-            auto& funcRefList = itr->second;
-            if (funcRefList.empty())
                 return false;
 
             u32 packedEventID = static_cast<u32>(eventTypeVal) | (static_cast<u32>(eventTypeID) << 16);
@@ -472,6 +467,27 @@ namespace Scripting
             CallAllFunctions(funcRefList, numParametersToPush, false);
 
             return true;
+        }
+
+        template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
+        bool CallEvent(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
+        {
+            const u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
+            const u16 eventTypeVal = static_cast<u16>(eventType);
+
+            auto eventTypeItr = eventState.eventTypeToState.find(eventTypeID);
+            if (eventTypeItr == eventState.eventTypeToState.end())
+                return false;
+
+            auto eventItr = eventTypeItr->second.eventIDToEventState.find(eventTypeVal);
+            if (eventItr == eventTypeItr->second.eventIDToEventState.end())
+                return false;
+
+            auto callbacksItr = eventItr->second.eventVariantToFuncRef.find(variantID);
+            if (callbacksItr == eventItr->second.eventVariantToFuncRef.end())
+                return false;
+
+            return CallEventHandlers(eventType, std::forward<EventDataType>(eventData), callbacksItr->second);
         }
 
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>

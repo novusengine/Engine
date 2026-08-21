@@ -5,14 +5,6 @@ local SpellEffectCatalog = require("SpellEffectCatalog")
 
 return D.Definitions
 {
-    D.Enum("SpellEditorMutationTypeEnum", Type.U8,
-    {
-        D.Field("Create"),
-        D.Field("Update"),
-        D.Field("Delete"),
-        D.Field("Count")
-    }),
-
     D.Enum("SpellProcPhaseTypeEnum", Type.U8,
     {
         D.Field("OnSpellCast"),

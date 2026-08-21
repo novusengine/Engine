@@ -41,7 +41,9 @@ namespace Renderer
     {
         struct Texture
         {
+        public:
             bool loaded = true;
+            u32 referenceCount = 1; // Standalone owner or the array that adopts a create/load reference.
             u64 hash;
 
             TextureID::type textureIndex;
@@ -70,6 +72,7 @@ namespace Renderer
 
         struct TextureArray
         {
+        public:
             u32 size;
 
             SafeVector<TextureID>* textures = nullptr;
@@ -205,26 +208,10 @@ namespace Renderer
 
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
-            // Check the cache, we only want to do this for LOADED textures though, never CREATED data textures
-            TextureID nextID;
             u64 cacheDescHash = CalculateDescHash(desc);
-            if (TryFindExistingTexture(cacheDescHash, nextID))
-            {
-                TextureID::type id = static_cast<TextureID::type>(nextID);
-
-                const Texture* texture = nullptr;
-
-                data.textures.ReadLock(
-                    [&](const std::vector<Texture*>& textures)
-                    {
-                        texture = textures[id];
-                    });
-
-                if (texture->loaded)
-                {
-                    return TextureID(id); // We already loaded this texture
-                }
-            }
+            TextureID existingTextureID;
+            if (TryAcquireExistingTexture(cacheDescHash, existingTextureID))
+                return existingTextureID;
 
             // TODO: Check the clearlist before allocating a new one
 
@@ -266,26 +253,10 @@ namespace Renderer
 
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
-            // Check the cache, we only want to do this for LOADED textures though, never CREATED data textures
-            TextureID nextID;
             u64 cacheDescHash = desc.hash;
-            if (TryFindExistingTexture(cacheDescHash, nextID))
-            {
-                TextureID::type id = static_cast<TextureID::type>(nextID);
-
-                const Texture* texture = nullptr;
-
-                data.textures.ReadLock(
-                    [&](const std::vector<Texture*>& textures)
-                    {
-                        texture = textures[id];
-                    });
-
-                if (texture->loaded)
-                {
-                    return TextureID(id); // We already loaded this texture
-                }
-            }
+            TextureID existingTextureID;
+            if (TryAcquireExistingTexture(cacheDescHash, existingTextureID))
+                return existingTextureID;
 
             // TODO: Check the clearlist before allocating a new one
 
@@ -350,7 +321,10 @@ namespace Renderer
 
             textureID = LoadTexture(desc);
 
-            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash, true);
+            bool ownershipAccepted = false;
+            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash, true, &ownershipAccepted);
+            if (!ownershipAccepted)
+                UnloadTexture(textureID);
             
             return textureID;
         }
@@ -389,7 +363,10 @@ namespace Renderer
 
             textureID = LoadDataTexture(desc);
 
-            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash, true);
+            bool ownershipAccepted = false;
+            arrayIndex = AddTextureToArrayInternal(textureID, textureArrayID, descHash, true, &ownershipAccepted);
+            if (!ownershipAccepted)
+                UnloadTexture(textureID);
 
             return textureID;
         }
@@ -401,12 +378,27 @@ namespace Renderer
             data.textures.WriteLock(
                 [&](std::vector<Texture*>& textures)
                 {
-                    Texture* texture = textures[static_cast<TextureID::type>(textureID)];
-
-                    if (!texture->loaded)
+                    const TextureID::type id = static_cast<TextureID::type>(textureID);
+                    if (id >= textures.size())
                     {
+                        NC_LOG_CRITICAL("TextureHandlerVK::UnloadTexture : Tried to unload invalid TextureID {0}", id);
                         return;
                     }
+
+                    Texture* texture = textures[id];
+
+                    if (!texture->loaded)
+                        return;
+
+                    if (texture->referenceCount == 0)
+                    {
+                        NC_LOG_CRITICAL("TextureHandlerVK::UnloadTexture : TextureID {0} has no references", id);
+                        return;
+                    }
+
+                    texture->referenceCount--;
+                    if (texture->referenceCount > 0)
+                        return;
 
                     texture->loaded = false;
                     texture->hash = 0;
@@ -1072,6 +1064,35 @@ namespace Renderer
             return foundTexture;
         }
 
+        bool TextureHandlerVK::TryAcquireExistingTexture(u64 descHash, TextureID& textureID)
+        {
+            TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
+            textureID = TextureID::Invalid();
+
+            data.textures.WriteLock(
+                [&](std::vector<Texture*>& textures)
+                {
+                    for (size_t i = 0; i < textures.size(); i++)
+                    {
+                        Texture* texture = textures[i];
+                        if (!texture->loaded || texture->hash != descHash)
+                            continue;
+
+                        if (texture->referenceCount == std::numeric_limits<u32>::max())
+                        {
+                            NC_LOG_CRITICAL("TextureHandlerVK::TryAcquireExistingTexture : TextureID {0} reference count overflow", i);
+                            return;
+                        }
+
+                        texture->referenceCount++;
+                        textureID = TextureID(static_cast<TextureID::type>(i));
+                        return;
+                    }
+                });
+
+            return textureID != TextureID::Invalid();
+        }
+
         bool TextureHandlerVK::TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID)
         {
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
@@ -1350,14 +1371,17 @@ namespace Renderer
             DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)texture.imageView, VK_OBJECT_TYPE_IMAGE_VIEW, texture.desc.debugName.c_str());
         }
 
-        size_t TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership)
+        size_t TextureHandlerVK::AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership, bool* ownershipAccepted)
         {
             ZoneScoped;
             TextureHandlerVKData& data = static_cast<TextureHandlerVKData&>(*_data);
 
+            if (ownershipAccepted)
+                *ownershipAccepted = false;
+
             size_t arrayIndex = 0;
             data.textureArrays.WriteLock(
-                [&, hasOwnership](std::vector<TextureArray>& textureArrays)
+                [&](std::vector<TextureArray>& textureArrays)
                 {
                     TextureArray& textureArray = textureArrays[static_cast<TextureArrayID::type>(textureArrayID)];
 
@@ -1365,6 +1389,14 @@ namespace Renderer
                     if (textureArray.textureIDToArrayIndex->find(textureIDTyped) != textureArray.textureIDToArrayIndex->end())
                     {
                         arrayIndex = (*textureArray.textureIDToArrayIndex)[textureIDTyped];
+
+                        if (hasOwnership && !textureArray.ownedTextureIDs.contains(textureIDTyped))
+                        {
+                            textureArray.ownedTextureIDs.insert(textureIDTyped);
+                            if (ownershipAccepted)
+                                *ownershipAccepted = true;
+                        }
+
                         return;
                     }
 
@@ -1375,6 +1407,8 @@ namespace Renderer
                     if (hasOwnership)
                     {
                         textureArray.ownedTextureIDs.insert(textureIDTyped);
+                        if (ownershipAccepted)
+                            *ownershipAccepted = true;
                     }
 
                     (*textureArray.textureIDToArrayIndex)[textureIDTyped] = arrayIndex;

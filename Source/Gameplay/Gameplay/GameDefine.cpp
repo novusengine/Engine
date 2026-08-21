@@ -165,7 +165,7 @@ namespace GameDefine
             didFail |= !buffer->GetString(result.internalName);
             didFail |= !buffer->GetString(result.name);
 
-            didFail |= !buffer->GetU16(result.type);
+            didFail |= !buffer->GetU8(result.type);
             didFail |= !buffer->GetU16(result.maxPlayers);
 
             bool succeeded = !didFail;
@@ -181,7 +181,7 @@ namespace GameDefine
             didFail |= !buffer->PutString(data.internalName);
             didFail |= !buffer->PutString(data.name);
 
-            didFail |= !buffer->PutU16(data.type);
+            didFail |= !buffer->PutU8(data.type);
             didFail |= !buffer->PutU16(data.maxPlayers);
 
             bool succeeded = !didFail;

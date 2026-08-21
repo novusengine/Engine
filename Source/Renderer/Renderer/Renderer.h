@@ -98,6 +98,8 @@ namespace Renderer
 
         virtual TextureArrayID CreateTextureArray(TextureArrayDesc& desc) = 0;
 
+        // Standalone create/load calls acquire one reference owned by the caller. The IntoArray variants
+        // transfer that reference to the array, which releases it through UnloadTexturesInArray.
         virtual TextureID CreateDataTexture(DataTextureDesc& desc) = 0;
         virtual TextureID CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex) = 0;
 
@@ -113,7 +115,7 @@ namespace Renderer
         virtual PixelShaderID LoadShader(PixelShaderDesc& desc) = 0;
         virtual ComputeShaderID LoadShader(ComputeShaderDesc& desc) = 0;
 
-        // Unloading
+        // Unloading releases references and destroys a texture only after its final reference is released.
         virtual void UnloadTexture(TextureID textureID) = 0;
         virtual void UnloadTexturesInArray(TextureArrayID textureArrayID, u32 unloadStartIndex) = 0;
 
@@ -130,6 +132,7 @@ namespace Renderer
         virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) = 0;
 
         // Misc
+        // This adds a borrowed texture reference. The texture's owner must keep it loaded while the array uses it.
         virtual size_t AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;
         virtual void FlushTextureArrayDescriptors(TextureArrayID textureArrayID) = 0;
         virtual bool TryFindExistingTexture(u64 descHash, TextureID& textureID) = 0;

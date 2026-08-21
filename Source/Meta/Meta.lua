@@ -9,6 +9,8 @@ MetaGen.RegisterProvider {
 MetaGen.RegisterProvider {
     name = "Engine.Gameplay",
     sources = {
+        { root = mod.Path .. "/Definitions/Shared/Interaction", namespace = "MetaGen.Shared.Interaction" },
+        { root = mod.Path .. "/Definitions/Shared/Localization", namespace = "MetaGen.Shared.Localization" },
         { root = mod.Path .. "/Definitions/Shared/ProximityTrigger", namespace = "MetaGen.Shared.ProximityTrigger" },
         { root = mod.Path .. "/Definitions/Shared/Spell", namespace = "MetaGen.Shared.Spell" },
         { root = mod.Path .. "/Definitions/Shared/Unit", namespace = "MetaGen.Shared.Unit" }
@@ -19,6 +21,8 @@ MetaGen.RegisterProvider {
     sources = {
         { root = mod.Path .. "/Definitions/Shared/Cheat", namespace = "MetaGen.Shared.Cheat" },
         { root = mod.Path .. "/Definitions/Shared/CombatLog", namespace = "MetaGen.Shared.CombatLog" },
+        { root = mod.Path .. "/Definitions/Shared/DatabaseEditor", namespace = "MetaGen.Shared.DatabaseEditor" },
+        { root = mod.Path .. "/Definitions/Shared/Development", namespace = "MetaGen.Shared.Development" },
         { root = mod.Path .. "/Definitions/Shared/NetField", namespace = "MetaGen.Shared.NetField" },
         { root = mod.Path .. "/Definitions/Shared/Packet", namespace = "MetaGen.Shared.Packet" }
     },

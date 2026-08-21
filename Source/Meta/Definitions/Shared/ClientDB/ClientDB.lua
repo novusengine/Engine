@@ -327,13 +327,107 @@ return D.Definitions
 
     D.ClientDB("Map",
     {
-        D.Field("nameInternal", Type.STRINGREF),
-        D.Field("name", Type.STRINGREF),
-
         D.Field("flags", Type.U32),
-        D.Field("instanceType", Type.U8),
-        D.Field("expansionID", Type.U8),
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("name", Type.STRINGREF),
+        D.Field("type", Type.U8),
         D.Field("maxPlayers", Type.U16)
+    }),
+
+    D.ClientDB("LocalizedTextEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("englishValue", Type.STRINGREF),
+        D.Field("translatorContext", Type.STRINGREF)
+    }),
+
+    D.ClientDB("LocalizedTextTranslationEditor",
+    {
+        D.Field("textID", Type.U32),
+        D.Field("locale", Type.U8),
+        D.Field("value", Type.STRINGREF)
+    }),
+
+    D.ClientDB("ConditionDescriptorEditor",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("comparisonMask", Type.U16),
+        D.Field("parameterNames", Type.ARRAY, { type = Type.STRINGREF, count = 4 }),
+        D.Field("parameterKinds", Type.ARRAY, { type = Type.U8, count = 4 }),
+        D.Field("parameterMinimums", Type.ARRAY, { type = Type.I64, count = 4 }),
+        D.Field("parameterMaximums", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("ConditionSetEditor",
+    {
+        D.Field("internalName", Type.STRINGREF)
+    }),
+
+    D.ClientDB("ConditionGroupEditor",
+    {
+        D.Field("conditionSetID", Type.U32),
+        D.Field("parentGroupID", Type.U32),
+        D.Field("groupOperator", Type.U8),
+        D.Field("negated", Type.U8),
+        D.Field("orderIndex", Type.U16)
+    }),
+
+    D.ClientDB("ConditionEditor",
+    {
+        D.Field("conditionGroupID", Type.U32),
+        D.Field("orderIndex", Type.U16),
+        D.Field("conditionType", Type.U16),
+        D.Field("comparison", Type.U8),
+        D.Field("parameters", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("GossipActionDescriptorEditor",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("parameterNames", Type.ARRAY, { type = Type.STRINGREF, count = 4 }),
+        D.Field("parameterKinds", Type.ARRAY, { type = Type.U8, count = 4 }),
+        D.Field("parameterMinimums", Type.ARRAY, { type = Type.I64, count = 4 }),
+        D.Field("parameterMaximums", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("GossipMenuEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("greetingTextID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("GossipMenuOptionEditor",
+    {
+        D.Field("menuID", Type.U32),
+        D.Field("orderIndex", Type.U16),
+        D.Field("textID", Type.U32),
+        D.Field("icon", Type.U16),
+        D.Field("flags", Type.U32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("enabledConditionSetID", Type.U32),
+        D.Field("disabledReasonTextID", Type.U32),
+        D.Field("actionType", Type.U8),
+        D.Field("actionParameters", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("CreatureTemplateDescriptorEditor",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("subname", Type.STRINGREF)
+    }),
+
+    D.ClientDB("CreatureTemplateInteractionEditor",
+    {
+        D.Field("rangePolicy", Type.U8),
+        D.Field("interactionRange", Type.F32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateGossipEditor",
+    {
+        D.Field("rootMenuID", Type.U32),
+        D.Field("flags", Type.U32)
     }),
 
     D.ClientDB("Spell",

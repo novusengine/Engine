@@ -84,12 +84,13 @@ namespace Renderer
 
         private:
             u64 CalculateDescHash(const TextureDesc& desc);
+            bool TryAcquireExistingTexture(u64 descHash, TextureID& textureID);
 
             void LoadFile(const std::string& filename, Texture& texture, TextureID textureID);
             void LoadFromMemory(const u8* data, size_t size, Texture& texture, TextureID textureID);
             void CreateTexture(Texture& texture);
 
-            size_t AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership);
+            size_t AddTextureToArrayInternal(const TextureID textureID, const TextureArrayID textureArrayID, u64 hash, bool hasOwnership, bool* ownershipAccepted = nullptr);
 
         private:
             ITextureHandlerVKData* _data;

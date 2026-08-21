@@ -182,7 +182,7 @@ namespace Scripting
 
         for (auto& [key, zenith] : _zenithStateManager)
         {
-            bool result = true;
+            bool reloadedZenith = false;
             bool isStateDirty = zenith->IsDirty();
             bool isDirty = !failedToCompile && (isLuaManagerDirty || zenith->IsDirty());
 
@@ -193,7 +193,6 @@ namespace Scripting
             if (isDirty)
             {
                 bool loadedScripts = true;
-                bool reloadedZenith = false;
 
                 // Recompile scripts if needed
                 if (NeedsRecompilation())
@@ -214,7 +213,10 @@ namespace Scripting
                     continue;
 
                 if (isDirty)
+                {
+                    luaHandler->OnReload(zenith.get(), reloadedZenith ? LuaReloadResult::Succeeded : LuaReloadResult::Failed);
                     luaHandler->PostLoad(zenith.get());
+                }
 
                 luaHandler->Update(zenith.get(), deltaTime);
             }

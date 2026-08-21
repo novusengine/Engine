@@ -326,6 +326,37 @@ local function Run()
     AssertContains(manifest, "metagen-postgres-manifest-v3")
     AssertContains(schemaHeader, Sha256.Hash(manifest))
 
+    local longStringModel, longStringPostgresModel = Build(D.Definitions
+    {
+        D.DatabaseTable("LongStrings",
+        {
+            D.Field("id", Type.U32,
+            {
+                persistentId = "postgres.long_strings.id",
+                postgres = Postgres.Column("id", Postgres.Integer, { nullable = false, identity = "byDefault" })
+            }),
+            D.Field("value", Type.STRING,
+            {
+                persistentId = "postgres.long_strings.value",
+                default = string.rep("x", 5000),
+                postgres = Postgres.Column("value", Postgres.Text, { nullable = false })
+            })
+        },
+        {
+            persistentId = "postgres.long_strings",
+            database = "shared",
+            schema = "public",
+            table = "long_strings",
+            primaryKey = Postgres.PrimaryKey("long_strings_pkey", { "id" }, { persistentId = "postgres.long_strings.pk" })
+        })
+    })
+    local longStringDiff = PostgresMigration.Diff(PostgresManifest.Empty("shared"), longStringPostgresModel.bundles[1])
+    local longStringMigration = PostgresMigration.BuildArtifact(longStringDiff, "0001_long_strings", "long strings")
+    local longStringOutputs = EmitInMemory(longStringModel, { shared = { longStringMigration } })
+    local longStringSchema = longStringOutputs["memory/Postgres/Shared/Schema.h"]
+    local _, adjacentLiteralCount = longStringSchema:gsub('" "', "")
+    assert(adjacentLiteralCount >= 2, "Long bootstrap and migration SQL must use bounded adjacent C++ string literals, found " .. adjacentLiteralCount)
+
     local bootstrapSql = firstOutputs["memory/Postgres/Character/Bootstrap.sql"]
     AssertContains(bootstrapSql, "BEGIN;\nCREATE SCHEMA IF NOT EXISTS \"public\";")
     AssertContains(bootstrapSql, "CREATE TABLE \"public\".\"accounts\"")

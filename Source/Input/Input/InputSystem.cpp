@@ -3,6 +3,7 @@
 #include <Base/Util/DebugHandler.h>
 
 #include <algorithm>
+#include <cmath>
 
 InputSystem::InputSystem()
 {
@@ -25,6 +26,7 @@ void InputSystem::BeginFrame()
     _releasedControls.reset();
     _mouseDelta = vec2(0.0f);
     _scrollDelta = vec2(0.0f);
+    _penState.delta = vec2(0.0f);
 
     if (_metricsEnabled)
         _frameMetrics = {};
@@ -67,15 +69,15 @@ void InputSystem::QueueTextEvent(u32 codepoint)
     AppendEvent(event);
 }
 
-void InputSystem::QueueMouseButtonEvent(MouseButton button, InputPhase phase, InputModifier modifiers)
+void InputSystem::QueueMouseButtonEvent(MouseButton button, InputPhase phase, InputModifier modifiers, PointerSource pointerSource)
 {
     if (button > MouseButton::Button8)
         return;
 
-    QueueButtonEvent(InputControl::Mouse(button), phase, modifiers);
+    QueueButtonEvent(InputControl::Mouse(button), phase, modifiers, pointerSource);
 }
 
-void InputSystem::QueueCursorPositionEvent(f32 x, f32 y)
+void InputSystem::QueueCursorPositionEvent(f32 x, f32 y, PointerSource pointerSource)
 {
     const vec2 position(x, y);
     vec2 delta(0.0f);
@@ -90,10 +92,11 @@ void InputSystem::QueueCursorPositionEvent(f32 x, f32 y)
     if (!IsMouseCaptured())
         _mousePosition = position;
 
-    if (_cursorEventIndex == INVALID_EVENT_INDEX)
+    if (_cursorEventIndex == INVALID_EVENT_INDEX || _events[_cursorEventIndex].pointerSource != pointerSource)
     {
         InputEvent event;
         event.type = InputEventType::CursorMove;
+        event.pointerSource = pointerSource;
         event.position = _mousePosition;
         event.delta = delta;
 
@@ -157,6 +160,8 @@ void InputSystem::QueueFocusEvent(bool focused)
         }
 
         _hasCursorSample = false;
+        _penState = {};
+        _hasPenSample = false;
     }
 
     InputEvent event;
@@ -316,6 +321,26 @@ void InputSystem::SetMousePosition(const vec2& position)
     }
 }
 
+void InputSystem::SetPenState(f32 pressure, bool inRange, bool inContact, const vec2& position)
+{
+    if (inRange || inContact)
+    {
+        if (_hasPenSample)
+            _penState.delta += position - _lastPenSample;
+
+        _lastPenSample = position;
+        _hasPenSample = true;
+    }
+    else
+    {
+        _hasPenSample = false;
+    }
+
+    _penState.inContact = inContact;
+    _penState.inRange = inRange || inContact;
+    _penState.pressure = inContact && std::isfinite(pressure) ? std::clamp(pressure, 0.0f, 1.0f) : 0.0f;
+}
+
 bool InputSystem::IsContextHandleValid(InputContextHandle handle) const
 {
     if (!handle.IsValid() || handle.index >= MAX_CONTEXTS)
@@ -384,7 +409,7 @@ void InputSystem::CancelContextInputs(u8 contextIndex)
     FlushContextMutations();
 }
 
-void InputSystem::QueueButtonEvent(InputControl control, InputPhase phase, InputModifier modifiers)
+void InputSystem::QueueButtonEvent(InputControl control, InputPhase phase, InputModifier modifiers, PointerSource pointerSource)
 {
     const u32 controlIndex = GetInputControlIndex(control);
     if (controlIndex >= BUTTON_CONTROL_COUNT)
@@ -395,6 +420,7 @@ void InputSystem::QueueButtonEvent(InputControl control, InputPhase phase, Input
     event.control = control;
     event.phase = phase;
     event.modifiers = modifiers;
+    event.pointerSource = pointerSource;
 
     if (!AppendEvent(event))
         return;

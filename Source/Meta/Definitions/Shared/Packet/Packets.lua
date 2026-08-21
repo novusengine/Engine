@@ -5,7 +5,8 @@ return D.Definitions
 {
     D.Packet("ClientConnectPacket",
     {
-        D.Field("accountName", Type.STRING)
+        D.Field("accountName", Type.STRING),
+        D.Field("locale", Type.U8)
     }),
 
     D.Packet("ServerConnectResultPacket",
@@ -350,22 +351,119 @@ return D.Definitions
         D.Field("weaponSlot", Type.U8)
     }),
 
-    D.Packet("ServerSpellEditorSnapshotBeginPacket",
+    D.Packet("ServerDatabaseEditorSnapshotBeginPacket",
     {}),
 
-    D.Packet("ServerSpellEditorSnapshotChunkPacket",
+    D.Packet("ServerDatabaseEditorSnapshotChunkPacket",
     {}),
 
-    D.Packet("ServerSpellEditorSnapshotEndPacket",
+    D.Packet("ServerDatabaseEditorSnapshotEndPacket",
     {}),
 
-    D.Packet("ServerSpellEditorMutationResultPacket",
+    D.Packet("ServerDatabaseEditorChangeSetPacket",
+    {}),
+
+    D.Packet("ServerDatabaseEditorMutationResultPacket",
     {
         D.Field("requestID", Type.U32),
+        D.Field("editor", Type.U8),
         D.Field("artifact", Type.U8),
         D.Field("artifactID", Type.U32),
         D.Field("mutationType", Type.U8),
         D.Field("succeeded", Type.U8),
+        D.Field("revision", Type.U64),
         D.Field("response", Type.STRING)
+    }),
+
+    D.Packet("ServerDevelopmentActionResultPacket",
+    {
+        D.Field("requestID", Type.U32),
+        D.Field("resource", Type.U8),
+        D.Field("operation", Type.U8),
+        D.Field("result", Type.U8),
+        D.Field("resourceName", Type.STRING),
+        D.Field("relativePath", Type.STRING),
+        D.Field("leaseToken", Type.U64),
+        D.Field("leaseDurationMilliseconds", Type.U32),
+        D.Field("creationReservation", Type.U8),
+        D.Field("revision", Type.U64),
+        D.Field("response", Type.STRING)
+    }),
+
+    D.Packet("ServerDevelopmentTransferBeginPacket",
+    {
+        D.Field("requestID", Type.U32),
+        D.Field("totalSize", Type.U32),
+        D.Field("revision", Type.U64)
+    }),
+
+    D.Packet("ServerDevelopmentTransferChunkPacket",
+    {
+        D.Field("requestID", Type.U32),
+        D.Field("offset", Type.U32),
+        D.Field("chunkSize", Type.U16)
+    }),
+
+    D.Packet("ServerDevelopmentTransferEndPacket",
+    {
+        D.Field("requestID", Type.U32),
+        D.Field("succeeded", Type.U8)
+    }),
+
+    D.Packet("ServerCreatureAIDevelopmentInfoPacket",
+    {
+        D.Field("requestID", Type.U32),
+        D.Field("creatureGUID", Type.OBJECTGUID),
+        D.Field("creatureTemplateID", Type.U32),
+        D.Field("guidScriptName", Type.STRING),
+        D.Field("templateScriptName", Type.STRING),
+        D.Field("effectiveScriptName", Type.STRING),
+        D.Field("effectiveScope", Type.U8)
+    }),
+
+    D.Packet("ClientInteractionOpenPacket",
+    {
+        D.Field("sourceGUID", Type.OBJECTGUID)
+    }),
+
+    D.Packet("ClientInteractionSelectPacket",
+    {
+        D.Field("sessionID", Type.U64),
+        D.Field("revision", Type.U32),
+        D.Field("optionToken", Type.U64)
+    }),
+
+    D.Packet("ClientInteractionClosePacket",
+    {
+        D.Field("sessionID", Type.U64)
+    }),
+
+    D.Packet("ServerInteractionSnapshotPacket",
+    {
+        D.Field("sessionID", Type.U64),
+        D.Field("revision", Type.U32),
+        D.Field("sourceGUID", Type.OBJECTGUID),
+        D.Field("surfaceType", Type.U8),
+        D.Field("greeting", Type.STRING),
+        D.Field("optionCount", Type.U16)
+    }),
+
+    D.Packet("ServerInteractionClosePacket",
+    {
+        D.Field("sessionID", Type.U64),
+        D.Field("reason", Type.U8)
+    }),
+
+    D.Packet("ServerInteractionResultPacket",
+    {
+        D.Field("sessionID", Type.U64),
+        D.Field("revision", Type.U32),
+        D.Field("result", Type.U8)
+    }),
+
+    D.Packet("ServerUnitInteractionUpdatePacket",
+    {
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("capabilities", Type.U8)
     })
 }
