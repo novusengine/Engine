@@ -674,8 +674,21 @@ namespace Renderer
 
         void RenderDeviceVK::CreateImages(SwapChainVK* swapChain, ImageHandlerVK* imageHandler, VkFormat format)
         {
-            u32 imageCount = FRAME_BUFFER_COUNT;
-            vkGetSwapchainImagesKHR(_device, swapChain->swapChain, &imageCount, nullptr);
+            u32 imageCount = 0;
+            VkResult imageResult = vkGetSwapchainImagesKHR(_device, swapChain->swapChain, &imageCount, nullptr);
+            if (imageResult != VK_SUCCESS)
+            {
+                NC_LOG_CRITICAL("Failed to query swapchain image count");
+            }
+
+            std::vector<VkImage> images(imageCount);
+            imageResult = vkGetSwapchainImagesKHR(_device, swapChain->swapChain, &imageCount, images.data());
+            if (imageResult != VK_SUCCESS)
+            {
+                NC_LOG_CRITICAL("Failed to query swapchain images");
+            }
+
+            swapChain->imageIDs.resize(imageCount);
 
             for (u32 i = 0; i < imageCount; i++)
             {
@@ -687,7 +700,7 @@ namespace Renderer
                 imageDesc.mipLevels = 1;
                 imageDesc.sampleCount = SampleCount::SAMPLE_COUNT_1;
 
-                swapChain->imageIDs.Get(i) = imageHandler->CreateImageFromSwapchain(imageDesc, format, swapChain->swapChain, imageCount, i);
+                swapChain->imageIDs[i] = imageHandler->CreateImageFromSwapchain(imageDesc, format, images[i]);
             }
         }
 
@@ -710,11 +723,19 @@ namespace Renderer
                 return;
 
             _mainWindowSize = size;
-            _renderSize = size;
 
             vkDeviceWaitIdle(_device); // Wait for any in progress rendering to finish
 
-            // Destroy the parts of the swapchain we need to destroy
+            for (ImageID imageID : swapChain->imageIDs)
+                imageHandler->ReleaseSwapchainImage(imageID);
+            swapChain->imageIDs.clear();
+
+            for (u32 i = 0; i < FRAME_BUFFER_COUNT; ++i)
+            {
+                semaphoreHandler->RecreateNSemaphore(swapChain->imageAvailableSemaphores.Get(i));
+                semaphoreHandler->RecreateNSemaphore(swapChain->blitFinishedSemaphores.Get(i));
+            }
+
             CleanupSwapChain(swapChain);
 
             // Recreate the swapchain
@@ -724,7 +745,6 @@ namespace Renderer
             CreateSwapChain(size, swapChain, format);
 
             CreateImages(swapChain, imageHandler, format);
-            CreateSemaphores(swapChain, semaphoreHandler);
         }
 
         int RenderDeviceVK::RateDeviceSuitability(VkPhysicalDevice device)

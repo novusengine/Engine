@@ -46,6 +46,20 @@ namespace Renderer
             return SemaphoreID(static_cast<SemaphoreID::type>(nextID));
         }
 
+        void SemaphoreHandlerVK::RecreateNSemaphore(SemaphoreID id)
+        {
+            SemaphoreHandlerVKData& data = static_cast<SemaphoreHandlerVKData&>(*_data);
+            VkSemaphore& semaphore = data.semaphores[static_cast<SemaphoreID::type>(id)];
+            vkDestroySemaphore(_device->_device, semaphore, nullptr);
+
+            VkSemaphoreCreateInfo semaphoreInfo = {};
+            semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            if (vkCreateSemaphore(_device->_device, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS)
+            {
+                NC_LOG_CRITICAL("Failed to recreate semaphore!");
+            }
+        }
+
         VkSemaphore SemaphoreHandlerVK::GetVkSemaphore(SemaphoreID id)
         {
             SemaphoreHandlerVKData& data = static_cast<SemaphoreHandlerVKData&>(*_data);

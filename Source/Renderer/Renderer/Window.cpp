@@ -77,4 +77,22 @@ namespace Novus
     {
         //glfwSwapBuffers(_window);
     }
+
+    void Window::SetSize(u32 width, u32 height)
+    {
+        glfwRestoreWindow(_window);
+        glfwSetWindowSize(_window, static_cast<i32>(width), static_cast<i32>(height));
+    }
+
+    uvec2 Window::GetSize() const
+    {
+        ivec2 size;
+        glfwGetWindowSize(_window, &size.x, &size.y);
+        return uvec2(glm::max(size, ivec2(0)));
+    }
+
+    void Window::Minimize()
+    {
+        glfwIconifyWindow(_window);
+    }
 }

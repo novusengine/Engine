@@ -128,7 +128,7 @@ namespace Renderer
             VkSurfaceKHR surface;
             VkSwapchainKHR swapChain;
 
-            FrameResource<ImageID, FRAME_BUFFER_COUNT> imageIDs;
+            std::vector<ImageID> imageIDs;
             FrameResource<SemaphoreID, FRAME_BUFFER_COUNT> imageAvailableSemaphores;
             FrameResource<SemaphoreID, FRAME_BUFFER_COUNT> blitFinishedSemaphores;
         };

@@ -24,6 +24,7 @@ namespace Renderer
             void Init(RenderDeviceVK* device);
 
             SemaphoreID CreateNSemaphore();
+            void RecreateNSemaphore(SemaphoreID id);
 
             VkSemaphore GetVkSemaphore(SemaphoreID id);
 

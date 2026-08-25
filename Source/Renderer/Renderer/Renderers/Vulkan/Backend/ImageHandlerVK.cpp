@@ -205,7 +205,7 @@ namespace Renderer
             return ImageID(static_cast<ImageID::type>(nextHandle));
         }
 
-        ImageID ImageHandlerVK::CreateImageFromSwapchain(const ImageDesc& desc, VkFormat format, VkSwapchainKHR swapChain, u32 imageCount, u32 index)
+        ImageID ImageHandlerVK::CreateImageFromSwapchain(const ImageDesc& desc, VkFormat format, VkImage swapchainImage)
         {
             ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
 
@@ -223,16 +223,8 @@ namespace Renderer
             assert(desc.depth > 0); // Make sure the depth is valid
             assert(desc.format != ImageFormat::UNKNOWN); // Make sure the format is valid
 
-            // Get VkImage from swapchain
-            VkImage images[3];
-            vkGetSwapchainImagesKHR(_device->_device, swapChain, &imageCount, images);
-            image.image = images[index];
-
-            for (u32 i = 0; i < 3; i++)
-            {
-                std::string imageName = "swapchain";
-                DebugMarkerUtilVK::SetObjectName(_device->_device, (u64)images[index], VK_OBJECT_TYPE_IMAGE, imageName.c_str());
-            }
+            image.image = swapchainImage;
+            DebugMarkerUtilVK::SetObjectName(_device->_device, reinterpret_cast<u64>(image.image), VK_OBJECT_TYPE_IMAGE, "swapchain");
 
             CreateImageViews(image, format);
 
@@ -242,6 +234,30 @@ namespace Renderer
             data.images.push_back(image);
 
             return ImageID(static_cast<ImageID::type>(nextHandle));
+        }
+
+        void ImageHandlerVK::ReleaseSwapchainImage(ImageID id)
+        {
+            ImageHandlerVKData& data = static_cast<ImageHandlerVKData&>(*_data);
+            Image& image = data.images[static_cast<ImageID::type>(id)];
+            NC_ASSERT(image.isSwapchain, "Tried to release a non-swapchain image as a swapchain image");
+
+            if (image.colorView != VK_NULL_HANDLE)
+                vkDestroyImageView(_device->_device, image.colorView, nullptr);
+            for (VkImageView view : image.mipViews)
+            {
+                if (view != VK_NULL_HANDLE && view != image.colorView)
+                    vkDestroyImageView(_device->_device, view, nullptr);
+            }
+            for (VkImageView view : image.mipArrayViews)
+            {
+                if (view != VK_NULL_HANDLE && view != image.colorView)
+                    vkDestroyImageView(_device->_device, view, nullptr);
+            }
+            image.image = VK_NULL_HANDLE;
+            image.colorView = VK_NULL_HANDLE;
+            image.mipViews.clear();
+            image.mipArrayViews.clear();
         }
 
         DepthImageID ImageHandlerVK::CreateDepthImage(const DepthImageDesc& desc)

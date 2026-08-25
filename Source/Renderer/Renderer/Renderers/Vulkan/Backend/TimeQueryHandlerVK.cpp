@@ -86,7 +86,7 @@ namespace Renderer
                 }
                 else
                 {
-                    NC_LOG_CRITICAL("TimeQueryHandlerVK : FlipFrame failed to receive query results!");
+                    NC_LOG_CRITICAL("TimeQueryHandlerVK : FlipFrame failed to receive query results ({})!", static_cast<i32>(result));
                 }
 
                 // Queries must be reset after each individual use.

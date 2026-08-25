@@ -29,7 +29,8 @@ namespace Renderer
             void OnResize(bool windowResize);
 
             ImageID CreateImage(const ImageDesc& desc);
-            ImageID CreateImageFromSwapchain(const ImageDesc& desc, VkFormat format, VkSwapchainKHR swapChain, u32 imageCount, u32 index);
+            ImageID CreateImageFromSwapchain(const ImageDesc& desc, VkFormat format, VkImage swapchainImage);
+            void ReleaseSwapchainImage(ImageID id);
 
             DepthImageID CreateDepthImage(const DepthImageDesc& desc);
             void DestroyImage(ImageID id);

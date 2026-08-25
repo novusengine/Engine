@@ -2024,8 +2024,20 @@ namespace Renderer
 
             if (result == VK_ERROR_OUT_OF_DATE_KHR)
             {
-                RecreateSwapChain(swapChain);
+                if (semaphoreID != SemaphoreID::Invalid())
+                    _commandListHandler->AddWaitSemaphore(commandListID, _semaphoreHandler->GetVkSemaphore(semaphoreID));
+#if TRACY_ENABLE
+                tracyScope->End();
+                tracyScope = nullptr;
+#endif
                 PopMarker(commandListID);
+                _commandListHandler->EndCommandList(commandListID, frameFence);
+                RecreateSwapChain(swapChain);
+
+                std::scoped_lock lock(_destroyListMutex);
+                _destroyListIndex = (_destroyListIndex + 1) % _destroyLists.size();
+                DestroyObjects(_destroyLists[_destroyListIndex]);
+                _descriptorHandler->OnFrameEnd();
                 return;
             }
             else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -2089,7 +2101,7 @@ namespace Renderer
             };
 
             // Render targets
-            renderPassDesc.renderTargets[0] = ImageMutableResource(static_cast<ImageID::type>(swapChain->imageIDs.Get(frameIndex)));
+            renderPassDesc.renderTargets[0] = ImageMutableResource(static_cast<ImageID::type>(swapChain->imageIDs[frameIndex]));
             ImageBarrier(commandListID, imageID);
             BeginRenderPass(commandListID, renderPassDesc);
 
@@ -2116,8 +2128,8 @@ namespace Renderer
             VkImageView vkImageView = _imageHandler->GetColorView(imageID);
 
             DescriptorSetID descriptorSetID = _presentDescriptorSet.GetID();
-            _descriptorHandler->BindDescriptor(descriptorSetID, 0, vkSampler, frameIndex);
-            _descriptorHandler->BindDescriptor(descriptorSetID, 1, vkImageView, DescriptorType::SampledImage, false, frameIndex);
+            _descriptorHandler->BindDescriptor(descriptorSetID, 0, vkSampler, _frameIndex);
+            _descriptorHandler->BindDescriptor(descriptorSetID, 1, vkImageView, DescriptorType::SampledImage, false, _frameIndex);
             
             VkDescriptorSet descriptorSet = _descriptorHandler->GetVkDescriptorSet(descriptorSetID, _frameIndex);
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, DescriptorSetSlot::PER_PASS, 1, &descriptorSet, 0, nullptr);
@@ -2179,7 +2191,6 @@ namespace Renderer
             if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
             {
                 RecreateSwapChain(swapChain);
-                return;
             }
             else if (result != VK_SUCCESS)
             {
