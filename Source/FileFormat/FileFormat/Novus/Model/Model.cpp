@@ -85,6 +85,7 @@ namespace FileFormat::Model
         size = AddSectionSize(size, data.parameterBindings);
         size = AddSectionSize(size, data.embeddedInstanceSets);
         size = AddSectionSize(size, data.embeddedInstances);
+        size = AddSectionSize(size, data.physicsData);
         return size;
     }
 
@@ -115,6 +116,7 @@ namespace FileFormat::Model
         failed |= !WriteSection(buffer, data.parameterBindings, serialized.parameterBindingsOffset, serialized.numParameterBindings);
         failed |= !WriteSection(buffer, data.embeddedInstanceSets, serialized.embeddedInstanceSetsOffset, serialized.numEmbeddedInstanceSets);
         failed |= !WriteSection(buffer, data.embeddedInstances, serialized.embeddedInstancesOffset, serialized.numEmbeddedInstances);
+        failed |= !WriteSection(buffer, data.physicsData, serialized.physicsDataOffset, serialized.numPhysicsDataBytes);
         failed |= !buffer->Put(serialized, 0);
 
         if (failed)
@@ -147,6 +149,7 @@ namespace FileFormat::Model
                IsValidSection<Parameter>(buffer, out.parametersOffset, out.numParameters, headerSize) &&
                IsValidSection<ParameterBinding>(buffer, out.parameterBindingsOffset, out.numParameterBindings, headerSize) &&
                IsValidSection<EmbeddedInstanceSet>(buffer, out.embeddedInstanceSetsOffset, out.numEmbeddedInstanceSets, headerSize) &&
-               IsValidSection<EmbeddedInstance>(buffer, out.embeddedInstancesOffset, out.numEmbeddedInstances, headerSize);
+               IsValidSection<EmbeddedInstance>(buffer, out.embeddedInstancesOffset, out.numEmbeddedInstances, headerSize) &&
+               IsValidSection<u8>(buffer, out.physicsDataOffset, out.numPhysicsDataBytes, headerSize);
     }
 }

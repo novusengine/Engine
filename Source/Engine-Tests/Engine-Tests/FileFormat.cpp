@@ -58,6 +58,7 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
         FileFormat::Model::ModelAsset asset;
         FileFormat::Model::ModelData data;
         data.positions.push_back({1, 2, 3, 0});
+        data.physicsData = {10, 20, 30, 40};
 
         const size_t serializedSize = asset.GetSerializedSize(data);
         std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(serializedSize);
@@ -65,11 +66,14 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
         REQUIRE(buffer->writtenData == serializedSize);
         REQUIRE((asset.positionsOffset & 15u) == 0);
         REQUIRE(asset.numPositions == 1);
+        REQUIRE((asset.physicsDataOffset & 15u) == 0);
+        REQUIRE(asset.numPhysicsDataBytes == data.physicsData.size());
 
         const auto* position = reinterpret_cast<const FileFormat::Model::PackedPosition*>(buffer->GetDataPointer() + asset.positionsOffset);
         REQUIRE(position->x == 1);
         REQUIRE(position->y == 2);
         REQUIRE(position->z == 3);
+        REQUIRE(buffer->GetDataPointer()[asset.physicsDataOffset + 2] == 30);
 
         FileFormat::Model::ModelAsset loaded;
         REQUIRE(FileFormat::Model::ModelAsset::Read(buffer, loaded));

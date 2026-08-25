@@ -256,6 +256,7 @@ namespace FileFormat::Model
         std::vector<ParameterBinding> parameterBindings;
         std::vector<EmbeddedInstanceSet> embeddedInstanceSets;
         std::vector<EmbeddedInstance> embeddedInstances;
+        std::vector<u8> physicsData;
     };
 
     // Flat file root. Non-empty root sections begin on 16-byte boundaries and
@@ -271,7 +272,8 @@ namespace FileFormat::Model
     {
         FileHeader header = FileHeader(FILE_TYPE, VERSION);
         Bounds bounds;
-        AssetID collisionAssetID = INVALID_ASSET_ID;
+        u32 physicsDataOffset = 0;
+        u32 numPhysicsDataBytes = 0;
 
         u32 meshesOffset = 0;
         u32 numMeshes = 0;

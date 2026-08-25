@@ -13,9 +13,9 @@ public:
         ClientDB,
         MapHeader,
         MapChunk,
-        MapObject,
-        MapObjectGroup,
-        ComplexModel,
+        MapObjectDEPRECATED,
+        MapObjectGroupDEPRECATED,
+        ComplexModelDEPRECATED,
         ShaderPack,
         NavMeshTerrainHeight,
 
