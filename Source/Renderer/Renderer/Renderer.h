@@ -137,7 +137,7 @@ namespace Renderer
         virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, DescriptorType type, u32 frameIndex) = 0;
         virtual void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) = 0;
         virtual void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) = 0;
-        virtual bool HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID) const = 0;
+        virtual bool HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID, u32 frameIndex) const = 0;
 
         // Misc
         virtual u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;

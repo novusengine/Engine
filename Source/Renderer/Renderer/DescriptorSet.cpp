@@ -9,7 +9,8 @@ namespace Renderer
 {
     bool DescriptorSet::HasPendingBufferWrites() const
     {
-        return _initialized && _renderer->HasPendingBufferDescriptorWrites(_descriptorSetID);
+        return _initialized &&
+            _renderer->HasPendingBufferDescriptorWrites(_descriptorSetID, _renderer->GetCurrentFrameIndex());
     }
 
     DescriptorSet::~DescriptorSet()

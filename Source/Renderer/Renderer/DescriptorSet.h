@@ -92,6 +92,7 @@ namespace Renderer
         void RegisterPipeline(Renderer* renderer, ComputePipelineID pipelineID);
         void RegisterPipeline(Renderer* renderer, GraphicsPipelineID pipelineID);
         void Init(Renderer* renderer);
+        void Shutdown() { Release(); }
         bool IsInitialized() const { return _initialized; }
         bool HasPendingBufferWrites() const;
 

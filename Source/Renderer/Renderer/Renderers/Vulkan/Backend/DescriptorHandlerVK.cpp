@@ -65,7 +65,17 @@ namespace Renderer
         struct PendingBufferWrite
         {
             BufferID bufferID;
+            u64 generation = 0;
             DescriptorType type;
+        };
+
+        struct FlushedBufferBinding
+        {
+            VkBuffer buffer = VK_NULL_HANDLE;
+            u64 generation = 0;
+            VkDeviceSize offset = 0;
+            VkDeviceSize range = VK_WHOLE_SIZE;
+            DescriptorType type = DescriptorType::StorageBuffer;
         };
 
         struct DescriptorSet
@@ -97,6 +107,7 @@ namespace Renderer
             // FlushPendingBufferWrites once that slot's fence has been waited (its previous frame is done),
             // so we never rewrite a descriptor copy an in-flight frame is still reading.
             std::unordered_map<u32, PendingBufferWrite> pendingBufferWritesPerSlot[RenderDeviceVK::FRAME_INDEX_COUNT];
+            std::unordered_map<u32, FlushedBufferBinding> flushedBufferBindingsPerSlot[RenderDeviceVK::FRAME_INDEX_COUNT];
 
             // [Temp descriptor sets] Highest written element end per fixed-size array binding, so a
             // snapshot only copies descriptors that have actually been written
@@ -520,6 +531,18 @@ namespace Renderer
             ZoneScoped;
             DescriptorHandlerData& data = *static_cast<DescriptorHandlerData*>(_data);
             DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
+            VkBuffer resolvedBuffer = _bufferHandler->GetBuffer(bufferID);
+            const u64 generation = _bufferHandler->GetBufferGeneration(bufferID);
+            auto& pendingWrites = descriptorSet.pendingBufferWritesPerSlot[frameIndex];
+            const auto pendingWrite = pendingWrites.find(binding);
+            const auto& flushedBindings = descriptorSet.flushedBufferBindingsPerSlot[frameIndex];
+            const auto flushedBinding = flushedBindings.find(binding);
+            const bool slotUnchanged = pendingWrite != pendingWrites.end() ?
+                pendingWrite->second.bufferID == bufferID && pendingWrite->second.generation == generation &&
+                    pendingWrite->second.type == type :
+                flushedBinding != flushedBindings.end() && flushedBinding->second.buffer == resolvedBuffer &&
+                    flushedBinding->second.generation == generation && flushedBinding->second.offset == 0 &&
+                    flushedBinding->second.range == VK_WHOLE_SIZE && flushedBinding->second.type == type;
 
             BufferID::type newBufferIndex = static_cast<BufferID::type>(bufferID);
 
@@ -574,7 +597,8 @@ namespace Renderer
             // fence has been waited. So record the desired buffer per (slot, binding) here and apply it in
             // FlushPendingBufferWrites, which runs in FlipFrame immediately after that fence wait. The actual
             // VkBuffer is resolved from bufferID at flush time, so it always reflects the latest generation.
-            descriptorSet.pendingBufferWritesPerSlot[frameIndex][binding] = PendingBufferWrite{ bufferID, type };
+            if (!slotUnchanged)
+                pendingWrites[binding] = PendingBufferWrite{ bufferID, generation, type };
         }
 
         void DescriptorHandlerVK::WriteBufferDescriptor(VkDescriptorSet dstSet, u32 binding, VkBuffer buffer, DescriptorType type)
@@ -613,22 +637,19 @@ namespace Renderer
                 for (auto& [binding, write] : pending)
                 {
                     VkBuffer buffer = _bufferHandler->GetBuffer(write.bufferID);
+                    const u64 generation = _bufferHandler->GetBufferGeneration(write.bufferID);
                     WriteBufferDescriptor(descriptorSet, binding, buffer, write.type, frameIndex);
+                    descriptorSet.flushedBufferBindingsPerSlot[frameIndex][binding] = {buffer, generation, 0, VK_WHOLE_SIZE, write.type};
                 }
                 pending.clear();
             }
         }
 
-        bool DescriptorHandlerVK::HasPendingBufferWrites(DescriptorSetID setID) const
+        bool DescriptorHandlerVK::HasPendingBufferWrites(DescriptorSetID setID, u32 frameIndex) const
         {
             const DescriptorHandlerData& data = *static_cast<const DescriptorHandlerData*>(_data);
             const DescriptorSet& descriptorSet = *data.descriptorSets[static_cast<DescriptorSetID::type>(setID)];
-            for (const auto& pending : descriptorSet.pendingBufferWritesPerSlot)
-            {
-                if (!pending.empty())
-                    return true;
-            }
-            return false;
+            return !descriptorSet.pendingBufferWritesPerSlot[frameIndex].empty();
         }
 
         u32 DescriptorHandlerVK::SnapshotTempDescriptorSet(DescriptorSetID setID, u32 frameIndex)

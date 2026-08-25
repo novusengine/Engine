@@ -28,7 +28,7 @@ namespace Renderer
         {
             VkQueryPool queryPool;
 
-            static const u32 NUM_TOTAL_TIMESTAMPS = 300;
+            static const u32 NUM_TOTAL_TIMESTAMPS = 1024;
             u32 numTimestamps = 0;
 
             std::vector<TimeQuery> timeQueries;
@@ -103,7 +103,7 @@ namespace Renderer
 
             for (u32 i = 0; i < data.timeQueries.size(); i++)
             {
-                if (nameHash == data.timeQueries[i].nameHash)
+                if (nameHash == data.timeQueries[i].nameHash && desc.name == data.timeQueries[i].name)
                 {
                     return TimeQueryID(static_cast<TimeQueryID::type>(i));
                 }
@@ -117,7 +117,7 @@ namespace Renderer
 
             const u32 queryCount = TimeQuery::NUM_TIMESTAMPS_PER_FRAME * NUM_FRAMES_IN_FLIGHT;
 
-            NC_ASSERT(data.numTimestamps + queryCount < data.NUM_TOTAL_TIMESTAMPS, "TimeQueryHandlerVK : CreateTimeQuery overflowed NUM_TOTAL_QUERIES, maybe increase it?");
+            NC_ASSERT(data.numTimestamps + queryCount <= data.NUM_TOTAL_TIMESTAMPS, "TimeQueryHandlerVK : CreateTimeQuery overflowed NUM_TOTAL_QUERIES, maybe increase it?");
 
             timeQuery.timestampOffset = data.numTimestamps;
             timeQuery.timestampCount = queryCount;

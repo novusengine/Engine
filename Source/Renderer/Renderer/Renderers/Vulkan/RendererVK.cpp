@@ -304,9 +304,9 @@ namespace Renderer
         _descriptorHandler->BindDescriptor(descriptorSetID, bindingIndex, bufferID, type, frameIndex);
     }
 
-    bool RendererVK::HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID) const
+    bool RendererVK::HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID, u32 frameIndex) const
     {
-        return _descriptorHandler->HasPendingBufferWrites(descriptorSetID);
+        return _descriptorHandler->HasPendingBufferWrites(descriptorSetID, frameIndex);
     }
 
     void RendererVK::BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, ImageID imageID, u32 mipLevel, DescriptorType type, u32 frameIndex)
@@ -1889,6 +1889,8 @@ namespace Renderer
 
         VkPipelineStageFlags srcStageMask = 0;
         VkPipelineStageFlags dstStageMask = 0;
+        const VkPipelineStageFlags optionalTaskStage = _device->GetMeshShaderProperties().taskShaderSupported ?
+            VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT : 0;
 
         static thread_local std::vector<VkBufferMemoryBarrier> vkBarriers;
         vkBarriers.clear();
@@ -1915,7 +1917,7 @@ namespace Renderer
                 // DRAW_INDIRECT: the pass may have consumed the buffer as indirect draw args, a
                 // following write needs the execution dependency against that read (WAR)
                 srcStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                                VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
+                                optionalTaskStage | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
                                 VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
                 bufferBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
             }
@@ -1935,7 +1937,7 @@ namespace Renderer
         dstStageMask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
         // Graphics
         dstStageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                        VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
+                        optionalTaskStage | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT |
                         VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
         
         // Compute
@@ -2190,9 +2192,8 @@ namespace Renderer
             // Flip frameIndex between 0 and 1
             swapChain->frameIndex = !swapChain->frameIndex;
 
-            _destroyListIndex = (_destroyListIndex + 1) % _destroyLists.size();
-
             std::scoped_lock lock(_destroyListMutex);
+            _destroyListIndex = (_destroyListIndex + 1) % _destroyLists.size();
             DestroyObjects(_destroyLists[_destroyListIndex]);
 
             _descriptorHandler->OnFrameEnd();

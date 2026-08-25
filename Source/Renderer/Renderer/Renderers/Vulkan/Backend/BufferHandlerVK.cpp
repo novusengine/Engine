@@ -20,6 +20,7 @@ namespace Renderer
             VmaAllocation allocation;
             VkBuffer buffer;
             VkDeviceSize size;
+            u64 generation = 0;
         };
 
         struct TemporaryBuffer
@@ -32,6 +33,7 @@ namespace Renderer
         {
             std::vector<Buffer> buffers;
             std::queue<BufferID> returnedBufferIDs;
+            u64 nextGeneration = 1;
 
             std::vector<TemporaryBuffer> temporaryBuffers;
         };
@@ -73,6 +75,18 @@ namespace Renderer
             NC_ASSERT(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBuffer tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
 
             return data.buffers[bufferIndex].buffer;
+        }
+
+        u64 BufferHandlerVK::GetBufferGeneration(BufferID bufferID) const
+        {
+            BufferHandlerVKData& data = static_cast<BufferHandlerVKData&>(*_data);
+
+            NC_ASSERT(bufferID != BufferID::Invalid(), "BufferHandler VK : GetBufferGeneration tried to access Invalid BufferID");
+
+            BufferID::type bufferIndex = static_cast<BufferID::type>(bufferID);
+            NC_ASSERT(bufferIndex < data.buffers.size(), "BufferHandler VK : GetBufferGeneration tried to access BufferID {} which doesn't exist yet (Size: {})", bufferIndex, data.buffers.size());
+
+            return data.buffers[bufferIndex].generation;
         }
 
         VkDeviceSize BufferHandlerVK::GetBufferSize(BufferID bufferID) const
@@ -184,6 +198,7 @@ namespace Renderer
 
             Buffer& buffer = data.buffers[(BufferID::type)bufferID];
             buffer.size = descSize;
+            buffer.generation = data.nextGeneration++;
 
             if (vmaCreateBuffer(_device->_allocator, &bufferInfo, &allocInfo, &buffer.buffer, &buffer.allocation, nullptr) != VK_SUCCESS)
             {

@@ -24,6 +24,7 @@ namespace Renderer
             void OnFrameStart();
 
             VkBuffer GetBuffer(BufferID bufferID) const;
+            u64 GetBufferGeneration(BufferID bufferID) const;
             VkDeviceSize GetBufferSize(BufferID bufferID) const;
             VmaAllocation GetBufferAllocation(BufferID bufferID) const;
             std::string GetBufferName(BufferID bufferID) const;

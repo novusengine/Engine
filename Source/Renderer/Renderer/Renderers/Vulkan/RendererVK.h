@@ -103,7 +103,7 @@ namespace Renderer
         void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, DescriptorType type, u32 frameIndex) override;
         void BindDescriptorArray(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureID textureID, u32 mipLevel, u32 mipCount, DescriptorType type, u32 frameIndex) override;
         void BindDescriptor(DescriptorSetID descriptorSetID, u32 bindingIndex, TextureArrayID textureArrayID) override;
-        bool HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID) const override;
+        bool HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID, u32 frameIndex) const override;
         
         // Misc
         u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) override;

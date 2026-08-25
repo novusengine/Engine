@@ -48,13 +48,22 @@ namespace Renderer
             , _onExecute(std::move(onExecute))
         {
             _flags = flags;
-            if (name.length() >= 32)
+            if (name.length() < sizeof(_name))
             {
-                NC_LOG_CRITICAL("We encountered a render pass name ({0}) that is longer than 31 characters, we have this limit because we store the string internally and not on the heap.", name.c_str());
+                strcpy_s(_name, name.c_str());
             }
-
-            strcpy_s(_name, name.c_str());
-            _nameLength = static_cast<u8>(name.length());
+            else
+            {
+                constexpr size_t PREFIX_LENGTH = 22;
+                u32 hash = 2166136261u;
+                for (const char character : name)
+                {
+                    hash ^= static_cast<u8>(character);
+                    hash *= 16777619u;
+                }
+                sprintf_s(_name, "%.*s~%08X", static_cast<i32>(PREFIX_LENGTH), name.c_str(), hash);
+            }
+            _nameLength = static_cast<u8>(strlen(_name));
         }
 
     private:
