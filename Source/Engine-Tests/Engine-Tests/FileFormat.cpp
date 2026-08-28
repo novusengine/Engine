@@ -18,6 +18,26 @@
 
 namespace
 {
+    constexpr u64 Fnv1a64(const u8* bytes, size_t size)
+    {
+        u64 value = 0xCBF29CE484222325ull;
+        for (size_t index = 0; index < size; index++)
+        {
+            value ^= bytes[index];
+            value *= 0x100000001B3ull;
+        }
+        return value;
+    }
+
+    FileFormat::Animation::LocalTransform MakeLocalTransform(const vec3& translation = vec3(0.0f), const quat& rotation = quat(1.0f, 0.0f, 0.0f, 0.0f), const vec3& scale = vec3(1.0f))
+    {
+        FileFormat::Animation::LocalTransform transform;
+        transform.translation = translation;
+        transform.rotation = rotation;
+        transform.scale = scale;
+        return transform;
+    }
+
     template <typename TAsset, typename TData>
     void VerifyEmptyRoundTrip(TAsset asset, const TData& data)
     {
@@ -32,6 +52,23 @@ namespace
         REQUIRE(loaded.header == asset.header);
     }
 }
+
+static_assert(sizeof(FileFormat::Animation::LocalTransform) == 48);
+static_assert(sizeof(FileFormat::Animation::SkeletonJoint) == 120);
+static_assert(sizeof(FileFormat::Animation::SkeletonFamilyBinding) == 104);
+static_assert(sizeof(FileFormat::Animation::SkeletonPropagationRule) == 64);
+static_assert(sizeof(FileFormat::Animation::HierarchyDepthRange) == 8);
+static_assert(sizeof(FileFormat::Animation::SkeletonAttachment) == 64);
+static_assert(sizeof(FileFormat::Animation::SkeletonAsset) == 72);
+static_assert(sizeof(FileFormat::Animation::AnimationTrack) == 80);
+static_assert(sizeof(FileFormat::Animation::SynchronizationMarker) == 16);
+static_assert(sizeof(FileFormat::Animation::ActionWindow) == 16);
+static_assert(sizeof(FileFormat::Animation::AnimationEvent) == 24);
+static_assert(sizeof(FileFormat::Animation::AnimationClipAsset) == 112);
+static_assert(offsetof(FileFormat::Animation::SkeletonAsset, jointsOffset) == 16);
+static_assert(offsetof(FileFormat::Animation::SkeletonAsset, attachmentsOffset) == 56);
+static_assert(offsetof(FileFormat::Animation::AnimationClipAsset, tracksOffset) == 48);
+static_assert(offsetof(FileFormat::Animation::AnimationClipAsset, eventPayloadBytesOffset) == 104);
 
 TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[FileFormat]")
 {
@@ -210,6 +247,173 @@ TEST_CASE("Flat FileFormats follow the Bytebuffer Save and Read convention", "[F
         REQUIRE(loaded.modelAllocationHints.scene.meshletHistoryWords == 29);
         REQUIRE(loaded.modelAllocationHints.flags == Map::ModelAllocationHintFlags_SceneCountsAreUpperBounds);
         REQUIRE(loaded.chunkHashes == asset.chunkHashes);
+    }
+}
+
+TEST_CASE("Animation development ABI matches the independent NBS conformance fixtures", "[FileFormat][Animation]")
+{
+    using namespace FileFormat::Animation;
+
+    SECTION("Non-empty Skeleton bytes, sections, padding, and rejection behavior are locked")
+    {
+        SkeletonAsset asset;
+        asset.rigFamilyAssetID = 0x1122334455667788ull;
+        asset.flags = 0xA5A5A5A5u;
+
+        SkeletonData data;
+        SkeletonJoint root;
+        root.semanticID = 0x0102030405060708ull;
+        root.restTransform = MakeLocalTransform(vec3(1.0f, 2.0f, 3.0f), quat(1.0f, 0.0f, 0.0f, 0.0f), vec3(1.0f, 2.0f, 1.0f));
+        data.joints.push_back(root);
+
+        SkeletonJoint child;
+        child.semanticID = 0x1112131415161718ull;
+        child.parentJointIndex = 0;
+        child.familyJointIndex = 1;
+        child.hierarchyDepth = 1;
+        child.flags = SkeletonJointFlags_Deformation;
+        child.restTransform = MakeLocalTransform(vec3(0.0f, 2.0f, 0.0f), quat(0.7071067690849304f, 0.0f, 0.0f, 0.7071067690849304f));
+        child.inverseBindTransform[0] = vec3(1.0f, 0.0f, 0.0f);
+        child.inverseBindTransform[1] = vec3(0.0f, 1.0f, 0.0f);
+        child.inverseBindTransform[2] = vec3(0.0f, 0.0f, 1.0f);
+        child.inverseBindTransform[3] = vec3(-1.0f, -4.0f, -3.0f);
+        data.joints.push_back(child);
+
+        SkeletonFamilyBinding binding;
+        binding.skeletonJointIndex = 1;
+        binding.familyJointIndex = 7;
+        binding.skeletonToFamily = MakeLocalTransform(vec3(0.25f, 0.0f, 0.0f));
+        binding.familyToSkeleton = MakeLocalTransform(vec3(-0.25f, 0.0f, 0.0f));
+        data.familyBindings.push_back(binding);
+
+        SkeletonPropagationRule rule;
+        rule.sourceJointIndex = 0;
+        rule.targetJointIndex = 1;
+        rule.type = SkeletonPropagationType::DistributeRotation;
+        rule.flags = 3;
+        rule.executionOrder = 4;
+        rule.weight = 0.5f;
+        rule.offsetTransform = MakeLocalTransform(vec3(0.0f, 0.5f, 0.0f));
+        data.propagationRules.push_back(rule);
+        data.hierarchyDepthRanges = {{0, 1}, {1, 1}};
+        data.hierarchyDepthJointIndices = {0, 1};
+
+        SkeletonAttachment attachment;
+        attachment.semanticID = 0x2122232425262728ull;
+        attachment.jointIndex = 1;
+        attachment.flags = 9;
+        attachment.localTransform = MakeLocalTransform(vec3(0.0f, 0.0f, 0.5f));
+        data.attachments.push_back(attachment);
+
+        std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(asset.GetSerializedSize(data));
+        REQUIRE(asset.Save(buffer, data));
+        REQUIRE(buffer->writtenData == 592);
+        CHECK(Fnv1a64(buffer->GetDataPointer(), buffer->writtenData) == 0xCF94CCA9D382C8D4ull);
+        CHECK(asset.jointsOffset == 80);
+        CHECK(asset.familyBindingsOffset == 320);
+        CHECK(asset.propagationRulesOffset == 432);
+        CHECK(asset.hierarchyDepthRangesOffset == 496);
+        CHECK(asset.hierarchyDepthJointIndicesOffset == 512);
+        CHECK(asset.attachmentsOffset == 528);
+        CHECK(std::all_of(buffer->GetDataPointer() + 72, buffer->GetDataPointer() + 80, [](u8 value) { return value == 0; }));
+
+        SkeletonAsset loaded;
+        REQUIRE(SkeletonAsset::Read(buffer, loaded));
+        CHECK(loaded.rigFamilyAssetID == asset.rigFamilyAssetID);
+        CHECK(loaded.numJoints == 2);
+        CHECK(loaded.numAttachments == 1);
+
+        buffer->writtenData = sizeof(SkeletonAsset) - 1;
+        buffer->readData = 0;
+        REQUIRE_FALSE(SkeletonAsset::Read(buffer, loaded));
+        buffer->writtenData = 592;
+        auto* serialized = reinterpret_cast<SkeletonAsset*>(buffer->GetDataPointer());
+        serialized->jointsOffset = 81;
+        buffer->readData = 0;
+        REQUIRE_FALSE(SkeletonAsset::Read(buffer, loaded));
+        serialized->jointsOffset = asset.jointsOffset;
+        serialized->numJoints = std::numeric_limits<u32>::max();
+        buffer->readData = 0;
+        REQUIRE_FALSE(SkeletonAsset::Read(buffer, loaded));
+        serialized->numJoints = asset.numJoints;
+        serialized->attachmentsOffset = 16;
+        serialized->numAttachments = 0;
+        buffer->readData = 0;
+        REQUIRE_FALSE(SkeletonAsset::Read(buffer, loaded));
+    }
+
+    SECTION("Non-empty AnimationClip bytes, sections, transforms, and rejection behavior are locked")
+    {
+        AnimationClipAsset asset;
+        asset.sourcePoseDomainAssetID = 0x3132333435363738ull;
+        asset.durationMicroseconds = 1'000'000;
+        asset.sampleRateHz = 2;
+        asset.sourcePoseDomainType = PoseDomainType::Skeleton;
+        asset.flags = AnimationClipFlags_Looping;
+        asset.sampleCount = 3;
+
+        AnimationClipData data;
+        AnimationTrack sampled;
+        sampled.sourceJointIndex = 0;
+        sampled.flags = AnimationTrackFlags_HasTranslationSamples | AnimationTrackFlags_HasRotationSamples | AnimationTrackFlags_HasScaleSamples;
+        sampled.numTranslations = 3;
+        sampled.numRotations = 3;
+        sampled.numScales = 3;
+        data.tracks.push_back(sampled);
+        AnimationTrack defaults;
+        defaults.sourceJointIndex = 1;
+        defaults.defaultTranslation = vec3(0.0f, 2.0f, 0.0f);
+        defaults.defaultRotation = quat(0.7071067690849304f, 0.0f, 0.0f, 0.7071067690849304f);
+        data.tracks.push_back(defaults);
+        data.translationSamples = {vec3(0.0f), vec3(0.5f, 0.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f)};
+        data.rotationSamples = {quat(1.0f, 0.0f, 0.0f, 0.0f), quat(0.7071067690849304f, 0.0f, 0.0f, 0.7071067690849304f), quat(0.0f, 0.0f, 0.0f, 1.0f)};
+        data.scaleSamples = {vec3(1.0f), vec3(1.0f, 1.5f, 1.0f), vec3(1.0f, 2.0f, 1.0f)};
+        data.synchronizationMarkers = {{0x4142434445464748ull, 0, 1}, {0x5152535455565758ull, 500'000, 2}};
+        data.actionWindows = {{0x6162636465666768ull, 250'000, 750'000}};
+        data.events = {{500'000, 0x71727374u, 0x81828384u, 5, 1, 3}};
+        data.eventPayloadBytes = {0x10, 0x20, 0x30, 0x40, 0x50};
+
+        std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(asset.GetSerializedSize(data));
+        REQUIRE(asset.Save(buffer, data));
+        REQUIRE(buffer->writtenData == 501);
+        CHECK(Fnv1a64(buffer->GetDataPointer(), buffer->writtenData) == 0x1925CD4355FF7D5Dull);
+        CHECK(asset.tracksOffset == 112);
+        CHECK(asset.translationSamplesOffset == 272);
+        CHECK(asset.rotationSamplesOffset == 320);
+        CHECK(asset.scaleSamplesOffset == 368);
+        CHECK(asset.synchronizationMarkersOffset == 416);
+        CHECK(asset.actionWindowsOffset == 448);
+        CHECK(asset.eventsOffset == 464);
+        CHECK(asset.eventPayloadBytesOffset == 496);
+        CHECK(std::all_of(buffer->GetDataPointer() + 308, buffer->GetDataPointer() + 320, [](u8 value) { return value == 0; }));
+        const auto* firstRotation = reinterpret_cast<const quat*>(buffer->GetDataPointer() + asset.rotationSamplesOffset);
+        CHECK(firstRotation->x == 0.0f);
+        CHECK(firstRotation->y == 0.0f);
+        CHECK(firstRotation->z == 0.0f);
+        CHECK(firstRotation->w == 1.0f);
+
+        AnimationClipAsset loaded;
+        REQUIRE(AnimationClipAsset::Read(buffer, loaded));
+        CHECK(loaded.sourcePoseDomainType == PoseDomainType::Skeleton);
+        CHECK(loaded.sampleCount == 3);
+
+        buffer->writtenData--;
+        buffer->readData = 0;
+        REQUIRE_FALSE(AnimationClipAsset::Read(buffer, loaded));
+        buffer->writtenData = 501;
+        auto* serialized = reinterpret_cast<AnimationClipAsset*>(buffer->GetDataPointer());
+        serialized->rotationSamplesOffset = 319;
+        buffer->readData = 0;
+        REQUIRE_FALSE(AnimationClipAsset::Read(buffer, loaded));
+        serialized->rotationSamplesOffset = asset.rotationSamplesOffset;
+        serialized->numEvents = std::numeric_limits<u32>::max();
+        buffer->readData = 0;
+        REQUIRE_FALSE(AnimationClipAsset::Read(buffer, loaded));
+        serialized->numEvents = asset.numEvents;
+        serialized->eventPayloadBytesOffset = 16;
+        serialized->numEventPayloadBytes = 0;
+        buffer->readData = 0;
+        REQUIRE_FALSE(AnimationClipAsset::Read(buffer, loaded));
     }
 }
 
