@@ -148,7 +148,7 @@ namespace Renderer
     void CommandList::PushMarker(std::string marker, Color color)
     {
         Commands::PushMarker* command = AddCommand<Commands::PushMarker>();
-        strncpy_s(command->marker, marker.c_str(), _TRUNCATE);
+        snprintf(command->marker, sizeof(command->marker), "%s", marker.c_str());
         command->color = color;
 
         _markerScope++;
