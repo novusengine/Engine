@@ -166,6 +166,13 @@ return D.Definitions
         D.Field("durability", Type.U16)
     }),
 
+    D.Packet("ServerItemUpdatePacket",
+    {
+        D.Field("guid", Type.OBJECTGUID),
+        D.Field("count", Type.U16),
+        D.Field("durability", Type.U16)
+    }),
+
     D.Packet("ServerSendCombatEventPacket",
     {
         D.Field("eventID", Type.U16)
@@ -444,8 +451,12 @@ return D.Definitions
         D.Field("revision", Type.U32),
         D.Field("sourceGUID", Type.OBJECTGUID),
         D.Field("surfaceType", Type.U8),
+        D.Field("questMask", Type.U8),
+        D.Field("heading", Type.STRING),
         D.Field("greeting", Type.STRING),
-        D.Field("optionCount", Type.U16)
+        D.Field("optionCount", Type.U16),
+        D.Field("objectiveCount", Type.U16),
+        D.Field("rewardCount", Type.U16)
     }),
 
     D.Packet("ServerInteractionClosePacket",
@@ -464,6 +475,41 @@ return D.Definitions
     D.Packet("ServerUnitInteractionUpdatePacket",
     {
         D.Field("guid", Type.OBJECTGUID),
-        D.Field("capabilities", Type.U8)
+        D.Field("capabilities", Type.U8),
+        D.Field("questMask", Type.U8)
+    }),
+
+    D.Packet("ClientVendorPurchasePacket",
+    {
+        D.Field("sessionID", Type.U64),
+        D.Field("revision", Type.U32),
+        D.Field("purchaseToken", Type.U64),
+        D.Field("bundleCount", Type.U32)
+    }),
+
+    D.Packet("ClientQuestCompletePacket",
+    {
+        D.Field("sessionID", Type.U64),
+        D.Field("revision", Type.U32),
+        D.Field("completionToken", Type.U64),
+        D.Field("selectedRewardCount", Type.U8),
+        D.Field("selectedRewardIDs", Type.ARRAY, { type = Type.U32, count = 64 })
+    }),
+
+    D.Packet("ClientQuestAbandonPacket",
+    {
+        D.Field("questID", Type.U32)
+    }),
+
+    D.Packet("ServerQuestCommandResultPacket",
+    {
+        D.Field("questID", Type.U32),
+        D.Field("result", Type.U8)
+    }),
+
+    D.Packet("ServerQuestLogSnapshotPacket",
+    {
+        D.Field("revision", Type.U64),
+        D.Field("questCount", Type.U8)
     })
 }

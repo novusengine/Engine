@@ -14,6 +14,7 @@ robin_hood::unordered_map<u32, std::function<bool(const FileChunkHeader&, std::s
     { FileChunkToken("MAID"), WdtParser::ReadMAID },
     { FileChunkToken("MODF"), WdtParser::ReadMODF },
 
+    { FileChunkToken("MAI2"), nullptr },
     { FileChunkToken("MWMO"), nullptr },
     { FileChunkToken("MANM"), nullptr },
     { FileChunkToken("MAOI"), nullptr },

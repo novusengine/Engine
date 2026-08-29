@@ -224,6 +224,12 @@ namespace Scripting
             bool result = true;
 
             u32 numFunctions = static_cast<u32>(funcList.size());
+            if (!lua_checkstack(state, static_cast<i32>(numFunctions + numArguments)))
+            {
+                Pop(numArguments);
+                return false;
+            }
+
             for (auto itr = funcList.rbegin(); itr != funcList.rend(); ++itr)
             {
                 GetRawI(LUA_REGISTRYINDEX, *itr);
@@ -266,6 +272,12 @@ namespace Scripting
             bool result = true;
 
             u32 numFunctions = static_cast<u32>(funcList.size());
+            if (!lua_checkstack(state, static_cast<i32>(numFunctions + numArguments)))
+            {
+                Pop(numArguments);
+                return false;
+            }
+
             for (auto itr = funcList.rbegin(); itr != funcList.rend(); ++itr)
             {
                 GetRawI(LUA_REGISTRYINDEX, *itr);

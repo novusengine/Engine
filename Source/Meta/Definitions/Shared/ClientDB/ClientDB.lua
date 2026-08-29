@@ -400,7 +400,7 @@ return D.Definitions
     D.ClientDB("GossipMenuOptionEditor",
     {
         D.Field("menuID", Type.U32),
-        D.Field("orderIndex", Type.U16),
+        D.Field("priority", Type.I32),
         D.Field("textID", Type.U32),
         D.Field("icon", Type.U16),
         D.Field("flags", Type.U32),
@@ -421,6 +421,7 @@ return D.Definitions
     {
         D.Field("rangePolicy", Type.U8),
         D.Field("interactionRange", Type.F32),
+        D.Field("defaultGreetingTextID", Type.U32),
         D.Field("flags", Type.U32)
     }),
 
@@ -428,6 +429,170 @@ return D.Definitions
     {
         D.Field("rootMenuID", Type.U32),
         D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CostEditor",
+    {
+        D.Field("internalName", Type.STRINGREF)
+    }),
+
+    D.ClientDB("CostCurrencyComponentEditor",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("currencyID", Type.U16),
+        D.Field("amount", Type.U64)
+    }),
+
+    D.ClientDB("CostItemComponentEditor",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("amount", Type.U32)
+    }),
+
+    D.ClientDB("VendorListEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("VendorListItemEditor",
+    {
+        D.Field("vendorListID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("purchaseQuantity", Type.U32),
+        D.Field("costID", Type.U32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("enabledConditionSetID", Type.U32),
+        D.Field("disabledReasonTextID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateVendorEditor",
+    {
+        D.Field("vendorListID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestTemplateEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("titleTextID", Type.U32),
+        D.Field("summaryTextID", Type.U32),
+        D.Field("detailsTextID", Type.U32),
+        D.Field("logTextID", Type.U32),
+        D.Field("progressTextID", Type.U32),
+        D.Field("completionTextID", Type.U32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("availabilityConditionSetID", Type.U32),
+        D.Field("unavailableReasonTextID", Type.U32),
+        D.Field("level", Type.U16),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestPrerequisiteEditor",
+    {
+        D.Field("questID", Type.U32),
+        D.Field("prerequisiteQuestID", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateQuestGiverEditor",
+    {
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateQuestEditor",
+    {
+        D.Field("creatureTemplateID", Type.U32),
+        D.Field("questID", Type.U32),
+        D.Field("roleFlags", Type.U8),
+        D.Field("priority", Type.I32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("enabledConditionSetID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestObjectiveEditor",
+    {
+        D.Field("questID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("objectiveType", Type.U8),
+        D.Field("requiredCount", Type.U32),
+        D.Field("textID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestObjectiveTargetEditor",
+    {
+        D.Field("objectiveID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("targetID", Type.U32),
+        D.Field("contribution", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardGroupEditor",
+    {
+        D.Field("questID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("selectionCount", Type.U8),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardItemEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("quantity", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardCurrencyEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("currencyID", Type.U16),
+        D.Field("amount", Type.U64),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardReputationEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("factionID", Type.U16),
+        D.Field("amount", Type.I32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardExperienceEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("amount", Type.U64),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("Currency",
+    {
+        D.Field("name", Type.STRINGREF)
+    }),
+
+    D.ClientDB("CostCurrencyComponent",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("currencyID", Type.U16),
+        D.Field("amount", Type.U64)
+    }),
+
+    D.ClientDB("CostItemComponent",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("amount", Type.U32)
     }),
 
     D.ClientDB("Spell",
