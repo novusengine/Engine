@@ -270,7 +270,7 @@ M.I8 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "static_cast<i64>(" .. fieldInfo.name .. ")" }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -312,7 +312,7 @@ M.I16 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "static_cast<i64>(" .. fieldInfo.name .. ")" }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -354,7 +354,7 @@ M.I32 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "static_cast<i64>(" .. fieldInfo.name .. ")" }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -396,7 +396,7 @@ M.I64 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", fieldInfo.name }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -438,7 +438,7 @@ M.U8 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "static_cast<i64>(" .. fieldInfo.name .. ")" }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -480,7 +480,7 @@ M.U16 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "static_cast<i64>(" .. fieldInfo.name .. ")" }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -522,7 +522,7 @@ M.U32 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "static_cast<i64>(" .. fieldInfo.name .. ")" }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -564,7 +564,7 @@ M.U64 =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "std::bit_cast<i64>(" .. fieldInfo.name .. ")" }))
     end,
 
     CommandReadExpr = function(self, fieldInfo, attributes, cppParamIndex, context)
@@ -928,7 +928,7 @@ M.STRINGREF =
     end,
 
     EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name }))
+        context.cpp:Statement(context.cpp:Call("lua_pushinteger64", { "state", "static_cast<i64>(" .. fieldInfo.name .. ")" }))
     end
 }
 
@@ -970,10 +970,6 @@ M.OBJECTGUID =
     end,
     SerializedSizeExpr = function(self, fieldInfo, attributes)
         return fieldInfo.name .. ".GetCounterBytesUsed() + 1"
-    end,
-
-    EmitLuaPush = function(self, fieldInfo, attributes, context)
-        context.cpp:Statement(context.cpp:Call("lua_pushnumber", { "state", fieldInfo.name .. ".GetData()" }))
     end
 }
 

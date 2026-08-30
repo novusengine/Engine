@@ -5,6 +5,7 @@
 #include "Luau/DenseHash.h"
 #include "Luau/NotNull.h"
 #include "Luau/TypeFwd.h"
+#include "Luau/TypeIds.h"
 
 #include <optional>
 #include <set>
@@ -22,7 +23,8 @@ struct SimplifyResult
 };
 
 SimplifyResult simplifyIntersection(NotNull<BuiltinTypes> builtinTypes, NotNull<TypeArena> arena, TypeId left, TypeId right);
-SimplifyResult simplifyIntersection(NotNull<BuiltinTypes> builtinTypes, NotNull<TypeArena> arena, std::set<TypeId> parts);
+
+SimplifyResult simplifyIntersection(NotNull<BuiltinTypes> builtinTypes, NotNull<TypeArena> arena, TypeIds parts);
 
 SimplifyResult simplifyUnion(NotNull<BuiltinTypes> builtinTypes, NotNull<TypeArena> arena, TypeId left, TypeId right);
 

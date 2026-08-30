@@ -4,8 +4,11 @@
 
 #include <Base/Memory/Bytebuffer.h>
 
+#include <libsodium/core/crypto_hash_sha256.h>
+
 #include <filesystem>
 #include <fstream>
+#include <thread>
 
 namespace fs = std::filesystem;
 
@@ -13,7 +16,7 @@ namespace PACT
 {
     bool PactFileKey::operator==(const PactFileKey& other) const
     {
-        return type == other.type && value == other.value;
+        return type == other.type && value == other.value && generation == other.generation;
     }
 
     bool PactResidentFile::operator==(const PactResidentFile& other) const
@@ -91,6 +94,31 @@ namespace PACT
             {
                 delete[] buffer;
                 return PactReadResult::FileReadFailed;
+            }
+
+            PactDigest contentDigest;
+            const u8 emptyContent = 0;
+            const u8* content = entry.dataSize > 0 ? buffer : &emptyContent;
+            crypto_hash_sha256(contentDigest.data(), content, entry.dataSize);
+            if (contentDigest != entry.contentDigest)
+            {
+                delete[] buffer;
+                return PactReadResult::FileReadFailed;
+            }
+
+            size_t chunkOffset = 0;
+            for (u32 i = 0; i < entry.chunkCount; i++)
+            {
+                const PactChunkInfo& chunk = manifest.chunks[entry.chunkIndex + i];
+                PactDigest chunkDigest;
+                crypto_hash_sha256(chunkDigest.data(), buffer + chunkOffset, chunk.storedSize);
+                if (chunkDigest != chunk.digest)
+                {
+                    delete[] buffer;
+                    return PactReadResult::FileReadFailed;
+                }
+
+                chunkOffset += chunk.storedSize;
             }
 
             data = buffer;

@@ -8,6 +8,29 @@ local Sha256 = require("Sha256")
 
 local M = {}
 
+local CPP_STRING_CHUNK_SIZE = 4096
+
+local function ChunkedCppString(cpp, value)
+    value = tostring(value)
+    if #value <= CPP_STRING_CHUNK_SIZE then return cpp:String(value) end
+
+    local chunks = {}
+    local offset = 1
+    while offset <= #value do
+        local finish = math.min(offset + CPP_STRING_CHUNK_SIZE - 1, #value)
+        while finish < #value do
+            local nextByte = value:byte(finish + 1)
+            if nextByte < 0x80 or nextByte > 0xBF then break end
+            finish = finish - 1
+        end
+
+        chunks[#chunks + 1] = cpp:String(value:sub(offset, finish))
+        offset = finish + 1
+    end
+
+    return table.concat(chunks, " ")
+end
+
 local bundleNames = { auth = "Auth", character = "Character", world = "World", shared = "Shared" }
 local cardinalityNames = { exactlyOne = "ExactlyOne", zeroOrOne = "ZeroOrOne", zeroOrMore = "ZeroOrMore" }
 
@@ -440,7 +463,7 @@ local function WriteSchema(context, bundle, bootstrapSql, manifest, migrations, 
                     { static = true, constexpr = true })
                 cpp:Variable("std::string_view", "BOOTSTRAP_CONTENT_HASH", cpp:String(Sha256.Hash(bootstrapSql)),
                     { static = true, constexpr = true })
-                cpp:Variable("std::string_view", "BOOTSTRAP_SQL", cpp:String(bootstrapSql),
+                cpp:Variable("std::string_view", "BOOTSTRAP_SQL", ChunkedCppString(cpp, bootstrapSql),
                     { static = true, constexpr = true })
                 cpp:Using("Tables", "std::tuple<" .. table.concat(tables, ", ") .. ">")
                 local preparedStatements = {}
@@ -466,7 +489,7 @@ local function WriteSchema(context, bundle, bootstrapSql, manifest, migrations, 
                         cpp:Variable("std::string_view", "TARGET_HASH", cpp:String(migration.targetHash), { static = true, constexpr = true })
                         cpp:Variable("std::string_view", "CONTENT_HASH", cpp:String(migration.contentHash), { static = true, constexpr = true })
                         cpp:Variable("bool", "TRANSACTIONAL", "true", { static = true, constexpr = true })
-                        cpp:Variable("std::string_view", "SQL", cpp:String(migration.sql), { static = true, constexpr = true })
+                        cpp:Variable("std::string_view", "SQL", ChunkedCppString(cpp, migration.sql), { static = true, constexpr = true })
                     end)
                 end
                 local migrationTypes = {}

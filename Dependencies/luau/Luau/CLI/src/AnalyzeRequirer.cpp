@@ -17,22 +17,29 @@ static Luau::Require::NavigationContext::NavigateResult convert(NavigationStatus
         return Luau::Require::NavigationContext::NavigateResult::NotFound;
 }
 
+static Luau::Require::NavigationContext::ConfigStatus convert(VfsNavigator::ConfigStatus status)
+{
+    if (status == VfsNavigator::ConfigStatus::Ambiguous)
+        return Luau::Require::NavigationContext::ConfigStatus::Ambiguous;
+    else if (status == VfsNavigator::ConfigStatus::PresentJson)
+        return Luau::Require::NavigationContext::ConfigStatus::PresentJson;
+    else if (status == VfsNavigator::ConfigStatus::PresentLuau)
+        return Luau::Require::NavigationContext::ConfigStatus::PresentLuau;
+    else
+        return Luau::Require::NavigationContext::ConfigStatus::Absent;
+}
+
 FileNavigationContext::FileNavigationContext(std::string requirerPath)
     : requirerPath(std::move(requirerPath))
 {
 }
 
-std::string FileNavigationContext::getRequirerIdentifier() const
+Luau::Require::NavigationContext::NavigateResult FileNavigationContext::resetToRequirer()
 {
-    return requirerPath;
-}
-
-Luau::Require::NavigationContext::NavigateResult FileNavigationContext::reset(const std::string& identifier)
-{
-    if (identifier == "-")
+    if (requirerPath == "-")
         return convert(vfs.resetToStdIn());
 
-    return convert(vfs.resetToPath(identifier));
+    return convert(vfs.resetToPath(requirerPath));
 }
 
 Luau::Require::NavigationContext::NavigateResult FileNavigationContext::jumpToAlias(const std::string& path)
@@ -63,9 +70,9 @@ std::optional<std::string> FileNavigationContext::getIdentifier() const
     return vfs.getAbsoluteFilePath();
 }
 
-bool FileNavigationContext::isConfigPresent() const
+Luau::Require::NavigationContext::ConfigStatus FileNavigationContext::getConfigStatus() const
 {
-    return isFile(vfs.getLuaurcPath());
+    return convert(vfs.getConfigStatus());
 }
 
 Luau::Require::NavigationContext::ConfigBehavior FileNavigationContext::getConfigBehavior() const
@@ -80,5 +87,5 @@ std::optional<std::string> FileNavigationContext::getAlias(const std::string& al
 
 std::optional<std::string> FileNavigationContext::getConfig() const
 {
-    return readFile(vfs.getLuaurcPath());
+    return vfs.getConfig();
 }

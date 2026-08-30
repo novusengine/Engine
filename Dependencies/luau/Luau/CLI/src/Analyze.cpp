@@ -1,16 +1,23 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
-#include "Luau/Config.h"
-#include "Luau/ModuleResolver.h"
-#include "Luau/TypeInfer.h"
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/Config.h"
 #include "Luau/Frontend.h"
+#include "Luau/LuauConfig.h"
+#include "Luau/ModuleResolver.h"
+#include "Luau/PrettyPrinter.h"
+#include "Luau/StringUtils.h"
+#include "Luau/TimeTrace.h"
 #include "Luau/TypeAttach.h"
-#include "Luau/Transpiler.h"
+#include "Luau/TypeCheckLimits.h"
+#include "Luau/TypeInfer.h"
 
 #include "Luau/AnalyzeRequirer.h"
 #include "Luau/FileUtils.h"
 #include "Luau/Flags.h"
 #include "Luau/RequireNavigator.h"
+
+#include "lua.h"
+#include "lualib.h"
 
 #include <condition_variable>
 #include <functional>
@@ -113,7 +120,7 @@ static bool reportModuleResult(Luau::Frontend& frontend, const Luau::ModuleName&
 
         Luau::attachTypeData(*sm, *m);
 
-        std::string annotated = Luau::transpileWithTypes(*sm->root);
+        std::string annotated = Luau::prettyPrintWithTypes(*sm->root);
 
         printf("%s", annotated.c_str());
     }
@@ -133,6 +140,7 @@ static void displayHelp(const char* argv0)
     printf("  --formatter=plain: report analysis errors in Luacheck-compatible format\n");
     printf("  --formatter=gnu: report analysis errors in GNU-compatible format\n");
     printf("  --mode=strict: default to strict mode when typechecking\n");
+    printf("  --solver={new|old}: selects which typechecker to use (defaults to the new solver)");
     printf("  --timetrace: record compiler time tracing information into trace.json\n");
 }
 
@@ -142,6 +150,12 @@ static int assertionHandler(const char* expr, const char* file, int line, const 
     fflush(stdout);
     return 1;
 }
+
+struct LuauConfigInterruptInfo
+{
+    Luau::TypeCheckLimits limits;
+    std::string module;
+};
 
 struct CliFileResolver : Luau::FileResolver
 {
@@ -168,13 +182,28 @@ struct CliFileResolver : Luau::FileResolver
         return Luau::SourceCode{*source, sourceType};
     }
 
-    std::optional<Luau::ModuleInfo> resolveModule(const Luau::ModuleInfo* context, Luau::AstExpr* node) override
+    std::optional<Luau::ModuleInfo> resolveModule(const Luau::ModuleInfo* context, Luau::AstExpr* node, const Luau::TypeCheckLimits& limits) override
     {
         if (Luau::AstExprConstantString* expr = node->as<Luau::AstExprConstantString>())
         {
             std::string path{expr->value.data, expr->value.size};
 
             FileNavigationContext navigationContext{context->name};
+
+            LuauConfigInterruptInfo info = {limits, path};
+            navigationContext.luauConfigInit = [&info](lua_State* L)
+            {
+                lua_setthreaddata(L, &info);
+            };
+            navigationContext.luauConfigInterrupt = [](lua_State* L, int gc)
+            {
+                LuauConfigInterruptInfo* info = static_cast<LuauConfigInterruptInfo*>(lua_getthreaddata(L));
+                if (info->limits.finishTime && Luau::TimeTrace::getClock() > *info->limits.finishTime)
+                    throw Luau::TimeLimitError{info->module};
+                if (info->limits.cancellationToken && info->limits.cancellationToken->requested())
+                    throw Luau::UserCancelError{info->module};
+            };
+
             Luau::Require::ErrorHandler nullErrorHandler{};
 
             Luau::Require::Navigator navigator(navigationContext, nullErrorHandler);
@@ -211,38 +240,80 @@ struct CliConfigResolver : Luau::ConfigResolver
         defaultConfig.mode = mode;
     }
 
-    const Luau::Config& getConfig(const Luau::ModuleName& name) const override
+    const Luau::Config& getConfig(const Luau::ModuleName& name, const Luau::TypeCheckLimits& limits) const override
     {
         std::optional<std::string> path = getParentPath(name);
         if (!path)
             return defaultConfig;
 
-        return readConfigRec(*path);
+        return readConfigRec(*path, limits);
     }
 
-    const Luau::Config& readConfigRec(const std::string& path) const
+    const Luau::Config& readConfigRec(const std::string& path, const Luau::TypeCheckLimits& limits) const
     {
         auto it = configCache.find(path);
         if (it != configCache.end())
             return it->second;
 
         std::optional<std::string> parent = getParentPath(path);
-        Luau::Config result = parent ? readConfigRec(*parent) : defaultConfig;
+        Luau::Config result = parent ? readConfigRec(*parent, limits) : defaultConfig;
 
-        std::string configPath = joinPaths(path, Luau::kConfigName);
+        std::optional<std::string> configPath = joinPaths(path, Luau::kConfigName);
+        if (!isFile(*configPath))
+            configPath = std::nullopt;
 
-        if (std::optional<std::string> contents = readFile(configPath))
+        std::optional<std::string> luauConfigPath = joinPaths(path, Luau::kLuauConfigName);
+        if (!isFile(*luauConfigPath))
+            luauConfigPath = std::nullopt;
+
+        if (configPath && luauConfigPath)
         {
-            Luau::ConfigOptions::AliasOptions aliasOpts;
-            aliasOpts.configLocation = configPath;
-            aliasOpts.overwriteAliases = true;
+            std::string ambiguousError = Luau::format("Both %s and %s files exist", Luau::kConfigName, Luau::kLuauConfigName);
+            configErrors.emplace_back(*configPath, std::move(ambiguousError));
+        }
+        else if (configPath)
+        {
+            if (std::optional<std::string> contents = readFile(*configPath))
+            {
+                Luau::ConfigOptions::AliasOptions aliasOpts;
+                aliasOpts.configLocation = *configPath;
+                aliasOpts.overwriteAliases = true;
 
-            Luau::ConfigOptions opts;
-            opts.aliasOptions = std::move(aliasOpts);
+                Luau::ConfigOptions opts;
+                opts.aliasOptions = std::move(aliasOpts);
 
-            std::optional<std::string> error = Luau::parseConfig(*contents, result, opts);
-            if (error)
-                configErrors.push_back({configPath, *error});
+                std::optional<std::string> error = Luau::parseConfig(*contents, result, opts);
+                if (error)
+                    configErrors.emplace_back(*configPath, *error);
+            }
+        }
+        else if (luauConfigPath)
+        {
+            if (std::optional<std::string> contents = readFile(*luauConfigPath))
+            {
+                Luau::ConfigOptions::AliasOptions aliasOpts;
+                aliasOpts.configLocation = *configPath;
+                aliasOpts.overwriteAliases = true;
+
+                Luau::InterruptCallbacks callbacks;
+                LuauConfigInterruptInfo info{limits, *luauConfigPath};
+                callbacks.initCallback = [&info](lua_State* L)
+                {
+                    lua_setthreaddata(L, &info);
+                };
+                callbacks.interruptCallback = [](lua_State* L, int gc)
+                {
+                    LuauConfigInterruptInfo* info = static_cast<LuauConfigInterruptInfo*>(lua_getthreaddata(L));
+                    if (info->limits.finishTime && Luau::TimeTrace::getClock() > *info->limits.finishTime)
+                        throw Luau::TimeLimitError{info->module};
+                    if (info->limits.cancellationToken && info->limits.cancellationToken->requested())
+                        throw Luau::UserCancelError{info->module};
+                };
+
+                std::optional<std::string> error = Luau::extractLuauConfig(*contents, result, aliasOpts, std::move(callbacks));
+                if (error)
+                    configErrors.emplace_back(*luauConfigPath, *error);
+            }
         }
 
         return configCache[path] = result;
@@ -337,6 +408,7 @@ int main(int argc, char** argv)
     bool annotate = false;
     int threadCount = 0;
     std::string basePath = "";
+    Luau::SolverMode solverMode = Luau::SolverMode::New;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -359,6 +431,8 @@ int main(int argc, char** argv)
             threadCount = int(strtol(argv[i] + 2, nullptr, 10));
         else if (strncmp(argv[i], "--logbase=", 10) == 0)
             basePath = std::string{argv[i] + 10};
+        else if (strcmp(argv[i], "--solver=old") == 0)
+            solverMode = Luau::SolverMode::Old;
     }
 
 #if !defined(LUAU_ENABLE_TIME_TRACE)
@@ -375,7 +449,8 @@ int main(int argc, char** argv)
 
     CliFileResolver fileResolver;
     CliConfigResolver configResolver(mode);
-    Luau::Frontend frontend(&fileResolver, &configResolver, frontendOptions);
+
+    Luau::Frontend frontend(solverMode, &fileResolver, &configResolver, frontendOptions);
 
     if (FFlag::DebugLuauLogSolverToJsonFile)
     {
@@ -421,9 +496,10 @@ int main(int argc, char** argv)
 
         checkedModules = frontend.checkQueuedModules(
             std::nullopt,
-            [&](std::function<void()> f)
+            [&](std::vector<std::function<void()>> tasks)
             {
-                scheduler.push(std::move(f));
+                for (auto& task : tasks)
+                    scheduler.push(std::move(task));
             }
         );
     }

@@ -2,9 +2,9 @@
 #pragma once
 
 #include "Luau/Constraint.h"
-#include "Luau/EqSatSimplification.h"
 #include "Luau/Error.h"
 #include "Luau/NotNull.h"
+#include "Luau/Subtyping.h"
 #include "Luau/TypeCheckLimits.h"
 #include "Luau/TypeFunctionRuntime.h"
 #include "Luau/TypeFwd.h"
@@ -32,11 +32,11 @@ struct TypeFunctionContext
     NotNull<TypeArena> arena;
     NotNull<BuiltinTypes> builtins;
     NotNull<Scope> scope;
-    NotNull<Simplifier> simplifier;
     NotNull<Normalizer> normalizer;
     NotNull<TypeFunctionRuntime> typeFunctionRuntime;
     NotNull<InternalErrorReporter> ice;
     NotNull<TypeCheckLimits> limits;
+    NotNull<Subtyping> subtyping;
 
     // nullptr if the type function is being reduced outside of the constraint solver.
     ConstraintSolver* solver;
@@ -45,26 +45,36 @@ struct TypeFunctionContext
 
     std::optional<AstName> userFuncName; // Name of the user-defined type function; only available for UDTFs
 
-    TypeFunctionContext(NotNull<ConstraintSolver> cs, NotNull<Scope> scope, NotNull<const Constraint> constraint);
+    // Some type functions will create fresh instances as part of
+    // being solved, for example:
+    //
+    //  add<number | number, number>
+    //
+    // ... will mint:
+    //
+    //  union<number, number>
+    std::vector<TypeId> freshInstances;
+
+    TypeFunctionContext(NotNull<ConstraintSolver> cs, NotNull<Scope> scope, NotNull<const Constraint> constraint, NotNull<Subtyping> subtyping);
 
     TypeFunctionContext(
         NotNull<TypeArena> arena,
         NotNull<BuiltinTypes> builtins,
         NotNull<Scope> scope,
-        NotNull<Simplifier> simplifier,
         NotNull<Normalizer> normalizer,
         NotNull<TypeFunctionRuntime> typeFunctionRuntime,
         NotNull<InternalErrorReporter> ice,
-        NotNull<TypeCheckLimits> limits
+        NotNull<TypeCheckLimits> limits,
+        NotNull<Subtyping> subtyping
     )
         : arena(arena)
         , builtins(builtins)
         , scope(scope)
-        , simplifier(simplifier)
         , normalizer(normalizer)
         , typeFunctionRuntime(typeFunctionRuntime)
         , ice(ice)
         , limits(limits)
+        , subtyping(subtyping)
         , solver(nullptr)
         , constraint(nullptr)
     {

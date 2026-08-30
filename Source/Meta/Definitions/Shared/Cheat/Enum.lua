@@ -29,8 +29,7 @@ return D.Definitions
         D.Field("CreatureAdd"),
         D.Field("CreatureRemove"),
         D.Field("CreatureInfo"),
-        D.Field("MapAdd"),
-        D.Field("GotoAdd"),
+        D.Field("GotoAdd", 26),
         D.Field("GotoAddHere"),
         D.Field("GotoRemove"),
         D.Field("GotoMap"),
@@ -38,11 +37,7 @@ return D.Definitions
         D.Field("GotoXYZ"),
         D.Field("TriggerAdd"),
         D.Field("TriggerRemove"),
-        D.Field("SpellSet"),
-        D.Field("SpellEffectSet"),
-        D.Field("SpellProcDataSet"),
-        D.Field("SpellProcLinkSet"),
-        D.Field("CreatureAddScript"),
+        D.Field("CreatureAddScript", 37),
         D.Field("CreatureRemoveScript"),
         D.Field("CreatureMove"),
         D.Field("CreatureFollow"),
@@ -55,6 +50,8 @@ return D.Definitions
         D.Field("FactionReputationRemove"),
         D.Field("FactionReputationSetFlags"),
         D.Field("FactionReputationLock"),
-        D.Field("UnitSetFaction")
+        D.Field("UnitSetFaction"),
+        D.Field("DatabaseEditor"),
+        D.Field("DevelopmentAction", 57)
     })
 }

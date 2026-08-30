@@ -105,16 +105,18 @@ namespace Renderer
 
         virtual TextureArrayID CreateTextureArray(TextureArrayDesc& desc) = 0;
 
+        // Standalone create/load calls acquire one reference owned by the caller. The IntoArray variants
+        // transfer that reference to the array, which releases it through UnloadTexturesInArray.
         virtual TextureID CreateDataTexture(DataTextureDesc& desc) = 0;
-        virtual TextureID CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex) = 0;
+        virtual TextureID CreateDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex) = 0;
 
         virtual TimeQueryID CreateTimeQuery(TimeQueryDesc& desc) = 0;
 
         // Loading
         virtual TextureID LoadTexture(TextureDesc& desc) = 0;
         virtual TextureID LoadDataTexture(DataTextureDesc& desc) = 0;
-        virtual TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) = 0;
-        virtual TextureID LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, u32& arrayIndex, bool allowDuplicates = false) = 0;
+        virtual TextureID LoadTextureIntoArray(TextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex, bool allowDuplicates = false) = 0;
+        virtual TextureID LoadDataTextureIntoArray(DataTextureDesc& desc, TextureArrayID textureArray, size_t& arrayIndex, bool allowDuplicates = false) = 0;
 
         virtual VertexShaderID LoadShader(VertexShaderDesc& desc) = 0;
         virtual PixelShaderID LoadShader(PixelShaderDesc& desc) = 0;
@@ -122,7 +124,7 @@ namespace Renderer
         virtual MeshShaderID LoadShader(MeshShaderDesc& desc) = 0;
         virtual TaskShaderID LoadShader(TaskShaderDesc& desc) = 0;
 
-        // Unloading
+        // Unloading releases references and destroys a texture only after its final reference is released.
         virtual void UnloadTexture(TextureID textureID) = 0;
         virtual void UnloadTexturesInArray(TextureArrayID textureArrayID, u32 unloadStartIndex) = 0;
 
@@ -140,8 +142,11 @@ namespace Renderer
         virtual bool HasPendingBufferDescriptorWrites(DescriptorSetID descriptorSetID, u32 frameIndex) const = 0;
 
         // Misc
-        virtual u32 AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;
+        // This adds a borrowed texture reference. The texture's owner must keep it loaded while the array uses it.
+        virtual size_t AddTextureToArray(TextureID textureID, TextureArrayID textureArrayID) = 0;
         virtual void FlushTextureArrayDescriptors(TextureArrayID textureArrayID) = 0;
+        virtual bool TryFindExistingTexture(u64 descHash, TextureID& textureID) = 0;
+        virtual bool TryFindExistingTextureInArray(TextureArrayID textureArrayID, u64 descHash, size_t& arrayIndex, TextureID& textureID) = 0;
 
         // Command List Functions
         virtual CommandListID BeginCommandList() = 0;
@@ -226,6 +231,7 @@ namespace Renderer
 
         // Staging and memory
         virtual std::shared_ptr<UploadBuffer> CreateUploadBuffer(BufferID targetBuffer, size_t targetOffset, size_t size) = 0;
+        virtual std::shared_ptr<UploadBuffer> CreateUploadBuffer(TextureID targetTexture, const TextureUploadRegion& region, size_t size) = 0;
         virtual bool ShouldWaitForUpload() = 0;
         virtual void SetHasWaitedForUpload() = 0;
         virtual SemaphoreID GetUploadFinishedSemaphore() = 0;
@@ -284,7 +290,7 @@ namespace Renderer
 
         virtual void ResetTimeQueries(u32 frameIndex) = 0;
 
-        virtual TextureID GetTextureID(TextureArrayID textureArrayID, u32 index) = 0;
+        virtual TextureID GetTextureID(TextureArrayID textureArrayID, size_t index) = 0;
 
         virtual uvec2 GetImageDimensions(const ImageID id, u32 mipLevel = 0) = 0;
         virtual uvec2 GetImageDimensions(const DepthImageID id) = 0;

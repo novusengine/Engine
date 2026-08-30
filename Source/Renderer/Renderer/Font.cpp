@@ -259,7 +259,8 @@ namespace Renderer
 
         f32 currentLineWidth = borderSize * 2.0f;
         f32 maxLineWidth = currentLineWidth;
-        f32 totalHeight = 0.0f;
+        const f32 lineAdvance = fontSize * static_cast<f32>(metrics.lineHeight);
+        u32 lineCount = 1;
 
         for (; it != endIt; it++)
         {
@@ -274,24 +275,17 @@ namespace Renderer
             // Handle newline characters
             if (c == '\n')
             {
-                totalHeight += fontSize * static_cast<f32>(metrics.lineHeight);
+                ++lineCount;
                 maxLineWidth = std::max(maxLineWidth, currentLineWidth);
                 currentLineWidth = borderSize * 2.0f;
                 continue;
             }
 
-            vec2 charSize = CalculateCharSize(c, fontSize, borderSize);
-            currentLineWidth += charSize.x;
-            totalHeight = glm::max(totalHeight, charSize.y);
+            currentLineWidth += CalculateCharWidth(c, fontSize, borderSize);
         }
 
         maxLineWidth = std::max(maxLineWidth, currentLineWidth);
-
-        // Add last line height if there was no trailing newline
-        if (totalHeight == 0.0f)
-        {
-            totalHeight = fontSize * static_cast<f32>(metrics.lineHeight);
-        }
+        const f32 totalHeight = static_cast<f32>(lineCount) * lineAdvance + borderSize * 2.0f;
 
         return vec2(maxLineWidth, totalHeight);
     }

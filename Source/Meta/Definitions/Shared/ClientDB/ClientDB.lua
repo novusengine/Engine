@@ -327,13 +327,272 @@ return D.Definitions
 
     D.ClientDB("Map",
     {
-        D.Field("nameInternal", Type.STRINGREF),
-        D.Field("name", Type.STRINGREF),
-
         D.Field("flags", Type.U32),
-        D.Field("instanceType", Type.U8),
-        D.Field("expansionID", Type.U8),
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("name", Type.STRINGREF),
+        D.Field("type", Type.U8),
         D.Field("maxPlayers", Type.U16)
+    }),
+
+    D.ClientDB("LocalizedTextEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("englishValue", Type.STRINGREF),
+        D.Field("translatorContext", Type.STRINGREF)
+    }),
+
+    D.ClientDB("LocalizedTextTranslationEditor",
+    {
+        D.Field("textID", Type.U32),
+        D.Field("locale", Type.U8),
+        D.Field("value", Type.STRINGREF)
+    }),
+
+    D.ClientDB("ConditionDescriptorEditor",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("comparisonMask", Type.U16),
+        D.Field("parameterNames", Type.ARRAY, { type = Type.STRINGREF, count = 4 }),
+        D.Field("parameterKinds", Type.ARRAY, { type = Type.U8, count = 4 }),
+        D.Field("parameterMinimums", Type.ARRAY, { type = Type.I64, count = 4 }),
+        D.Field("parameterMaximums", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("ConditionSetEditor",
+    {
+        D.Field("internalName", Type.STRINGREF)
+    }),
+
+    D.ClientDB("ConditionGroupEditor",
+    {
+        D.Field("conditionSetID", Type.U32),
+        D.Field("parentGroupID", Type.U32),
+        D.Field("groupOperator", Type.U8),
+        D.Field("negated", Type.U8),
+        D.Field("orderIndex", Type.U16)
+    }),
+
+    D.ClientDB("ConditionEditor",
+    {
+        D.Field("conditionGroupID", Type.U32),
+        D.Field("orderIndex", Type.U16),
+        D.Field("conditionType", Type.U16),
+        D.Field("comparison", Type.U8),
+        D.Field("parameters", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("GossipActionDescriptorEditor",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("parameterNames", Type.ARRAY, { type = Type.STRINGREF, count = 4 }),
+        D.Field("parameterKinds", Type.ARRAY, { type = Type.U8, count = 4 }),
+        D.Field("parameterMinimums", Type.ARRAY, { type = Type.I64, count = 4 }),
+        D.Field("parameterMaximums", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("GossipMenuEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("greetingTextID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("GossipMenuOptionEditor",
+    {
+        D.Field("menuID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("textID", Type.U32),
+        D.Field("icon", Type.U16),
+        D.Field("flags", Type.U32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("enabledConditionSetID", Type.U32),
+        D.Field("disabledReasonTextID", Type.U32),
+        D.Field("actionType", Type.U8),
+        D.Field("actionParameters", Type.ARRAY, { type = Type.I64, count = 4 })
+    }),
+
+    D.ClientDB("CreatureTemplateDescriptorEditor",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("subname", Type.STRINGREF)
+    }),
+
+    D.ClientDB("CreatureTemplateInteractionEditor",
+    {
+        D.Field("rangePolicy", Type.U8),
+        D.Field("interactionRange", Type.F32),
+        D.Field("defaultGreetingTextID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateGossipEditor",
+    {
+        D.Field("rootMenuID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CostEditor",
+    {
+        D.Field("internalName", Type.STRINGREF)
+    }),
+
+    D.ClientDB("CostCurrencyComponentEditor",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("currencyID", Type.U16),
+        D.Field("amount", Type.U64)
+    }),
+
+    D.ClientDB("CostItemComponentEditor",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("amount", Type.U32)
+    }),
+
+    D.ClientDB("VendorListEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("VendorListItemEditor",
+    {
+        D.Field("vendorListID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("purchaseQuantity", Type.U32),
+        D.Field("costID", Type.U32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("enabledConditionSetID", Type.U32),
+        D.Field("disabledReasonTextID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateVendorEditor",
+    {
+        D.Field("vendorListID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestTemplateEditor",
+    {
+        D.Field("internalName", Type.STRINGREF),
+        D.Field("titleTextID", Type.U32),
+        D.Field("summaryTextID", Type.U32),
+        D.Field("detailsTextID", Type.U32),
+        D.Field("logTextID", Type.U32),
+        D.Field("progressTextID", Type.U32),
+        D.Field("completionTextID", Type.U32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("availabilityConditionSetID", Type.U32),
+        D.Field("unavailableReasonTextID", Type.U32),
+        D.Field("level", Type.U16),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestPrerequisiteEditor",
+    {
+        D.Field("questID", Type.U32),
+        D.Field("prerequisiteQuestID", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateQuestGiverEditor",
+    {
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("CreatureTemplateQuestEditor",
+    {
+        D.Field("creatureTemplateID", Type.U32),
+        D.Field("questID", Type.U32),
+        D.Field("roleFlags", Type.U8),
+        D.Field("priority", Type.I32),
+        D.Field("visibilityConditionSetID", Type.U32),
+        D.Field("enabledConditionSetID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestObjectiveEditor",
+    {
+        D.Field("questID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("objectiveType", Type.U8),
+        D.Field("requiredCount", Type.U32),
+        D.Field("textID", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestObjectiveTargetEditor",
+    {
+        D.Field("objectiveID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("targetID", Type.U32),
+        D.Field("contribution", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardGroupEditor",
+    {
+        D.Field("questID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("selectionCount", Type.U8),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardItemEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("quantity", Type.U32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardCurrencyEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("currencyID", Type.U16),
+        D.Field("amount", Type.U64),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardReputationEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("factionID", Type.U16),
+        D.Field("amount", Type.I32),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("QuestRewardExperienceEditor",
+    {
+        D.Field("rewardGroupID", Type.U32),
+        D.Field("priority", Type.I32),
+        D.Field("amount", Type.U64),
+        D.Field("flags", Type.U32)
+    }),
+
+    D.ClientDB("Currency",
+    {
+        D.Field("name", Type.STRINGREF)
+    }),
+
+    D.ClientDB("CostCurrencyComponent",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("currencyID", Type.U16),
+        D.Field("amount", Type.U64)
+    }),
+
+    D.ClientDB("CostItemComponent",
+    {
+        D.Field("costID", Type.U32),
+        D.Field("itemTemplateID", Type.U32),
+        D.Field("amount", Type.U32)
     }),
 
     D.ClientDB("Spell",
@@ -345,7 +604,16 @@ return D.Definitions
 
         D.Field("castTime", Type.F32),
         D.Field("cooldown", Type.F32),
-        D.Field("duration", Type.F32)
+
+        D.Field("targetSelector", Type.U8),
+        D.Field("targetShape", Type.U8),
+        D.Field("targetRelation", Type.U8),
+        D.Field("targetRecipientMask", Type.U8),
+        D.Field("rangePolicy", Type.U8),
+        D.Field("minimumRange", Type.F32),
+        D.Field("maximumRange", Type.F32),
+        D.Field("targetRadius", Type.F32),
+        D.Field("maximumTargets", Type.U16)
     }),
 
     D.ClientDB("SpellEffects",
@@ -353,12 +621,42 @@ return D.Definitions
         D.Field("spellID", Type.U32),
         D.Field("effectPriority", Type.U8),
         D.Field("effectType", Type.U8),
-        D.Field("effectValues", Type.ARRAY, { type = Type.I32, count = 3 }),
-        D.Field("effectMiscValues", Type.ARRAY, { type = Type.I32, count = 3 })
+        D.Field("parameters", Type.ARRAY, { type = Type.I32, count = 6 })
+    }),
+
+    D.ClientDB("SpellAura",
+    {
+        D.Field("duration", Type.F32),
+        D.Field("stacksPerApplication", Type.U16),
+        D.Field("maximumStacks", Type.U16),
+        D.Field("applicationPolicy", Type.U8),
+        D.Field("disposition", Type.U8),
+        D.Field("dispelType", Type.U8),
+        D.Field("lifecycleFlags", Type.U8)
+    }),
+
+    D.ClientDB("SpellAuraConstraintGroup",
+    {
+        D.Field("name", Type.STRINGREF),
+        D.Field("defaultScope", Type.U8),
+        D.Field("defaultMaximumApplications", Type.U16),
+        D.Field("defaultOverflowBehavior", Type.U8)
+    }),
+
+    D.ClientDB("SpellAuraConstraint",
+    {
+        D.Field("spellID", Type.U32),
+        D.Field("groupID", Type.U32),
+        D.Field("scope", Type.U8),
+        D.Field("maximumApplications", Type.U16),
+        D.Field("overflowBehavior", Type.U8),
+        D.Field("overrideMask", Type.U8)
     }),
 
     D.ClientDB("SpellProcData",
     {
+        D.Field("ownerSpellID", Type.U32),
+        D.Field("name", Type.STRINGREF),
         D.Field("phaseMask", Type.U32),
         D.Field("typeMask", Type.U64),
         D.Field("hitMask", Type.U64),

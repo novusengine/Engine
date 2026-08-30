@@ -11,46 +11,8 @@
 
 using namespace Luau;
 
-LUAU_FASTFLAG(LuauSolverAgnosticStringification)
 
 TEST_SUITE_BEGIN("TypeTests");
-
-TEST_CASE_FIXTURE(Fixture, "primitives_are_equal")
-{
-    REQUIRE_EQ(getBuiltins()->booleanType, getBuiltins()->booleanType);
-}
-
-TEST_CASE_FIXTURE(Fixture, "bound_type_is_equal_to_that_which_it_is_bound")
-{
-    Type bound(BoundType(getBuiltins()->booleanType));
-    REQUIRE_EQ(bound, *getBuiltins()->booleanType);
-}
-
-TEST_CASE_FIXTURE(Fixture, "equivalent_cyclic_tables_are_equal")
-{
-    Type cycleOne{TypeVariant(TableType())};
-    TableType* tableOne = getMutable<TableType>(&cycleOne);
-    tableOne->props["self"] = {&cycleOne};
-
-    Type cycleTwo{TypeVariant(TableType())};
-    TableType* tableTwo = getMutable<TableType>(&cycleTwo);
-    tableTwo->props["self"] = {&cycleTwo};
-
-    CHECK_EQ(cycleOne, cycleTwo);
-}
-
-TEST_CASE_FIXTURE(Fixture, "different_cyclic_tables_are_not_equal")
-{
-    Type cycleOne{TypeVariant(TableType())};
-    TableType* tableOne = getMutable<TableType>(&cycleOne);
-    tableOne->props["self"] = {&cycleOne};
-
-    Type cycleTwo{TypeVariant(TableType())};
-    TableType* tableTwo = getMutable<TableType>(&cycleTwo);
-    tableTwo->props["this"] = {&cycleTwo};
-
-    CHECK_NE(cycleOne, cycleTwo);
-}
 
 TEST_CASE_FIXTURE(Fixture, "return_type_of_function_is_not_parenthesized_if_just_one_value")
 {
@@ -221,7 +183,6 @@ TEST_CASE_FIXTURE(Fixture, "UnionTypeIterator_with_only_cyclic_union")
  */
 TEST_CASE_FIXTURE(Fixture, "substitution_skip_failure")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverAgnosticStringification, true};
     Type ftv11{FreeType{TypeLevel{}, getBuiltins()->neverType, getBuiltins()->unknownType}};
 
     TypePackVar tp24{TypePack{{&ftv11}}};
@@ -294,9 +255,9 @@ TEST_CASE_FIXTURE(Fixture, "substitution_skip_failure")
 
     TypeId root = &ttvTweenResult;
 
-    ModulePtr currentModule = std::make_shared<Module>();
+    ModulePtr currentModule = std::make_shared<Module>(std::make_shared<TypeArena>());
     Anyification anyification(
-        &currentModule->internalTypes,
+        currentModule->internalTypes.get(),
         getFrontend().globals.globalScope,
         getBuiltins(),
         &getFrontend().iceHandler,

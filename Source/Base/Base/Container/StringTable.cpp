@@ -112,10 +112,14 @@ namespace Novus::Container
             if (!bytebuffer->GetString(string))
                 return false;
 
+            const u32 serializedStringSize = static_cast<u32>(string.length() + 1);
+            if (serializedStringSize > totalSize - readSize)
+                return false;
+
             u64 hashedString = XXHash64::hash(string.c_str(), string.size(), 0);
             _strings.push_back(string);
             _hashes.push_back(hashedString);
-            readSize += static_cast<u32>(string.length() + 1);
+            readSize += serializedStringSize;
         }
 
         _numBytes = readSize;
@@ -274,10 +278,14 @@ namespace Novus::Container
             if (!bytebuffer->GetString(string))
                 return false;
 
+            const u32 serializedStringSize = static_cast<u32>(string.length() + 1);
+            if (serializedStringSize > totalSize - readSize)
+                return false;
+
             u64 hashedString = XXHash64::hash(string.c_str(), string.size(), 0);
             _strings.push_back(string);
             _hashes.push_back(hashedString);
-            readSize += static_cast<u32>(string.length() + 1);
+            readSize += serializedStringSize;
         }
 
         _numBytes = readSize;

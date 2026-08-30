@@ -9,10 +9,11 @@
 
 using namespace Luau;
 
-LUAU_FASTFLAG(LuauSolverV2)
-LUAU_FASTFLAG(LuauSolverAgnosticStringification)
-LUAU_FASTFLAG(LuauInitializeDefaultGenericParamsAtProgramPoint)
-LUAU_FASTFLAG(LuauAddErrorCaseForIncompatibleTypePacks)
+LUAU_FASTFLAG(DebugLuauForceOldSolver)
+LUAU_FASTFLAG(LuauDisallowRedefiningBuiltinTypes)
+LUAU_FASTFLAG(LuauAvoidCascadingRecursiveConstraintViolationError)
+LUAU_FASTFLAG(LuauFixInfiniteTypeRedundantBind)
+LUAU_FASTFLAG(LuauDoNotEmplaceAnnotatedType)
 
 TEST_SUITE_BEGIN("TypeAliases");
 
@@ -75,7 +76,7 @@ TEST_CASE_FIXTURE(Fixture, "cannot_steal_hoisted_type_alias")
     )");
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
-    if (FFlag::LuauSolverV2)
+    if (!FFlag::DebugLuauForceOldSolver)
     {
         CHECK(
             result.errors[0] == TypeError{
@@ -205,7 +206,7 @@ TEST_CASE_FIXTURE(Fixture, "mutually_recursive_aliases")
 
 TEST_CASE_FIXTURE(Fixture, "generic_aliases")
 {
-    ScopedFastFlag _{FFlag::LuauSolverV2, true};
+    ScopedFastFlag _{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         type T<a> = { v: a }
@@ -216,12 +217,12 @@ TEST_CASE_FIXTURE(Fixture, "generic_aliases")
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
     CHECK(result.errors[0].location == Location{{4, 37}, {4, 42}});
-    CHECK_EQ("Type 'string' could not be converted into 'number'", toString(result.errors[0]));
+    CHECK_EQ("Expected this to be 'number', but got 'string'", toString(result.errors[0]));
 }
 
 TEST_CASE_FIXTURE(Fixture, "dependent_generic_aliases")
 {
-    ScopedFastFlag _{FFlag::LuauSolverV2, true};
+    ScopedFastFlag _{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         type T<a> = { v: a }
@@ -232,7 +233,7 @@ TEST_CASE_FIXTURE(Fixture, "dependent_generic_aliases")
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
     CHECK(result.errors[0].location == Location{{4, 43}, {4, 48}});
-    CHECK_EQ("Type 'string' could not be converted into 'number'", toString(result.errors[0]));
+    CHECK_EQ("Expected this to be 'number', but got 'string'", toString(result.errors[0]));
 }
 
 TEST_CASE_FIXTURE(Fixture, "mutually_recursive_generic_aliases")
@@ -269,7 +270,7 @@ TEST_CASE_FIXTURE(Fixture, "mutually_recursive_types_errors")
     unfreeze(module->interfaceTypes);
     copyErrors(module->errors, module->interfaceTypes, getBuiltins());
     freeze(module->interfaceTypes);
-    module->internalTypes.clear();
+    module->internalTypes->clear();
     module->astTypes.clear();
 
     // Make sure the error strings don't include "VALUELESS"
@@ -309,7 +310,6 @@ TEST_CASE_FIXTURE(Fixture, "dont_stop_typechecking_after_reporting_duplicate_typ
 
 TEST_CASE_FIXTURE(Fixture, "stringify_type_alias_of_recursive_template_table_type")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverAgnosticStringification, true};
 
     CheckResult result = check(R"(
         type Table<T> = { a: T }
@@ -327,7 +327,6 @@ TEST_CASE_FIXTURE(Fixture, "stringify_type_alias_of_recursive_template_table_typ
 
 TEST_CASE_FIXTURE(Fixture, "stringify_type_alias_of_recursive_template_table_type2")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverAgnosticStringification, true};
 
     CheckResult result = check(R"(
         type Table<T> = { a: T }
@@ -343,10 +342,9 @@ TEST_CASE_FIXTURE(Fixture, "stringify_type_alias_of_recursive_template_table_typ
     CHECK_EQ(getBuiltins()->numberType, tm->givenType);
 }
 
-#if 0 // CLI-169898: temporarily disabled for stack overflow in unoptimized build
-// Check that recursive intersection type doesn't generate an OOM
 TEST_CASE_FIXTURE(Fixture, "cli_38393_recursive_intersection_oom")
 {
+    // Check that recursive intersection type doesn't generate an OOM
     CheckResult result = check(R"(
         function _(l0:(t0)&((t0)&(((t0)&((t0)->()))->(typeof(_),typeof(# _)))),l39,...):any
         end
@@ -354,7 +352,6 @@ TEST_CASE_FIXTURE(Fixture, "cli_38393_recursive_intersection_oom")
         _(_)
     )");
 }
-#endif
 
 TEST_CASE_FIXTURE(Fixture, "type_alias_fwd_declaration_is_precise")
 {
@@ -407,8 +404,6 @@ TEST_CASE_FIXTURE(Fixture, "corecursive_function_types")
 
 TEST_CASE_FIXTURE(Fixture, "generic_param_remap")
 {
-    DOES_NOT_PASS_NEW_SOLVER_GUARD();
-
     const std::string code = R"(
         -- An example of a forwarded use of a type that has different type arguments than parameters
         type A<T,U> = {t:T, u:U, next:A<U,T>?}
@@ -591,7 +586,6 @@ type Cool = typeof(c)
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "type_alias_of_an_imported_recursive_type")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverAgnosticStringification, true};
 
     fileResolver.source["game/A"] = R"(
 export type X = { a: number, b: X? }
@@ -618,7 +612,6 @@ type X = Import.X
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "type_alias_of_an_imported_recursive_generic_type")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverAgnosticStringification, true};
 
     fileResolver.source["game/A"] = R"(
         export type X<T, U> = { a: T, b: U, C: X<T, U>? }
@@ -654,7 +647,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "type_alias_of_an_imported_recursive_generic_
     ty2 = lookupType("X");
     REQUIRE(ty2);
 
-    if (FFlag::LuauSolverV2)
+    if (!FFlag::DebugLuauForceOldSolver)
     {
         CHECK(toString(*ty1, {true}) == "t1 where t1 = { C: t1?, a: T, b: U }");
         CHECK(toString(*ty2, {true}) == "t1 where t1 = { C: t1?, a: U, b: T }");
@@ -705,8 +698,7 @@ TEST_CASE_FIXTURE(Fixture, "mutually_recursive_types_restriction_ok")
 
 TEST_CASE_FIXTURE(Fixture, "mutually_recursive_types_restriction_not_ok_1")
 {
-    // CLI-116108
-    DOES_NOT_PASS_NEW_SOLVER_GUARD();
+    ScopedFastFlag _{FFlag::LuauFixInfiniteTypeRedundantBind, true};
 
     CheckResult result = check(R"(
         -- OK because forwarded types are used with their parameters.
@@ -719,8 +711,7 @@ TEST_CASE_FIXTURE(Fixture, "mutually_recursive_types_restriction_not_ok_1")
 
 TEST_CASE_FIXTURE(Fixture, "mutually_recursive_types_restriction_not_ok_2")
 {
-    // CLI-116108
-    DOES_NOT_PASS_NEW_SOLVER_GUARD();
+    ScopedFastFlag _{FFlag::LuauFixInfiniteTypeRedundantBind, true};
 
     CheckResult result = check(R"(
         -- Not OK because forwarded types are used with different types than their parameters.
@@ -743,8 +734,7 @@ TEST_CASE_FIXTURE(Fixture, "mutually_recursive_types_swapsies_ok")
 
 TEST_CASE_FIXTURE(Fixture, "mutually_recursive_types_swapsies_not_ok")
 {
-    // CLI-116108
-    DOES_NOT_PASS_NEW_SOLVER_GUARD();
+    ScopedFastFlag _{FFlag::LuauFixInfiniteTypeRedundantBind, true};
 
     CheckResult result = check(R"(
         type Tree1<T,U> = { data: T, children: {Tree2<U,T>} }
@@ -840,7 +830,6 @@ TEST_CASE_FIXTURE(Fixture, "generic_typevars_are_not_considered_to_escape_their_
  */
 TEST_CASE_FIXTURE(Fixture, "forward_declared_alias_is_not_clobbered_by_prior_unification_with_any")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverAgnosticStringification, true};
 
     CheckResult result = check(R"(
         local function x()
@@ -867,9 +856,6 @@ TEST_CASE_FIXTURE(Fixture, "recursive_types_restriction_ok")
 
 TEST_CASE_FIXTURE(Fixture, "recursive_types_restriction_not_ok")
 {
-    // CLI-116108
-    DOES_NOT_PASS_NEW_SOLVER_GUARD();
-
     CheckResult result = check(R"(
         -- this would be an infinite type if we allowed it
         type Tree<T> = { data: T, children: {Tree<{T}>} }
@@ -1080,7 +1066,7 @@ TEST_CASE_FIXTURE(Fixture, "typeof_is_not_a_valid_alias_name")
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
 
-    if (FFlag::LuauSolverV2)
+    if (!FFlag::DebugLuauForceOldSolver)
     {
         CHECK("typeof cannot be used as an identifier for a type function or alias" == toString(result.errors[0]));
     }
@@ -1112,7 +1098,7 @@ type Foo<T> = Foo<T>
 
 TEST_CASE_FIXTURE(Fixture, "recursive_type_alias_bad_pack_use_warns")
 {
-    ScopedFastFlag sffs[] = {{FFlag::LuauSolverV2, true}, {FFlag::LuauAddErrorCaseForIncompatibleTypePacks, true}};
+    ScopedFastFlag sff{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
 type Foo<T> = Foo<T...>
@@ -1154,7 +1140,7 @@ type Foo<T> = Foo<T> | string
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "type_alias_adds_reduce_constraint_for_type_function")
 {
-    if (!FFlag::LuauSolverV2)
+    if (FFlag::DebugLuauForceOldSolver)
         return;
 
     CheckResult result = check(R"(
@@ -1168,7 +1154,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "type_alias_adds_reduce_constraint_for_type_f
 
 TEST_CASE_FIXTURE(Fixture, "bound_type_in_alias_segfault")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+    ScopedFastFlag sff{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         --!nonstrict
@@ -1185,7 +1171,7 @@ TEST_CASE_FIXTURE(Fixture, "bound_type_in_alias_segfault")
 TEST_CASE_FIXTURE(BuiltinsFixture, "gh1632_no_infinite_recursion_in_normalization")
 {
     ScopedFastFlag flags[] = {
-        {FFlag::LuauSolverV2, true},
+        {FFlag::DebugLuauForceOldSolver, false},
     };
 
     CheckResult result = check(R"(
@@ -1227,7 +1213,7 @@ TEST_CASE_FIXTURE(Fixture, "exported_alias_location_is_accessible_on_module")
 TEST_CASE_FIXTURE(Fixture, "exported_type_function_location_is_accessible_on_module")
 {
     ScopedFastFlag flags[] = {
-        {FFlag::LuauSolverV2, true},
+        {FFlag::DebugLuauForceOldSolver, false},
     };
 
     CheckResult result = check(R"(
@@ -1255,7 +1241,7 @@ TEST_CASE_FIXTURE(Fixture, "fuzzer_cursed_type_aliases")
 
 TEST_CASE_FIXTURE(Fixture, "type_alias_dont_crash_on_bad_name")
 {
-    ScopedFastFlag _{FFlag::LuauSolverV2, true};
+    ScopedFastFlag _{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         type typeof = typeof(nil :: any)
@@ -1289,14 +1275,12 @@ export type t0<t0,t10,t10,t109> = t0
 
 TEST_CASE_FIXTURE(Fixture, "evaluating_generic_default_type_shouldnt_ice")
 {
-    ScopedFastFlag sff{FFlag::LuauInitializeDefaultGenericParamsAtProgramPoint, true};
-
     auto result = check(R"(
 local A = {}
 type B<T = typeof(A)> = unknown
 )");
 
-    if (FFlag::LuauSolverV2)
+    if (!FFlag::DebugLuauForceOldSolver)
         LUAU_REQUIRE_NO_ERRORS(result);
     else
     {
@@ -1307,14 +1291,12 @@ type B<T = typeof(A)> = unknown
 
 TEST_CASE_FIXTURE(Fixture, "evaluating_generic_default_type_pack_shouldnt_ice")
 {
-    ScopedFastFlag sff{FFlag::LuauInitializeDefaultGenericParamsAtProgramPoint, true};
-
     auto result = check(R"(
 local A = {}
 type B<T... = ...typeof(A)> = unknown
 )");
 
-    if (FFlag::LuauSolverV2)
+    if (!FFlag::DebugLuauForceOldSolver)
         LUAU_REQUIRE_NO_ERRORS(result);
     else
     {
@@ -1326,8 +1308,7 @@ type B<T... = ...typeof(A)> = unknown
 TEST_CASE_FIXTURE(Fixture, "evaluating_generic_default_type_for_symbol_before_definition_is_an_error")
 {
     ScopedFastFlag sff[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauInitializeDefaultGenericParamsAtProgramPoint, true},
+        {FFlag::DebugLuauForceOldSolver, false},
     };
 
     auto result = check(R"(
@@ -1342,8 +1323,7 @@ local A = {}
 TEST_CASE_FIXTURE(Fixture, "evaluating_generic_default_type_pack_for_symbol_before_definition_is_an_error")
 {
     ScopedFastFlag sff[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauInitializeDefaultGenericParamsAtProgramPoint, true},
+        {FFlag::DebugLuauForceOldSolver, false},
     };
 
     auto result = check(R"(
@@ -1355,6 +1335,85 @@ local A = {}
     LUAU_CHECK_ERROR(result, UnknownSymbol);
 }
 
+TEST_CASE_FIXTURE(BuiltinsFixture, "dont_allow_redefining_builtin_types")
+{
+    ScopedFastFlag _{FFlag::LuauDisallowRedefiningBuiltinTypes, true};
+    auto result = check(R"(
+        type number = string
+    )");
 
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+    LUAU_CHECK_ERROR(result, DuplicateTypeDefinition);
+}
+
+TEST_CASE_FIXTURE(Fixture, "only_report_single_error_for_missing_generics_1")
+{
+    DOES_NOT_PASS_OLD_SOLVER_GUARD();
+
+    ScopedFastFlag _{FFlag::LuauAvoidCascadingRecursiveConstraintViolationError, true};
+
+    CheckResult results = check(R"(
+        type t0<A> = {[t0]: t0<A>}
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(1, results);
+    REQUIRE(get<IncorrectGenericParameterCount>(results.errors[0]));
+}
+
+TEST_CASE_FIXTURE(Fixture, "only_report_single_error_for_missing_generics_2")
+{
+    DOES_NOT_PASS_OLD_SOLVER_GUARD();
+
+    ScopedFastFlag _{FFlag::LuauAvoidCascadingRecursiveConstraintViolationError, true};
+
+    CheckResult results = check(R"(
+        type Tree<A> = { [string]: Tree }
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(1, results);
+    REQUIRE(get<IncorrectGenericParameterCount>(results.errors[0]));
+}
+
+TEST_CASE_FIXTURE(Fixture, "cyclic_type_alias_through_generic_does_not_assert")
+{
+    ScopedFastFlag sff[] = {
+        {FFlag::DebugLuauForceOldSolver, false},
+        {FFlag::LuauFixInfiniteTypeRedundantBind, true},
+    };
+
+    // We had an issue where a generic type alias cycle caused the system to
+    // improperly rebind a concrete type.  This was tripping an assertion in
+    // noopt builds.
+    CheckResult result = check(R"(
+        type A = B
+        type B = { x: C<any> }
+        type C<T> = A
+    )");
+
+    // The actual thing we care about is that we not LUAU_ASSERT.  As long as
+    // that doesn't happen, we're okay.
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+    CHECK(get<RecursiveRestraintViolation>(result.errors.at(0)));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "unpack_doesnt_emplace_typeof_type")
+{
+    DOES_NOT_PASS_OLD_SOLVER_GUARD();
+
+    ScopedFastFlag _{FFlag::LuauDoNotEmplaceAnnotatedType, true};
+
+    LUAU_REQUIRE_NO_ERRORS(check(R"(
+        local Obj = {}
+        
+        local function g(): number
+            return 42
+        end
+
+        local val: typeof(Obj.Foo.Bar) = g()
+
+        Obj.Foo = {}
+        Obj.Foo.Bar = 42
+    )"));
+}
 
 TEST_SUITE_END();

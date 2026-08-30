@@ -50,8 +50,8 @@ inline void ReleaseModeBreakpoint()
 #endif
 
 #if defined(__clang__)
-#define PRAGMA_NO_PADDING_START __pragma(pack(push, 1))
-#define PRAGMA_NO_PADDING_END __pragma(pack(pop))
+#define PRAGMA_NO_PADDING_START _Pragma("pack(push, 1)")
+#define PRAGMA_NO_PADDING_END _Pragma("pack(pop)")
 
 #elif defined(_MSC_VER)
 #define PRAGMA_NO_PADDING_START __pragma(pack(push, 1))

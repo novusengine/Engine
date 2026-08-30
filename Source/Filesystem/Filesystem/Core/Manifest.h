@@ -1,5 +1,7 @@
 #pragma once
+#include "Filesystem/Core/Chunk.h"
 #include "Filesystem/Core/File.h"
+#include "Filesystem/Core/Origin.h"
 
 #include <Base/Types.h>
 #include <Base/Container/StringTable.h>
@@ -17,10 +19,12 @@ namespace PACT
     using PactManifestHandle = u64;
     static constexpr PactManifestHandle MANIFEST_INVALID_ID = std::numeric_limits<PactManifestHandle>().max();
 
+    // Runtime-only IDs for loose overlays. Persisted publishers assign their
+    // manifest IDs without using this generator.
     class PactManifestHandleGenerator
     {
     public:
-        PactManifestHandleGenerator() : _rng(_rd()) { }
+        PactManifestHandleGenerator() : _rng(_rd()) {}
 
         PactManifestHandle Generate()
         {
@@ -51,15 +55,12 @@ namespace PACT
 
     public:
         char magic[4] = { 'P', 'A', 'M', 'F' };
-        uvec3 version;
+        uvec3 version = {};
 
-        u64 manifestID;
-        Flags flags;
-        u32 priority;
-        PactSourceType sourceType;
-
-        u32 entryCount;
-        u32 reserved;
+        PactManifestHandle manifestID = 0;
+        Flags flags = {};
+        u32 priority = 0;
+        PactSourceType sourceType = PactSourceType::Pack;
     };
 
     struct ManifestEntry
@@ -77,38 +78,55 @@ namespace PACT
         };
 
     public:
-        PactFileID fileID;
-        Flags flags;
+        PactFileID fileID = 0;
+        Flags flags = {};
 
-        u32 pathIndex;
-        u64 pathHash;
-        u64 dataOffset;
-        u32 dataSize;
-        u32 dataCompressedSize;
+        u32 pathIndex = 0;
+        u64 pathHash = 0;
+        u64 dataOffset = 0;
+        u32 dataSize = 0;
+        u32 chunkIndex = 0;         // First chunk of this file in the chunk table.
+        u32 chunkCount = 0;         // Number of consecutive chunks.
+        PactDigest contentDigest{}; // SHA-256 of the whole-file plaintext.
     };
 
     enum class PactManifestValidateResult
     {
         Success,
         InvalidMagic,
-        MismatchVersion
+        MismatchVersion,
+        InvalidHeader,
+        InvalidEntries
     };
 
     struct PactManifest
     {
     public:
+        static constexpr size_t SERIALIZED_HEADER_SIZE = 44;
+        static constexpr size_t SERIALIZED_CHUNK_SIZE = 44;
+        static constexpr size_t SERIALIZED_ENTRY_SIZE = 76;
+
         ManifestHeader header;
         Novus::Container::StringTableUnsafe stringTable;
+        std::vector<PactChunkInfo> chunks;
         std::vector<ManifestEntry> entries;
+        PactManifestOrigin origin = PactManifestOrigin::Remote;
+        std::filesystem::path path;
         std::filesystem::path dataPath;
 
     public:
+        size_t GetSerializedSize() const;
         bool Serialize(Bytebuffer* buffer) const;
         bool Deserialize(Bytebuffer* buffer);
         PactManifestValidateResult Validate() const;
 
     public:
-        PactManifest& operator=(PactManifest&& other) noexcept;
+        PactManifest() = default;
+        PactManifest(PactManifest&& other) noexcept = default;
+        PactManifest& operator=(PactManifest&& other) noexcept = default;
+
+        PactManifest(const PactManifest&) = delete;
+        PactManifest& operator=(const PactManifest&) = delete;
     };
 
     struct PactManifestTable

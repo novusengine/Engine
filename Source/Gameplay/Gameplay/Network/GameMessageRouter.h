@@ -60,7 +60,7 @@ namespace Network
         }
 
         template <PacketConcept PacketStruct>
-        void UnregisterPacketHandler(OpcodeType opcode)
+        void UnregisterPacketHandler(OpcodeType /*opcode*/)
         {
             auto opcode = static_cast<OpcodeType>(PacketStruct::PACKET_ID);
 

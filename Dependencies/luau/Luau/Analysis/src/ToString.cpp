@@ -18,11 +18,8 @@
 #include <algorithm>
 #include <string>
 
-LUAU_FASTFLAGVARIABLE(LuauEnableDenseTableAlias)
-
 LUAU_FASTFLAG(LuauSolverV2)
-LUAU_FASTFLAGVARIABLE(LuauSolverAgnosticStringification)
-LUAU_FASTFLAG(LuauExplicitSkipBoundTypes)
+LUAU_FASTFLAG(LuauIntegerType2)
 
 /*
  * Enables increasing levels of verbosity for Luau type names when stringifying.
@@ -52,7 +49,7 @@ namespace
 struct FindCyclicTypes final : TypeVisitor
 {
     FindCyclicTypes()
-        : TypeVisitor("FindCyclicTypes", FFlag::LuauExplicitSkipBoundTypes)
+        : TypeVisitor("FindCyclicTypes", /* skipBoundTypes */ true)
     {
     }
 
@@ -89,27 +86,10 @@ struct FindCyclicTypes final : TypeVisitor
     {
         if (!visited.insert(ty))
             return false;
-        if (FFlag::LuauSolverAgnosticStringification)
-        {
-            LUAU_ASSERT(ft.lowerBound);
-            LUAU_ASSERT(ft.upperBound);
-            traverse(ft.lowerBound);
-            traverse(ft.upperBound);
-        }
-        else if (FFlag::LuauSolverV2)
-        {
-            // TODO: Replace these if statements with assert()s when we
-            // delete FFlag::LuauSolverV2.
-            //
-            // When the old solver is used, these pointers are always
-            // unused. When the new solver is used, they are never null.
-
-            if (ft.lowerBound)
-                traverse(ft.lowerBound);
-            if (ft.upperBound)
-                traverse(ft.upperBound);
-        }
-
+        LUAU_ASSERT(ft.lowerBound);
+        LUAU_ASSERT(ft.upperBound);
+        traverse(ft.lowerBound);
+        traverse(ft.upperBound);
         return false;
     }
 
@@ -173,6 +153,12 @@ static std::pair<bool, std::optional<Luau::Name>> canUseTypeNameInScope(ScopePtr
     return {false, std::nullopt};
 }
 
+struct ElementResult
+{
+    std::string str;
+    std::vector<ToStringSpan> spans;
+};
+
 struct StringifierState
 {
     ToStringOptions& opts;
@@ -187,12 +173,15 @@ struct StringifierState
     size_t indentation = 0;
 
     bool exhaustive;
+    bool ignoreSyntheticName = false;
 
     StringifierState(ToStringOptions& opts, ToStringResult& result)
         : opts(opts)
         , result(result)
         , exhaustive(opts.exhaustive)
     {
+        ignoreSyntheticName = opts.ignoreSyntheticName;
+
         for (const auto& [_, v] : opts.nameMap.types)
             usedNames.insert(v);
         for (const auto& [_, v] : opts.nameMap.typePacks)
@@ -311,6 +300,16 @@ struct StringifierState
     void emit(size_t i)
     {
         emit(std::to_string(i).c_str());
+    }
+
+    void emitAndRecordSpan(const std::string& s, TypeId ty)
+    {
+        size_t startPos = result.name.length();
+        emit(s);
+        size_t endPos = result.name.length();
+
+        if (endPos > startPos)
+            result.typeSpans.emplace_back(ToStringSpan{startPos, endPos, ty});
     }
 
     void emit(Polarity p)
@@ -446,11 +445,7 @@ struct TypeStringifier
 
     void stringify(const std::string& name, const Property& prop)
     {
-        if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-            return _newStringify(name, prop);
-
-        emitKey(name);
-        stringify(prop.type_DEPRECATED());
+        return _newStringify(name, prop);
     }
 
     void stringify(TypePackId tp);
@@ -509,96 +504,39 @@ struct TypeStringifier
         state.result.invalid = true;
 
         // Free types are guaranteed to have upper and lower bounds now.
-        if (FFlag::LuauSolverAgnosticStringification)
+        LUAU_ASSERT(ftv.lowerBound);
+        LUAU_ASSERT(ftv.upperBound);
+        const TypeId lowerBound = follow(ftv.lowerBound);
+        const TypeId upperBound = follow(ftv.upperBound);
+        if (get<NeverType>(lowerBound) && get<UnknownType>(upperBound))
         {
-            LUAU_ASSERT(ftv.lowerBound);
-            LUAU_ASSERT(ftv.upperBound);
-            const TypeId lowerBound = follow(ftv.lowerBound);
-            const TypeId upperBound = follow(ftv.upperBound);
-            if (get<NeverType>(lowerBound) && get<UnknownType>(upperBound))
-            {
-                state.emit("'");
-                state.emit(state.getName(ty));
-                if (FInt::DebugLuauVerboseTypeNames >= 1)
-                    state.emit(ftv.polarity);
-            }
-            else
-            {
-                state.emit("(");
-                if (!get<NeverType>(lowerBound))
-                {
-                    stringify(lowerBound);
-                    state.emit(" <: ");
-                }
-                state.emit("'");
-                state.emit(state.getName(ty));
-
-                if (FInt::DebugLuauVerboseTypeNames >= 1)
-                    state.emit(ftv.polarity);
-
-                if (!get<UnknownType>(upperBound))
-                {
-                    state.emit(" <: ");
-                    stringify(upperBound);
-                }
-                state.emit(")");
-            }
-            return;
+            state.emit("'");
+            state.emit(state.getName(ty));
+            if (FInt::DebugLuauVerboseTypeNames >= 1)
+                state.emit(ftv.polarity);
         }
-        else if (FFlag::LuauSolverV2 && ftv.lowerBound && ftv.upperBound)
+        else
         {
-            const TypeId lowerBound = follow(ftv.lowerBound);
-            const TypeId upperBound = follow(ftv.upperBound);
-            if (get<NeverType>(lowerBound) && get<UnknownType>(upperBound))
+            state.emit("(");
+            if (!get<NeverType>(lowerBound))
             {
-                state.emit("'");
-                state.emit(state.getName(ty));
-                if (FInt::DebugLuauVerboseTypeNames >= 1)
-                    state.emit(ftv.polarity);
+                stringify(lowerBound);
+                state.emit(" <: ");
             }
-            else
+            state.emit("'");
+            state.emit(state.getName(ty));
+
+            if (FInt::DebugLuauVerboseTypeNames >= 1)
+                state.emit(ftv.polarity);
+
+            if (!get<UnknownType>(upperBound))
             {
-                state.emit("(");
-                if (!get<NeverType>(lowerBound))
-                {
-                    stringify(lowerBound);
-                    state.emit(" <: ");
-                }
-                state.emit("'");
-                state.emit(state.getName(ty));
-
-                if (FInt::DebugLuauVerboseTypeNames >= 1)
-                    state.emit(ftv.polarity);
-
-                if (!get<UnknownType>(upperBound))
-                {
-                    state.emit(" <: ");
-                    stringify(upperBound);
-                }
-                state.emit(")");
+                state.emit(" <: ");
+                stringify(upperBound);
             }
-            return;
+            state.emit(")");
         }
-
-        if (FInt::DebugLuauVerboseTypeNames >= 1)
-            state.emit("free-");
-
-        state.emit(state.getName(ty));
-
-        if (FFlag::LuauSolverAgnosticStringification && FInt::DebugLuauVerboseTypeNames >= 1)
-            state.emit(ftv.polarity);
-        else if (FFlag::LuauSolverV2 && FInt::DebugLuauVerboseTypeNames >= 1)
-            state.emit(ftv.polarity);
-
-
-        if (FInt::DebugLuauVerboseTypeNames >= 2)
-        {
-            state.emit("-");
-            if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-                state.emitLevel(ftv.scope);
-            else
-                state.emit(ftv.level);
-        }
+        return;
     }
 
     void operator()(TypeId, const BoundType& btv)
@@ -626,10 +564,7 @@ struct TypeStringifier
         if (FInt::DebugLuauVerboseTypeNames >= 2)
         {
             state.emit("-");
-            if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-                state.emitLevel(gtv.scope);
-            else
-                state.emit(gtv.level);
+            state.emitLevel(gtv.scope);
         }
     }
 
@@ -675,6 +610,13 @@ struct TypeStringifier
         case PrimitiveType::Table:
             state.emit("table");
             return;
+        case PrimitiveType::Integer:
+            if (FFlag::LuauIntegerType2)
+            {
+                state.emit("integer");
+                return;
+            }
+            [[fallthrough]];
         default:
             LUAU_ASSERT(!"Unknown primitive type");
             throw InternalCompilerError("Unknown primitive type " + std::to_string(ptv.type));
@@ -729,11 +671,8 @@ struct TypeStringifier
             state.emit(">");
         }
 
-        if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-        {
-            if (ftv.isCheckedFunction)
-                state.emit("@checked ");
-        }
+        if (ftv.isCheckedFunction)
+            state.emit("@checked ");
 
         state.emit("(");
 
@@ -770,17 +709,14 @@ struct TypeStringifier
         state.unsee(&ftv);
     }
 
-    void operator()(TypeId, const TableType& ttv)
+    void operator()(TypeId ty, const TableType& ttv)
     {
         if (ttv.boundTo)
             return stringify(*ttv.boundTo);
 
-        bool showName = !state.exhaustive;
-        if (FFlag::LuauEnableDenseTableAlias)
-        {
-            // if hide table alias expansions are enabled and there is a name found for the table, use it
-            showName = !state.exhaustive || state.opts.hideTableAliasExpansions;
-        }
+        // if hide table alias expansions are enabled and there is a name found for the table, use it
+        bool showName = !state.exhaustive || state.opts.hideTableAliasExpansions;
+
         if (showName)
         {
             if (ttv.name)
@@ -800,18 +736,18 @@ struct TypeStringifier
                     }
                 }
 
-                state.emit(*ttv.name);
+                state.emitAndRecordSpan(*ttv.name, ty);
                 stringify(ttv.instantiatedTypeParams, ttv.instantiatedTypePackParams);
                 return;
             }
         }
 
-        if (!state.exhaustive)
+        if (!state.exhaustive && !state.ignoreSyntheticName)
         {
             if (ttv.syntheticName)
             {
                 state.result.invalid = true;
-                state.emit(*ttv.syntheticName);
+                state.emitAndRecordSpan(*ttv.syntheticName, ty);
                 stringify(ttv.instantiatedTypeParams, ttv.instantiatedTypePackParams);
                 return;
             }
@@ -826,35 +762,16 @@ struct TypeStringifier
 
         std::string openbrace = "@@@";
         std::string closedbrace = "@@@?!";
-        switch (state.opts.hideTableKind
-                    ? ((FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification) ? TableState::Sealed : TableState::Unsealed)
-                    : ttv.state)
+        switch (state.opts.hideTableKind ? TableState::Sealed : ttv.state)
         {
         case TableState::Sealed:
-            if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-            {
-                openbrace = "{";
-                closedbrace = "}";
-            }
-            else
-            {
-                state.result.invalid = true;
-                openbrace = "{|";
-                closedbrace = "|}";
-            }
+            openbrace = "{";
+            closedbrace = "}";
             break;
         case TableState::Unsealed:
-            if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-            {
-                state.result.invalid = true;
-                openbrace = "{|";
-                closedbrace = "|}";
-            }
-            else
-            {
-                openbrace = "{";
-                closedbrace = "}";
-            }
+            state.result.invalid = true;
+            openbrace = "{|";
+            closedbrace = "|}";
             break;
         case TableState::Free:
             state.result.invalid = true;
@@ -872,6 +789,8 @@ struct TypeStringifier
         if (ttv.indexer && ttv.props.empty() && isNumber(ttv.indexer->indexType))
         {
             state.emit("{");
+            if (ttv.indexer->isReadOnly)
+                state.emit("read ");
             stringify(ttv.indexer->indexResultType);
             state.emit("}");
 
@@ -886,6 +805,8 @@ struct TypeStringifier
         if (ttv.indexer)
         {
             state.newline();
+            if (ttv.indexer->isReadOnly)
+                state.emit("read ");
             state.emit("[");
             stringify(ttv.indexer->indexType);
             state.emit("]: ");
@@ -931,12 +852,12 @@ struct TypeStringifier
         state.unsee(&ttv);
     }
 
-    void operator()(TypeId, const MetatableType& mtv)
+    void operator()(TypeId ty, const MetatableType& mtv)
     {
         state.result.invalid = true;
         if (!state.exhaustive && mtv.syntheticName)
         {
-            state.emit(*mtv.syntheticName);
+            state.emitAndRecordSpan(*mtv.syntheticName, ty);
             return;
         }
 
@@ -948,9 +869,9 @@ struct TypeStringifier
         state.emit(" }");
     }
 
-    void operator()(TypeId, const ExternType& etv)
+    void operator()(TypeId ty, const ExternType& etv)
     {
-        state.emit(etv.name);
+        state.emitAndRecordSpan(etv.name, ty);
     }
 
     void operator()(TypeId, const AnyType&)
@@ -977,7 +898,7 @@ struct TypeStringifier
         bool optional = false;
         bool hasNonNilDisjunct = false;
 
-        std::vector<std::string> results = {};
+        std::vector<ElementResult> results = {};
         size_t resultsLength = 0;
         bool lengthLimitHit = false;
 
@@ -996,8 +917,9 @@ struct TypeStringifier
             }
 
             std::string saved = std::move(state.result.name);
+            size_t savedSpansSize = state.result.typeSpans.size();
 
-            bool needParens = !state.cycleNames.contains(el) && (get<IntersectionType>(el) || get<FunctionType>(el));
+            bool needParens = !state.cycleNames.contains(el) && (get<IntersectionType>(el) != nullptr || get<FunctionType>(el) != nullptr);
 
             if (needParens)
                 state.emit("(");
@@ -1007,8 +929,15 @@ struct TypeStringifier
             if (needParens)
                 state.emit(")");
 
-            resultsLength += state.result.name.length();
-            results.push_back(std::move(state.result.name));
+            ElementResult elem;
+            elem.str = std::move(state.result.name);
+
+            for (size_t i = savedSpansSize; i < state.result.typeSpans.size(); ++i)
+                elem.spans.push_back(state.result.typeSpans[i]);
+            state.result.typeSpans.resize(savedSpansSize);
+
+            resultsLength += elem.str.length();
+            results.push_back(std::move(elem));
 
             state.result.name = std::move(saved);
 
@@ -1021,14 +950,21 @@ struct TypeStringifier
         state.unsee(&uv);
 
         if (!lengthLimitHit && !FFlag::DebugLuauToStringNoLexicalSort)
-            std::sort(results.begin(), results.end());
+            std::sort(
+                results.begin(),
+                results.end(),
+                [](const ElementResult& a, const ElementResult& b)
+                {
+                    return a.str < b.str;
+                }
+            );
 
         if (optional && results.size() > 1)
             state.emit("(");
 
         bool first = true;
         bool shouldPlaceOnNewlines = results.size() > state.opts.compositeTypesSingleLineLimit;
-        for (std::string& ss : results)
+        for (ElementResult& elem : results)
         {
             if (!first)
             {
@@ -1038,7 +974,12 @@ struct TypeStringifier
                     state.emit(" ");
                 state.emit("| ");
             }
-            state.emit(ss);
+
+            size_t basePos = state.result.name.length();
+            state.emit(elem.str);
+            for (const auto& [start, end, ty] : elem.spans)
+                state.result.typeSpans.emplace_back(ToStringSpan{basePos + start, basePos + end, ty});
+
             first = false;
         }
 
@@ -1064,7 +1005,7 @@ struct TypeStringifier
             return;
         }
 
-        std::vector<std::string> results = {};
+        std::vector<ElementResult> results = {};
         size_t resultsLength = 0;
         bool lengthLimitHit = false;
 
@@ -1073,8 +1014,9 @@ struct TypeStringifier
             el = follow(el);
 
             std::string saved = std::move(state.result.name);
+            size_t savedSpansSize = state.result.typeSpans.size();
 
-            bool needParens = !state.cycleNames.contains(el) && (get<UnionType>(el) || get<FunctionType>(el));
+            bool needParens = !state.cycleNames.contains(el) && (get<UnionType>(el) != nullptr || get<FunctionType>(el) != nullptr);
 
             if (needParens)
                 state.emit("(");
@@ -1084,8 +1026,15 @@ struct TypeStringifier
             if (needParens)
                 state.emit(")");
 
-            resultsLength += state.result.name.length();
-            results.push_back(std::move(state.result.name));
+            ElementResult elem;
+            elem.str = std::move(state.result.name);
+
+            for (size_t i = savedSpansSize; i < state.result.typeSpans.size(); ++i)
+                elem.spans.push_back(state.result.typeSpans[i]);
+            state.result.typeSpans.resize(savedSpansSize);
+
+            resultsLength += elem.str.length();
+            results.push_back(std::move(elem));
 
             state.result.name = std::move(saved);
 
@@ -1098,11 +1047,18 @@ struct TypeStringifier
         state.unsee(&uv);
 
         if (!lengthLimitHit && !FFlag::DebugLuauToStringNoLexicalSort)
-            std::sort(results.begin(), results.end());
+            std::sort(
+                results.begin(),
+                results.end(),
+                [](const ElementResult& a, const ElementResult& b)
+                {
+                    return a.str < b.str;
+                }
+            );
 
         bool first = true;
         bool shouldPlaceOnNewlines = results.size() > state.opts.compositeTypesSingleLineLimit || isOverloadedFunction(ty);
-        for (std::string& ss : results)
+        for (ElementResult& elem : results)
         {
             if (!first)
             {
@@ -1112,7 +1068,12 @@ struct TypeStringifier
                     state.emit(" ");
                 state.emit("& ");
             }
-            state.emit(ss);
+
+            size_t basePos = state.result.name.length();
+            state.emit(elem.str);
+            for (const auto& [start, end, spanTy] : elem.spans)
+                state.result.typeSpans.emplace_back(ToStringSpan{basePos + start, basePos + end, spanTy});
+
             first = false;
         }
     }
@@ -1356,10 +1317,7 @@ struct TypePackStringifier
         if (FInt::DebugLuauVerboseTypeNames >= 2)
         {
             state.emit("-");
-            if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-                state.emitLevel(pack.scope);
-            else
-                state.emit(pack.level);
+            state.emitLevel(pack.scope);
         }
 
         state.emit("...");
@@ -1378,10 +1336,7 @@ struct TypePackStringifier
         if (FInt::DebugLuauVerboseTypeNames >= 2)
         {
             state.emit("-");
-            if (FFlag::LuauSolverV2 || FFlag::LuauSolverAgnosticStringification)
-                state.emitLevel(pack.scope);
-            else
-                state.emit(pack.level);
+            state.emitLevel(pack.scope);
         }
 
         state.emit("...");
@@ -1484,6 +1439,47 @@ static void assignCycleNames(
     }
 }
 
+enum class IgnoreSyntheticName
+{
+    Yes,
+    No
+};
+
+static void tableTypeToStringDetailed(
+    TypeId ty,
+    const TableType* ttv,
+    const IgnoreSyntheticName ignoreSyntheticName,
+    ToStringResult& result,
+    const std::shared_ptr<Scope>& scope,
+    const std::string_view nameToUse,
+    TypeStringifier& tvs
+)
+{
+    if (ignoreSyntheticName == IgnoreSyntheticName::No && ttv->syntheticName)
+        result.invalid = true;
+
+    // If scope is provided, add module name and check visibility
+    if (ttv->name && scope)
+    {
+        auto [success, moduleName] = canUseTypeNameInScope(scope, *ttv->name);
+
+        if (!success)
+            result.invalid = true;
+
+        if (moduleName)
+            result.name = format("%s.", moduleName->c_str());
+    }
+
+    size_t startPos = result.name.length();
+    result.name += nameToUse;
+    size_t endPos = result.name.length();
+
+    if (endPos > startPos)
+        result.typeSpans.emplace_back(ToStringSpan{startPos, endPos, ty});
+
+    tvs.stringify(ttv->instantiatedTypeParams, ttv->instantiatedTypePackParams);
+}
+
 ToStringResult toStringDetailed(TypeId ty, ToStringOptions& opts)
 {
     /*
@@ -1508,26 +1504,18 @@ ToStringResult toStringDetailed(TypeId ty, ToStringOptions& opts)
 
     if (!opts.exhaustive)
     {
-        if (auto ttv = get<TableType>(ty); ttv && (ttv->name || ttv->syntheticName))
+        if (state.ignoreSyntheticName)
         {
-            if (ttv->syntheticName)
-                result.invalid = true;
-
-            // If scope if provided, add module name and check visibility
-            if (ttv->name && opts.scope)
+            if (auto ttv = get<TableType>(ty); ttv && ttv->name)
             {
-                auto [success, moduleName] = canUseTypeNameInScope(opts.scope, *ttv->name);
+                tableTypeToStringDetailed(ty, ttv, IgnoreSyntheticName::Yes, result, opts.scope, *ttv->name, tvs);
 
-                if (!success)
-                    result.invalid = true;
-
-                if (moduleName)
-                    result.name = format("%s.", moduleName->c_str());
+                return result;
             }
-
-            result.name += ttv->name ? *ttv->name : *ttv->syntheticName;
-
-            tvs.stringify(ttv->instantiatedTypeParams, ttv->instantiatedTypePackParams);
+        }
+        else if (auto ttv = get<TableType>(ty); ttv && (ttv->name || ttv->syntheticName))
+        {
+            tableTypeToStringDetailed(ty, ttv, IgnoreSyntheticName::No, result, opts.scope, ttv->name ? *ttv->name : *ttv->syntheticName, tvs);
 
             return result;
         }
@@ -1886,6 +1874,11 @@ std::string dump(const std::vector<TypeId>& types)
     return toStringVector(types, dumpOptions());
 }
 
+std::string dump(const std::vector<TypePackId>& typePacks)
+{
+    return toStringVector(typePacks, dumpOptions());
+}
+
 std::string dump(DenseHashMap<TypeId, TypeId>& types)
 {
     std::string s = "{";
@@ -1950,6 +1943,18 @@ std::string toStringVector(const std::vector<TypeId>& types, ToStringOptions& op
     return s;
 }
 
+std::string toStringVector(const std::vector<TypePackId>& typePacks, ToStringOptions& opts)
+{
+    std::string s;
+    for (TypePackId typePack : typePacks)
+    {
+        if (!s.empty())
+            s += ", ";
+        s += toString(typePack, opts);
+    }
+    return s;
+}
+
 std::string toString(const Constraint& constraint, ToStringOptions& opts)
 {
     auto go = [&opts](auto&& c) -> std::string
@@ -2004,7 +2009,7 @@ std::string toString(const Constraint& constraint, ToStringOptions& opts)
         {
             return "function_check " + tos(c.fn) + " " + tos(c.argsPack);
         }
-        else if constexpr (std::is_same_v<T, PrimitiveTypeConstraint>)
+        else if constexpr (std::is_same_v<T, DEPRECATED_PrimitiveTypeConstraint>)
         {
             if (c.expectedType)
                 return "prim " + tos(c.freeType) + "[expected: " + tos(*c.expectedType) + "] as " + tos(c.primitiveType);
@@ -2040,6 +2045,9 @@ std::string toString(const Constraint& constraint, ToStringOptions& opts)
             return "simplify " + tos(c.ty);
         else if constexpr (std::is_same_v<T, PushFunctionTypeConstraint>)
             return "push_function_type " + tos(c.expectedFunctionType) + " => " + tos(c.functionType);
+        else if constexpr (std::is_same_v<T, TypeInstantiationConstraint>)
+            return "explicitly_specified_constraints " + tos(c.functionType) + " (typeArguments = " + dump(c.typeArguments) +
+                   "), (typePackArguments = " + dump(c.typePackArguments) + ")";
         else if constexpr (std::is_same_v<T, PushTypeConstraint>)
             return "push_type " + tos(c.expectedType) + " => " + tos(c.targetType);
         else
@@ -2062,6 +2070,29 @@ std::string dump(const Constraint& c)
     std::string s = toString(c, opts);
     printf("%s\n", s.c_str());
     return s;
+}
+
+// Converts the given number index into a human-readable string for that index to be used in errors.
+// e.g. the index `0` becomes `1st`, `1` becomes `2nd`, `11` becomes `12th`, etc.
+std::string toHumanReadableIndex(size_t number)
+{
+    size_t humanIndex = number + 1;
+    size_t finalDigit = humanIndex % 10;
+
+    if (humanIndex > 10 && humanIndex < 20)
+        return std::to_string(humanIndex) + "th";
+
+    switch (finalDigit)
+    {
+    case 1:
+        return std::to_string(humanIndex) + "st";
+    case 2:
+        return std::to_string(humanIndex) + "nd";
+    case 3:
+        return std::to_string(humanIndex) + "rd";
+    default:
+        return std::to_string(humanIndex) + "th";
+    }
 }
 
 std::optional<std::string> getFunctionNameAsString(const AstExpr& expr)

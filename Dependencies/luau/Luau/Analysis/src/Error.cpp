@@ -17,10 +17,7 @@
 #include <unordered_set>
 
 LUAU_FASTINTVARIABLE(LuauIndentTypeMismatchMaxTypeLength, 10)
-
-LUAU_FASTFLAG(LuauSolverAgnosticStringification)
-LUAU_FASTFLAGVARIABLE(LuauNewNonStrictReportsOneIndexedErrors)
-LUAU_FASTFLAG(LuauSubtypingReportGenericBoundMismatches2)
+LUAU_FASTFLAGVARIABLE(LuauTweakAccessViolationReporting)
 
 static std::string wrongNumberOfArgsString(
     size_t expectedCount,
@@ -117,9 +114,23 @@ struct ErrorConverter
             std::string given = givenModule ? quote(givenType) + " from " + quote(*givenModule) : quote(givenType);
             std::string wanted = wantedModule ? quote(wantedType) + " from " + quote(*wantedModule) : quote(wantedType);
             size_t luauIndentTypeMismatchMaxTypeLength = size_t(FInt::LuauIndentTypeMismatchMaxTypeLength);
+            if (get<NeverType>(follow(tm.wantedType)))
+            {
+                if (givenType.length() <= luauIndentTypeMismatchMaxTypeLength)
+                    return "Expected this to be unreachable, but got " + given;
+                return "Expected this to be unreachable, but got\n\t" + given;
+            }
+
+            if (tm.context == TypeMismatch::InvariantContext)
+            {
+                if (givenType.length() <= luauIndentTypeMismatchMaxTypeLength || wantedType.length() <= luauIndentTypeMismatchMaxTypeLength)
+                    return "Expected this to be exactly " + wanted + ", but got " + given;
+                return "Expected this to be exactly\n\t" + wanted + "\nbut got\n\t" + given;
+            }
+
             if (givenType.length() <= luauIndentTypeMismatchMaxTypeLength || wantedType.length() <= luauIndentTypeMismatchMaxTypeLength)
-                return "Type " + given + " could not be converted into " + wanted;
-            return "Type\n\t" + given + "\ncould not be converted into\n\t" + wanted;
+                return "Expected this to be " + wanted + ", but got " + given;
+            return "Expected this to be\n\t" + wanted + "\nbut got\n\t" + given;
         };
 
         if (givenTypeName == wantedTypeName)
@@ -159,10 +170,6 @@ struct ErrorConverter
         {
             result += "; " + tm.reason;
         }
-        else if (tm.context == TypeMismatch::InvariantContext)
-        {
-            result += " in an invariant context";
-        }
 
         return result;
     }
@@ -172,7 +179,7 @@ struct ErrorConverter
         switch (e.context)
         {
         case UnknownSymbol::Binding:
-            return "Unknown global '" + e.name + "'";
+            return "Unknown global '" + e.name + "'; consider assigning to it first";
         case UnknownSymbol::Type:
             return "Unknown type '" + e.name + "'";
         }
@@ -187,7 +194,7 @@ struct ErrorConverter
         if (get<TableType>(t))
             return "Key '" + e.key + "' not found in table '" + Luau::toString(t) + "'";
         else if (get<ExternType>(t))
-            return "Key '" + e.key + "' not found in class '" + Luau::toString(t) + "'";
+            return "Key '" + e.key + "' not found in external type '" + Luau::toString(t) + "'";
         else
             return "Type '" + Luau::toString(e.table) + "' does not have key '" + e.key + "'";
     }
@@ -234,7 +241,6 @@ struct ErrorConverter
     std::string operator()(const Luau::CountMismatch& e) const
     {
         const std::string expectedS = e.expected == 1 ? "" : "s";
-        const std::string actualS = e.actual == 1 ? "" : "s";
         const std::string actualVerb = e.actual == 1 ? "is" : "are";
 
         switch (e.context)
@@ -360,7 +366,7 @@ struct ErrorConverter
 
         TypeId t = follow(e.table);
         if (get<ExternType>(t))
-            s += "class";
+            s += "external type";
         else
             s += "table";
 
@@ -408,17 +414,7 @@ struct ErrorConverter
         auto it = mtt->props.find("__call");
         if (it != mtt->props.end())
         {
-            if (FFlag::LuauSolverAgnosticStringification)
-            {
-                return it->second.readTy;
-            }
-            else
-            {
-                if (FFlag::LuauSolverV2)
-                    return it->second.readTy;
-                else
-                    return it->second.type_DEPRECATED();
-            }
+            return it->second.readTy;
         }
         else
             return std::nullopt;
@@ -606,7 +602,7 @@ struct ErrorConverter
 
     std::string operator()(const TypePackMismatch& e) const
     {
-        std::string ss = "Type pack '" + toString(e.givenTp) + "' could not be converted into '" + toString(e.wantedTp) + "'";
+        std::string ss = "Expected this to be '" + toString(e.wantedTp) + "', but got '" + toString(e.givenTp) + "'";
 
         if (!e.reason.empty())
             ss += "; " + e.reason;
@@ -708,7 +704,7 @@ struct ErrorConverter
             if (tfit->typeArguments.size() != 2)
                 return "Type function instance " + Luau::toString(e.ty) + " is ill-formed, and thus invalid";
 
-            if (auto errType = get<ErrorType>(tfit->typeArguments[1])) // Second argument to (index | rawget)<_,_> is not a type
+            if (get<ErrorType>(tfit->typeArguments[1])) // Second argument to (index | rawget)<_,_> is not a type
                 return "Second argument to " + tfit->function->name + "<" + Luau::toString(tfit->typeArguments[0]) + ", _> is not a valid index type";
             else // Property `indexer` does not exist on type `indexee`
                 return "Property '" + Luau::toString(tfit->typeArguments[1]) + "' does not exist on type '" + Luau::toString(tfit->typeArguments[0]) +
@@ -767,37 +763,40 @@ struct ErrorConverter
 
     std::string operator()(const CheckedFunctionCallError& e) const
     {
-        // TODO: What happens if checkedFunctionName cannot be found??
-        if (FFlag::LuauNewNonStrictReportsOneIndexedErrors)
-            return "Function '" + e.checkedFunctionName + "' expects '" + toString(e.expected) + "' at argument #" +
-                   std::to_string(e.argumentIndex + 1) + ", but got '" + Luau::toString(e.passed) + "'";
-        else
-            return "Function '" + e.checkedFunctionName + "' expects '" + toString(e.expected) + "' at argument #" + std::to_string(e.argumentIndex) +
-                   ", but got '" + Luau::toString(e.passed) + "'";
+        return "the function '" + e.checkedFunctionName + "' expects to get a " + toString(e.expected) + " as its " +
+               toHumanReadableIndex(e.argumentIndex) + " argument, but is being given a " + toString(e.passed) + "";
     }
 
     std::string operator()(const NonStrictFunctionDefinitionError& e) const
     {
-        if (e.functionName.empty())
-        {
-            return "Argument " + e.argument + " with type '" + toString(e.argumentType) + "' is used in a way that will run time error";
-        }
-        else
-        {
-            return "Argument " + e.argument + " with type '" + toString(e.argumentType) + "' in function '" + e.functionName +
-                   "' is used in a way that will run time error";
-        }
+        std::string prefix = e.functionName.empty() ? "" : "in the function '" + e.functionName + "', '";
+        return prefix + "the argument '" + e.argument + "' is used in a way that will error at runtime";
     }
 
     std::string operator()(const PropertyAccessViolation& e) const
     {
         const std::string stringKey = isIdentifier(e.key) ? e.key : "\"" + e.key + "\"";
-        switch (e.context)
+        if (FFlag::LuauTweakAccessViolationReporting)
         {
-        case PropertyAccessViolation::CannotRead:
-            return "Property " + stringKey + " of table '" + toString(e.table) + "' is write-only";
-        case PropertyAccessViolation::CannotWrite:
-            return "Property " + stringKey + " of table '" + toString(e.table) + "' is read-only";
+            const std::string kind = getTableType(e.table) ? "table" : "type";
+
+            switch (e.context)
+            {
+            case PropertyAccessViolation::CannotRead:
+                return "Property " + stringKey + " of " + kind + " '" + toString(e.table) + "' is write-only";
+            case PropertyAccessViolation::CannotWrite:
+                return "Property " + stringKey + " of " + kind + " '" + toString(e.table) + "' is read-only";
+            }
+        }
+        else
+        {
+            switch (e.context)
+            {
+            case PropertyAccessViolation::CannotRead:
+                return "Property " + stringKey + " of table '" + toString(e.table) + "' is write-only";
+            case PropertyAccessViolation::CannotWrite:
+                return "Property " + stringKey + " of table '" + toString(e.table) + "' is read-only";
+            }
         }
 
         LUAU_UNREACHABLE();
@@ -806,8 +805,9 @@ struct ErrorConverter
 
     std::string operator()(const CheckedFunctionIncorrectArgs& e) const
     {
-        return "Checked Function " + e.functionName + " expects " + std::to_string(e.expected) + " arguments, but received " +
-               std::to_string(e.actual);
+
+        return "the function '" + e.functionName + "' will error at runtime if it is not called with " + std::to_string(e.expected) +
+               " arguments, but we are calling it here with " + std::to_string(e.actual) + " arguments";
     }
 
     std::string operator()(const UnexpectedTypeInSubtyping& e) const
@@ -823,6 +823,11 @@ struct ErrorConverter
     std::string operator()(const UserDefinedTypeFunctionError& e) const
     {
         return e.message;
+    }
+
+    std::string operator()(const BuiltInTypeFunctionError& e) const
+    {
+        return toString(e.error);
     }
 
     std::string operator()(const ReservedIdentifier& e) const
@@ -885,7 +890,6 @@ struct ErrorConverter
 
     std::string operator()(const GenericBoundsMismatch& e) const
     {
-        LUAU_ASSERT(FFlag::LuauSubtypingReportGenericBoundMismatches2);
         std::string lowerBounds;
         for (size_t i = 0; i < e.lowerBounds.size(); ++i)
         {
@@ -906,9 +910,92 @@ struct ErrorConverter
                "\nbut these types are not compatible with one another.";
     }
 
+    std::string operator()(const InstantiateGenericsOnNonFunction& e) const
+    {
+        switch (e.interestingEdgeCase)
+        {
+        case InstantiateGenericsOnNonFunction::InterestingEdgeCase::None:
+            return "Cannot instantiate type parameters on something without type parameters.";
+        case InstantiateGenericsOnNonFunction::InterestingEdgeCase::MetatableCall:
+            // `__call` is complicated because `f<<T>>()` is interpreted as `f<<T>>` as its own expression that is then called.
+            // This is so that you can write code like `local f2 = f<<number>>`, and then call `f2()`.
+            // With metatables, it's not so obvious what this would result in.
+            return "Luau does not currently support explicitly instantiating a table with a `__call` metamethod. \
+                You may be able to work around this by creating a function that calls the table, and using that instead.";
+        case InstantiateGenericsOnNonFunction::InterestingEdgeCase::Intersection:
+            return "Luau does not currently support explicitly instantiating an overloaded function type.";
+        default:
+            LUAU_ASSERT(false);
+            return ""; // MSVC exhaustive
+        }
+    }
+
+    std::string operator()(const TypeInstantiationCountMismatch& e) const
+    {
+        LUAU_ASSERT(e.providedTypes > e.maximumTypes || e.providedTypePacks > e.maximumTypePacks);
+
+        std::string result = "Too many type parameters passed to ";
+
+        if (e.functionName)
+        {
+            result += "'";
+            result += *e.functionName;
+            result += "', which is typed as ";
+        }
+        else
+        {
+            result += "function typed as ";
+        }
+
+        result += toString(e.functionType);
+        result += ". Expected ";
+
+        if (e.providedTypes > e.maximumTypes)
+        {
+            result += "at most ";
+            result += std::to_string(e.maximumTypes);
+            result += " type parameter";
+            if (e.maximumTypes != 1)
+            {
+                result += "s";
+            }
+            result += ", but ";
+            result += std::to_string(e.providedTypes);
+            result += " provided";
+
+            if (e.providedTypePacks > e.maximumTypePacks)
+            {
+                result += ". Also expected ";
+            }
+        }
+
+        if (e.providedTypePacks > e.maximumTypePacks)
+        {
+            result += "at most ";
+            result += std::to_string(e.maximumTypePacks);
+            result += " type pack";
+            if (e.maximumTypePacks != 1)
+            {
+                result += "s";
+            }
+            result += ", but ";
+            result += std::to_string(e.providedTypePacks);
+            result += " provided";
+        }
+
+        result += ".";
+
+        return result;
+    }
+
     std::string operator()(const UnappliedTypeFunction&) const
     {
         return "Type functions always require `<>` when referenced.";
+    }
+
+    std::string operator()(const AmbiguousFunctionCall& afc) const
+    {
+        return "Calling function " + toString(afc.function) + " with argument pack " + toString(afc.arguments) + " is ambiguous.";
     }
 };
 
@@ -1284,6 +1371,11 @@ bool UserDefinedTypeFunctionError::operator==(const UserDefinedTypeFunctionError
     return message == rhs.message;
 }
 
+bool BuiltInTypeFunctionError::operator==(const BuiltInTypeFunctionError& rhs) const
+{
+    return error == rhs.error;
+}
+
 bool ReservedIdentifier::operator==(const ReservedIdentifier& rhs) const
 {
     return name == rhs.name;
@@ -1318,17 +1410,26 @@ bool MultipleNonviableOverloads::operator==(const MultipleNonviableOverloads& rh
     return attemptedArgCount == rhs.attemptedArgCount;
 }
 
+bool InstantiateGenericsOnNonFunction::operator==(const InstantiateGenericsOnNonFunction& rhs) const
+{
+    return interestingEdgeCase == rhs.interestingEdgeCase;
+}
+
+bool TypeInstantiationCountMismatch::operator==(const TypeInstantiationCountMismatch& rhs) const
+{
+    return functionName == rhs.functionName && functionType == rhs.functionType && providedTypes == rhs.providedTypes &&
+           maximumTypes == rhs.maximumTypes && providedTypePacks == rhs.providedTypePacks && maximumTypePacks == rhs.maximumTypePacks;
+}
+
 GenericBoundsMismatch::GenericBoundsMismatch(const std::string_view genericName, TypeIds lowerBoundSet, TypeIds upperBoundSet)
     : genericName(genericName)
     , lowerBounds(lowerBoundSet.take())
     , upperBounds(upperBoundSet.take())
 {
-    LUAU_ASSERT(FFlag::LuauSubtypingReportGenericBoundMismatches2);
 }
 
 bool GenericBoundsMismatch::operator==(const GenericBoundsMismatch& rhs) const
 {
-    LUAU_ASSERT(FFlag::LuauSubtypingReportGenericBoundMismatches2);
     return genericName == rhs.genericName && lowerBounds == rhs.lowerBounds && upperBounds == rhs.upperBounds;
 }
 
@@ -1336,6 +1437,12 @@ bool UnappliedTypeFunction::operator==(const UnappliedTypeFunction& rhs) const
 {
     return true;
 }
+
+bool AmbiguousFunctionCall::operator==(const AmbiguousFunctionCall& rhs) const
+{
+    return function == rhs.function && arguments == rhs.arguments;
+}
+
 
 std::string toString(const TypeError& error)
 {
@@ -1540,6 +1647,9 @@ void copyError(T& e, TypeArena& destArena, CloneState& cloneState)
     else if constexpr (std::is_same_v<T, UserDefinedTypeFunctionError>)
     {
     }
+    else if constexpr (std::is_same_v<T, BuiltInTypeFunctionError>)
+    {
+    }
     else if constexpr (std::is_same_v<T, CannotAssignToNever>)
     {
         e.rhsType = clone(e.rhsType);
@@ -1570,14 +1680,25 @@ void copyError(T& e, TypeArena& destArena, CloneState& cloneState)
     }
     else if constexpr (std::is_same_v<T, GenericBoundsMismatch>)
     {
-        LUAU_ASSERT(FFlag::LuauSubtypingReportGenericBoundMismatches2);
         for (auto& lowerBound : e.lowerBounds)
             lowerBound = clone(lowerBound);
         for (auto& upperBound : e.upperBounds)
             upperBound = clone(upperBound);
     }
+    else if constexpr (std::is_same_v<T, InstantiateGenericsOnNonFunction>)
+    {
+    }
+    else if constexpr (std::is_same_v<T, TypeInstantiationCountMismatch>)
+    {
+        e.functionType = clone(e.functionType);
+    }
     else if constexpr (std::is_same_v<T, UnappliedTypeFunction>)
     {
+    }
+    else if constexpr (std::is_same_v<T, AmbiguousFunctionCall>)
+    {
+        e.function = clone(e.function);
+        e.arguments = clone(e.arguments);
     }
     else
         static_assert(always_false_v<T>, "Non-exhaustive type switch");

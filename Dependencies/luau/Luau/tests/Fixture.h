@@ -3,7 +3,6 @@
 
 #include "Luau/BuiltinTypeFunctions.h"
 #include "Luau/Config.h"
-#include "Luau/EqSatSimplification.h"
 #include "Luau/Error.h"
 #include "Luau/FileResolver.h"
 #include "Luau/Frontend.h"
@@ -28,13 +27,21 @@
 
 LUAU_FASTFLAG(DebugLuauFreezeArena)
 LUAU_FASTFLAG(DebugLuauForceAllNewSolverTests)
+LUAU_FASTFLAG(DebugLuauForceAllOldSolverTests)
 
-LUAU_FASTFLAG(LuauTidyTypeUtils)
 LUAU_FASTFLAG(DebugLuauAlwaysShowConstraintSolvingIncomplete);
+LUAU_FASTFLAG(DebugLuauForceOldSolver)
+LUAU_FASTFLAG(LuauDisallowExternClassInTypeDefinitions)
 
-#define DOES_NOT_PASS_NEW_SOLVER_GUARD_IMPL(line) ScopedFastFlag sff_##line{FFlag::LuauSolverV2, FFlag::DebugLuauForceAllNewSolverTests};
+#define DOES_NOT_PASS_NEW_SOLVER_GUARD_IMPL(line) ScopedFastFlag sff_##line{FFlag::DebugLuauForceOldSolver, !FFlag::DebugLuauForceAllNewSolverTests};
 
 #define DOES_NOT_PASS_NEW_SOLVER_GUARD() DOES_NOT_PASS_NEW_SOLVER_GUARD_IMPL(__LINE__)
+
+#define DOES_NOT_PASS_OLD_SOLVER_GUARD_IMPL(line) ScopedFastFlag sff_##line{FFlag::DebugLuauForceOldSolver, FFlag::DebugLuauForceAllOldSolverTests};
+
+#define DOES_NOT_PASS_OLD_SOLVER_GUARD() DOES_NOT_PASS_OLD_SOLVER_GUARD_IMPL(__LINE__)
+
+
 
 namespace Luau
 {
@@ -88,7 +95,7 @@ struct TestFileResolver
 
     std::optional<SourceCode> readSource(const ModuleName& name) override;
 
-    std::optional<ModuleInfo> resolveModule(const ModuleInfo* context, AstExpr* expr) override;
+    std::optional<ModuleInfo> resolveModule(const ModuleInfo* context, AstExpr* expr, const TypeCheckLimits& limits) override;
 
     std::string getHumanReadableModuleName(const ModuleName& name) const override;
 
@@ -104,12 +111,16 @@ struct TestConfigResolver : ConfigResolver
     Config defaultConfig;
     std::unordered_map<ModuleName, Config> configFiles;
 
-    const Config& getConfig(const ModuleName& name) const override;
+    const Config& getConfig(const ModuleName& name, const TypeCheckLimits& limits = {}) const override;
 };
 
 struct Fixture
 {
     explicit Fixture(bool prepareAutocomplete = false);
+
+    explicit Fixture(const Fixture&) = delete;
+    Fixture& operator=(const Fixture&) = delete;
+
     ~Fixture();
 
     // Throws Luau::ParseErrors if the parse fails.
@@ -138,22 +149,23 @@ struct Fixture
     TypeId requireType(const ScopePtr& scope, const std::string& name);
 
     std::optional<TypeId> findTypeAtPosition(Position position);
+    std::optional<TypeId> findTypeAtPosition(const ModuleName& moduleName, Position position);
     TypeId requireTypeAtPosition(Position position);
+    TypeId requireTypeAtPosition(const ModuleName& moduleName, Position position);
     std::optional<TypeId> findExpectedTypeAtPosition(Position position);
 
     std::optional<TypeId> lookupType(const std::string& name);
     std::optional<TypeId> lookupImportedType(const std::string& moduleAlias, const std::string& name);
     TypeId requireTypeAlias(const std::string& name);
+    TypeId requireExportedType(const std::string& name);
     TypeId requireExportedType(const ModuleName& moduleName, const std::string& name);
 
-    std::string canonicalize(TypeId ty);
+    TypeId parseType(std::string_view src);
 
     // While most flags can be flipped inside the unit test, some code changes affect the state that is part of Fixture initialization
     // Most often those are changes related to builtin type definitions.
     // In that case, flag can be forced to 'true' using the example below:
     // ScopedFastFlag sff_LuauExampleFlagDefinition{FFlag::LuauExampleFlagDefinition, true};
-
-    ScopedFastFlag sff_TypeUtilTidy{FFlag::LuauTidyTypeUtils, true};
 
     // Arena freezing marks the `TypeArena`'s underlying memory as read-only, raising an access violation whenever you mutate it.
     // This is useful for tracking down violations of Luau's memory model.
@@ -162,12 +174,17 @@ struct Fixture
     // This makes sure that errant cases of constraint solving failing to complete still pop up in tests.
     ScopedFastFlag sff_DebugLuauAlwaysShowConstraintSolvingIncomplete{FFlag::DebugLuauAlwaysShowConstraintSolvingIncomplete, true};
 
+    // lots of tests might use declare class in type definitions - disable this and force all tests to adopt the new syntax
+    ScopedFastFlag sff_LuauDisallowExternClassInTypeDefinitions{FFlag::LuauDisallowExternClassInTypeDefinitions, true};
+
     TestFileResolver fileResolver;
     TestConfigResolver configResolver;
     NullModuleResolver moduleResolver;
     std::unique_ptr<SourceModule> sourceModule;
     InternalErrorReporter ice;
-
+    Allocator allocator;
+    AstNameTable nameTable{allocator};
+    TypeArena arena;
 
     std::string decorateWithTypes(const std::string& code);
 
@@ -186,7 +203,13 @@ struct Fixture
     LoadDefinitionFileResult loadDefinition(const std::string& source, bool forAutocomplete = false);
     // TODO: test theory about dynamic dispatch
     NotNull<BuiltinTypes> getBuiltins();
+    const BuiltinTypeFunctions& getBuiltinTypeFunctions();
     virtual Frontend& getFrontend();
+
+    // On platforms that support it, adjust our internal stack guard to
+    // limit how much address space we should use before we blow up.  We
+    // use this to test the stack guard itself.
+    void limitStackSize(size_t size);
 
 private:
     bool hasDumpedErrors = false;
@@ -196,8 +219,7 @@ protected:
     std::optional<Frontend> frontend;
     BuiltinTypes* builtinTypes = nullptr;
 
-    TypeArena simplifierArena;
-    SimplifierPtr simplifier{nullptr, nullptr};
+    std::vector<ScopedFastInt> dynamicScopedInts;
 };
 
 struct BuiltinsFixture : Fixture
@@ -206,6 +228,11 @@ struct BuiltinsFixture : Fixture
 
     // For the purpose of our tests, we're always the latest version of type functions.
     Frontend& getFrontend() override;
+};
+
+struct IsSubtypeFixture : Fixture
+{
+    bool isSubtype(TypeId a, TypeId b);
 };
 
 std::optional<std::string> pathExprToModuleName(const ModuleName& currentModuleName, const std::vector<std::string_view>& segments);
@@ -370,3 +397,27 @@ const E* findError(const CheckResult& result)
             CHECK_MESSAGE(false, "Expected to find no " #Type " error"); \
         } \
     } while (false)
+
+#define CHECK_LONG_STRINGS_EQ(a, b) \
+    do \
+    { \
+        const auto aa = (a); \
+        const auto bb = (b); \
+        const auto aLines = split(aa, '\n'); \
+        const auto bLines = split(bb, '\n'); \
+        CHECK_MESSAGE(aLines.size() == bLines.size(), "Line counts don't match: " << aLines.size() << " != " << bLines.size()); \
+        bool anyWrong = false; \
+        for (size_t i = 0; i < std::min(aLines.size(), bLines.size()); ++i) \
+        { \
+            auto aLine = strip(aLines.at(i)); \
+            auto bLine = strip(bLines.at(i)); \
+            if (aLine != bLine) \
+                anyWrong = true; \
+            CHECK_MESSAGE(aLine == bLine, "Mismatch on line " << i << " between:\n\t«" << aLine << "»\nand\t«" << bLine << "»\n"); \
+        } \
+        if (anyWrong) \
+        { \
+            MESSAGE(aa); \
+            MESSAGE(bb); \
+        } \
+    } while (0)

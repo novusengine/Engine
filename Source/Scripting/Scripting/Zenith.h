@@ -88,8 +88,14 @@ namespace Scripting
 
         void SetGlobalKey(const char* key);
         void AddGlobalField(const char* key, bool value);
+        void AddGlobalField(const char* key, i8 value);
+        void AddGlobalField(const char* key, i16 value);
         void AddGlobalField(const char* key, i32 value);
+        void AddGlobalField(const char* key, i64 value);
+        void AddGlobalField(const char* key, u8 value);
+        void AddGlobalField(const char* key, u16 value);
         void AddGlobalField(const char* key, u32 value);
+        void AddGlobalField(const char* key, u64 value);
         void AddGlobalField(const char* key, f32 value);
         void AddGlobalField(const char* key, f64 value);
         void AddGlobalField(const char* key, const char* value);
@@ -99,6 +105,7 @@ namespace Scripting
 
         bool IsNil(i32 index);
         bool IsBoolean(i32 index);
+        bool IsInteger(i32 index);
         bool IsNumber(i32 index);
         bool IsString(i32 index);
         bool IsVector(i32 index);
@@ -108,8 +115,8 @@ namespace Scripting
         bool IsLightUserData(i32 index);
 
         bool ToBoolean(i32 index);
-        i32 ToInteger(i32 index);
-        u32 ToUnsigned(i32 index);
+        i64 ToInteger(i32 index);
+        u64 ToUnsigned(i32 index);
         f64 ToNumber(i32 index);
         const char* ToString(i32 index);
         vec3 ToVector(i32 index);
@@ -217,9 +224,15 @@ namespace Scripting
             bool result = true;
 
             u32 numFunctions = static_cast<u32>(funcList.size());
-            for (i32 funcRef : funcList)
+            if (!lua_checkstack(state, static_cast<i32>(numFunctions + numArguments)))
             {
-                GetRawI(LUA_REGISTRYINDEX, funcRef);
+                Pop(numArguments);
+                return false;
+            }
+
+            for (auto itr = funcList.rbegin(); itr != funcList.rend(); ++itr)
+            {
+                GetRawI(LUA_REGISTRYINDEX, *itr);
             }
 
             while (numFunctions > 0)
@@ -259,9 +272,15 @@ namespace Scripting
             bool result = true;
 
             u32 numFunctions = static_cast<u32>(funcList.size());
-            for (i32 funcRef : funcList)
+            if (!lua_checkstack(state, static_cast<i32>(numFunctions + numArguments)))
             {
-                GetRawI(LUA_REGISTRYINDEX, funcRef);
+                Pop(numArguments);
+                return false;
+            }
+
+            for (auto itr = funcList.rbegin(); itr != funcList.rend(); ++itr)
+            {
+                GetRawI(LUA_REGISTRYINDEX, *itr);
             }
 
             while (result && numFunctions > 0)
@@ -422,11 +441,14 @@ namespace Scripting
         }
 
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
-        bool CallEvent(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
+        bool CallEventHandlers(EventType eventType, EventDataType&& eventData, const std::vector<i32>& funcRefList)
         {
             u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
             u16 eventDataID = std::decay_t<EventDataType>::STRUCT_ID;
             u16 eventTypeVal = static_cast<u16>(eventType);
+
+            if (funcRefList.empty())
+                return false;
 
             auto& eventTypeMap = eventState.eventTypeToState;
             if (!eventTypeMap.contains(eventTypeID))
@@ -438,14 +460,6 @@ namespace Scripting
 
             EventState& eventState = eventTypeState.eventIDToEventState[eventTypeVal];
             if (eventState.eventDataID != eventDataID)
-                return false;
-
-            auto itr = eventState.eventVariantToFuncRef.find(variantID);
-            if (itr == eventState.eventVariantToFuncRef.end())
-                return false;
-
-            auto& funcRefList = itr->second;
-            if (funcRefList.empty())
                 return false;
 
             u32 packedEventID = static_cast<u32>(eventTypeVal) | (static_cast<u32>(eventTypeID) << 16);
@@ -465,6 +479,27 @@ namespace Scripting
             CallAllFunctions(funcRefList, numParametersToPush, false);
 
             return true;
+        }
+
+        template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
+        bool CallEvent(EventType eventType, EventDataType&& eventData, u16 variantID = 0)
+        {
+            const u16 eventTypeID = EnumTraits<EventType>::Meta::ENUM_ID;
+            const u16 eventTypeVal = static_cast<u16>(eventType);
+
+            auto eventTypeItr = eventState.eventTypeToState.find(eventTypeID);
+            if (eventTypeItr == eventState.eventTypeToState.end())
+                return false;
+
+            auto eventItr = eventTypeItr->second.eventIDToEventState.find(eventTypeVal);
+            if (eventItr == eventTypeItr->second.eventIDToEventState.end())
+                return false;
+
+            auto callbacksItr = eventItr->second.eventVariantToFuncRef.find(variantID);
+            if (callbacksItr == eventItr->second.eventVariantToFuncRef.end())
+                return false;
+
+            return CallEventHandlers(eventType, std::forward<EventDataType>(eventData), callbacksItr->second);
         }
 
         template <LuaEventTypeConcept EventType, LuaEventDataConcept EventDataType>
@@ -531,8 +566,14 @@ namespace Scripting
 
 
     template<> bool Zenith::GetGlobalField<bool>(const char* key);
+    template<> i8 Zenith::GetGlobalField<i8>(const char* key);
+    template<> i16 Zenith::GetGlobalField<i16>(const char* key);
     template<> i32 Zenith::GetGlobalField<i32>(const char* key);
+    template<> i64 Zenith::GetGlobalField<i64>(const char* key);
+    template<> u8 Zenith::GetGlobalField<u8>(const char* key);
+    template<> u16 Zenith::GetGlobalField<u16>(const char* key);
     template<> u32 Zenith::GetGlobalField<u32>(const char* key);
+    template<> u64 Zenith::GetGlobalField<u64>(const char* key);
     template<> f32 Zenith::GetGlobalField<f32>(const char* key);
     template<> f64 Zenith::GetGlobalField<f64>(const char* key);
     template<> const char* Zenith::GetGlobalField<const char*>(const char* key);
@@ -547,8 +588,14 @@ namespace Scripting
     template<> void Zenith::Push<::std::string>(const ::std::string& value);
 
     template<> bool Zenith::Get<bool>(i32 index);
+    template<> i8 Zenith::Get<i8>(i32 index);
+    template<> i16 Zenith::Get<i16>(i32 index);
     template<> i32 Zenith::Get<i32>(i32 index);
+    template<> i64 Zenith::Get<i64>(i32 index);
+    template<> u8 Zenith::Get<u8>(i32 index);
+    template<> u16 Zenith::Get<u16>(i32 index);
     template<> u32 Zenith::Get<u32>(i32 index);
+    template<> u64 Zenith::Get<u64>(i32 index);
     template<> f32 Zenith::Get<f32>(i32 index);
     template<> f64 Zenith::Get<f64>(i32 index);
     template<> const char* Zenith::Get<const char*>(i32 index);

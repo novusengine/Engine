@@ -14,6 +14,11 @@
 #include <string_view>
 #include <utility>
 
+LUAU_FASTFLAG(LuauCyclicRequireShortCircuit)
+
+// Mirrors kRequireStackValues in RequireImpl.cpp: slot index of the module placeholder.
+static const int kRequireStackValues = 6;
+
 static luarequire_WriteResult write(std::optional<std::string> contents, char* buffer, size_t bufferSize, size_t* sizeOut)
 {
     if (!contents)
@@ -40,6 +45,18 @@ static luarequire_NavigateResult convert(NavigationStatus status)
         return NAVIGATE_AMBIGUOUS;
     else
         return NAVIGATE_NOT_FOUND;
+}
+
+static luarequire_ConfigStatus convert(VfsNavigator::ConfigStatus status)
+{
+    if (status == VfsNavigator::ConfigStatus::Ambiguous)
+        return CONFIG_AMBIGUOUS;
+    else if (status == VfsNavigator::ConfigStatus::PresentJson)
+        return CONFIG_PRESENT_JSON;
+    else if (status == VfsNavigator::ConfigStatus::PresentLuau)
+        return CONFIG_PRESENT_LUAU;
+    else
+        return CONFIG_ABSENT;
 }
 
 static bool is_require_allowed(lua_State* L, void* ctx, const char* requirer_chunkname)
@@ -107,16 +124,16 @@ static luarequire_WriteResult get_cache_key(lua_State* L, void* ctx, char* buffe
     return write(req->vfs.getAbsoluteFilePath(), buffer, buffer_size, size_out);
 }
 
-static bool is_config_present(lua_State* L, void* ctx)
+static luarequire_ConfigStatus get_config_status(lua_State* L, void* ctx)
 {
     ReplRequirer* req = static_cast<ReplRequirer*>(ctx);
-    return isFile(req->vfs.getLuaurcPath());
+    return convert(req->vfs.getConfigStatus());
 }
 
 static luarequire_WriteResult get_config(lua_State* L, void* ctx, char* buffer, size_t buffer_size, size_t* size_out)
 {
     ReplRequirer* req = static_cast<ReplRequirer*>(ctx);
-    return write(readFile(req->vfs.getLuaurcPath()), buffer, buffer_size, size_out);
+    return write(req->vfs.getConfig(), buffer, buffer_size, size_out);
 }
 
 static int load(lua_State* L, void* ctx, const char* path, const char* chunkname, const char* loadname)
@@ -156,13 +173,31 @@ static int load(lua_State* L, void* ctx, const char* path, const char* chunkname
         if (req->codegenEnabled())
         {
             Luau::CodeGen::CompilationOptions nativeOptions;
+
+            if (req->countersActive())
+                nativeOptions.recordCounters = true;
+
             Luau::CodeGen::compile(ML, -1, nativeOptions);
         }
 
         if (req->coverageActive())
             req->coverageTrack(ML, -1);
 
-        int status = lua_resume(ML, L, 0);
+        if (req->countersActive())
+            req->countersTrack(ML, -1);
+
+        int status;
+        if (FFlag::LuauCyclicRequireShortCircuit)
+        {
+            // Pass the module placeholder as ... so the module can adopt it as its export surface.
+            lua_pushvalue(L, kRequireStackValues);
+            lua_xmove(L, ML, 1);
+            status = lua_resume(ML, L, 1);
+        }
+        else
+        {
+            status = lua_resume(ML, L, 0);
+        }
 
         if (status == 0)
         {
@@ -204,19 +239,27 @@ void requireConfigInit(luarequire_Configuration* config)
     config->to_parent = to_parent;
     config->to_child = to_child;
     config->is_module_present = is_module_present;
-    config->is_config_present = is_config_present;
+    config->get_config_status = get_config_status;
     config->get_chunkname = get_chunkname;
     config->get_loadname = get_loadname;
     config->get_cache_key = get_cache_key;
-    config->get_alias = nullptr;
     config->get_config = get_config;
     config->load = load;
 }
 
-ReplRequirer::ReplRequirer(CompileOptions copts, BoolCheck coverageActive, BoolCheck codegenEnabled, Coverage coverageTrack)
+ReplRequirer::ReplRequirer(
+    CompileOptions copts,
+    BoolCheck coverageActive,
+    BoolCheck codegenEnabled,
+    Coverage coverageTrack,
+    BoolCheck countersActive,
+    Coverage countersTrack
+)
     : copts(copts)
     , coverageActive(coverageActive)
     , codegenEnabled(codegenEnabled)
     , coverageTrack(coverageTrack)
+    , countersActive(countersActive)
+    , countersTrack(countersTrack)
 {
 }

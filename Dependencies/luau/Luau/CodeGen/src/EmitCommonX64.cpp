@@ -14,8 +14,8 @@
 
 #include <utility>
 
-
-LUAU_DYNAMIC_FASTFLAGVARIABLE(AddReturnExectargetCheck, false);
+LUAU_DYNAMIC_FASTFLAGVARIABLE(AddReturnExectargetCheck, false)
+LUAU_FASTFLAG(LuauCIProto)
 
 namespace Luau
 {
@@ -24,7 +24,7 @@ namespace CodeGen
 namespace X64
 {
 
-void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs, OperandX64 rhs, IrCondition cond, Label& label)
+void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs, OperandX64 rhs, IrCondition cond, Label& label, bool floatPrecision)
 {
     // Refresher on comi/ucomi EFLAGS:
     // all zero: greater
@@ -36,14 +36,29 @@ void jumpOnNumberCmp(AssemblyBuilderX64& build, RegisterX64 tmp, OperandX64 lhs,
     if (cond == IrCondition::Greater || cond == IrCondition::GreaterEqual || cond == IrCondition::NotGreater || cond == IrCondition::NotGreaterEqual)
         std::swap(lhs, rhs);
 
-    if (rhs.cat == CategoryX64::reg)
+    if (floatPrecision)
     {
-        build.vucomisd(rhs, lhs);
+        if (rhs.cat == CategoryX64::reg)
+        {
+            build.vucomiss(rhs, lhs);
+        }
+        else
+        {
+            build.vmovss(tmp, rhs);
+            build.vucomiss(tmp, lhs);
+        }
     }
     else
     {
-        build.vmovsd(tmp, rhs);
-        build.vucomisd(tmp, lhs);
+        if (rhs.cat == CategoryX64::reg)
+        {
+            build.vucomisd(rhs, lhs);
+        }
+        else
+        {
+            build.vmovsd(tmp, rhs);
+            build.vucomisd(tmp, lhs);
+        }
     }
 
     // Keep in mind that 'Not' conditions want 'true' for comparisons with NaN
@@ -228,14 +243,23 @@ void callSetTable(IrRegAllocX64& regs, AssemblyBuilderX64& build, int rb, Operan
     emitUpdateBase(build);
 }
 
-void checkObjectBarrierConditions(AssemblyBuilderX64& build, RegisterX64 tmp, RegisterX64 object, IrOp ra, int ratag, Label& skip)
+void checkObjectBarrierConditions(AssemblyBuilderX64& build, RegisterX64 tmp, RegisterX64 object, RegisterX64 ra, IrOp raOp, int ratag, Label& skip)
 {
     // Barrier should've been optimized away if we know that it's not collectable, checking for correctness
     if (ratag == -1 || !isGCO(ratag))
     {
         // iscollectable(ra)
-        OperandX64 tag = (ra.kind == IrOpKind::VmReg) ? luauRegTag(vmRegOp(ra)) : luauConstantTag(vmConstOp(ra));
-        build.cmp(tag, LUA_TSTRING);
+        if (raOp.kind == IrOpKind::Inst)
+        {
+            build.vpextrd(dwordReg(tmp), ra, 3);
+            build.cmp(dwordReg(tmp), LUA_TSTRING);
+        }
+        else
+        {
+            OperandX64 tag = (raOp.kind == IrOpKind::VmReg) ? luauRegTag(vmRegOp(raOp)) : luauConstantTag(vmConstOp(raOp));
+            build.cmp(tag, LUA_TSTRING);
+        }
+
         build.jcc(ConditionX64::Less, skip);
     }
 
@@ -244,19 +268,25 @@ void checkObjectBarrierConditions(AssemblyBuilderX64& build, RegisterX64 tmp, Re
     build.jcc(ConditionX64::Zero, skip);
 
     // iswhite(gcvalue(ra))
-    OperandX64 value = (ra.kind == IrOpKind::VmReg) ? luauRegValue(vmRegOp(ra)) : luauConstantValue(vmConstOp(ra));
-    build.mov(tmp, value);
+    if (raOp.kind == IrOpKind::Inst)
+    {
+        build.vmovq(tmp, ra);
+    }
+    else
+    {
+        OperandX64 value = (raOp.kind == IrOpKind::VmReg) ? luauRegValue(vmRegOp(raOp)) : luauConstantValue(vmConstOp(raOp));
+        build.mov(tmp, value);
+    }
     build.test(byte[tmp + offsetof(GCheader, marked)], bit2mask(WHITE0BIT, WHITE1BIT));
     build.jcc(ConditionX64::Zero, skip);
 }
 
-
-void callBarrierObject(IrRegAllocX64& regs, AssemblyBuilderX64& build, RegisterX64 object, IrOp objectOp, IrOp ra, int ratag)
+void callBarrierObject(IrRegAllocX64& regs, AssemblyBuilderX64& build, RegisterX64 object, IrOp objectOp, RegisterX64 ra, IrOp raOp, int ratag)
 {
     Label skip;
 
     ScopedRegX64 tmp{regs, SizeX64::qword};
-    checkObjectBarrierConditions(build, tmp.reg, object, ra, ratag, skip);
+    checkObjectBarrierConditions(build, tmp.reg, object, ra, raOp, ratag, skip);
 
     {
         ScopedSpills spillGuard(regs);
@@ -347,8 +377,8 @@ void emitInterrupt(AssemblyBuilderX64& build)
 
     // note: rbx is non-volatile so it will be saved across interrupt call automatically
 
-    RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
-    RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
+    RegisterX64 rArg1 = IrCallWrapperX64::suggestArgumentRegister<0>(SizeX64::qword, build);
+    RegisterX64 rArg2 = IrCallWrapperX64::suggestArgumentRegister<1>(SizeX64::qword, build);
 
     Label skip;
 
@@ -468,7 +498,10 @@ void emitReturn(AssemblyBuilderX64& build, ModuleHelpers& helpers)
     build.mov(rax, qword[rax + offsetof(TValue, value.gc)]);
     build.mov(sClosure, rax);
 
-    build.mov(proto, qword[rax + offsetof(Closure, l.p)]);
+    if (FFlag::LuauCIProto)
+        build.mov(proto, qword[cip + offsetof(CallInfo, p)]);
+    else
+        build.mov(proto, qword[rax + offsetof(Closure, l.p)]);
 
     build.mov(execdata, qword[proto + offsetof(Proto, execdata)]);
 

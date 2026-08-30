@@ -521,6 +521,7 @@ M.LuaSerialization =
         system =
         {
             "Base/Types.h",
+            "bit",
             "lua.h"
         }
     },

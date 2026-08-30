@@ -31,6 +31,15 @@ namespace Renderer
         size_t size = 0;
     };
 
+    struct TextureUploadRegion
+    {
+    public:
+        uvec2 offset = uvec2(0);
+        uvec2 extent = uvec2(0);
+        u32 layer = 0;
+        u32 mipLevel = 0;
+    };
+
     // Lets strong-typedef an ID type with the underlying type of u16
     STRONG_TYPEDEF(TextureID, u16);
 }

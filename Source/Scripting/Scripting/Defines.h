@@ -43,6 +43,12 @@ namespace Scripting
 
     using LuaGenericEventCallback = std::function<void(Zenith*, void*)>;
 
+    enum class LuaReloadResult : u8
+    {
+        Succeeded,
+        Failed
+    };
+
     struct EventState
     {
     public:
@@ -66,6 +72,7 @@ namespace Scripting
         virtual void Register(Zenith* zenith) = 0;
         virtual void Clear(Zenith* zenith) = 0;
 
+        virtual void OnReload(Zenith*, LuaReloadResult) {}
         virtual void PostLoad(Zenith* zenith) = 0;
         virtual void Update(Zenith* zenith, f32 deltaTime) = 0;
     };

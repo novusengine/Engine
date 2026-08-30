@@ -297,6 +297,7 @@ namespace ClientDB
     bool Data::Save(std::shared_ptr<Bytebuffer>& buffer)
     {
         Compact();
+        ClearPaddingBytes();
 
         bool failed = false;
 
@@ -305,8 +306,15 @@ namespace ClientDB
             if (_fileHeader.version != CURRENT_VERSION)
                 _fileHeader.version = CURRENT_VERSION;
 
+            Header serializedHeader;
+            memset(&serializedHeader, 0, sizeof(serializedHeader));
+            serializedHeader.Flags.IsInitialized = _header.Flags.IsInitialized;
+            serializedHeader.Flags.HasFieldInfo = _header.Flags.HasFieldInfo;
+            serializedHeader.numBytesPerRow = _header.numBytesPerRow;
+            serializedHeader.maxID = _header.maxID;
+
             failed |= !buffer->Put(_fileHeader);
-            failed |= !buffer->Put(_header);
+            failed |= !buffer->Put(serializedHeader);
         }
 
         // Field Info
@@ -454,6 +462,33 @@ namespace ClientDB
             return;
 
         memset(&_data[index], 0, _header.numBytesPerRow);
+    }
+
+    void Data::ClearPaddingBytes()
+    {
+        if (!_header.Flags.HasFieldInfo || _data.empty() || _fieldInfo.size() != _fieldOffset.size())
+            return;
+
+        const size_t rowSize = _header.numBytesPerRow;
+        for (size_t rowOffset = 0; rowOffset + rowSize <= _data.size(); rowOffset += rowSize)
+        {
+            size_t populatedEnd = 0;
+            for (size_t fieldIndex = 0; fieldIndex < _fieldInfo.size(); ++fieldIndex)
+            {
+                const size_t fieldOffset = _fieldOffset[fieldIndex];
+                const size_t fieldSize = GetSizeForField(_fieldInfo[fieldIndex]);
+                if (fieldOffset > rowSize || fieldSize > rowSize - fieldOffset)
+                    return;
+
+                if (fieldOffset > populatedEnd)
+                    memset(&_data[rowOffset + populatedEnd], 0, fieldOffset - populatedEnd);
+
+                populatedEnd = fieldOffset + fieldSize;
+            }
+
+            if (populatedEnd < rowSize)
+                memset(&_data[rowOffset + populatedEnd], 0, rowSize - populatedEnd);
+        }
     }
 
     void Data::Link(u32 id, u32 index)

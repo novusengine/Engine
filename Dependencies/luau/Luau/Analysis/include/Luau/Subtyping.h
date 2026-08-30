@@ -2,7 +2,6 @@
 #pragma once
 
 #include "Luau/DenseHash.h"
-#include "Luau/EqSatSimplification.h"
 #include "Luau/Set.h"
 #include "Luau/SubtypingVariance.h"
 #include "Luau/TypeCheckLimits.h"
@@ -41,6 +40,11 @@ struct SubtypingReasoning
     // The path, relative to the _root supertype_, where subtyping failed.
     Path superPath;
     SubtypingVariance variance = SubtypingVariance::Covariant;
+    // Set when the failure is due to a property modifier mismatch (e.g. the
+    // sub property is read-only or write-only but the super property requires
+    // read-write). In this case the leaf types at the path ends are the same,
+    // so a plain "X is not a subtype of X" message would be misleading.
+    bool isPropertyModifierViolation = false;
 
     bool operator==(const SubtypingReasoning& other) const;
 };
@@ -103,27 +107,33 @@ struct MappedGenericEnvironment
     bool bindGeneric(TypePackId genericTp, TypePackId bindeeTp);
 };
 
+enum class SubtypingSuppressionPolicy
+{
+    Any,
+    All
+};
+
 struct SubtypingResult
 {
     bool isSubtype = false;
     bool normalizationTooComplex = false;
     bool isCacheable = true;
+    bool isErrorSuppressing = false;
     ErrorVec errors;
     /// The reason for isSubtype to be false. May not be present even if
     /// isSubtype is false, depending on the input types.
     SubtypingReasonings reasoning{kEmptyReasoning};
-    DenseHashMap<TypePackId, TypePackId> mappedGenericPacks_DEPRECATED{nullptr};
 
     // If this subtype result required testing free types, we might be making
     // assumptions about what the free type eventually resolves to.  If so,
     // those assumptions are recorded here.
-    std::vector<SubtypeConstraint> assumedConstraints;
+    std::vector<ConstraintV> assumedConstraints;
 
     /// If any generic bounds were invalid, report them here
     std::vector<GenericBoundsMismatch> genericBoundsMismatches;
 
-    SubtypingResult& andAlso(const SubtypingResult& other);
-    SubtypingResult& orElse(const SubtypingResult& other);
+    SubtypingResult& andAlso(SubtypingResult other, SubtypingSuppressionPolicy policy = SubtypingSuppressionPolicy::Any);
+    SubtypingResult& orElse(SubtypingResult other);
     SubtypingResult& withBothComponent(TypePath::Component component);
     SubtypingResult& withSuperComponent(TypePath::Component component);
     SubtypingResult& withSubComponent(TypePath::Component component);
@@ -132,11 +142,12 @@ struct SubtypingResult
     SubtypingResult& withSuperPath(TypePath::Path path);
     SubtypingResult& withErrors(ErrorVec& err);
     SubtypingResult& withError(TypeError err);
+    SubtypingResult& withPropertyModifierViolation();
+
+    SubtypingResult& withAssumedConstraint(ConstraintV constraint);
 
     // Only negates the `isSubtype`.
     static SubtypingResult negate(const SubtypingResult& result);
-    static SubtypingResult all(const std::vector<SubtypingResult>& results);
-    static SubtypingResult any(const std::vector<SubtypingResult>& results);
 };
 
 struct SubtypingEnvironment
@@ -145,13 +156,6 @@ struct SubtypingEnvironment
     {
         TypeIds lowerBound;
         TypeIds upperBound;
-    };
-
-    // TODO: Clip with LuauSubtypingGenericsDoesntUseVariance
-    struct GenericBounds_DEPRECATED
-    {
-        DenseHashSet<TypeId> lowerBound{nullptr};
-        DenseHashSet<TypeId> upperBound{nullptr};
     };
 
     /* For nested subtyping relationship tests of mapped generic bounds, we keep the outer environment immutable */
@@ -165,21 +169,15 @@ struct SubtypingEnvironment
         TypeId ty,
         NotNull<InternalErrorReporter> iceReporter
     );
-    // TODO: Clip with LuauSubtypingGenericsDoesntUseVariance
-    std::optional<TypeId> applyMappedGenerics_DEPRECATED(NotNull<BuiltinTypes> builtinTypes, NotNull<TypeArena> arena, TypeId ty);
 
-    const TypeId* tryFindSubstitution(TypeId ty) const;
-    // TODO: Clip with LuauSubtypingGenericsDoesntUseVariance
+    std::optional<TypeId> tryFindSubstitution(TypeId ty) const;
     const SubtypingResult* tryFindSubtypingResult(std::pair<TypeId, TypeId> subAndSuper) const;
 
     bool containsMappedType(TypeId ty) const;
     bool containsMappedPack(TypePackId tp) const;
 
     GenericBounds& getMappedTypeBounds(TypeId ty, NotNull<InternalErrorReporter> iceReporter);
-    // TODO: Clip with LuauSubtypingGenericsDoesntUseVariance
-    GenericBounds_DEPRECATED& getMappedTypeBounds_DEPRECATED(TypeId ty);
-    // TODO: Clip with LuauSubtypingGenericPacksDoesntUseVariance
-    TypePackId* getMappedPackBounds_DEPRECATED(TypePackId tp);
+    MappedGenericEnvironment::LookupResult lookupGenericPack(TypePackId tp) const;
 
     /*
      * When we encounter a generic over the course of a subtyping test, we need
@@ -188,12 +186,8 @@ struct SubtypingEnvironment
      * of each vector represents the current scope.
      */
     DenseHashMap<TypeId, std::vector<GenericBounds>> mappedGenerics{nullptr};
-    // TODO: Clip with LuauSubtypingGenericsDoesntUseVariance
-    DenseHashMap<TypeId, GenericBounds_DEPRECATED> mappedGenerics_DEPRECATED{nullptr};
 
     MappedGenericEnvironment mappedGenericPacks;
-    // TODO: Clip with LuauSubtypingGenericPacksDoesntUseVariance
-    DenseHashMap<TypePackId, TypePackId> mappedGenericPacks_DEPRECATED{nullptr};
 
     /*
      * See the test cyclic_tables_are_assumed_to_be_compatible_with_extern_types for
@@ -203,21 +197,21 @@ struct SubtypingEnvironment
      */
     DenseHashMap<TypeId, TypeId> substitutions{nullptr};
 
-    // TODO: Clip with LuauSubtypingGenericsDoesntUseVariance
-    DenseHashMap<std::pair<TypeId, TypeId>, SubtypingResult, TypePairHash> ephemeralCache{{}};
-
     // We use this cache to track pairs of subtypes that we tried to subtype, and found them to be in the seen set at the time.
     // In those situations, we return True, but mark the result as not cacheable, because we don't want to cache broader results which
     // led to the seen pair. However, those results were previously being cache in the ephemeralCache, and we still want to cache them somewhere
     // for performance reasons.
     DenseHashMap<std::pair<TypeId, TypeId>, SubtypingResult, TypePairHash> seenSetCache{{}};
+
+    int iterationCount = 0;
 };
+
+struct TypeFunctionRuntime;
 
 struct Subtyping
 {
     NotNull<BuiltinTypes> builtinTypes;
     NotNull<TypeArena> arena;
-    NotNull<Simplifier> simplifier;
     NotNull<Normalizer> normalizer;
     NotNull<TypeFunctionRuntime> typeFunctionRuntime;
     NotNull<InternalErrorReporter> iceReporter;
@@ -228,15 +222,6 @@ struct Subtyping
     // a covariant test where an invariant test would otherwise be required.
     const DenseHashSet<TypeId>* uniqueTypes = nullptr;
 
-    enum class Variance
-    {
-        Covariant,
-        Contravariant
-    };
-
-    // TODO: Clip this along with LuauSubtypingGenericsDoesntUseVariance?
-    Variance variance = Variance::Covariant;
-
     using SeenSet = Set<std::pair<TypeId, TypeId>, TypePairHash>;
     using SeenTypePackSet = Set<std::pair<TypePackId, TypePackId>, TypePairHash>;
 
@@ -246,7 +231,6 @@ struct Subtyping
     Subtyping(
         NotNull<BuiltinTypes> builtinTypes,
         NotNull<TypeArena> typeArena,
-        NotNull<Simplifier> simplifier,
         NotNull<Normalizer> normalizer,
         NotNull<TypeFunctionRuntime> typeFunctionRuntime,
         NotNull<InternalErrorReporter> iceReporter
@@ -269,11 +253,13 @@ struct Subtyping
     // TODO recursion limits
 
     SubtypingResult isSubtype(TypeId subTy, TypeId superTy, NotNull<Scope> scope);
+    SubtypingResult isSubtype(TypePackId subTp, TypePackId superTp, NotNull<Scope> scope, const std::vector<TypeId>& bindableGenerics);
     SubtypingResult isSubtype(
         TypePackId subTp,
         TypePackId superTp,
         NotNull<Scope> scope,
-        std::optional<std::vector<TypeId>> bindableGenerics = std::nullopt
+        const std::vector<TypeId>& bindableGenerics,
+        const std::vector<TypePackId>& bindableGenericPacks
     );
 
 private:
@@ -284,10 +270,10 @@ private:
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, TypeId subTy, TypeId superTy, NotNull<Scope> scope);
 
     template<typename SubTy, typename SuperTy>
-    SubtypingResult isContravariantWith(SubtypingEnvironment& env, SubTy&& subTy, SuperTy&& superTy, NotNull<Scope> scope);
+    SubtypingResult isContravariantWith(SubtypingEnvironment& env, SubTy subTy, SuperTy superTy, NotNull<Scope> scope);
 
     template<typename SubTy, typename SuperTy>
-    SubtypingResult isInvariantWith(SubtypingEnvironment& env, SubTy&& subTy, SuperTy&& superTy, NotNull<Scope> scope);
+    SubtypingResult isInvariantWith(SubtypingEnvironment& env, SubTy subTy, SuperTy superTy, NotNull<Scope> scope);
 
     template<typename SubTy, typename SuperTy>
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, const TryPair<const SubTy*, const SuperTy*>& pair, NotNull<Scope> scope);
@@ -298,6 +284,7 @@ private:
     template<typename SubTy, typename SuperTy>
     SubtypingResult isInvariantWith(SubtypingEnvironment& env, const TryPair<const SubTy*, const SuperTy*>& pair, NotNull<Scope>);
 
+    SubtypingResult isCovariantWith(SubtypingEnvironment& env, const UnionType* subUnion, const UnionType* superUnion, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, TypeId subTy, const UnionType* superUnion, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, const UnionType* subUnion, TypeId superTy, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, TypeId subTy, const IntersectionType* superIntersection, NotNull<Scope> scope);
@@ -319,7 +306,6 @@ private:
         const SingletonType* superSingleton,
         NotNull<Scope> scope
     );
-    SubtypingResult isCovariantWith(SubtypingEnvironment& env, const TableType* subTable, const TableType* superTable, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(
         SubtypingEnvironment& env,
         const TableType* subTable,
@@ -327,6 +313,7 @@ private:
         bool forceCovariantTest,
         NotNull<Scope> scope
     );
+
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, const MetatableType* subMt, const MetatableType* superMt, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, const MetatableType* subMt, const TableType* superTable, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(
@@ -349,6 +336,7 @@ private:
         const FunctionType* superFunction,
         NotNull<Scope> scope
     );
+    SubtypingResult isCovariantWith(SubtypingEnvironment& env, const MetatableType* subMt, const PrimitiveType* superPrim, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, const TableType* subTable, const PrimitiveType* superPrim, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, const PrimitiveType* subPrim, const TableType* superTable, NotNull<Scope> scope);
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, const SingletonType* subSingleton, const TableType* superTable, NotNull<Scope> scope);
@@ -427,9 +415,16 @@ private:
 
     // Pack subtyping
     SubtypingResult isCovariantWith(SubtypingEnvironment& env, TypePackId subTp, TypePackId superTp, NotNull<Scope> scope);
-    std::optional<SubtypingResult> isSubTailCovariantWith(
+
+    enum class EarlyExit
+    {
+        Yes,
+        No
+    };
+
+    EarlyExit isSubTailCovariantWith(
         SubtypingEnvironment& env,
-        std::vector<SubtypingResult>& outputResults,
+        SubtypingResult& outputResult,
         TypePackId subTp,
         TypePackId subTail,
         TypePackId superTp,
@@ -438,9 +433,10 @@ private:
         std::optional<TypePackId> superTail,
         NotNull<Scope> scope
     );
-    std::optional<SubtypingResult> isCovariantWithSuperTail(
+
+    EarlyExit isCovariantWithSuperTail(
         SubtypingEnvironment& env,
-        std::vector<SubtypingResult>& outputResults,
+        SubtypingResult& outputResult,
         TypePackId subTp,
         size_t subHeadStartIndex,
         const std::vector<TypeId>& subHead,
@@ -450,9 +446,56 @@ private:
         NotNull<Scope> scope
     );
 
-    bool bindGeneric(SubtypingEnvironment& env, TypeId subTp, TypeId superTp);
-    // Clip with LuauSubtypingGenericPacksDoesntUseVariance
-    bool bindGeneric_DEPRECATED(SubtypingEnvironment& env, TypePackId subTp, TypePackId superTp) const;
+    // Markers to help overload selection.
+    struct Anything
+    {
+    };
+    struct Nothing
+    {
+    };
+
+    SubtypingResult isTailCovariantWithTail(
+        SubtypingEnvironment& env,
+        NotNull<Scope> scope,
+        TypePackId subTp,
+        const VariadicTypePack* sub,
+        TypePackId superTp,
+        const VariadicTypePack* super
+    );
+    SubtypingResult isTailCovariantWithTail(
+        SubtypingEnvironment& env,
+        NotNull<Scope> scope,
+        TypePackId subTp,
+        const GenericTypePack* sub,
+        TypePackId superTp,
+        const GenericTypePack* super
+    );
+    SubtypingResult isTailCovariantWithTail(
+        SubtypingEnvironment& env,
+        NotNull<Scope> scope,
+        TypePackId subTp,
+        const VariadicTypePack* sub,
+        TypePackId superTp,
+        const GenericTypePack* super
+    );
+    SubtypingResult isTailCovariantWithTail(
+        SubtypingEnvironment& env,
+        NotNull<Scope> scope,
+        TypePackId subTp,
+        const GenericTypePack* sub,
+        TypePackId superTp,
+        const VariadicTypePack* super
+    );
+    SubtypingResult isTailCovariantWithTail(SubtypingEnvironment& env, NotNull<Scope> scope, TypePackId subTp, const GenericTypePack* sub, Nothing);
+    SubtypingResult isTailCovariantWithTail(
+        SubtypingEnvironment& env,
+        NotNull<Scope> scope,
+        Nothing,
+        TypePackId superTp,
+        const GenericTypePack* super
+    );
+
+    bool bindGeneric(SubtypingEnvironment& env, TypeId subTy, TypeId superTy) const;
 
     template<typename T, typename Container>
     TypeId makeAggregateType(const Container& container, TypeId orElse);
@@ -470,9 +513,6 @@ private:
         NotNull<Scope> scope,
         std::string_view genericName
     );
-
-    // TODO: Clip with LuauSubtypingReportGenericBoundMismatches
-    SubtypingResult checkGenericBounds_DEPRECATED(const SubtypingEnvironment::GenericBounds& bounds, SubtypingEnvironment& env, NotNull<Scope> scope);
 
     static void maybeUpdateBounds(
         TypeId here,

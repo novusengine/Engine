@@ -39,7 +39,7 @@ namespace ShaderCooker
 
     SlangBridge::~SlangBridge()
     {
-        
+        delete static_cast<SlangBridgeData*>(_data);
     }
 
     void SlangBridge::AddDefine(const std::string& name, const std::string& value)
@@ -71,7 +71,7 @@ namespace ShaderCooker
         (char*)"ms",  // Mesh Shader
         (char*)"as"   // Amplification Shader (used with Mesh Shaders)
     };
-    constexpr i32 ProfileToProfileIndex(const std::string& profile)
+    inline i32 ProfileToProfileIndex(const std::string& profile)
     {
         i32 currentProfileIndex = 0;
         for (char* validProfile : validProfilesArray)

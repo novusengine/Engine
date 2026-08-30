@@ -12,8 +12,7 @@
 
 using namespace Luau;
 
-LUAU_FASTFLAG(LuauSolverV2)
-LUAU_FASTFLAG(LuauTryToOptimizeSetTypeUnification)
+LUAU_FASTFLAG(DebugLuauForceOldSolver)
 
 struct Unifier2Fixture
 {
@@ -24,7 +23,7 @@ struct Unifier2Fixture
     Unifier2 u2{NotNull{&arena}, NotNull{&builtinTypes}, NotNull{&scope}, NotNull{&iceReporter}};
     ToStringOptions opts;
 
-    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+    ScopedFastFlag sff{FFlag::DebugLuauForceOldSolver, false};
 
     std::pair<TypeId, FreeType*> freshType()
     {
@@ -133,9 +132,8 @@ TEST_CASE_FIXTURE(Unifier2Fixture, "unify_binds_free_supertype_tail_pack")
     CHECK("(number <: 'a)" == toString(freeAndFree));
 }
 
-TEST_CASE_FIXTURE(Unifier2Fixture, "unify_avoid_free_type_intersection_in_ub_from_union")
+TEST_CASE_FIXTURE(Unifier2Fixture, "unify_free_type_intersection_in_ub_from_union")
 {
-    ScopedFastFlag _{FFlag::LuauTryToOptimizeSetTypeUnification, true};
     // 'a
     TypeId freeTy = arena.addType(FreeType{&scope, builtinTypes.neverType, builtinTypes.unknownType});
     // 'a & ~(false?)
@@ -144,12 +142,12 @@ TEST_CASE_FIXTURE(Unifier2Fixture, "unify_avoid_free_type_intersection_in_ub_fro
     TypeId superTy = arena.addType(UnionType{{builtinTypes.numberType, builtinTypes.nilType}});
     u2.unify(subTy, superTy);
 
-    CHECK("('a <: number?)" == toString(freeTy));
+    // TODO CLI-168953: This is not correct. We should not be unifying to `never` here.
+    CHECK("('a <: never)" == toString(freeTy));
 }
 
-TEST_CASE_FIXTURE(Unifier2Fixture, "unify_unfortunate_free_type_lb_from_intersection")
+TEST_CASE_FIXTURE(Unifier2Fixture, "unify_free_type_lb_from_intersection")
 {
-    ScopedFastFlag _{FFlag::LuauTryToOptimizeSetTypeUnification, true};
     // 'a
     TypeId freeTy = arena.addType(FreeType{&scope, builtinTypes.neverType, builtinTypes.unknownType});
     // 'a?
@@ -158,12 +156,7 @@ TEST_CASE_FIXTURE(Unifier2Fixture, "unify_unfortunate_free_type_lb_from_intersec
     TypeId subTy =
         arena.addType(IntersectionType{{builtinTypes.stringType, arena.addType(NegationType{arena.addType(SingletonType{StringSingleton{"foo"}})})}});
     u2.unify(subTy, superTy);
-
-    // TODO CLI-168953: This is not correct. The lower bound should be
-    // string & ~"foo", but we're making this tradeoff for now to avoid
-    // the more common case where the upper bound becomes `never` (see
-    // previous test case).
-    CHECK("(string | ~\"foo\" <: 'a)" == toString(freeTy));
+    CHECK("(string & ~\"foo\" <: 'a)" == toString(freeTy));
 }
 
 TEST_SUITE_END();

@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <limits>
 #include <shared_mutex>
+#include <span>
+#include <string_view>
 #include <vector>
 
 namespace PACT
@@ -27,6 +29,9 @@ namespace PACT
         // without tearing storage down when that lifetime contract is violated.
         bool Shutdown();
 
+        PactRoot GetRoot() const;
+        std::filesystem::path GetStagingDirectory() const;
+
         PactManifestHandle AddOverlay(const std::filesystem::path& relativeRootDir, bool mountImmediately = true, u32 priority = std::numeric_limits<u32>::max());
         bool ReloadOverlay(PactManifestHandle handle);
         bool ReloadOverlay(const std::filesystem::path& relativeRootDir);
@@ -37,6 +42,8 @@ namespace PACT
         bool FileExists(const u64 hash);
         bool FileExists(const std::string& path);
         bool GetFilePath(const u64 hash, std::string& outPath);
+        void GetFilePaths(std::string_view prefix, std::vector<std::string>& outPaths) const;
+        void GetDirectoryEntries(std::string_view directory, std::vector<std::string>& outDirectories, std::vector<std::string>& outFiles) const;
         // The returned pointer is only valid until the next mount-table mutation.
         // Prefer the copy-out overload for access that crosses thread boundaries.
         const std::string* GetFilePath(const u64 hash);
@@ -78,6 +85,7 @@ namespace PACT
         std::filesystem::path _rootDir;
         std::filesystem::path _manifestDir;
         std::filesystem::path _dataDir;
+        std::filesystem::path _stagingDir;
 
         PactRoot _root;
         PactManifestTable _manifestTable;

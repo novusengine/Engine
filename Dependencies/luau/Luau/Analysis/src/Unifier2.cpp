@@ -3,6 +3,7 @@
 #include "Luau/Unifier2.h"
 
 #include "Luau/Instantiation.h"
+#include "Luau/Instantiation2.h"
 #include "Luau/Scope.h"
 #include "Luau/Simplify.h"
 #include "Luau/Type.h"
@@ -20,11 +21,11 @@
 LUAU_FASTINT(LuauTypeInferIterationLimit)
 LUAU_FASTINT(LuauTypeInferRecursionLimit)
 
-LUAU_FASTFLAG(LuauEmplaceNotPushBack)
-LUAU_FASTFLAGVARIABLE(LuauLimitUnification)
-LUAU_FASTFLAGVARIABLE(LuauUnifyShortcircuitSomeIntersectionsAndUnions)
-LUAU_FASTFLAGVARIABLE(LuauTryToOptimizeSetTypeUnification)
-LUAU_FASTFLAGVARIABLE(LuauFixNilRightPad)
+LUAU_DYNAMIC_FASTINTVARIABLE(LuauUnifierRecursionLimit, 100)
+
+LUAU_FASTFLAGVARIABLE(LuauLimitUnificationRecursion)
+LUAU_FASTFLAGVARIABLE(LuauPropagateFreeTypesIntoUnionAndIntersectionBounds)
+LUAU_FASTFLAG(LuauHigherOrderGenericInference)
 
 namespace Luau
 {
@@ -90,7 +91,7 @@ static bool areCompatible(TypeId left, TypeId right)
     return true;
 }
 
-// returns `true` if `ty` is irressolvable and should be added to `incompleteSubtypes`.
+// returns `true` if `ty` is irresolvable and should be added to `incompleteSubtypes`.
 static bool isIrresolvable(TypeId ty)
 {
     if (auto tfit = get<TypeFunctionInstanceType>(ty); tfit && tfit->state != TypeFunctionInstanceState::Unsolved)
@@ -99,7 +100,7 @@ static bool isIrresolvable(TypeId ty)
     return get<BlockedType>(ty) || get<TypeFunctionInstanceType>(ty);
 }
 
-// returns `true` if `tp` is irressolvable and should be added to `incompleteSubtypes`.
+// returns `true` if `tp` is irresolvable and should be added to `incompleteSubtypes`.
 static bool isIrresolvable(TypePackId tp)
 {
     return get<BlockedTypePack>(tp) || get<TypeFunctionInstanceTypePack>(tp);
@@ -111,7 +112,7 @@ Unifier2::Unifier2(NotNull<TypeArena> arena, NotNull<BuiltinTypes> builtinTypes,
     , scope(scope)
     , ice(ice)
     , limits(TypeCheckLimits{}) // TODO: typecheck limits in unifier2
-    , recursionLimit(FInt::LuauTypeInferRecursionLimit)
+    , recursionLimit(DFInt::LuauUnifierRecursionLimit)
     , uninhabitedTypeFunctions(nullptr)
 {
 }
@@ -128,7 +129,7 @@ Unifier2::Unifier2(
     , scope(scope)
     , ice(ice)
     , limits(TypeCheckLimits{}) // TODO: typecheck limits in unifier2
-    , recursionLimit(FInt::LuauTypeInferRecursionLimit)
+    , recursionLimit(DFInt::LuauUnifierRecursionLimit)
     , uninhabitedTypeFunctions(uninhabitedTypeFunctions)
 {
 }
@@ -147,12 +148,20 @@ UnifyResult Unifier2::unify(TypePackId subTp, TypePackId superTp)
 
 UnifyResult Unifier2::unify_(TypeId subTy, TypeId superTy)
 {
-    if (FFlag::LuauLimitUnification)
-    {
-        if (FInt::LuauTypeInferIterationLimit > 0 && iterationCount >= FInt::LuauTypeInferIterationLimit)
-            return UnifyResult::TooComplex;
+    if (FInt::LuauTypeInferIterationLimit > 0 && iterationCount >= FInt::LuauTypeInferIterationLimit)
+        return UnifyResult::TooComplex;
 
-        ++iterationCount;
+    ++iterationCount;
+
+    // NOTE: It's a little odd that we are doing something non-exceptional for
+    // the core of unification but not for occurs check, which may throw an
+    // exception. It would be nice if, in the future, this were unified.
+    std::optional<NonExceptionalRecursionLimiter> nerl;
+    if (FFlag::LuauLimitUnificationRecursion)
+    {
+        nerl.emplace(&recursionCount);
+        if (!nerl->isOk(recursionLimit))
+            return UnifyResult::TooComplex;
     }
 
     subTy = follow(subTy);
@@ -183,10 +192,7 @@ UnifyResult Unifier2::unify_(TypeId subTy, TypeId superTy)
         if (uninhabitedTypeFunctions && (uninhabitedTypeFunctions->contains(subTy) || uninhabitedTypeFunctions->contains(superTy)))
             return UnifyResult::Ok;
 
-        if (FFlag::LuauEmplaceNotPushBack)
-            incompleteSubtypes.emplace_back(SubtypeConstraint{subTy, superTy});
-        else
-            incompleteSubtypes.push_back(SubtypeConstraint{subTy, superTy});
+        incompleteSubtypes.emplace_back(SubtypeConstraint{subTy, superTy});
         return UnifyResult::Ok;
     }
 
@@ -195,7 +201,7 @@ UnifyResult Unifier2::unify_(TypeId subTy, TypeId superTy)
 
     if (superFree)
     {
-        superFree->lowerBound = mkUnion(superFree->lowerBound, subTy);
+        superFree->lowerBound = mkUnion(superFree->lowerBound, instantiateWithBoundTypes(subTy));
     }
 
     if (subFree)
@@ -211,67 +217,19 @@ UnifyResult Unifier2::unify_(TypeId subTy, TypeId superTy)
     if (subFn && superFn)
         return unify_(subTy, superFn);
 
-    if (FFlag::LuauTryToOptimizeSetTypeUnification)
-    {
-        auto subUnion = get<UnionType>(subTy);
-        auto superUnion = get<UnionType>(superTy);
+    auto subUnion = get<UnionType>(subTy);
+    auto superUnion = get<UnionType>(superTy);
+    if (subUnion)
+        return unify_(subUnion, superTy);
+    else if (superUnion)
+        return unify_(subTy, superUnion);
 
-        auto subIntersection = get<IntersectionType>(subTy);
-        auto superIntersection = get<IntersectionType>(superTy);
-
-        // This is, effectively, arranged to avoid the following:
-        //
-        //  'a & T <: U | V => 'a & T <: U and 'a & T <: V
-        //
-
-        // For T <: U & V and T | U <: V, these two cases are entirely correct.
-
-        // We decompose T <: U & V above into T <: U and T <: V ...
-        if (superIntersection)
-            return unify_(subTy, superIntersection);
-
-        // ... and T | U <: V into T <: V and U <: V.
-        if (subUnion)
-            return unify_(subUnion, superTy);
-
-        // This, T & U <: V, erroneously is decomposed into T <: U and T <: V,
-        // even though technically we only need one of the above to hold.
-        // However, this ordering means that we avoid ...
-        if (subIntersection)
-            return unify_(subIntersection, superTy);
-
-        // T <: U | V decomposing into T <: U and T <: V is incorrect, and
-        // can result in some really strange user-visible bugs. Consider:
-        //
-        //  'a & ~(false?) <: string | number
-        //
-        // Intuitively, this should place a constraint of `string | number`
-        // on the upper bound of `'a`. But if we hit this case, then we
-        // end up with something like:
-        //
-        //  'a & ~(false?) <: string and 'a & ~(false?) <: number
-        //
-        // ... which will result in `'a` having `string & number` as its
-        // upper bound, and being inferred to `never`.
-        if (superUnion)
-            return unify_(subTy, superUnion);
-    }
-    else
-    {
-        auto subUnion = get<UnionType>(subTy);
-        auto superUnion = get<UnionType>(superTy);
-        if (subUnion)
-            return unify_(subUnion, superTy);
-        else if (superUnion)
-            return unify_(subTy, superUnion);
-
-        auto subIntersection = get<IntersectionType>(subTy);
-        auto superIntersection = get<IntersectionType>(superTy);
-        if (subIntersection)
-            return unify_(subIntersection, superTy);
-        else if (superIntersection)
-            return unify_(subTy, superIntersection);
-    }
+    auto subIntersection = get<IntersectionType>(subTy);
+    auto superIntersection = get<IntersectionType>(superTy);
+    if (subIntersection)
+        return unify_(subIntersection, superTy);
+    else if (superIntersection)
+        return unify_(subTy, superIntersection);
 
     auto subNever = get<NeverType>(subTy);
     auto superNever = get<NeverType>(superTy);
@@ -280,6 +238,7 @@ UnifyResult Unifier2::unify_(TypeId subTy, TypeId superTy)
     else if (subNever && superFn)
     {
         // If `never` is the subtype, then we can propagate that inward.
+
         UnifyResult argResult = unify_(superFn->argTypes, builtinTypes->neverTypePack);
         UnifyResult retResult = unify_(builtinTypes->neverTypePack, superFn->retTypes);
         return argResult & retResult;
@@ -342,6 +301,18 @@ UnifyResult Unifier2::unify_(TypeId subTy, TypeId superTy)
     return UnifyResult::Ok;
 }
 
+template TypeId Unifier2::instantiateWithBoundTypes(TypeId ty);
+template TypePackId Unifier2::instantiateWithBoundTypes(TypePackId ty);
+
+template<typename TID>
+TID Unifier2::instantiateWithBoundTypes(TID ty)
+{
+    Replacer r{arena, NotNull{&genericSubstitutions}, NotNull{&genericPackSubstitutions}};
+    if (auto newTy = r.substitute(ty))
+        return *newTy;
+    return ty;
+}
+
 // If superTy is a function and subTy already has a
 // potentially-compatible function in its upper bound, we assume that
 // the function is not overloaded and attempt to combine superTy into
@@ -353,8 +324,9 @@ UnifyResult Unifier2::unifyFreeWithType(TypeId subTy, TypeId superTy)
 
     auto doDefault = [&]()
     {
-        subFree->upperBound = mkIntersection(subFree->upperBound, superTy);
-        expandedFreeTypes[subTy].push_back(superTy);
+        auto newSuperTy = instantiateWithBoundTypes(superTy);
+        subFree->upperBound = mkIntersection(subFree->upperBound, newSuperTy);
+        expandedFreeTypes[subTy].push_back(newSuperTy);
         return UnifyResult::Ok;
     };
 
@@ -362,6 +334,39 @@ UnifyResult Unifier2::unifyFreeWithType(TypeId subTy, TypeId superTy)
 
     if (get<FunctionType>(upperBound))
         return unify_(subFree->upperBound, superTy);
+
+    // When superTy is a union or intersection, propagate subTy as a lower bound into any
+    // free-type members. Without this, `freeA <: 'T | nil` (or `freeA <: 'T & C`) never
+    // constrains 'T, because the FreeType path intercepts before structural dispatch.
+    // Members may be GenericTypes that map to FreeTypes via genericSubstitutions.
+    if (FFlag::LuauPropagateFreeTypesIntoUnionAndIntersectionBounds)
+    {
+        auto propagateToFreeMembers = [&](auto memberRange)
+        {
+            for (TypeId member : memberRange)
+            {
+                TypeId m = follow(member);
+                if (auto subst = genericSubstitutions.find(m))
+                    m = follow(*subst);
+                if (FreeType* memberFree = getMutable<FreeType>(m))
+                {
+                    memberFree->lowerBound = mkUnion(memberFree->lowerBound, instantiateWithBoundTypes(subTy));
+                }
+            }
+        };
+
+        if (const UnionType* superUnion = get<UnionType>(superTy))
+        {
+            propagateToFreeMembers(superUnion->options);
+            return doDefault();
+        }
+
+        if (const IntersectionType* superIntersection = get<IntersectionType>(superTy))
+        {
+            propagateToFreeMembers(superIntersection->parts);
+            return doDefault();
+        }
+    }
 
     const FunctionType* superFunction = get<FunctionType>(superTy);
     if (!superFunction)
@@ -408,9 +413,11 @@ UnifyResult Unifier2::unify_(TypeId subTy, const FunctionType* superFn)
 
     if (shouldInstantiate)
     {
+
         for (TypeId generic : subFn->generics)
         {
-            const GenericType* gen = get<GenericType>(follow(generic));
+            generic = follow(generic);
+            const GenericType* gen = get<GenericType>(generic);
             if (gen)
                 genericSubstitutions[generic] = freshType(scope, gen->polarity);
         }
@@ -446,15 +453,12 @@ UnifyResult Unifier2::unify_(const UnionType* subUnion, TypeId superTy)
 
 UnifyResult Unifier2::unify_(TypeId subTy, const UnionType* superUnion)
 {
-    if (FFlag::LuauUnifyShortcircuitSomeIntersectionsAndUnions)
+    subTy = follow(subTy);
+    // T <: T | U1 | U2 | ... | Un is trivially true, so we don't gain any information by unifying
+    for (const auto superOption : superUnion)
     {
-        subTy = follow(subTy);
-        // T <: T | U1 | U2 | ... | Un is trivially true, so we don't gain any information by unifying
-        for (const auto superOption : superUnion)
-        {
-            if (subTy == superOption)
-                return UnifyResult::Ok;
-        }
+        if (subTy == superOption)
+            return UnifyResult::Ok;
     }
 
     UnifyResult result = UnifyResult::Ok;
@@ -471,15 +475,12 @@ UnifyResult Unifier2::unify_(TypeId subTy, const UnionType* superUnion)
 
 UnifyResult Unifier2::unify_(const IntersectionType* subIntersection, TypeId superTy)
 {
-    if (FFlag::LuauUnifyShortcircuitSomeIntersectionsAndUnions)
+    superTy = follow(superTy);
+    // T & I1 & I2 & ... & In <: T is trivially true, so we don't gain any information by unifying
+    for (const auto subOption : subIntersection)
     {
-        superTy = follow(superTy);
-        // T & I1 & I2 & ... & In <: T is trivially true, so we don't gain any information by unifying
-        for (const auto subOption : subIntersection)
-        {
-            if (superTy == subOption)
-                return UnifyResult::Ok;
-        }
+        if (superTy == subOption)
+            return UnifyResult::Ok;
     }
 
     UnifyResult result = UnifyResult::Ok;
@@ -542,7 +543,6 @@ UnifyResult Unifier2::unify_(TableType* subTable, const TableType* superTable)
            superTypePackParamsIter != superTable->instantiatedTypePackParams.end())
     {
         result &= unify_(*subTypePackParamsIter, *superTypePackParamsIter);
-
         subTypePackParamsIter++;
         superTypePackParamsIter++;
     }
@@ -666,26 +666,26 @@ UnifyResult Unifier2::unify_(const AnyType*, const MetatableType* superMetatable
     return unify_(builtinTypes->anyType, superMetatable->table);
 }
 
-// FIXME?  This should probably return an ErrorVec or an optional<TypeError>
-// rather than a boolean to signal an occurs check failure.
 UnifyResult Unifier2::unify_(TypePackId subTp, TypePackId superTp)
 {
-    if (FFlag::LuauLimitUnification)
-    {
-        if (FInt::LuauTypeInferIterationLimit > 0 && iterationCount >= FInt::LuauTypeInferIterationLimit)
-            return UnifyResult::TooComplex;
+    if (FInt::LuauTypeInferIterationLimit > 0 && iterationCount >= FInt::LuauTypeInferIterationLimit)
+        return UnifyResult::TooComplex;
 
-        ++iterationCount;
+    ++iterationCount;
+
+    // NOTE: It's a little odd that we are doing something non-exceptional for
+    // the core of unification but not for occurs check, which may throw an
+    // exception. It would be nice if, in the future, this were unified.
+    std::optional<NonExceptionalRecursionLimiter> nerl;
+    if (FFlag::LuauLimitUnificationRecursion)
+    {
+        nerl.emplace(&recursionCount);
+        if (!nerl->isOk(recursionLimit))
+            return UnifyResult::TooComplex;
     }
 
     subTp = follow(subTp);
     superTp = follow(superTp);
-
-    if (auto subGen = genericPackSubstitutions.find(subTp))
-        return unify_(*subGen, superTp);
-
-    if (auto superGen = genericPackSubstitutions.find(superTp))
-        return unify_(subTp, *superGen);
 
     if (seenTypePackPairings.contains({subTp, superTp}))
         return UnifyResult::Ok;
@@ -694,93 +694,207 @@ UnifyResult Unifier2::unify_(TypePackId subTp, TypePackId superTp)
     if (subTp == superTp)
         return UnifyResult::Ok;
 
-    if (isIrresolvable(subTp) || isIrresolvable(superTp))
+    auto emplaceFreeTypePack = [this](TypePackId target, TypePackId boundTo)
     {
-        if (uninhabitedTypeFunctions && (uninhabitedTypeFunctions->contains(subTp) || uninhabitedTypeFunctions->contains(superTp)))
-            return UnifyResult::Ok;
+        LUAU_ASSERT(is<FreeTypePack>(target));
 
-        if (FFlag::LuauEmplaceNotPushBack)
+        boundTo = instantiateWithBoundTypes(boundTo);
+
+        if (occursCheck(target, boundTo) == OccursCheckResult::Fail)
+        {
+            emplaceTypePack<BoundTypePack>(asMutable(target), builtinTypes->errorTypePack);
+            return UnifyResult::OccursCheckFailed;
+        }
+        emplaceTypePack<BoundTypePack>(asMutable(target), boundTo);
+        return UnifyResult::Ok;
+    };
+
+    // FIXME: CLI-188000: If we are _directly_ given a free type, we must
+    // eagerly emplace it. Otherwise, later, we may generalize the underlying
+    // free types incorrectly.
+    if (is<FreeTypePack>(subTp))
+        return emplaceFreeTypePack(subTp, superTp);
+
+    if (is<FreeTypePack>(superTp))
+        return emplaceFreeTypePack(superTp, subTp);
+
+    /* If the passed iterator points at the head of a type pack, return that. If
+     * not, allocate a fresh type pack starting at the position of the iterator.
+     */
+    auto makeTail = [this](TypePackIterator iter, TypePackIterator endIter)
+    {
+        std::optional<TypePackId> newSuper = iter.tryGetHead();
+        if (newSuper)
+            return *newSuper;
+
+        std::vector<TypeId> newHead;
+        while (iter != endIter)
+        {
+            newHead.push_back(*iter);
+            ++iter;
+        }
+
+        return arena->addTypePack(std::move(newHead), iter.tail());
+    };
+
+    /* If either type pack is blocked, record a constraint so that the solver
+     * can get back to it later. Else unify.
+     */
+    auto deferOrUnify = [this](TypePackId subTp, TypePackId superTp)
+    {
+        if (isIrresolvable(subTp) || isIrresolvable(superTp))
+        {
+            if (uninhabitedTypeFunctions != nullptr && (uninhabitedTypeFunctions->contains(subTp) || uninhabitedTypeFunctions->contains(superTp)))
+                return UnifyResult::Ok;
+
             incompleteSubtypes.emplace_back(PackSubtypeConstraint{subTp, superTp});
+            return UnifyResult::Ok;
+        }
         else
-            incompleteSubtypes.push_back(PackSubtypeConstraint{subTp, superTp});
-        return UnifyResult::Ok;
-    }
+            return unify_(subTp, superTp);
+    };
 
-    const FreeTypePack* subFree = get<FreeTypePack>(subTp);
-    const FreeTypePack* superFree = get<FreeTypePack>(superTp);
-
-    if (subFree)
+    auto maybeReplaceTail = [this](std::optional<TypePackId> maybeTp)
     {
-        DenseHashSet<TypePackId> seen{nullptr};
-        if (OccursCheckResult::Fail == occursCheck(seen, subTp, superTp))
+        if (!maybeTp)
+            return builtinTypes->emptyTypePack;
+
+        auto tp = follow(*maybeTp);
+        if (auto replacement = genericPackSubstitutions.find(tp))
+            return follow(*replacement);
+        return tp;
+    };
+
+    if (FFlag::LuauHigherOrderGenericInference)
+    {
+        auto subIter = begin(subTp);
+        const auto subEnd = end(subTp);
+        auto superIter = begin(superTp);
+        const auto superEnd = end(superTp);
+
+        while (subIter != subEnd && superIter != superEnd)
         {
-            emplaceTypePack<BoundTypePack>(asMutable(subTp), builtinTypes->errorTypePack);
-            return UnifyResult::OccursCheckFailed;
+            unify_(*subIter, *superIter);
+            ++subIter;
+            ++superIter;
         }
 
-        emplaceTypePack<BoundTypePack>(asMutable(subTp), superTp);
-        return UnifyResult::Ok;
-    }
-
-    if (superFree)
-    {
-        DenseHashSet<TypePackId> seen{nullptr};
-        if (OccursCheckResult::Fail == occursCheck(seen, superTp, subTp))
+        // If we have hit the end of one OR the other iter, and if that ended
+        // iter points at a variadic pack, expand it out.  Note that, if both
+        // packs have variadic tails, we do not expand.
+        if (subIter == subEnd && superIter != superEnd && subIter.tail())
         {
-            emplaceTypePack<BoundTypePack>(asMutable(superTp), builtinTypes->errorTypePack);
-            return UnifyResult::OccursCheckFailed;
+            if (auto vtp = get<VariadicTypePack>(follow(*subIter.tail())))
+            {
+                while (superIter != superEnd)
+                {
+                    unify_(vtp->ty, *superIter);
+                    ++superIter;
+                }
+            }
+        }
+        if (superIter == superEnd && subIter != subEnd && superIter.tail())
+        {
+            if (auto vtp = get<VariadicTypePack>(follow(*superIter.tail())))
+            {
+                while (subIter != subEnd)
+                {
+                    unify_(*subIter, vtp->ty);
+                    ++subIter;
+                }
+            }
         }
 
-        emplaceTypePack<BoundTypePack>(asMutable(superTp), subTp);
+        if (subIter == subEnd && superIter == superEnd)
+        {
+            auto subTail = subIter.tail();
+            auto superTail = superIter.tail();
+
+            if (!subTail && !superTail)
+                return UnifyResult::Ok;
+
+            return deferOrUnify(maybeReplaceTail(subTail), maybeReplaceTail(superTail));
+        }
+        else if (subIter == subEnd)
+        {
+            LUAU_ASSERT(superIter != superEnd);
+            TypePackId newSub = maybeReplaceTail(subIter.tail());
+            TypePackId newSuper = makeTail(superIter, superEnd);
+
+            return deferOrUnify(newSub, newSuper);
+        }
+        else if (superIter == superEnd)
+        {
+            LUAU_ASSERT(subIter != subEnd);
+            TypePackId newSub = makeTail(subIter, subEnd);
+            TypePackId newSuper = maybeReplaceTail(superIter.tail());
+            return deferOrUnify(newSub, newSuper);
+        }
+
+        LUAU_ASSERT(!"Unreachable");
         return UnifyResult::Ok;
     }
 
-    size_t maxLength = std::max(flatten(subTp).first.size(), flatten(superTp).first.size());
+    size_t maxLength = std::max(std::distance(begin(subTp), end(subTp)), std::distance(begin(superTp), end(superTp)));
 
     auto [subTypes, subTail] = extendTypePack(*arena, builtinTypes, subTp, maxLength);
     auto [superTypes, superTail] = extendTypePack(*arena, builtinTypes, superTp, maxLength);
 
-    // right-pad the subpack with nils if `superPack` is larger since that's what a function call does
-    if (FFlag::LuauFixNilRightPad)
+    auto limit = std::min(subTypes.size(), superTypes.size());
+    for (size_t i = 0; i < limit; ++i)
+        unify_(subTypes[i], superTypes[i]);
+
+    // At this point it should be the case that either:
+    // - `subTypes` now has all of its types unified, and we are down to its tail
+    // - `superTypes` now has all of its types unified, and we are down to its tail
+
+    if (!subTail && !superTail)
     {
-        if (subTypes.size() < maxLength)
-            subTypes.resize(maxLength, builtinTypes->nilType);
+        // If both types are missing a tail, we've done all we can.
+        return UnifyResult::Ok;
+    }
+
+    // It should be the case that exclusively one of these packs can be reduced
+    // to their tail for the rest of the function.
+    if (limit < subTypes.size())
+    {
+        LUAU_ASSERT(limit == superTypes.size());
+        // If we have extra subtypes left over, construct a new type pack
+        std::vector<TypeId> newSubHead{subTypes.begin() + superTypes.size(), subTypes.end()};
+        subTp = arena->addTypePack(TypePack{std::move(newSubHead), subTail});
+        superTp = maybeReplaceTail(superTail);
+    }
+    else if (limit < superTypes.size())
+    {
+        LUAU_ASSERT(limit == subTypes.size() && limit < superTypes.size());
+        // If we have extra subtypes left over, construct a new type pack
+        std::vector<TypeId> newSuperHead{superTypes.begin() + subTypes.size(), superTypes.end()};
+        superTp = arena->addTypePack(TypePack{std::move(newSuperHead), superTail});
+        subTp = maybeReplaceTail(subTail);
     }
     else
     {
-        if (subTypes.size() < maxLength)
-        {
-            for (size_t i = 0; i <= maxLength - subTypes.size(); i++)
-                subTypes.push_back(builtinTypes->nilType);
-        }
+        subTp = maybeReplaceTail(subTail);
+        superTp = maybeReplaceTail(superTail);
     }
 
-    if (subTypes.size() < maxLength || superTypes.size() < maxLength)
+    if (isIrresolvable(subTp) || isIrresolvable(superTp))
+    {
+        if (uninhabitedTypeFunctions != nullptr && (uninhabitedTypeFunctions->contains(subTp) || uninhabitedTypeFunctions->contains(superTp)))
+            return UnifyResult::Ok;
+
+        incompleteSubtypes.emplace_back(PackSubtypeConstraint{subTp, superTp});
         return UnifyResult::Ok;
-
-    for (size_t i = 0; i < maxLength; ++i)
-        unify_(subTypes[i], superTypes[i]);
-
-    if (subTail && superTail)
-    {
-        TypePackId followedSubTail = follow(*subTail);
-        TypePackId followedSuperTail = follow(*superTail);
-
-        if (get<FreeTypePack>(followedSubTail) || get<FreeTypePack>(followedSuperTail))
-            return unify_(followedSubTail, followedSuperTail);
     }
-    else if (subTail)
-    {
-        TypePackId followedSubTail = follow(*subTail);
-        if (get<FreeTypePack>(followedSubTail))
-            emplaceTypePack<BoundTypePack>(asMutable(followedSubTail), builtinTypes->emptyTypePack);
-    }
-    else if (superTail)
-    {
-        TypePackId followedSuperTail = follow(*superTail);
-        if (get<FreeTypePack>(followedSuperTail))
-            emplaceTypePack<BoundTypePack>(asMutable(followedSuperTail), builtinTypes->emptyTypePack);
-    }
+
+    // ... after doing all of our replacements, we may also need to check for
+    // free types again.
+
+    if (is<FreeTypePack>(subTp))
+        return emplaceFreeTypePack(subTp, superTp);
+
+    if (is<FreeTypePack>(superTp))
+        return emplaceFreeTypePack(superTp, subTp);
 
     return UnifyResult::Ok;
 }
@@ -799,89 +913,6 @@ TypeId Unifier2::mkIntersection(TypeId left, TypeId right)
     right = follow(right);
 
     return simplifyIntersection(builtinTypes, arena, left, right).result;
-}
-
-OccursCheckResult Unifier2::occursCheck(DenseHashSet<TypeId>& seen, TypeId needle, TypeId haystack)
-{
-    RecursionLimiter _ra("Unifier2::occursCheck", &recursionCount, recursionLimit);
-
-    OccursCheckResult occurrence = OccursCheckResult::Pass;
-
-    auto check = [&](TypeId ty)
-    {
-        if (occursCheck(seen, needle, ty) == OccursCheckResult::Fail)
-            occurrence = OccursCheckResult::Fail;
-    };
-
-    needle = follow(needle);
-    haystack = follow(haystack);
-
-    if (seen.find(haystack))
-        return OccursCheckResult::Pass;
-
-    seen.insert(haystack);
-
-    if (get<ErrorType>(needle))
-        return OccursCheckResult::Pass;
-
-    if (!get<FreeType>(needle))
-        ice->ice("Expected needle to be free");
-
-    if (needle == haystack)
-        return OccursCheckResult::Fail;
-
-    if (auto haystackFree = get<FreeType>(haystack))
-    {
-        check(haystackFree->lowerBound);
-        check(haystackFree->upperBound);
-    }
-    else if (auto ut = get<UnionType>(haystack))
-    {
-        for (TypeId ty : ut->options)
-            check(ty);
-    }
-    else if (auto it = get<IntersectionType>(haystack))
-    {
-        for (TypeId ty : it->parts)
-            check(ty);
-    }
-
-    return occurrence;
-}
-
-OccursCheckResult Unifier2::occursCheck(DenseHashSet<TypePackId>& seen, TypePackId needle, TypePackId haystack)
-{
-    needle = follow(needle);
-    haystack = follow(haystack);
-
-    if (seen.find(haystack))
-        return OccursCheckResult::Pass;
-
-    seen.insert(haystack);
-
-    if (getMutable<ErrorTypePack>(needle))
-        return OccursCheckResult::Pass;
-
-    if (!getMutable<FreeTypePack>(needle))
-        ice->ice("Expected needle pack to be free");
-
-    RecursionLimiter _ra("Unifier2::occursCheck", &recursionCount, recursionLimit);
-
-    while (!getMutable<ErrorTypePack>(haystack))
-    {
-        if (needle == haystack)
-            return OccursCheckResult::Fail;
-
-        if (auto a = get<TypePack>(haystack); a && a->tail)
-        {
-            haystack = follow(*a->tail);
-            continue;
-        }
-
-        break;
-    }
-
-    return OccursCheckResult::Pass;
 }
 
 TypeId Unifier2::freshType(NotNull<Scope> scope, Polarity polarity)

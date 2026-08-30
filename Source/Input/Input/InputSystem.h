@@ -29,8 +29,8 @@ public:
 
     void QueueKeyboardEvent(Key key, InputPhase phase, InputModifier modifiers = InputModifier::None);
     void QueueTextEvent(u32 codepoint);
-    void QueueMouseButtonEvent(MouseButton button, InputPhase phase, InputModifier modifiers = InputModifier::None);
-    void QueueCursorPositionEvent(f32 x, f32 y);
+    void QueueMouseButtonEvent(MouseButton button, InputPhase phase, InputModifier modifiers = InputModifier::None, PointerSource pointerSource = PointerSource::Mouse);
+    void QueueCursorPositionEvent(f32 x, f32 y, PointerSource pointerSource = PointerSource::Mouse);
     void QueueScrollEvent(f32 x, f32 y);
     void QueueFocusEvent(bool focused);
 
@@ -51,6 +51,9 @@ public:
     const vec2& GetMouseDelta() const { return _mouseDelta; }
     const vec2& GetScrollDelta() const { return _scrollDelta; }
     void SetMousePosition(const vec2& position);
+
+    const PenState& GetPenState() const { return _penState; }
+    void SetPenState(f32 pressure, bool inRange, bool inContact, const vec2& position);
 
     void SetMetricsEnabled(bool enabled)
     {
@@ -98,7 +101,7 @@ private:
     void RebuildActiveContexts();
     void CancelContextInputs(u8 contextIndex);
 
-    void QueueButtonEvent(InputControl control, InputPhase phase, InputModifier modifiers);
+    void QueueButtonEvent(InputControl control, InputPhase phase, InputModifier modifiers, PointerSource pointerSource = PointerSource::None);
     bool AppendEvent(const InputEvent& event);
     void DispatchEvent(const InputEvent& event);
     void DispatchButtonEvent(const InputEvent& event);
@@ -132,6 +135,9 @@ private:
     vec2 _scrollDelta = vec2(0.0f);
     vec2 _lastCursorSample = vec2(0.0f);
     bool _hasCursorSample = false;
+    PenState _penState;
+    vec2 _lastPenSample = vec2(0.0f);
+    bool _hasPenSample = false;
     CursorMode _cursorMode = CursorMode::Hardware;
     bool _focused = true;
 

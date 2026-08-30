@@ -40,6 +40,7 @@ namespace Renderer
 
             [[nodiscard]] std::shared_ptr<UploadBuffer> CreateUploadBuffer(BufferID targetBuffer, size_t targetOffset, size_t size);
             [[nodiscard]] std::shared_ptr<UploadBuffer> CreateUploadBuffer(TextureID targetTexture, size_t targetOffset, size_t size, size_t numMipsToGenerate = 0);
+            [[nodiscard]] std::shared_ptr<UploadBuffer> CreateUploadBuffer(TextureID targetTexture, const TextureUploadRegion& region, size_t size);
             void CopyBufferToBuffer(BufferID targetBuffer, size_t targetOffset, BufferID sourceBuffer, size_t sourceOffset, size_t size);
             void QueueDestroyBuffer(BufferID buffer);
 

@@ -2,21 +2,192 @@
 #include "Filesystem/Config.h"
 
 #include <Base/Memory/Bytebuffer.h>
-#include <Base/Memory/FileReader.h>
 #include <Base/Memory/FileWriter.h>
 #include <Base/Util/DebugHandler.h>
 
+#include <libsodium/core/crypto_hash_sha256.h>
 #include <xxhash/xxhash64.h>
 
 #include <algorithm>
+#include <cstring>
 #include <fstream>
+#include <limits>
 #include <mutex>
 #include <system_error>
+#include <unordered_map>
+#include <unordered_set>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#endif
 
 namespace fs = std::filesystem;
 
 namespace PACT
 {
+    namespace
+    {
+        constexpr u64 MAX_METADATA_FILE_SIZE = 256ull * 1024ull * 1024ull;
+
+        struct StagedCommitFile
+        {
+        public:
+            fs::path path;
+            std::string virtualPath;
+            u64 pathHash = 0;
+            u64 size = 0;
+            PactFileID fileID = 0;
+            fs::file_time_type lastWriteTime;
+        };
+
+        struct CommitManifestState
+        {
+        public:
+            PactManifest manifest;
+            fs::path temporaryDataPath;
+            fs::path temporaryManifestPath;
+            PactDigest digest = {};
+            u64 dataSize = 0;
+            bool rewritesExisting = false;
+        };
+
+        bool ReplaceFileAtomically(const fs::path& source, const fs::path& destination)
+        {
+#ifdef _WIN32
+            return MoveFileExW(source.c_str(), destination.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#else
+            std::error_code error;
+            fs::rename(source, destination, error);
+            return !error;
+#endif
+        }
+
+        bool WriteBufferToFile(const fs::path& path, const std::shared_ptr<Bytebuffer>& buffer)
+        {
+            std::ofstream writer(path, std::ios::out | std::ios::binary | std::ios::trunc);
+            if (!writer.is_open())
+                return false;
+
+            writer.write(reinterpret_cast<const char*>(buffer->GetDataPointer()), static_cast<std::streamsize>(buffer->writtenData));
+            writer.flush();
+            writer.close();
+            return !writer.fail();
+        }
+
+        void CloneManifest(PactManifest& source, PactManifest& destination)
+        {
+            destination.header = source.header;
+            destination.stringTable.CopyFrom(source.stringTable);
+            destination.chunks = source.chunks;
+            destination.entries = source.entries;
+            destination.origin = source.origin;
+            destination.path = source.path;
+            destination.dataPath = source.dataPath;
+        }
+
+        bool CompactManifestChunks(PactManifest& manifest)
+        {
+            std::vector<PactChunkInfo> compactedChunks;
+            compactedChunks.reserve(manifest.chunks.size());
+
+            for (ManifestEntry& entry : manifest.entries)
+            {
+                if (entry.chunkCount == 0)
+                {
+                    entry.chunkIndex = 0;
+                    continue;
+                }
+
+                if (entry.chunkIndex > manifest.chunks.size() || entry.chunkCount > manifest.chunks.size() - entry.chunkIndex ||
+                    compactedChunks.size() > std::numeric_limits<u32>::max() - entry.chunkCount)
+                {
+                    return false;
+                }
+
+                const u32 compactedIndex = static_cast<u32>(compactedChunks.size());
+                for (u32 i = 0; i < entry.chunkCount; i++)
+                {
+                    compactedChunks.push_back(manifest.chunks[entry.chunkIndex + i]);
+                }
+
+                entry.chunkIndex = compactedIndex;
+            }
+
+            manifest.chunks = std::move(compactedChunks);
+            return true;
+        }
+
+        bool ReadMetadataFile(const fs::path& path, std::shared_ptr<Bytebuffer>& buffer)
+        {
+            std::error_code errorCode;
+            const u64 fileSize = fs::file_size(path, errorCode);
+            if (errorCode || fileSize == 0 || fileSize > MAX_METADATA_FILE_SIZE || fileSize > std::numeric_limits<size_t>::max())
+                return false;
+
+            buffer = Bytebuffer::BorrowRuntime(static_cast<size_t>(fileSize));
+            std::ifstream file(path, std::ios::binary);
+            if (!file.is_open())
+                return false;
+
+            file.read(reinterpret_cast<char*>(buffer->GetDataPointer()), static_cast<std::streamsize>(fileSize));
+            if (!file || static_cast<u64>(file.gcount()) != fileSize)
+                return false;
+
+            buffer->writtenData = static_cast<size_t>(fileSize);
+            return true;
+        }
+
+        bool ValidateManifestDataFile(const PactManifest& manifest)
+        {
+            if (manifest.header.sourceType != PactSourceType::Pack)
+                return true;
+
+            std::error_code errorCode;
+            const u64 fileSize = fs::file_size(manifest.dataPath, errorCode);
+            if (errorCode)
+                return false;
+
+            std::vector<std::pair<u64, u64>> fileRanges;
+            fileRanges.reserve(manifest.entries.size());
+            for (const ManifestEntry& entry : manifest.entries)
+            {
+                u64 storedSize = 0;
+                for (u32 i = 0; i < entry.chunkCount; i++)
+                {
+                    const u32 chunkSize = manifest.chunks[entry.chunkIndex + i].storedSize;
+                    if (storedSize > std::numeric_limits<u64>::max() - chunkSize)
+                        return false;
+
+                    storedSize += chunkSize;
+                }
+
+                if (entry.dataOffset > fileSize || storedSize > fileSize - entry.dataOffset)
+                    return false;
+
+                if (storedSize > 0)
+                    fileRanges.emplace_back(entry.dataOffset, storedSize);
+            }
+
+            std::sort(fileRanges.begin(), fileRanges.end());
+            u64 previousEnd = 0;
+            for (const auto& [offset, size] : fileRanges)
+            {
+                if (offset < previousEnd)
+                    return false;
+
+                previousEnd = offset + size;
+            }
+
+            return previousEnd <= fileSize;
+        }
+    }
+
     bool PactStorage::Init(PactOpenOptions options)
     {
         return InitAtRoot(fs::current_path() / Config::BASE_DIR, options);
@@ -29,6 +200,7 @@ namespace PACT
         _rootDir = rootDir;
         _manifestDir = _rootDir / Config::MANIFEST_DIR;
         _dataDir = _rootDir / Config::DATA_DIR;
+        _stagingDir = _dataDir / "staging";
         fs::path rootFile = _rootDir / Config::ROOT_FILE;
 
         if (fs::exists(rootFile))
@@ -40,17 +212,26 @@ namespace PACT
         fs::create_directories(_rootDir);
         fs::create_directories(_manifestDir);
         fs::create_directories(_dataDir);
+        fs::create_directories(_stagingDir);
 
         // Write Root File
         {
             _root =
             {
                 .version = Config::ROOT_VERSION,
-                .featureSet = {}
+                .featureSet =
+                {
+                    .chunking = 1,
+                    .hashAlgo = 0,
+                    .cdcAlgo = 0,
+                    .cdcMinSize = Config::CDC_MIN_SIZE,
+                    .cdcAvgSize = Config::CDC_AVG_SIZE,
+                    .cdcMaxSize = Config::CDC_MAX_SIZE
+                }
             };
 
-            std::shared_ptr<Bytebuffer> buffer = Bytebuffer::Borrow<sizeof(PactRoot)>();
-            if (!buffer->Serialize(_root))
+            std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(_root.GetSerializedSize());
+            if (!_root.Serialize(buffer.get()))
             {
                 NC_LOG_ERROR("Pact : Failed to initialize empty storage. Root file could not be serialized (\"{0}\")", rootFile.string());
                 return false;
@@ -68,6 +249,7 @@ namespace PACT
         _rootDir = rootDir;
         _manifestDir = _rootDir / Config::MANIFEST_DIR;
         _dataDir = _rootDir / Config::DATA_DIR;
+        _stagingDir = _dataDir / "staging";
         fs::path rootFile = _rootDir / Config::ROOT_FILE;
 
         if (!fs::exists(rootFile))
@@ -86,21 +268,18 @@ namespace PACT
 
         fs::create_directories(_manifestDir);
         fs::create_directories(_dataDir);
+        fs::create_directories(_stagingDir);
 
         // Read Root File
         {
-            std::shared_ptr<Bytebuffer> buffer = Bytebuffer::Borrow<sizeof(PactRoot)>();
-
-            FileReader reader(rootFile.string());
-            if (!reader.Open())
+            std::shared_ptr<Bytebuffer> buffer;
+            if (!ReadMetadataFile(rootFile, buffer))
             {
-                NC_LOG_ERROR("Pact : Failed to initialize storage. Root file could not be opened (\"{0}\")", rootFile.string());
+                NC_LOG_ERROR("Pact : Failed to initialize storage. Root file could not be read (\"{0}\")", rootFile.string());
                 return false;
             }
 
-            reader.Read(buffer.get(), buffer->size);
-
-            if (!buffer->Deserialize(_root))
+            if (!buffer->Deserialize(_root) || buffer->GetActiveSize() != 0)
             {
                 NC_LOG_ERROR("Pact : Failed to initialize storage. Root file is corrupt (\"{0}\")", rootFile.string());
                 return false;
@@ -119,37 +298,52 @@ namespace PACT
                     NC_LOG_ERROR("Pact : Failed to initialize storage. Root file has mismatching version (Found Version [{1}, {2}, {3}] | Expected Version : [{4}, {5}, {6}]) (\"{0}\")", rootFile.string(), _root.version.x, _root.version.y, _root.version.z, Config::ROOT_VERSION.x, Config::ROOT_VERSION.y, Config::ROOT_VERSION.z);
                     return false;
                 }
+                case PactRootValidateResult::InvalidFeatureSet:
+                {
+                    NC_LOG_ERROR("Pact : Failed to initialize storage. Root file has an unsupported or invalid feature set (\"{0}\")", rootFile.string());
+                    return false;
+                }
+                case PactRootValidateResult::InvalidManifestRefs:
+                {
+                    NC_LOG_ERROR("Pact : Failed to initialize storage. Root file has invalid manifest references (\"{0}\")", rootFile.string());
+                    return false;
+                }
 
                 default: break;
             }
         }
 
-        // Parse Manifest Directory
+        // Each root digest directly addresses its manifest and associated data file.
+        // Unreferenced files are harmless leftovers from interrupted publication.
         {
-            fs::recursive_directory_iterator manifestDirItr { _manifestDir };
+            robin_hood::unordered_map<PactManifestHandle, PactManifest> manifests;
+            manifests.reserve(_root.manifestRefs.size());
 
-            for (fs::path path : manifestDirItr)
+            for (const PactManifestRef& manifestRef : _root.manifestRefs)
             {
-                if (path.extension().compare(Config::MANIFEST_EXT) != 0)
-                    continue;
+                const std::string digestName = PactDigestToHex(manifestRef.digest);
+                const fs::path path = (_manifestDir / digestName).replace_extension(Config::MANIFEST_EXT);
 
-                FileReader reader(path.string());
-                if (!reader.Open())
+                std::shared_ptr<Bytebuffer> buffer;
+                if (!ReadMetadataFile(path, buffer))
                 {
-                    NC_LOG_WARNING("Pact : Failed to open Manifest File (\"{0}\")", path.string());
-                    continue;
+                    NC_LOG_ERROR("Pact : Failed to read referenced Manifest file (\"{0}\")", path.string());
+                    return false;
                 }
 
-                size_t fileSize = reader.Length();
-                std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(fileSize);
-                reader.Read(buffer.get(), fileSize);
+                PactDigest digest;
+                crypto_hash_sha256(digest.data(), buffer->GetDataPointer(), static_cast<unsigned long long>(buffer->writtenData));
+                if (digest != manifestRef.digest)
+                {
+                    NC_LOG_ERROR("Pact : Referenced Manifest file does not match its digest-addressed path (\"{0}\")", path.string());
+                    return false;
+                }
 
                 PactManifest manifest;
-
                 if (!buffer->Deserialize(manifest))
                 {
-                    NC_LOG_ERROR("Pact : Manifest File is corrupt (\"{0}\")", path.string());
-                    continue;
+                    NC_LOG_ERROR("Pact : Referenced Manifest File is corrupt (\"{0}\")", path.string());
+                    return false;
                 }
 
                 PactManifestValidateResult result = manifest.Validate();
@@ -157,25 +351,68 @@ namespace PACT
                 {
                     case PactManifestValidateResult::InvalidMagic:
                     {
-                        NC_LOG_ERROR("Pact : Manifest file has invalid magic (\"{0}\")", path.string());
-                        continue;
+                        NC_LOG_ERROR("Pact : Referenced Manifest file has invalid magic (\"{0}\")", path.string());
+                        return false;
                     }
                     case PactManifestValidateResult::MismatchVersion:
                     {
-                        NC_LOG_ERROR("Pact : Manifest file has mismatching version (Found Version [{1}, {2}, {3}] | Expected Version : [{4}, {5}, {6}]) (\"{0}\")", path.string(), manifest.header.version.x, manifest.header.version.y, manifest.header.version.z, Config::MANIFEST_VERSION.x, Config::MANIFEST_VERSION.y, Config::MANIFEST_VERSION.z);
-                        continue;
+                        NC_LOG_ERROR("Pact : Referenced Manifest file has mismatching version (Found Version [{1}, {2}, {3}] | Expected Version : [{4}, {5}, {6}]) (\"{0}\")", path.string(), manifest.header.version.x, manifest.header.version.y, manifest.header.version.z, Config::MANIFEST_VERSION.x, Config::MANIFEST_VERSION.y, Config::MANIFEST_VERSION.z);
+                        return false;
+                    }
+                    case PactManifestValidateResult::InvalidHeader:
+                    case PactManifestValidateResult::InvalidEntries:
+                    {
+                        NC_LOG_ERROR("Pact : Referenced Manifest file has invalid metadata (\"{0}\")", path.string());
+                        return false;
                     }
 
                     default: break;
                 }
 
-                manifest.dataPath = (_dataDir / path.filename()).replace_extension(Config::DATA_EXT);
-                _manifestTable.handleToManifest[manifest.header.manifestID] = std::move(manifest);
+                if (!_root.featureSet.chunking && !manifest.chunks.empty())
+                {
+                    NC_LOG_ERROR("Pact : Referenced Manifest uses chunking that is disabled by the root feature set (\"{0}\")", path.string());
+                    return false;
+                }
+
+                if (manifest.header.manifestID != manifestRef.manifestID ||
+                    manifest.header.priority != manifestRef.priority ||
+                    manifest.header.flags.storageMask != manifestRef.storageMask)
+                {
+                    NC_LOG_ERROR("Pact : Referenced Manifest file does not match its root reference (\"{0}\")", path.string());
+                    return false;
+                }
+
+                manifest.origin = manifestRef.origin;
+                manifest.path = path;
+                manifest.dataPath = (_dataDir / digestName).replace_extension(Config::DATA_EXT);
+                if (!ValidateManifestDataFile(manifest))
+                {
+                    NC_LOG_ERROR("Pact : Referenced Manifest data file is missing or inconsistent (\"{0}\")", manifest.dataPath.string());
+                    return false;
+                }
+
+                manifests.emplace(manifest.header.manifestID, std::move(manifest));
             }
+
+            _manifestTable.handleToManifest = std::move(manifests);
         }
 
         return true;
     }
+
+    PactRoot PactStorage::GetRoot() const
+    {
+        std::shared_lock lock(_mountTableMutex);
+        return _root;
+    }
+
+    fs::path PactStorage::GetStagingDirectory() const
+    {
+        std::shared_lock lock(_mountTableMutex);
+        return _stagingDir;
+    }
+
     bool PactStorage::Shutdown()
     {
         std::unique_lock mountTableLock(_mountTableMutex);
@@ -210,11 +447,12 @@ namespace PACT
 
         _manifestTable.handleToManifest.clear();
         _manifestTable.overlayPathToHandle.clear();
-        _root.featureSet = {};
+        _root = {};
 
         _rootDir.clear();
         _manifestDir.clear();
         _dataDir.clear();
+        _stagingDir.clear();
 
         return true;
     }
@@ -303,7 +541,8 @@ namespace PACT
             EvictResidentFile(PactFileKey
             {
                 .type = PactFileKey::Type::Loose,
-                .value = hash
+                .value = hash,
+                .generation = _mountTable.currentGeneration.load(std::memory_order_acquire)
             });
         }
 
@@ -415,6 +654,32 @@ namespace PACT
         return true;
     }
 
+    void PactStorage::GetFilePaths(std::string_view prefix, std::vector<std::string>& outPaths) const
+    {
+        std::shared_lock lock(_mountTableMutex);
+
+        outPaths.clear();
+        auto pathItr = std::lower_bound(_mountTable.virtualPathIndex.begin(), _mountTable.virtualPathIndex.end(), prefix);
+        for (; pathItr != _mountTable.virtualPathIndex.end() && pathItr->starts_with(prefix); ++pathItr)
+        {
+            outPaths.push_back(*pathItr);
+        }
+    }
+
+    void PactStorage::GetDirectoryEntries(std::string_view directory, std::vector<std::string>& outDirectories, std::vector<std::string>& outFiles) const
+    {
+        std::shared_lock lock(_mountTableMutex);
+
+        outDirectories.clear();
+        outFiles.clear();
+        auto directoryItr = _mountTable.virtualDirectoryIndex.find(std::string(directory));
+        if (directoryItr == _mountTable.virtualDirectoryIndex.end())
+            return;
+
+        outDirectories = directoryItr->second.directories;
+        outFiles = directoryItr->second.files;
+    }
+
     const std::string* PactStorage::GetFilePath(const u64 hash)
     {
         std::shared_lock lock(_mountTableMutex);
@@ -439,7 +704,8 @@ namespace PACT
         PactFileKey fileKey =
         {
             .type = static_cast<PactFileKey::Type>(record.source->manifest->header.sourceType),
-            .value = fileKeyValue
+            .value = fileKeyValue,
+            .generation = _mountTable.currentGeneration.load(std::memory_order_acquire)
         };
 
         PactFileHandle handle = CreateHandle(fileKey);
@@ -490,7 +756,8 @@ namespace PACT
         PactFileKey fileKey =
         {
             .type = static_cast<PactFileKey::Type>(record.source->manifest->header.sourceType),
-            .value = fileKeyValue
+            .value = fileKeyValue,
+            .generation = _mountTable.currentGeneration.load(std::memory_order_acquire)
         };
 
         PactResidentFile* residentFile = nullptr;
@@ -574,7 +841,7 @@ namespace PACT
         _mountTable.mountIDSet.reserve(64);
         _mountTable.mountIDSet.clear();
 
-        for (auto& [id, manifest] : _manifestTable.handleToManifest)
+        auto addMount = [this](PactManifest& manifest)
         {
             PactMount& mount = _mountTable.mounts.emplace_back();
 
@@ -583,6 +850,19 @@ namespace PACT
             mount.mountIndex = _mountTable.currentMountIndex++;
 
             _mountTable.mountIDSet.insert(mount.manifest->header.manifestID);
+        };
+
+        for (const PactManifestRef& manifestRef : _root.manifestRefs)
+        {
+            const auto manifestItr = _manifestTable.handleToManifest.find(manifestRef.manifestID);
+            if (manifestItr != _manifestTable.handleToManifest.end())
+                addMount(manifestItr->second);
+        }
+
+        for (auto& [id, manifest] : _manifestTable.handleToManifest)
+        {
+            if (!_mountTable.mountIDSet.contains(id))
+                addMount(manifest);
         }
 
         SortMountList();
@@ -607,6 +887,8 @@ namespace PACT
 
         _mountTable.fileIDTable.reserve(4096);
         _mountTable.fileIDTable.clear();
+        _mountTable.virtualPathIndex.clear();
+        _mountTable.virtualDirectoryIndex.clear();
 
         for (const PactMount& mount : _mountTable.mounts)
         {
@@ -644,6 +926,43 @@ namespace PACT
                     }
                 }
             }
+        }
+
+        _mountTable.virtualPathIndex.reserve(_mountTable.pathTable.size());
+        for (const auto& pathEntry : _mountTable.pathTable)
+        {
+            const PactFileRuntimeRecord& record = pathEntry.second;
+            if (record.entry && record.source && record.source->manifest)
+                _mountTable.virtualPathIndex.push_back(record.source->manifest->stringTable.GetString(record.entry->pathIndex));
+        }
+        std::sort(_mountTable.virtualPathIndex.begin(), _mountTable.virtualPathIndex.end());
+
+        _mountTable.virtualDirectoryIndex.reserve(_mountTable.virtualPathIndex.size() / 4 + 1);
+        _mountTable.virtualDirectoryIndex.try_emplace("");
+        for (const std::string& path : _mountTable.virtualPathIndex)
+        {
+            std::string parentDirectory;
+            size_t segmentStart = 0;
+            size_t separator = path.find('/');
+            while (separator != std::string::npos)
+            {
+                const std::string directory = path.substr(0, separator);
+                std::vector<std::string>& childDirectories = _mountTable.virtualDirectoryIndex[parentDirectory].directories;
+                if (childDirectories.empty() || childDirectories.back() != directory)
+                    childDirectories.push_back(directory);
+                _mountTable.virtualDirectoryIndex.try_emplace(directory);
+                parentDirectory = directory;
+                segmentStart = separator + 1;
+                separator = path.find('/', segmentStart);
+            }
+
+            _mountTable.virtualDirectoryIndex[parentDirectory].files.push_back(path);
+        }
+
+        for (auto& directoryEntry : _mountTable.virtualDirectoryIndex)
+        {
+            PactVirtualDirectory& directory = directoryEntry.second;
+            std::sort(directory.files.begin(), directory.files.end());
         }
     }
 
@@ -692,10 +1011,9 @@ namespace PACT
         manifest.header.flags = { .isOverlay = true };
         manifest.header.priority = priority;
         manifest.header.sourceType = PactSourceType::Loose;
-        manifest.header.entryCount = 0;
-        manifest.header.reserved = 0;
 
         manifest.stringTable.Clear();
+        manifest.chunks.clear();
         manifest.entries.clear();
         manifest.dataPath = absolutePath;
 
@@ -729,10 +1047,8 @@ namespace PACT
             manifestEntry.pathHash = XXHash64::hash(filePath.c_str(), filePath.length(), 0);
             manifestEntry.dataOffset = 0;
             manifestEntry.dataSize = 0;
-            manifestEntry.dataCompressedSize = 0;
         }
 
-        manifest.header.entryCount = static_cast<u32>(manifest.entries.size());
         return true;
     }
 

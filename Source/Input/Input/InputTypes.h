@@ -11,6 +11,14 @@ enum class InputDevice : u8
     MouseWheel
 };
 
+enum class PointerSource : u8
+{
+    None,
+    Mouse,
+    Pen,
+    Touch
+};
+
 enum class Key : u16
 {
     Unknown = 0,
@@ -302,10 +310,20 @@ public:
     InputControl control;
     InputPhase phase = InputPhase::None;
     InputModifier modifiers = InputModifier::None;
+    PointerSource pointerSource = PointerSource::None;
     vec2 position = vec2(0.0f);
     vec2 delta = vec2(0.0f);
     u32 codepoint = 0;
     bool focused = true;
+};
+
+struct PenState
+{
+public:
+    f32 pressure = 0.0f;
+    vec2 delta = vec2(0.0f);
+    bool inRange = false;
+    bool inContact = false;
 };
 
 struct InputContextHandle
