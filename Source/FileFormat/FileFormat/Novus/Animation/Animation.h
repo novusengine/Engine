@@ -609,6 +609,12 @@ namespace FileFormat::Animation
         std::vector<AnimatedBoundsSegment> segments;
     };
 
+    enum AnimationBoundsAssetFlags : u32
+    {
+        AnimationBoundsAssetFlags_None = 0,
+        AnimationBoundsAssetFlags_HasGlobalFallback = 1u << 0u
+    };
+
     // Bounds are binding-dependent: this asset belongs to one concrete Model and
     // Skeleton combination, not to a clip or skeleton in isolation.
     struct AnimationBoundsAsset

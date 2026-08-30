@@ -9,6 +9,7 @@ namespace Math
     constexpr f32 INV_TAU = 1.0f / TAU;
 
     f32 Sqrt(f32 in);
+    f32 Wrap(f32 value, f32 minimum, f32 maximum);
 
     constexpr f32 DegToRad(f32 deg)
     {

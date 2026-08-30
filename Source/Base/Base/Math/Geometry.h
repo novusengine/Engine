@@ -3,6 +3,8 @@
 
 namespace Geometry
 {
+    bool TryGetBarycentricCoordinates(const vec2& point, const vec2& a, const vec2& b, const vec2& c, vec3& coordinates, f32 degeneracyEpsilon = 1.0e-8f);
+
     struct Triangle
     {
     public:
