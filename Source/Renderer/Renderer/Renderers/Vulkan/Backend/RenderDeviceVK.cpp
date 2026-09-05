@@ -1417,8 +1417,11 @@ namespace Renderer
             submitInfo.commandBufferCount = 1;
             submitInfo.pCommandBuffers = &commandBuffer;
 
-            vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-            vkQueueWaitIdle(_graphicsQueue);
+            {
+                std::scoped_lock queueLock(_queueMutex);
+                vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+                vkQueueWaitIdle(_graphicsQueue);
+            }
 
             vkFreeCommandBuffers(_device, _graphicsCommandPool, 1, &commandBuffer);
         }

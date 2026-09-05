@@ -195,6 +195,7 @@ namespace Renderer
                 submitInfo.signalSemaphoreCount = static_cast<u32>(commandList.signalSemaphores.size());
                 submitInfo.pSignalSemaphores = commandList.signalSemaphores.data();
 
+                std::scoped_lock queueLock(_device->_queueMutex);
                 vkQueueSubmit(queue, 1, &submitInfo, fence);
             }
 

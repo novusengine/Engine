@@ -2194,6 +2194,7 @@ namespace Renderer
 
             {
                 ZoneScopedNC("Present::vkQueuePresentKHR", tracy::Color::Red);
+                std::scoped_lock queueLock(_device->_queueMutex);
                 result = vkQueuePresentKHR(_device->_presentQueue, &presentInfo);
             }
             

@@ -10,6 +10,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <vector>
+#include <mutex>
 #include <optional>
 
 namespace Novus
@@ -160,6 +161,7 @@ namespace Renderer
             VkQueue _graphicsQueue = VK_NULL_HANDLE;
             VkQueue _transferQueue = VK_NULL_HANDLE;
             VkQueue _presentQueue = VK_NULL_HANDLE;
+            std::mutex _queueMutex;
 
             bool _graphicsQueueSupportsTimestamps = false;
             f32 _timestampNanosecondsPerIncrement = 0.0f;
