@@ -114,7 +114,9 @@ namespace FileFormat::Animation
         SkeletonJointFlags_None = 0,
         SkeletonJointFlags_Deformation = 1u << 0,
         SkeletonJointFlags_Helper = 1u << 1,
-        SkeletonJointFlags_Extension = 1u << 2
+        SkeletonJointFlags_Extension = 1u << 2,
+        // Leaf-joint XY quads are expanded in the consuming view's camera plane.
+        SkeletonJointFlags_CameraFacing = 1u << 3
     };
 
     struct SkeletonJoint
@@ -137,6 +139,8 @@ namespace FileFormat::Animation
         u32 familyJointIndex = 0;
         LocalTransform skeletonToFamily;
         LocalTransform familyToSkeleton;
+        // Concrete bind posture relative to the family's canonical joint rotation.
+        quat familyReferenceRotation = quat(1.0f, 0.0f, 0.0f, 0.0f);
     };
 
     enum class SkeletonPropagationType : u8
@@ -647,7 +651,7 @@ namespace FileFormat::Animation
     static_assert(sizeof(mat4a) == 48);
     static_assert(sizeof(RigFamilyAsset) == 40);
     static_assert(sizeof(SkeletonJoint) == 120);
-    static_assert(sizeof(SkeletonFamilyBinding) == 104);
+    static_assert(sizeof(SkeletonFamilyBinding) == 120);
     static_assert(sizeof(SkeletonPropagationRule) == 64);
     static_assert(sizeof(SkeletonAttachment) == 64);
     static_assert(sizeof(HierarchyDepthRange) == 8);

@@ -307,14 +307,14 @@ TEST_CASE("Animation development ABI matches the independent NBS conformance fix
 
         std::shared_ptr<Bytebuffer> buffer = Bytebuffer::BorrowRuntime(asset.GetSerializedSize(data));
         REQUIRE(asset.Save(buffer, data));
-        REQUIRE(buffer->writtenData == 592);
-        CHECK(Fnv1a64(buffer->GetDataPointer(), buffer->writtenData) == 0xCF94CCA9D382C8D4ull);
+        REQUIRE(buffer->writtenData == 608);
+        CHECK(Fnv1a64(buffer->GetDataPointer(), buffer->writtenData) == 0x2D9D3DE2D430A244ull);
         CHECK(asset.jointsOffset == 80);
         CHECK(asset.familyBindingsOffset == 320);
-        CHECK(asset.propagationRulesOffset == 432);
-        CHECK(asset.hierarchyDepthRangesOffset == 496);
-        CHECK(asset.hierarchyDepthJointIndicesOffset == 512);
-        CHECK(asset.attachmentsOffset == 528);
+        CHECK(asset.propagationRulesOffset == 448);
+        CHECK(asset.hierarchyDepthRangesOffset == 512);
+        CHECK(asset.hierarchyDepthJointIndicesOffset == 528);
+        CHECK(asset.attachmentsOffset == 544);
         CHECK(std::all_of(buffer->GetDataPointer() + 72, buffer->GetDataPointer() + 80, [](u8 value) { return value == 0; }));
 
         SkeletonAsset loaded;
@@ -326,7 +326,7 @@ TEST_CASE("Animation development ABI matches the independent NBS conformance fix
         buffer->writtenData = sizeof(SkeletonAsset) - 1;
         buffer->readData = 0;
         REQUIRE_FALSE(SkeletonAsset::Read(buffer, loaded));
-        buffer->writtenData = 592;
+        buffer->writtenData = 608;
         auto* serialized = reinterpret_cast<SkeletonAsset*>(buffer->GetDataPointer());
         serialized->jointsOffset = 81;
         buffer->readData = 0;
