@@ -195,6 +195,27 @@ bool Parser::ReadMD21(const FileChunkHeader& header, std::shared_ptr<Bytebuffer>
             InitAnimationArray(buffer, textureTransform->scale, md21Offset);
         }
 
+        for (u32 i = 0; i < layout.md21.colors.size; i++)
+        {
+            M2Color* color = layout.md21.colors.GetElement(buffer, i);
+            InitAnimationArray(buffer, color->color, md21Offset);
+            InitAnimationArray(buffer, color->alpha, md21Offset);
+        }
+
+        for (u32 i = 0; i < layout.md21.attachments.size; i++)
+        {
+            M2Attachment* attachment = layout.md21.attachments.GetElement(buffer, i);
+            InitAnimationArray(buffer, attachment->isAnimated, md21Offset);
+        }
+
+        for (u32 i = 0; i < layout.md21.events.size; i++)
+        {
+            M2Event* event = layout.md21.events.GetElement(buffer, i);
+            event->enabled.timestamps.Init(md21Offset);
+            for (u32 channel = 0; channel < event->enabled.timestamps.size; channel++)
+                event->enabled.timestamps.GetElement(buffer, channel)->Init(md21Offset);
+        }
+
         for (u32 i = 0; i < layout.md21.textureWeights.size; i++)
         {
             M2TextureWeight* textureWeight = layout.md21.textureWeights.GetElement(buffer, i);
